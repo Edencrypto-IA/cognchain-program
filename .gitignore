@@ -2,4 +2,7 @@ node_modules/
 wallet.json
 memory-log.json
 .env
+.evn
 *.local
+users/
+agent-b.json

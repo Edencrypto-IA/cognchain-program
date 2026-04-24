@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node telegram-bot.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,6 +15,9 @@
     "@anthropic-ai/sdk": "^0.90.0",
     "@coral-xyz/anchor": "^0.29.0",
     "@solana/web3.js": "^1.98.4",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "form-data": "^4.0.5",
     "node-fetch": "^2.7.0",
     "node-telegram-bot-api": "^0.67.0"
