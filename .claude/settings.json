@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "congchain": {
+      "command": "bun",
+      "args": ["run", "mcp/server.ts"],
+      "cwd": "C:\\Users\\W10\\Desktop\\CONGCHAIN-project",
+      "env": {
+        "DATABASE_URL": "file:../db/dev.db"
+      }
+    }
+  }
+}

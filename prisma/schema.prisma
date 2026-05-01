@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Memory {
+  id         String        @id @default(cuid())
+  hash       String        @unique
+  content    String
+  model      String
+  timestamp  Int
+  parentHash String?
+  score      Float?
+  verified   Boolean       @default(false)
+  zkProof    String?
+  zkPublicSignals String?
+  zkVerified Boolean       @default(false)
+  zkMode     String?
+  zkProofVersion String?
+  zkHashAlgo String?
+  zkGeneratedAt Int?
+  poiTxHash  String?       // Solana TX quando PoI é atingido
+  createdAt  DateTime      @default(now())
+  children   Memory[]      @relation("MemoryTree")
+  parent     Memory?       @relation("MemoryTree", fields: [parentHash], references: [hash])
+  votes      InsightVote[]
+}
+
+// Proof of Insight — votos humanos que validam memórias AI
+model InsightVote {
+  id         String   @id @default(cuid())
+  memoryHash String
+  score      Int      // 1-10
+  voterIp    String   @default("anonymous")
+  createdAt  DateTime @default(now())
+  memory     Memory   @relation(fields: [memoryHash], references: [hash])
+}
+
+// ============================================================
+// Agent-to-Agent Economy — Task Marketplace
+// ============================================================
+
+model AgentTask {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  skill       String   @default("general") // analytical|creative|execution|general
+  solReward   Float    @default(0.01)
+  status      String   @default("open")    // open|assigned|completed|cancelled
+  posterId    String                        // Agent que postou
+  assigneeId  String?                       // Agent que pegou
+  result      String?                       // Output da execução
+  txHash      String?                       // Prova on-chain da conclusão
+  postedAt    DateTime @default(now())
+  completedAt DateTime?
+  poster      Agent    @relation("TasksPoster",   fields: [posterId],   references: [id], onDelete: Cascade)
+  assignee    Agent?   @relation("TasksAssignee", fields: [assigneeId], references: [id])
+}
+
+// ============================================================
+// Agent Builder — new models (EXTEND ONLY, no core changes)
+// ============================================================
+
+model Agent {
+  id               String           @id @default(cuid())
+  name             String
+  goal             String
+  personality      String           @default("friendly and helpful")
+  model            String           @default("gpt")
+  tools            String           @default("[]")
+  template         String?
+  systemPrompt     String?
+  isDeployed       Boolean          @default(false)
+  deployTarget     String?
+  deployConfig     String?
+  memoryCount      Int              @default(0)
+  totalInteractions Int             @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  rules            DecisionRule[]
+  decisions        DecisionRecord[]
+  tasksPosted      AgentTask[]      @relation("TasksPoster")
+  tasksAssigned    AgentTask[]      @relation("TasksAssignee")
+  solanaIntents    SolanaIntent[]
+}
+
+// ============================================================
+// API Keys — external agent authentication + billing foundation
+// ============================================================
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  keyHash        String    @unique   // SHA-256 of the raw key (never stored plain)
+  keyPrefix      String              // first 12 chars for display: "cog_live_ab12"
+  name           String              // "MiniMax Integration", "OpenClaw Agent"
+  owner          String              // email or wallet address
+  plan           String    @default("free")  // free | pro | enterprise
+  isActive       Boolean   @default(true)
+  requestsToday  Int       @default(0)
+  requestsTotal  Int       @default(0)
+  memoriesSaved  Int       @default(0)
+  tokensUsed     Int       @default(0)
+  lastUsedAt     DateTime?
+  rateResetAt    DateTime  @default(now())   // daily rate limit window
+  createdAt      DateTime  @default(now())
+
+  @@index([keyHash])
+}
+
+// ============================================================
+// Response Cache — zero-API-cost answers for repeated questions
+// ============================================================
+
+model ResponseCache {
+  id           String    @id @default(cuid())
+  questionHash String    @unique   // SHA-256 of normalized question
+  fuzzyHash    String?             // hash of first 6 significant words (loose match)
+  question     String             // original question (for display/debug)
+  answer       String             // cached response
+  model        String             // which model generated it
+  hits         Int       @default(0)
+  tokensSaved  Int       @default(0)
+  seeded       Boolean   @default(false) // true = pre-seeded FAQ, never expires
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime?           // null = permanent
+
+  @@index([fuzzyHash])
+}
+
+// ============================================================
+// Solana Intent Queue — human-confirmed transaction pipeline
+// ============================================================
+
+model SolanaIntent {
+  id          String    @id @default(cuid())
+  agentId     String
+  type        String    // "swap" | "transfer"
+  description String    // AI explanation of why
+  fromToken   String    // "SOL" or mint address
+  toToken     String?   // target token (swap only)
+  amount      Float     // in SOL
+  amountUsd   Float?    // estimated USD value
+  simulation  String?   // JSON: { success, fee, logs, error }
+  status      String    @default("pending") // pending|approved|rejected|executed|expired|failed
+  txHash      String?
+  error       String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  executedAt  DateTime?
+  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, status])
+}
+
+model DecisionRule {
+  id            String   @id @default(cuid())
+  agentId       String
+  name          String
+  condition     String   @default("{}") // JSON: {"type":"memory_contains","value":"Arweave"}
+  action        String   @default("notify") // tool name to execute
+  params        String   @default("{}") // JSON params for the action
+  isActive      Boolean  @default(true)
+  lastTriggered Int?
+  triggerCount  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  decisions     DecisionRecord[]
+  agent         Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model DecisionRecord {
+  id        String   @id @default(cuid())
+  agentId   String
+  ruleId    String
+  condition String
+  action    String
+  result    String   @default("pending") // "success" | "failure" | "pending"
+  evidence  String?  // memory hash that triggered the decision
+  output    String?  // result output from tool execution
+  txHash    String?  // blockchain proof of decision
+  timestamp Int
+  createdAt DateTime @default(now())
+  rule      DecisionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  agent     Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}

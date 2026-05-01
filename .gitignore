@@ -1,0 +1,53 @@
+# ============================================================
+# CONGCHAIN — .gitignore
+# ============================================================
+
+# ── Environment & Secrets (NEVER commit) ────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Database ─────────────────────────────────────────────────
+db/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# ── Next.js ──────────────────────────────────────────────────
+.next/
+out/
+build/
+
+# ── Dependencies ─────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Prisma generated ─────────────────────────────────────────
+prisma/migrations/
+
+# ── ZK / Circom build artifacts ──────────────────────────────
+zk/build/
+zk/*.r1cs
+zk/*.wasm
+zk/*.zkey
+zk/*.ptau
+
+# ── OS & Editor ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── TypeScript ───────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Misc ─────────────────────────────────────────────────────
+.turbo/
+coverage/
+*.pem
