@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "bun .next/standalone/server.js",
+    "build": "next build",
+    "start": "node .next/standalone/server.js",
+    "railway:build": "prisma generate && prisma db push && next build",
     "lint": "eslint .",
     "zk:setup": "node zk/scripts/setup.mjs",
     "zk:compile": "circom zk/circuits/memory_hash.circom --r1cs --wasm --sym -o zk-build",
