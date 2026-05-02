@@ -139,6 +139,7 @@ async function fileExists(target: string): Promise<boolean> {
 
 export async function buildRealSnarkBundle(witness: ZkMvpWitness): Promise<ZkMvpBundle> {
   validateWitnessLimits(witness);
+  // @ts-ignore — snarkjs has no @types package
   const snarkjs = await import('snarkjs');
   const artifacts = getArtifactPaths();
 
@@ -196,6 +197,7 @@ export async function verifyZkBundle(bundle: ZkMvpBundle): Promise<boolean> {
     return verifySimulatedBundle(bundle);
   }
 
+  // @ts-ignore — snarkjs has no @types package
   const snarkjs = await import('snarkjs');
   const artifacts = getArtifactPaths();
   const hasVKey = await fileExists(artifacts.vkey);
