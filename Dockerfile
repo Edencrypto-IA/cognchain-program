@@ -8,14 +8,13 @@ RUN apt-get update && apt-get install -y openssl curl python3 make g++ unzip && 
 
 WORKDIR /app
 
-# Cache bust — increment to force fresh bun install (used after Next.js downgrade)
-ARG CACHEBUST=2
+# Copy ONLY package.json — NOT bun.lock — so bun resolves Next.js 15 fresh
+COPY package.json ./
 
-# Install dependencies (no frozen-lockfile — Next.js version changed)
-COPY package.json bun.lock ./
-RUN bun install --ignore-scripts
+# Fresh install without lock file — picks up ~15.3.3 from package.json
+RUN bun install --ignore-scripts --no-cache
 
-# Copy source
+# Copy rest of source
 COPY . .
 
 # Generate Prisma client
