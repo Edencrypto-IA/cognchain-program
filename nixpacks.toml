@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "bun", "openssl"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["bun run build"]
+
+[start]
+cmd = "npx prisma generate && npx prisma db push && node server.js"
