@@ -1,7 +1,7 @@
 FROM node:20-slim
 
 # Install bun + openssl
-RUN apt-get update && apt-get install -y openssl curl python3 make g++ && \
+RUN apt-get update && apt-get install -y openssl curl python3 make g++ unzip && \
     curl -fsSL https://bun.sh/install | bash && \
     ln -s /root/.bun/bin/bun /usr/local/bin/bun && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
