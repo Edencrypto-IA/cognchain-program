@@ -138,16 +138,18 @@ export async function cacheResponse(
 
 export async function getCacheStats() {
   const [total, seeded, topHits] = await Promise.all([
-    db.responseCache.aggregate({ _sum: { hits: 1, tokensSaved: 1 }, _count: true }),
+    db.responseCache.aggregate({ _sum: { hits: true, tokensSaved: true }, _count: { id: true } }),
     db.responseCache.count({ where: { seeded: true } }),
     db.responseCache.findMany({ orderBy: { hits: 'desc' }, take: 5, select: { question: true, hits: true, tokensSaved: true, model: true } }),
   ]);
+  const sumHits = total._sum?.hits ?? 0;
+  const sumTokens = total._sum?.tokensSaved ?? 0;
   return {
-    totalEntries:  total._count,
+    totalEntries:  total._count.id,
     seededEntries: seeded,
-    totalHits:     total._sum.hits     ?? 0,
-    totalTokensSaved: total._sum.tokensSaved ?? 0,
-    estimatedSavingsUSD: ((total._sum.tokensSaved ?? 0) * 0.0000027).toFixed(4),
+    totalHits:     sumHits,
+    totalTokensSaved: sumTokens,
+    estimatedSavingsUSD: (sumTokens * 0.0000027).toFixed(4),
     topQuestions:  topHits,
   };
 }
