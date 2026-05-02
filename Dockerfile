@@ -8,7 +8,10 @@ RUN apt-get update && apt-get install -y openssl curl python3 make g++ unzip && 
 
 WORKDIR /app
 
-# Install dependencies
+# Cache bust — increment to force fresh bun install (used after Next.js downgrade)
+ARG CACHEBUST=2
+
+# Install dependencies (no frozen-lockfile — Next.js version changed)
 COPY package.json bun.lock ./
 RUN bun install --ignore-scripts
 
