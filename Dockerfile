@@ -17,7 +17,10 @@ RUN bun install --ignore-scripts --no-cache
 # Copy rest of source
 COPY . .
 
-# Generate Prisma client
+# DATABASE_URL placeholder for build time — real value injected at runtime
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+
+# Generate Prisma client (only needs schema, not a real DB connection)
 RUN bun x prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -26,4 +29,5 @@ RUN ./node_modules/.bin/next build
 EXPOSE 3000
 ENV PORT=3000
 
+# Clear placeholder — Railway injects the real DATABASE_URL at runtime
 CMD ["sh", "-c", "bun x prisma db push && node server.js"]
