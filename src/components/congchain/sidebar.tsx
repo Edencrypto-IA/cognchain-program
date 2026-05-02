@@ -12,6 +12,7 @@ import {
   Bot,
   RefreshCw,
   Sparkles,
+  Brain,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -162,6 +163,24 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
               </div>
               <span className="text-sm font-medium text-white/60 group-hover:text-white/90 transition-colors">
                 API Keys
+              </span>
+            </a>
+          </div>
+
+          {/* Memory Brain Link */}
+          <div className="px-3 pb-1">
+            <a
+              href="/brain"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                bg-white/[0.03] border border-white/[0.06]
+                hover:bg-white/[0.06] hover:border-[#9945FF]/30
+                transition-all duration-200 group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-[#9945FF]/10 border border-[#9945FF]/20 flex items-center justify-center">
+                <Brain className="w-4 h-4 text-[#9945FF]" />
+              </div>
+              <span className="text-sm font-medium text-white/60 group-hover:text-white/90 transition-colors">
+                Memory Brain
               </span>
             </a>
           </div>
