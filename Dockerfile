@@ -20,11 +20,7 @@ RUN bun x prisma generate
 
 # Build Next.js with webpack (not Turbopack)
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV TURBOPACK=0
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV TURBOPACK=0
-ENV NEXT_BUILD_TURBOPACK=0
-RUN ./node_modules/.bin/next build
+RUN ./node_modules/.bin/next build --no-turbopack
 
 EXPOSE 3000
 ENV PORT=3000

@@ -3,10 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // output: "standalone", // disabled for Railway — uses custom server.js
   reactStrictMode: true,
-  experimental: {
-    // @ts-expect-error — disable Turbopack for production builds
-    turbopack: false,
-  },
   // Railway / production headers
   async headers() {
     return [
