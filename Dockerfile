@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --ignore-scripts
+RUN bun install --ignore-scripts
 
 # Copy source
 COPY . .
@@ -18,9 +18,8 @@ COPY . .
 # Generate Prisma client
 RUN bun x prisma generate
 
-# Build Next.js with webpack (not Turbopack)
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN ./node_modules/.bin/next build --no-turbopack
+RUN ./node_modules/.bin/next build
 
 EXPOSE 3000
 ENV PORT=3000
