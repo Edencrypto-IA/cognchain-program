@@ -24,7 +24,7 @@
 
 <br/>
 
-[🔭 Explorer](https://explorer.solana.com/address/BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL?cluster=devnet) · [📄 Whitepaper](mailto:hello@cognchain.xyz?subject=CognChain%20Whitepaper%20Request) · [🌐 Website](https://cognchain.xyz) · [✉️ Contact](mailto:hello@cognchain.xyz)
+[🔭 Explorer](https://explorer.solana.com/address/BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL?cluster=devnet) · [📄 Whitepaper](https://htmlpreview.github.io/?https://github.com/Edencrypto-IA/cognchain-program/blob/main/CognChain_Solana_V11.html) · [🌐 Website](https://cognchain.xyz) · [✉️ Contact](mailto:hello@cognchain.xyz)
 
 </div>
 
