@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_20", "bun", "openssl"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["bun install --frozen-lockfile"]
 
 [phases.build]
 cmds = ["bun run build"]
