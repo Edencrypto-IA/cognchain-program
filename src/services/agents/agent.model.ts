@@ -2,7 +2,7 @@
 // Agent Builder — Type definitions
 // ============================================================
 
-export type AgentTemplate = 'trading' | 'research' | 'support';
+export type AgentTemplate = 'trading' | 'research' | 'support' | 'solana-sage';
 
 export type DeployTarget = 'telegram' | 'whatsapp';
 
