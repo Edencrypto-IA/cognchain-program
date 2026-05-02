@@ -7,5 +7,8 @@ cmds = ["bun install --frozen-lockfile --ignore-scripts"]
 [phases.build]
 cmds = ["bun x prisma generate", "bun run build"]
 
+[variables]
+NEXT_TELEMETRY_DISABLED = "1"
+
 [start]
 cmd = "bun x prisma db push && node server.js"
