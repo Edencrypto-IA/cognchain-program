@@ -1,8 +1,5 @@
 'use client';
 
-// Wallet adapter CSS — imported at runtime to avoid Turbopack NftJsonAsset build error
-import '@solana/wallet-adapter-react-ui/styles.css';
-
 import { useMemo } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
