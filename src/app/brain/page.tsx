@@ -30,7 +30,7 @@ interface GraphNode {
   score: number; verified: boolean; zkVerified: boolean; onChain: boolean; hash: string;
   x: number; y: number; vx: number; vy: number;
 }
-interface GraphLink { source: string; target: string; }
+interface GraphLink { source: string; target: string; type?: string; }
 interface RawData { nodes: Omit<GraphNode, 'x'|'y'|'vx'|'vy'>[]; links: GraphLink[]; }
 
 const REPULSION = 8000;
@@ -90,7 +90,7 @@ export default function BrainPage() {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, byModel: {} as Record<string, number> });
-  const [rawData, setRawData] = useState<RawData>({ nodes: [], links: [] });
+  const [, setRawData] = useState<RawData>({ nodes: [], links: [] });
 
   useEffect(() => {
     fetch('/api/memory/graph')
@@ -144,9 +144,17 @@ export default function BrainPage() {
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(t.x, t.y);
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      ctx.lineWidth = 1 / scale;
+      if (l.type === 'chain') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 2 / scale;
+        ctx.setLineDash([]);
+      } else {
+        ctx.strokeStyle = 'rgba(153,69,255,0.3)';
+        ctx.lineWidth = 1 / scale;
+        ctx.setLineDash([6 / scale, 4 / scale]);
+      }
       ctx.stroke();
+      ctx.setLineDash([]);
       // Arrow
       const angle = Math.atan2(t.y - s.y, t.x - s.x);
       const r = Math.max(4, (t.score ?? 0) * 0.8 + 5) + 2;
