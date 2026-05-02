@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs_20", "bun", "openssl", "python3", "gcc", "gnumake"]
 
 [phases.install]
-cmds = ["bun install --frozen-lockfile"]
+cmds = ["bun install --frozen-lockfile --ignore-scripts"]
 
 [phases.build]
-cmds = ["bun run build"]
+cmds = ["bun x prisma generate", "bun run build"]
 
 [start]
-cmd = "npx prisma generate && npx prisma db push && node server.js"
+cmd = "bun x prisma db push && node server.js"
