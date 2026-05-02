@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_20", "bun", "openssl", "python3", "gcc", "gnumake"]
 cmds = ["bun install --frozen-lockfile --ignore-scripts"]
 
 [phases.build]
-cmds = ["bun x prisma generate", "bun run build"]
+cmds = ["bun x prisma generate", "bun x next build --no-turbopack"]
 
 [variables]
 NEXT_TELEMETRY_DISABLED = "1"
