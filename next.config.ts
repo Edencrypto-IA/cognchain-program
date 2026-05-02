@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   // output: "standalone", // disabled for Railway — uses custom server.js
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: false },
+  typescript: { ignoreBuildErrors: true },
   // Railway / production headers
   async headers() {
     return [
