@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
       // ── External agent — must have valid API key ──────────
       const auth = await requireApiKey(request);
       if ('error' in auth) {
-        return NextResponse.json({ error: auth.error }, { status: auth.status });
+        const e = auth as { error: string; status: number };
+        return NextResponse.json({ error: e.error }, { status: e.status });
       }
       // External agents use their own AI keys via the same router,
       // but their usage is tracked against our budget — warn them clearly.

@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
     if (hasApiKey) {
       const auth = await requireApiKey(request);
       if ('error' in auth) {
-        return NextResponse.json({ error: auth.error }, { status: auth.status });
+        const e = auth as { error: string; status: number };
+        return NextResponse.json({ error: e.error }, { status: e.status });
       }
       // Check memory-per-day limit
       const limits = PLAN_LIMITS[auth.key.plan] ?? PLAN_LIMITS.free;
