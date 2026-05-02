@@ -33,11 +33,12 @@ interface GraphNode {
 interface GraphLink { source: string; target: string; }
 interface RawData { nodes: Omit<GraphNode, 'x'|'y'|'vx'|'vy'>[]; links: GraphLink[]; }
 
-const REPULSION = 4000;
-const SPRING_LEN = 120;
-const SPRING_K = 0.04;
-const DAMPING = 0.85;
+const REPULSION = 8000;
+const SPRING_LEN = 160;
+const SPRING_K = 0.03;
+const DAMPING = 0.82;
 const ITERATIONS_PER_FRAME = 3;
+const NODE_MIN_R = 12;
 
 function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
   const idxMap = new Map(nodes.map((n, i) => [n.id, i]));
@@ -100,7 +101,7 @@ export default function BrainPage() {
           const k = modelKey(n.model);
           byModel[k] = (byModel[k] ?? 0) + 1;
           const angle = (i / data.nodes.length) * 2 * Math.PI;
-          const radius = 200 + Math.random() * 100;
+          const radius = 80 + Math.random() * 60;
           return { ...n, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, vx: 0, vy: 0 };
         });
         nodesRef.current = nodes;
@@ -164,7 +165,7 @@ export default function BrainPage() {
     for (const n of nodes) {
       if (filteredIds && !filteredIds.has(n.id)) continue;
       const color = modelColor(n.model);
-      const r = Math.max(4, (n.score ?? 0) * 0.8 + 5);
+      const r = Math.max(NODE_MIN_R, (n.score ?? 0) * 0.8 + NODE_MIN_R);
       const isSelected = selected?.id === n.id;
 
       if (n.onChain || n.verified) {
@@ -234,7 +235,7 @@ export default function BrainPage() {
     const filteredIds = getFilteredIds();
     for (const n of nodesRef.current) {
       if (filteredIds && !filteredIds.has(n.id)) continue;
-      const r = Math.max(4, (n.score ?? 0) * 0.8 + 5) + 4;
+      const r = Math.max(NODE_MIN_R, (n.score ?? 0) * 0.8 + NODE_MIN_R) + 4;
       if ((n.x - wx) ** 2 + (n.y - wy) ** 2 <= r * r) return n;
     }
     return null;
