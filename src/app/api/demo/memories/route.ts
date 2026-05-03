@@ -13,66 +13,33 @@ function buildHash(content: string, model: string, ts: number) {
 const HACKATHON_CHAIN = [
   {
     model: 'nvidia',
-    prompt: `You are the first node in a verifiable AI memory chain anchored on Solana blockchain.
-
-Describe in 3 powerful sentences THE PROBLEM you solve:
-- Every AI session ends and insights vanish forever into vendor silos
-- No AI agent can prove what it learned, when, or from whom
-- Brilliant cross-model research chains are lost — GPT-4o analyzes, Claude deepens, DeepSeek plans — but none of it persists verifiably
-
-Be direct, technical, and impactful. This will be read by Solana hackathon judges.`,
+    prompt: `In 2 sentences, describe the core problem CognChain solves: AI sessions end and insights vanish into vendor silos — no agent can prove what it learned, when, or from whom. Be direct and impactful for hackathon judges.`,
   },
   {
     model: 'glm',
-    prompt: (prev: string) => `You are the second node in a verifiable AI memory chain on Solana.
-
-Previous memory (NVIDIA Llama — The Problem):
-"${prev.slice(0, 300)}"
-
-Now articulate THE SOLUTION in 3 sentences:
-- CognChain crystallizes high-value AI outputs into compact, hash-committed memory records
-- Each record is anchored permanently on Solana via Anchor program with ZK proof (Groth16)
-- Users own their vault. Agents earn verifiable reputation. Memory becomes portable across any AI model.
-
-Why Solana specifically: 400ms finality, $0.00025 per transaction, 65,000 TPS — the only chain fast and cheap enough for real-time AI memory anchoring at scale.`,
+    prompt: (prev: string) => `Context: "${prev.slice(0, 150)}" — In 2 sentences, explain CognChain's solution: hash-committed memory records anchored on Solana via Anchor + Groth16 ZK proof. User owns vault. Memory portable across any AI model.`,
   },
   {
     model: 'minimax',
-    prompt: (prev: string) => `You are the third node in a verifiable AI memory chain on Solana.
-
-Chain context so far:
-"${prev.slice(0, 300)}"
-
-Now explain THE SOLANA ADVANTAGE over other blockchains for AI memory in 3 sentences:
-- Ethereum L1: $15–50 per transaction, 12s finality — unusable for per-session AI memory
-- Ethereum L2s: still centralized sequencers, no native ZK settlement, 2–7s latency
-- Solana: sub-second finality, $0.00025/tx, Anchor framework with native ZK-ready accounts, Helius premium RPC — built for machine-speed transactions at AI scale
-
-The AI memory economy requires thousands of micro-transactions per day. Only Solana makes this economically viable.`,
+    prompt: (prev: string) => `Context: "${prev.slice(0, 150)}" — In 2 sentences, explain why Solana beats Ethereum for AI memory: 400ms finality, $0.00025/tx vs $15-50 on ETH, 65k TPS — the only chain fast and cheap enough for real-time AI memory at scale.`,
   },
   {
     model: 'qwen',
-    prompt: (prev: string) => `You are the fourth and final node in a verifiable AI memory chain on Solana — the synthesis node.
-
-Full chain context:
-"${prev.slice(0, 400)}"
-
-Now paint THE VISION in 3 sentences — what CognChain unlocks for the future:
-- AI agents that inherit memories from previous sessions, building genuine long-term expertise verifiable by any third party
-- A trustless agent economy where GPT-4o, Claude, DeepSeek, and Gemini collaborate on research chains — each contribution hashed, scored, and anchored — creating the first verifiable record of machine intelligence evolution
-- The cognitive layer missing from Web3: not just DeFi and NFTs, but permanent, portable, provable AI cognition — owned by users, trusted by any agent, recorded forever on Solana
-
-This is CognChain. The verifiable memory layer for AI. Built on Solana.`,
+    prompt: (prev: string) => `Context: "${prev.slice(0, 150)}" — In 2 sentences, paint the vision: AI agents inheriting verified memories, a trustless cross-model research economy, permanent provable cognition on Solana. This is CognChain.`,
   },
 ];
 
 export async function POST() {
-  // Clear old demo memories and recreate
-  await db.memory.deleteMany({
-    where: {
-      model: { in: ['nvidia', 'glm', 'minimax', 'qwen'] },
-    },
-  });
+  // Skip if chain already complete
+  const existing = await db.memory.count({ where: { model: { in: ['nvidia', 'glm', 'minimax', 'qwen'] } } });
+  if (existing >= 4) {
+    return NextResponse.json({ message: 'Chain already complete', skipped: true, existing });
+  }
+
+  // Only delete if we have a partial chain (to restart clean)
+  if (existing > 0 && existing < 4) {
+    await db.memory.deleteMany({ where: { model: { in: ['nvidia', 'glm', 'minimax', 'qwen'] } } });
+  }
 
   const now = Math.floor(Date.now() / 1000);
   let parentHash: string | null = null;
