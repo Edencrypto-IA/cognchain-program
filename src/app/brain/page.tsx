@@ -9,6 +9,9 @@ const MODEL_COLORS: Record<string, string> = {
   nvidia:   '#76B900',
   gemini:   '#4285F4',
   deepseek: '#FF6B35',
+  glm:      '#00D1FF',
+  minimax:  '#FF6B9D',
+  qwen:     '#A855F7',
 };
 
 const MODEL_LABELS: Record<string, string> = {
@@ -17,6 +20,9 @@ const MODEL_LABELS: Record<string, string> = {
   nvidia:   'NVIDIA',
   gemini:   'Gemini',
   deepseek: 'DeepSeek',
+  glm:      'GLM-4.7',
+  minimax:  'MiniMax',
+  qwen:     'Qwen3',
 };
 
 function modelKey(model: string) {
@@ -33,11 +39,11 @@ interface GraphNode {
 interface GraphLink { source: string; target: string; type?: string; }
 interface RawData { nodes: Omit<GraphNode, 'x'|'y'|'vx'|'vy'>[]; links: GraphLink[]; }
 
-const REPULSION = 8000;
-const SPRING_LEN = 160;
-const SPRING_K = 0.03;
-const DAMPING = 0.82;
-const ITERATIONS_PER_FRAME = 3;
+const REPULSION = 18000;
+const SPRING_LEN = 200;
+const SPRING_K = 0.015;
+const DAMPING = 0.78;
+const ITERATIONS_PER_FRAME = 4;
 const NODE_MIN_R = 12;
 
 function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
@@ -101,8 +107,8 @@ export default function BrainPage() {
         const nodes: GraphNode[] = data.nodes.map((n, i) => {
           const k = modelKey(n.model);
           byModel[k] = (byModel[k] ?? 0) + 1;
-          const angle = (i / data.nodes.length) * 2 * Math.PI;
-          const radius = 80 + Math.random() * 60;
+          const angle = (i / data.nodes.length) * 2 * Math.PI + (Math.random() - 0.5) * 0.8;
+          const radius = 150 + Math.random() * 120;
           return { ...n, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, vx: 0, vy: 0 };
         });
         nodesRef.current = nodes;
@@ -329,7 +335,9 @@ export default function BrainPage() {
                 const k = Object.keys(MODEL_COLORS).find(k => n.model.toLowerCase().includes(k)) ?? 'other';
                 byModel[k] = (byModel[k] ?? 0) + 1;
                 const angle = (i / data.nodes.length) * 2 * Math.PI;
-                return { ...n, x: Math.cos(angle) * 80, y: Math.sin(angle) * 80, vx: 0, vy: 0 };
+                const a = (i / data.nodes.length) * 2 * Math.PI + (Math.random() - 0.5) * 0.8;
+                const rad = 150 + Math.random() * 120;
+                return { ...n, x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20 };
               });
               nodesRef.current = nodes;
               linksRef.current = data.links;
