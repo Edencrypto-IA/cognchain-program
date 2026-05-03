@@ -1329,6 +1329,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   }]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [hashInput, setHashInput] = useState('');
+  const [hashLoading, setHashLoading] = useState(false);
+  const [hashError, setHashError] = useState('');
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [selectedModel, setSelectedModel] = useState<AIModel>('nvidia');
   const [previousModel, setPreviousModel] = useState<string>('gpt');
@@ -2056,11 +2059,41 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               </div>
               {/* Memory hash loader */}
               <div className="w-full max-w-md mb-6">
-                <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2.5">
-                  <Hash className="w-4 h-4 text-[#14F195]/40" />
-                  <input type="text" placeholder="Load a memory hash..." readOnly
-                    className="flex-1 bg-transparent text-sm text-white/30 placeholder-white/20 outline-none font-mono" />
-                  <span className="text-[10px] text-white/20">coming soon</span>
+                <div className={`flex items-center gap-2 bg-white/[0.03] border rounded-xl px-4 py-2.5 transition-all ${hashError ? 'border-red-500/40' : hashLoading ? 'border-[#9945FF]/40' : 'border-white/[0.06] focus-within:border-[#14F195]/40'}`}>
+                  <Hash className={`w-4 h-4 flex-shrink-0 ${hashLoading ? 'text-[#9945FF] animate-pulse' : 'text-[#14F195]/40'}`} />
+                  <input
+                    type="text"
+                    placeholder="Cole um hash de memória para continuar..."
+                    value={hashInput}
+                    onChange={e => { setHashInput(e.target.value); setHashError(''); }}
+                    onKeyDown={async e => {
+                      if (e.key !== 'Enter' || !hashInput.trim() || hashLoading) return;
+                      setHashLoading(true); setHashError('');
+                      try {
+                        const r = await fetch(`/api/memory/${hashInput.trim()}`);
+                        if (!r.ok) throw new Error('Hash não encontrado');
+                        const data = await r.json();
+                        const mem = data.memory;
+                        if (!mem) throw new Error('Memória inválida');
+                        const ctx = `⚡ Memória Verificada · CognChain on Solana\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nHash: ${mem.hash}\nModelo: ${mem.model} · Score: ${mem.score ?? '—'}/10\nStatus: ${mem.verified ? '✓ Verificado' : 'Pendente'}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${mem.content}`;
+                        setMessages([{ role: 'assistant', content: ctx }]);
+                        setHashInput('');
+                        setInputValue('Continue e aprofunde esta memória verificada:');
+                      } catch (err) {
+                        setHashError(err instanceof Error ? err.message : 'Erro ao carregar');
+                      } finally {
+                        setHashLoading(false);
+                      }
+                    }}
+                    className="flex-1 bg-transparent text-sm text-white/70 placeholder-white/20 outline-none font-mono"
+                  />
+                  {hashLoading
+                    ? <span className="text-[10px] text-[#9945FF]/60">carregando...</span>
+                    : hashError
+                      ? <span className="text-[10px] text-red-400/70">{hashError}</span>
+                      : hashInput
+                        ? <span className="text-[10px] text-white/20">↵ Enter</span>
+                        : <span className="text-[10px] text-white/20">↵ Enter</span>}
                 </div>
               </div>
               {/* Quick action cards */}
