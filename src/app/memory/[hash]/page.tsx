@@ -15,6 +15,7 @@ export default function MemoryPage() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [chainError, setChainError] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!hash) return;
@@ -196,7 +197,17 @@ export default function MemoryPage() {
                       <code className="text-[10px] text-[#14F195]/50 font-mono">{shortHash(entry.hash)}</code>
                       <span className="text-[10px] text-white/20">{(MODEL_LABELS as Record<string, string>)[entry.model] || entry.model}</span>
                     </div>
-                    <p className="text-xs text-white/50 line-clamp-2">{entry.content}</p>
+                    <p className={`text-xs text-white/50 ${expanded[entry.hash] ? '' : 'line-clamp-2'}`}>
+                      {entry.content}
+                    </p>
+                    {entry.content.length > 120 && (
+                      <button
+                        onClick={() => setExpanded(e => ({ ...e, [entry.hash]: !e[entry.hash] }))}
+                        className="mt-1.5 text-[10px] text-[#9945FF]/70 hover:text-[#9945FF] transition-colors"
+                      >
+                        {expanded[entry.hash] ? '▲ Ver menos' : '▼ Ver memória completa'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
