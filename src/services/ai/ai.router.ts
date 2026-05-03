@@ -177,6 +177,36 @@ class GLMHandler implements AIHandler {
   }
 }
 
+// ── MiniMax M2.7 via NVIDIA NIM (free endpoint) ─────────────
+class MiniMaxHandler implements AIHandler {
+  name = 'MiniMax M2.7';
+  model = 'minimax';
+
+  async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
+    const client = new OpenAI({
+      apiKey: process.env.NVIDIA_MINIMAX_KEY,
+      baseURL: 'https://integrate.api.nvidia.com/v1',
+    });
+    const systemPrompt = systemPromptOverride ||
+      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma precisa e eficiente.';
+
+    const response = await client.chat.completions.create({
+      model: 'minimaxai/minimax-m2.7',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ],
+      max_tokens: getMaxTokens('minimax'),
+      temperature: 0.7,
+      top_p: 0.95,
+    });
+
+    const content = response.choices[0]?.message?.content || 'Sem resposta do MiniMax.';
+    trackUsage('minimax', response.usage?.prompt_tokens ?? estimateTokens(systemPrompt), response.usage?.completion_tokens ?? estimateTokens(content));
+    return content;
+  }
+}
+
 // ── Handlers singleton ───────────────────────────────────────
 const handlers: Record<string, AIHandler> = {
   gpt:      new GPTHandler(),
@@ -185,6 +215,7 @@ const handlers: Record<string, AIHandler> = {
   gemini:   new GeminiHandler(),
   deepseek: new DeepSeekHandler(),
   glm:      new GLMHandler(),
+  minimax:  new MiniMaxHandler(),
 };
 
 export function getHandler(model: string): AIHandler {
