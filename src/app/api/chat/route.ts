@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { routeChat } from '@/services/ai';
 import { saveMemory, chunkContent } from '@/services/memory';
-import { checkRateLimit, validateModel, Limits, safeErrorMessage } from '@/lib/security';
+import { checkRateLimit, validateModel, Limits, safeErrorMessage, MODEL_TIER } from '@/lib/security';
 import { getCachedResponse, cacheResponse, seedFAQCache } from '@/services/cache/response-cache';
 import { extractRawKey, requireApiKey } from '@/lib/api-key-auth';
 
@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
   try {
     const hasApiKey = !!extractRawKey(request);
 
+    let userPlan: 'free' | 'pro' = 'free';
+
     if (hasApiKey) {
       // ── External agent — must have valid API key ──────────
       const auth = await requireApiKey(request);
@@ -24,9 +26,7 @@ export async function POST(request: NextRequest) {
         const e = auth as { error: string; status: number };
         return NextResponse.json({ error: e.error }, { status: e.status });
       }
-      // External agents use their own AI keys via the same router,
-      // but their usage is tracked against our budget — warn them clearly.
-      // Future: allow agents to pass their own AI key in headers.
+      userPlan = (auth.key.plan === 'pro' || auth.key.plan === 'enterprise') ? 'pro' : 'free';
     } else {
       // ── Internal app — IP rate limiting ──────────────────
       const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
@@ -36,6 +36,14 @@ export async function POST(request: NextRequest) {
           { error: 'Rate limit exceeded. Please slow down.' },
           { status: 429, headers: { 'Retry-After': String(Math.ceil((rate.resetAt - Date.now()) / 1000)) } }
         );
+      }
+      // Check for pro key passed in body (browser users who have a pro key)
+      const bodyPeek = await request.clone().json().catch(() => ({}));
+      const inlineKey = bodyPeek?.proKey as string | undefined;
+      if (inlineKey?.startsWith('cog_')) {
+        const { validateApiKey } = await import('@/services/api-keys/api-key.service');
+        const key = await validateApiKey(inlineKey).catch(() => null);
+        if (key && (key.plan === 'pro' || key.plan === 'enterprise')) userPlan = 'pro';
       }
     }
 
@@ -67,7 +75,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate model
-    const selectedModel = validateModel(model || 'gpt');
+    const selectedModel = validateModel(model || 'nvidia');
+
+    // ── Tier enforcement ──────────────────────────────────────
+    if (MODEL_TIER(selectedModel) === 'pro' && userPlan === 'free') {
+      return NextResponse.json({
+        error: 'PRO_REQUIRED',
+        message: 'Este modelo requer o plano Pro. Acesse /dashboard/keys para obter sua chave Pro por $5/mês.',
+        upgradeUrl: '/dashboard/keys',
+        model: selectedModel,
+      }, { status: 402 });
+    }
 
     // Validate previousModel if provided
     if (previousModel) {

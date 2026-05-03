@@ -1219,27 +1219,86 @@ function EvolutionTimeline({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 }
 
 // ============================================================
-// Model Selector
-// ============================================================
-function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIModel; onModelChange: (model: AIModel) => void }) {
-  const models: { key: AIModel; name: string; color: string }[] = [
-    { key: 'gpt',      name: 'GPT-4o',       color: '#10b981' },
-    { key: 'claude',   name: 'Claude',        color: '#f97316' },
-    { key: 'deepseek', name: 'DeepSeek',      color: '#06b6d4' },
-    { key: 'nvidia',   name: 'NVIDIA Llama',  color: '#9945FF' },
-    { key: 'gemini',   name: 'Gemini Pro',    color: '#3B82F6' },
-  ];
+// ── Upgrade Modal ─────────────────────────────────────────────
+function UpgradeModal({ model, onClose }: { model: string; onClose: () => void }) {
   return (
-    <div className="flex items-center gap-1">
-      {models.map(m => (
-        <button key={m.key} onClick={() => onModelChange(m.key)}
-          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200
-            ${selectedModel === m.key ? 'bg-white/[0.08] border border-white/[0.12] text-white/90 shadow-sm' : 'text-white/30 hover:text-white/50 hover:bg-white/[0.04]'}`}>
-          <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: m.color }} />
-          {m.name}
-        </button>
-      ))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-sm bg-[#0e0e1a] border border-[#9945FF]/40 rounded-2xl p-6 shadow-2xl shadow-[#9945FF]/10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚡</span>
+            <span className="font-bold text-white">Modelo PRO</span>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white transition-colors text-xl leading-none">×</button>
+        </div>
+        <p className="text-sm text-white/60 mb-4">
+          <span className="text-[#9945FF] font-semibold">{model.toUpperCase()}</span> requer o plano Pro.
+          Por apenas <span className="text-[#14F195] font-bold">$5/mês</span> você acessa todos os modelos premium.
+        </p>
+        <div className="space-y-2 mb-5">
+          {[['GPT-4o', '#10b981'], ['Claude Opus', '#f97316'], ['DeepSeek V3', '#06b6d4'], ['Gemini Pro', '#3B82F6']].map(([name, color]) => (
+            <div key={name} className="flex items-center gap-2 text-xs text-white/50">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: color as string }} />
+              {name}
+              <span className="ml-auto text-[#14F195]/60">✓ incluído</span>
+            </div>
+          ))}
+        </div>
+        <a href="/dashboard/keys"
+          className="block w-full py-2.5 rounded-xl text-center text-sm font-bold bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-lg shadow-[#9945FF]/20 hover:opacity-90 transition-opacity">
+          Obter Plano Pro — $5/mês
+        </a>
+        <p className="text-center text-xs text-white/20 mt-3">Modelos gratuitos disponíveis sem chave</p>
+      </div>
     </div>
+  );
+}
+
+// ── Model Selector ────────────────────────────────────────────
+function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIModel; onModelChange: (model: AIModel) => void }) {
+  const [showUpgrade, setShowUpgrade] = useState<string | null>(null);
+
+  const FREE = [
+    { key: 'nvidia'  as AIModel, name: 'NVIDIA',   color: '#76B900' },
+    { key: 'glm'     as AIModel, name: 'GLM-4.7',  color: '#00D1FF' },
+    { key: 'minimax' as AIModel, name: 'MiniMax',  color: '#FF6B35' },
+    { key: 'qwen'    as AIModel, name: 'Qwen3',    color: '#A855F7' },
+  ];
+  const PRO = [
+    { key: 'gpt'      as AIModel, name: 'GPT-4o',   color: '#10b981' },
+    { key: 'claude'   as AIModel, name: 'Claude',   color: '#f97316' },
+    { key: 'deepseek' as AIModel, name: 'DeepSeek', color: '#06b6d4' },
+    { key: 'gemini'   as AIModel, name: 'Gemini',   color: '#3B82F6' },
+  ];
+
+  const handleClick = (key: AIModel, isPro: boolean) => {
+    if (isPro) { setShowUpgrade(key); return; }
+    onModelChange(key);
+  };
+
+  return (
+    <>
+      {showUpgrade && <UpgradeModal model={showUpgrade} onClose={() => setShowUpgrade(null)} />}
+      <div className="flex items-center gap-1 flex-wrap">
+        {FREE.map(m => (
+          <button key={m.key} onClick={() => handleClick(m.key, false)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200
+              ${selectedModel === m.key ? 'bg-white/[0.08] border border-white/[0.12] text-white/90 shadow-sm' : 'text-white/30 hover:text-white/50 hover:bg-white/[0.04]'}`}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: m.color }} />
+            {m.name}
+          </button>
+        ))}
+        <span className="w-px h-4 bg-white/10 mx-0.5" />
+        {PRO.map(m => (
+          <button key={m.key} onClick={() => handleClick(m.key, true)}
+            className="relative px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 text-white/25 hover:text-white/40 hover:bg-white/[0.03] group">
+            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 opacity-40" style={{ backgroundColor: m.color }} />
+            {m.name}
+            <span className="ml-1 text-[9px] font-bold text-[#9945FF]/70 group-hover:text-[#9945FF]">PRO</span>
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -1262,7 +1321,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<AIModel>('gpt');
+  const [selectedModel, setSelectedModel] = useState<AIModel>('nvidia');
   const [previousModel, setPreviousModel] = useState<string>('gpt');
   const [contextActive, setContextActive] = useState(false);
 

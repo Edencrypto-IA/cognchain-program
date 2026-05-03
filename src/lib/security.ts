@@ -80,7 +80,11 @@ const MAX_MESSAGES_ARRAY = 50;
 const MAX_COMPARE_MODELS = 5;
 const MAX_TRANSLATE_MESSAGES = 100;
 
-const ALLOWED_MODELS = new Set(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek']);
+const ALLOWED_MODELS = new Set(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'glm', 'minimax', 'qwen']);
+
+export const FREE_MODELS  = new Set(['nvidia', 'glm', 'minimax', 'qwen']);
+export const PRO_MODELS   = new Set(['gpt', 'claude', 'deepseek', 'gemini']);
+export const MODEL_TIER   = (m: string): 'free' | 'pro' => PRO_MODELS.has(m) ? 'pro' : 'free';
 const HEX_REGEX = /^[a-fA-F0-9]{64}$/;
 const BASE58_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 

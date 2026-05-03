@@ -56,7 +56,7 @@ export interface ContextChunk {
   tokenEstimate: number;
 }
 
-export type AIModel = 'gpt' | 'claude' | 'nvidia' | 'gemini' | 'deepseek';
+export type AIModel = 'gpt' | 'claude' | 'nvidia' | 'gemini' | 'deepseek' | 'glm' | 'minimax' | 'qwen';
 
 export const MODEL_LABELS: Record<AIModel, string> = {
   gpt:      'GPT-4o',
@@ -64,4 +64,10 @@ export const MODEL_LABELS: Record<AIModel, string> = {
   nvidia:   'NVIDIA Llama',
   gemini:   'Gemini Pro',
   deepseek: 'DeepSeek V3',
+  glm:      'GLM-4.7',
+  minimax:  'MiniMax M2.7',
+  qwen:     'Qwen3 80B',
 };
+
+export const PRO_MODEL_KEYS: AIModel[] = ['gpt', 'claude', 'deepseek', 'gemini'];
+export const FREE_MODEL_KEYS: AIModel[] = ['nvidia', 'glm', 'minimax', 'qwen'];
