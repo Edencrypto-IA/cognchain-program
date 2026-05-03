@@ -1221,9 +1221,17 @@ function EvolutionTimeline({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 // ============================================================
 // ── Upgrade Modal ─────────────────────────────────────────────
 function UpgradeModal({ model, onClose }: { model: string; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-sm bg-[#0e0e1a] border border-[#9945FF]/40 rounded-2xl p-6 shadow-2xl shadow-[#9945FF]/10">
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+
+  const { createPortal } = require('react-dom');
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div className="w-full max-w-sm bg-[#0e0e1a] border border-[#9945FF]/40 rounded-2xl p-6 shadow-2xl shadow-[#9945FF]/10" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className="text-lg">⚡</span>
@@ -1250,7 +1258,8 @@ function UpgradeModal({ model, onClose }: { model: string; onClose: () => void }
         </a>
         <p className="text-center text-xs text-white/20 mt-3">Modelos gratuitos disponíveis sem chave</p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
