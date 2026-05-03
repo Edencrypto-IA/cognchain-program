@@ -4,6 +4,7 @@ import { saveMemory, chunkContent } from '@/services/memory';
 import { checkRateLimit, validateModel, Limits, safeErrorMessage, MODEL_TIER } from '@/lib/security';
 import { getCachedResponse, cacheResponse, seedFAQCache } from '@/services/cache/response-cache';
 import { extractRawKey, requireApiKey } from '@/lib/api-key-auth';
+import { verifyAdminToken } from '@/app/api/auth/verify/route';
 
 // Seed FAQ on first request
 let faqSeeded = false;
@@ -17,7 +18,11 @@ export async function POST(request: NextRequest) {
   try {
     const hasApiKey = !!extractRawKey(request);
 
-    let userPlan: 'free' | 'pro' = 'free';
+    // ── Admin cookie check ────────────────────────────────────
+    const adminToken = request.cookies.get('cog_admin')?.value || '';
+    const isAdmin = adminToken ? verifyAdminToken(adminToken) : false;
+
+    let userPlan: 'free' | 'pro' = isAdmin ? 'pro' : 'free';
 
     if (hasApiKey) {
       // ── External agent — must have valid API key ──────────
