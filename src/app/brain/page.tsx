@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
+import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle } from 'lucide-react';
 
 const MODEL_COLORS: Record<string, string> = {
   gpt:      '#10A37F',
@@ -315,6 +315,21 @@ export default function BrainPage() {
     draw();
   };
 
+  const scatter = () => {
+    const n = nodesRef.current.length;
+    nodesRef.current = nodesRef.current.map((node, i) => {
+      const angle = (i / n) * 2 * Math.PI + (Math.random() - 0.5) * 1.2;
+      const radius = 180 + Math.random() * 200;
+      return {
+        ...node,
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+        vx: (Math.random() - 0.5) * 40,
+        vy: (Math.random() - 0.5) * 40,
+      };
+    });
+  };
+
   return (
     <div className="flex h-screen bg-[#060610] text-white overflow-hidden">
       {/* Left panel */}
@@ -425,13 +440,16 @@ export default function BrainPage() {
           onWheel={onWheel}
           style={{ cursor: draggingRef.current.nodeId ? 'grabbing' : 'grab' }}
         />
-        {/* Zoom controls */}
+        {/* Zoom + Scatter controls */}
         <div className="absolute bottom-4 right-4 flex flex-col gap-1">
           <button onClick={() => zoom(1)} className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/10 border border-white/[0.08] flex items-center justify-center text-white/60 hover:text-white transition-all">
             <ZoomIn className="w-4 h-4" />
           </button>
           <button onClick={() => zoom(-1)} className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/10 border border-white/[0.08] flex items-center justify-center text-white/60 hover:text-white transition-all">
             <ZoomOut className="w-4 h-4" />
+          </button>
+          <button onClick={scatter} title="Espalhar nós" className="w-8 h-8 rounded-lg bg-[#9945FF]/10 hover:bg-[#9945FF]/20 border border-[#9945FF]/20 flex items-center justify-center text-[#9945FF]/60 hover:text-[#9945FF] transition-all">
+            <Shuffle className="w-4 h-4" />
           </button>
         </div>
       </div>
