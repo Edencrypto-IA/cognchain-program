@@ -36,19 +36,26 @@ interface GraphNode {
   score: number; verified: boolean; zkVerified: boolean; onChain: boolean; hash: string;
   x: number; y: number; vx: number; vy: number;
 }
-interface GraphLink { source: string; target: string; type?: string; }
+interface GraphLink { source: string; target: string; type?: string; strength?: number; }
 interface RawData { nodes: Omit<GraphNode, 'x'|'y'|'vx'|'vy'>[]; links: GraphLink[]; }
 
-const REPULSION = 18000;
-const SPRING_LEN = 200;
-const SPRING_K = 0.015;
-const DAMPING = 0.78;
-const ITERATIONS_PER_FRAME = 4;
-const NODE_MIN_R = 12;
+const REPULSION = 22000;
+const SPRING_LEN = 180;
+const SPRING_K = 0.02;
+const DAMPING = 0.75;
+const GRAVITY = 0.003;
+const ITERATIONS_PER_FRAME = 5;
+const NODE_MIN_R = 8;
+
+function getNodeRadius(id: string, links: GraphLink[]): number {
+  const degree = links.filter(l => l.source === id || l.target === id).length;
+  return Math.max(NODE_MIN_R, NODE_MIN_R + degree * 1.8);
+}
 
 function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
   const idxMap = new Map(nodes.map((n, i) => [n.id, i]));
   for (let iter = 0; iter < ITERATIONS_PER_FRAME; iter++) {
+    // Repulsion between all nodes
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const dx = nodes[j].x - nodes[i].x;
@@ -61,17 +68,23 @@ function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
         nodes[j].vx += fx; nodes[j].vy += fy;
       }
     }
+    // Spring forces — strength-weighted
     for (const l of links) {
       const si = idxMap.get(l.source); const ti = idxMap.get(l.target);
       if (si == null || ti == null) continue;
       const s = nodes[si]; const t = nodes[ti];
       const dx = t.x - s.x; const dy = t.y - s.y;
       const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-      const force = (dist - SPRING_LEN) * SPRING_K;
+      const k = SPRING_K * (l.strength ?? 0.5);
+      const targetLen = SPRING_LEN / Math.max(l.strength ?? 0.5, 0.2);
+      const force = (dist - targetLen) * k;
       const fx = (dx / dist) * force; const fy = (dy / dist) * force;
       s.vx += fx; s.vy += fy; t.vx -= fx; t.vy -= fy;
     }
+    // Gravity toward center
     for (const n of nodes) {
+      n.vx -= n.x * GRAVITY;
+      n.vy -= n.y * GRAVITY;
       n.vx *= DAMPING; n.vy *= DAMPING;
       n.x += n.vx; n.y += n.vy;
     }
@@ -151,36 +164,33 @@ export default function BrainPage() {
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(t.x, t.y);
+      const str = l.strength ?? 0.5;
       if (l.type === 'chain') {
-        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-        ctx.lineWidth = 2 / scale;
+        ctx.strokeStyle = `rgba(255,255,255,${0.5 * str})`;
+        ctx.lineWidth = (1.5 * str) / scale;
         ctx.setLineDash([]);
-      } else {
-        ctx.strokeStyle = 'rgba(153,69,255,0.3)';
+      } else if (l.type === 'model') {
+        ctx.strokeStyle = modelColor(nodes[si].model) + '55';
         ctx.lineWidth = 1 / scale;
-        ctx.setLineDash([6 / scale, 4 / scale]);
+        ctx.setLineDash([4 / scale, 4 / scale]);
+      } else if (l.type === 'bridge') {
+        ctx.strokeStyle = 'rgba(20,241,149,0.25)';
+        ctx.lineWidth = 1 / scale;
+        ctx.setLineDash([2 / scale, 6 / scale]);
+      } else {
+        ctx.strokeStyle = `rgba(153,69,255,${0.15 * str})`;
+        ctx.lineWidth = 0.8 / scale;
+        ctx.setLineDash([5 / scale, 5 / scale]);
       }
       ctx.stroke();
       ctx.setLineDash([]);
-      // Arrow
-      const angle = Math.atan2(t.y - s.y, t.x - s.x);
-      const r = Math.max(4, (t.score ?? 0) * 0.8 + 5) + 2;
-      const ax = t.x - Math.cos(angle) * r;
-      const ay = t.y - Math.sin(angle) * r;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.lineTo(ax - Math.cos(angle - 0.4) * 6 / scale, ay - Math.sin(angle - 0.4) * 6 / scale);
-      ctx.lineTo(ax - Math.cos(angle + 0.4) * 6 / scale, ay - Math.sin(angle + 0.4) * 6 / scale);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.fill();
     }
 
     // Draw nodes
     for (const n of nodes) {
       if (filteredIds && !filteredIds.has(n.id)) continue;
       const color = modelColor(n.model);
-      const r = Math.max(NODE_MIN_R, (n.score ?? 0) * 0.8 + NODE_MIN_R);
+      const r = getNodeRadius(n.id, links);
       const isSelected = selected?.id === n.id;
 
       if (n.onChain || n.verified) {
