@@ -68,7 +68,8 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 ┌─────────────────────────────────────────────────────────────────┐
 │                     APPLICATION LAYER                           │
 │   AI Agents · Copilots · Research Tools · Enterprise Apps       │
-│          5 Models: GPT-4o · Claude · Llama · Gemini · DeepSeek  │
+│   8 Models: GPT-4o · Claude · Llama · Gemini · DeepSeek         │
+│             GLM-4.7 · MiniMax M2.7 · Qwen3 80B                   │
 └──────────────────────────┬──────────────────────────────────────┘
                            │  SDK + Wallet Auth
 ┌──────────────────────────▼──────────────────────────────────────┐
@@ -168,12 +169,15 @@ Continuando e aprofundando a partir desta base verificada:
 | Feature | Status | Details |
 |---|---|---|
 | Anchor Program | ✅ Devnet | `create_vault`, `write_memory`, `read_memory` |
-| Multi-Provider AI Router | ✅ Live | GPT-4o, Claude Opus 4.7, NVIDIA Llama 3.3, Gemini 2.0 Flash, DeepSeek V3 |
+| Multi-Provider AI Router | ✅ Live | **8 models** — GPT-4o, Claude Opus 4.7, NVIDIA Llama 3.3, Gemini 2.0 Flash, DeepSeek V3, GLM-4.7, MiniMax M2.7, Qwen3 80B |
+| Free / Pro Tier | ✅ Live | 4 free models (NVIDIA · GLM · MiniMax · Qwen) + 4 Pro models ($5/month) |
+| Memory Brain | ✅ Live | Force-directed neural graph of all memories · color by model · ZK rings · on-chain glow |
+| Admin Login | ✅ Live | Cookie-based admin session · unlocks all Pro models instantly |
 | Proof of Insight (PoI) | ✅ Live | Human voting → threshold → auto-anchor on Solana |
 | Memory Audit Trail | ✅ Live | Memory Chain · Evidence Record · ZK Proof Stack |
 | ZK Proof Pipeline | ✅ Live | Circom + snarkjs Groth16 · simulated mode active |
 | Agent Builder | ✅ Live | Create, configure, deploy AI agents with verifiable memory |
-| Agent-to-Agent Economy | ✅ Live | Task marketplace · on-chain proof of completion |
+| Agent-to-Agent Economy | ✅ Live | Task marketplace · bot loop demo · on-chain proof of completion |
 | Autonomous Loop | ✅ Live | Fetch memories → AI synthesis → anchor proof on Solana |
 | Intelligence Score | ✅ Live | 0–100 composite · 5 levels: Nascente → Mestre |
 | Memory Inheritance | ✅ Live | Seed agents with verified on-chain memories |
@@ -182,7 +186,6 @@ Continuando e aprofundando a partir desta base verificada:
 | Wallet Connection | ✅ Live | Phantom · Solflare · Coinbase via standard adapter |
 | Helius RPC + Proxy | ✅ Live | Premium devnet RPC · API key secured server-side |
 | MCP Server | ✅ Live | 7 tools via Memory Internet Protocol |
-| DeepSeek V3 | ✅ Live | 5th AI provider · OpenAI-compatible · superior cost efficiency |
 
 ---
 
@@ -426,12 +429,15 @@ Continuando e aprofundando a partir desta base verificada:
 | Feature | Status | Detalhes |
 |---|---|---|
 | Programa Anchor | ✅ Devnet | `create_vault`, `write_memory`, `read_memory` |
-| AI Router Multi-Provedor | ✅ Ativo | GPT-4o, Claude Opus 4.7, NVIDIA Llama 3.3, Gemini 2.0 Flash, DeepSeek V3 |
+| AI Router Multi-Provedor | ✅ Ativo | **8 modelos** — GPT-4o, Claude Opus 4.7, NVIDIA Llama 3.3, Gemini 2.0 Flash, DeepSeek V3, GLM-4.7, MiniMax M2.7, Qwen3 80B |
+| Tier Free / Pro | ✅ Ativo | 4 modelos gratuitos (NVIDIA · GLM · MiniMax · Qwen) + 4 modelos Pro ($5/mês) |
+| Memory Brain | ✅ Ativo | Grafo neural das memórias · cores por modelo · anel ZK · brilho on-chain |
+| Login Admin | ✅ Ativo | Sessão admin por cookie · desbloqueia todos os modelos Pro instantaneamente |
 | Proof of Insight (PoI) | ✅ Ativo | Votação humana → threshold → âncora automática na Solana |
 | Memory Audit Trail | ✅ Ativo | Memory Chain · Evidence Record · Proof Stack ZK |
 | ZK Proof Pipeline | ✅ Ativo | Circom + snarkjs Groth16 · modo simulado ativo |
 | Agent Builder | ✅ Ativo | Criar, configurar e implantar agentes de IA com memória verificável |
-| Economia Agente-a-Agente | ✅ Ativo | Marketplace de tarefas · prova on-chain de conclusão |
+| Economia Agente-a-Agente | ✅ Ativo | Marketplace de tarefas · bot loop demo · prova on-chain de conclusão |
 | Loop Autônomo | ✅ Ativo | Busca memórias → síntese IA → ancora prova na Solana |
 | Intelligence Score | ✅ Ativo | 0–100 composto · 5 níveis: Nascente → Mestre |
 | Herança de Memória | ✅ Ativo | Inicialize agentes com memórias verificadas on-chain |
@@ -440,7 +446,6 @@ Continuando e aprofundando a partir desta base verificada:
 | Conexão de Carteira | ✅ Ativo | Phantom · Solflare · Coinbase via adapter padrão |
 | Helius RPC + Proxy | ✅ Ativo | RPC premium devnet · chave API protegida no servidor |
 | Servidor MCP | ✅ Ativo | 7 ferramentas via Memory Internet Protocol |
-| DeepSeek V3 | ✅ Ativo | 5º provedor de IA · compatível com OpenAI |
 
 ---
 
@@ -524,12 +529,15 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 | 功能 | 状态 | 详情 |
 |---|---|---|
 | Anchor 程序 | ✅ 开发网 | `create_vault`、`write_memory`、`read_memory` |
-| 多供应商 AI 路由器 | ✅ 上线 | GPT-4o、Claude Opus 4.7、NVIDIA Llama 3.3、Gemini 2.0 Flash、DeepSeek V3 |
+| 多供应商 AI 路由器 | ✅ 上线 | **8 个模型** — GPT-4o、Claude Opus 4.7、NVIDIA Llama 3.3、Gemini 2.0 Flash、DeepSeek V3、GLM-4.7、MiniMax M2.7、Qwen3 80B |
+| 免费/专业版分层 | ✅ 上线 | 4 个免费模型（NVIDIA · GLM · MiniMax · Qwen）+ 4 个专业版模型（$5/月）|
+| Memory Brain | ✅ 上线 | 记忆神经图谱 · 按模型着色 · ZK 环 · 链上光晕 |
+| 管理员登录 | ✅ 上线 | Cookie 会话 · 即时解锁所有专业版模型 |
 | 洞察证明（PoI）| ✅ 上线 | 人工投票 → 阈值 → 自动锚定到 Solana |
 | 记忆审计追踪 | ✅ 上线 | 记忆链 · 证据记录 · ZK 证明堆栈 |
 | ZK 证明管道 | ✅ 上线 | Circom + snarkjs Groth16 · 模拟模式激活 |
 | 代理构建器 | ✅ 上线 | 创建、配置、部署具有可验证记忆的 AI 代理 |
-| 代理间经济 | ✅ 上线 | 任务市场 · 链上完成证明 |
+| 代理间经济 | ✅ 上线 | 任务市场 · 机器人循环演示 · 链上完成证明 |
 | 自主循环 | ✅ 上线 | 获取记忆 → AI 综合 → 在 Solana 上锚定证明 |
 | 智能分数 | ✅ 上线 | 0–100 综合评分 · 5 个等级：初生 → 大师 |
 | 记忆继承 | ✅ 上线 | 用已验证的链上记忆初始化新代理 |
@@ -538,7 +546,6 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 | 钱包连接 | ✅ 上线 | Phantom · Solflare · Coinbase（标准适配器）|
 | Helius RPC + 代理 | ✅ 上线 | 高级开发网 RPC · API 密钥在服务器端保护 |
 | MCP 服务器 | ✅ 上线 | 通过记忆互联网协议提供 7 个工具 |
-| DeepSeek V3 | ✅ 上线 | 第 5 个 AI 供应商 · 兼容 OpenAI · 卓越性价比 |
 
 ---
 
