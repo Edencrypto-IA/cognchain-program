@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle } from 'lucide-react';
+import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2 } from 'lucide-react';
 
 const MODEL_COLORS: Record<string, string> = {
   gpt:      '#10A37F',
@@ -109,6 +109,9 @@ export default function BrainPage() {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [continueModel, setContinueModel] = useState('nvidia');
+  const [continuing, setContinuing] = useState(false);
+  const [continueMsg, setContinueMsg] = useState('');
   const [stats, setStats] = useState({ total: 0, byModel: {} as Record<string, number> });
   const [, setRawData] = useState<RawData>({ nodes: [], links: [] });
 
@@ -561,8 +564,68 @@ export default function BrainPage() {
               <span className="text-xs text-white/40">Data</span>
               <span className="text-xs text-white/60">{dateStr(selected.timestamp)}</span>
             </div>
+            {/* Continue Memory */}
+            <div className="border border-white/[0.06] rounded-xl p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <GitBranch className="w-3.5 h-3.5 text-[#14F195]" />
+                <span className="text-xs font-semibold text-white/70">Continuar com IA</span>
+              </div>
+              <select
+                value={continueModel}
+                onChange={e => setContinueModel(e.target.value)}
+                className="w-full mb-2 px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white/60 outline-none"
+              >
+                <option value="nvidia">NVIDIA Llama (grátis)</option>
+                <option value="glm">GLM-4.7 (grátis)</option>
+                <option value="minimax">MiniMax M2.7 (grátis)</option>
+                <option value="qwen">Qwen3 80B (grátis)</option>
+              </select>
+              <button
+                disabled={continuing}
+                onClick={async () => {
+                  setContinuing(true);
+                  setContinueMsg('Gerando...');
+                  try {
+                    const r = await fetch('/api/memory/continue', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ hash: selected.hash, model: continueModel }),
+                    });
+                    if (!r.ok) throw new Error('Falhou');
+                    const newMem = await r.json();
+                    const newNode: GraphNode = {
+                      ...newMem,
+                      id: newMem.hash,
+                      label: newMem.content.slice(0, 60),
+                      score: newMem.score ?? 7,
+                      verified: false, zkVerified: false, onChain: false,
+                      x: (selected.x ?? 0) + (Math.random() - 0.5) * 150,
+                      y: (selected.y ?? 0) + (Math.random() - 0.5) * 150,
+                      vx: (Math.random() - 0.5) * 15,
+                      vy: (Math.random() - 0.5) * 15,
+                    };
+                    nodesRef.current = [...nodesRef.current, newNode];
+                    linksRef.current = [...linksRef.current, { source: selected.hash, target: newMem.hash, type: 'chain', strength: 1.0 }];
+                    setStats(s => ({ ...s, total: s.total + 1 }));
+                    setContinueMsg(`✓ ${continueModel.toUpperCase()} — novo nó no grafo`);
+                    setSelected(newNode);
+                  } catch {
+                    setContinueMsg('Erro ao gerar');
+                  } finally {
+                    setContinuing(false);
+                  }
+                }}
+                className="w-full py-2 rounded-lg bg-gradient-to-r from-[#14F195]/20 to-[#9945FF]/20 border border-[#14F195]/30 hover:border-[#14F195]/60 text-xs font-semibold text-white/70 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                {continuing
+                  ? <><Loader2 className="w-3 h-3 animate-spin" />Gerando...</>
+                  : <><GitBranch className="w-3 h-3" />Continuar memória</>}
+              </button>
+              {continueMsg && <p className="text-[10px] text-[#14F195]/70 mt-1.5 text-center">{continueMsg}</p>}
+            </div>
+
             <a href={`/memory/${selected.hash}`}
-              className="mt-2 w-full py-2 rounded-xl text-center text-sm font-medium bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/10 border border-[#9945FF]/30 hover:border-[#9945FF]/60 text-white/70 hover:text-white transition-all">
+              className="w-full py-2 rounded-xl text-center text-sm font-medium bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/10 border border-[#9945FF]/30 hover:border-[#9945FF]/60 text-white/70 hover:text-white transition-all block">
               Ver memória completa →
             </a>
           </div>
