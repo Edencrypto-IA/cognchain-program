@@ -138,6 +138,19 @@ export default function BrainPage() {
     return new Set(nodesRef.current.filter(n => n.model.toLowerCase().includes(filter)).map(n => n.id));
   }, [filter]);
 
+  // Static star field generated once
+  const starsRef = useRef<{x:number;y:number;r:number;o:number}[]>([]);
+  if (starsRef.current.length === 0) {
+    for (let i = 0; i < 180; i++) {
+      starsRef.current.push({
+        x: Math.random() * 2000 - 1000,
+        y: Math.random() * 2000 - 1000,
+        r: Math.random() * 1.2,
+        o: 0.1 + Math.random() * 0.5,
+      });
+    }
+  }
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -145,10 +158,22 @@ export default function BrainPage() {
     if (!ctx) return;
     const { x: tx, y: ty, scale } = transformRef.current;
     const w = canvas.width; const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
+
+    // Dark universe background
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, w, h);
+
     ctx.save();
     ctx.translate(tx + w / 2, ty + h / 2);
     ctx.scale(scale, scale);
+
+    // Draw stars
+    for (const s of starsRef.current) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r / scale, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(255,255,255,${s.o})`;
+      ctx.fill();
+    }
 
     const filteredIds = getFilteredIds();
     const nodes = nodesRef.current;
@@ -161,28 +186,43 @@ export default function BrainPage() {
       if (si == null || ti == null) continue;
       const s = nodes[si]; const t = nodes[ti];
       if (filteredIds && (!filteredIds.has(s.id) || !filteredIds.has(t.id))) continue;
+
+      const str = l.strength ?? 0.5;
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(t.x, t.y);
-      const str = l.strength ?? 0.5;
+      ctx.setLineDash([]);
+
       if (l.type === 'chain') {
-        ctx.strokeStyle = `rgba(255,255,255,${0.5 * str})`;
-        ctx.lineWidth = (1.5 * str) / scale;
-        ctx.setLineDash([]);
+        // Bright solid white — strongest link
+        const grad = ctx.createLinearGradient(s.x, s.y, t.x, t.y);
+        grad.addColorStop(0, modelColor(s.model) + 'cc');
+        grad.addColorStop(1, modelColor(t.model) + 'cc');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2 / scale;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 6;
       } else if (l.type === 'model') {
-        ctx.strokeStyle = modelColor(nodes[si].model) + '55';
-        ctx.lineWidth = 1 / scale;
-        ctx.setLineDash([4 / scale, 4 / scale]);
+        ctx.strokeStyle = modelColor(nodes[si].model) + '99';
+        ctx.lineWidth = 1.2 / scale;
+        ctx.shadowColor = modelColor(nodes[si].model);
+        ctx.shadowBlur = 4;
+        ctx.setLineDash([5 / scale, 4 / scale]);
       } else if (l.type === 'bridge') {
-        ctx.strokeStyle = 'rgba(20,241,149,0.25)';
+        ctx.strokeStyle = 'rgba(20,241,149,0.6)';
         ctx.lineWidth = 1 / scale;
-        ctx.setLineDash([2 / scale, 6 / scale]);
+        ctx.shadowColor = '#14F195';
+        ctx.shadowBlur = 5;
+        ctx.setLineDash([3 / scale, 7 / scale]);
       } else {
-        ctx.strokeStyle = `rgba(153,69,255,${0.15 * str})`;
-        ctx.lineWidth = 0.8 / scale;
-        ctx.setLineDash([5 / scale, 5 / scale]);
+        ctx.strokeStyle = `rgba(153,69,255,${0.55 * str})`;
+        ctx.lineWidth = 0.9 / scale;
+        ctx.shadowColor = '#9945FF';
+        ctx.shadowBlur = 3;
+        ctx.setLineDash([4 / scale, 6 / scale]);
       }
       ctx.stroke();
+      ctx.shadowBlur = 0;
       ctx.setLineDash([]);
     }
 
@@ -193,26 +233,44 @@ export default function BrainPage() {
       const r = getNodeRadius(n.id, links);
       const isSelected = selected?.id === n.id;
 
-      if (n.onChain || n.verified) {
-        ctx.beginPath(); ctx.arc(n.x, n.y, r + 5, 0, 2 * Math.PI);
-        ctx.fillStyle = color + '22'; ctx.fill();
-      }
+      // Outer glow
+      const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3);
+      glow.addColorStop(0, color + '55');
+      glow.addColorStop(1, 'transparent');
+      ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, 2 * Math.PI);
+      ctx.fillStyle = glow; ctx.fill();
+
+      // Inner glow ring
+      ctx.beginPath(); ctx.arc(n.x, n.y, r * 1.6, 0, 2 * Math.PI);
+      ctx.fillStyle = color + '33'; ctx.fill();
+
+      // Core node
       ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
-      ctx.fillStyle = isSelected ? '#ffffff' : color; ctx.fill();
+      ctx.fillStyle = isSelected ? '#ffffff' : color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = isSelected ? 20 : 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Selected ring
       if (isSelected) {
-        ctx.beginPath(); ctx.arc(n.x, n.y, r + 3, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 / scale; ctx.stroke();
+        ctx.beginPath(); ctx.arc(n.x, n.y, r + 4, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#ffffff88'; ctx.lineWidth = 1.5 / scale; ctx.stroke();
       }
+      // ZK ring
       if (n.zkVerified) {
-        ctx.beginPath(); ctx.arc(n.x, n.y, r + 2, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 1.5 / scale; ctx.stroke();
+        ctx.beginPath(); ctx.arc(n.x, n.y, r + 3, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#FFD700cc'; ctx.lineWidth = 1.5 / scale;
+        ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 6;
+        ctx.stroke(); ctx.shadowBlur = 0;
       }
-      // Small label below node — model + first words
-      const snippet = n.label.slice(0, 22) + (n.label.length > 22 ? '…' : '');
-      ctx.font = `${9 / scale}px sans-serif`;
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+
+      // Label
+      const snippet = n.label.slice(0, 24) + (n.label.length > 24 ? '…' : '');
+      ctx.font = `${10 / scale}px sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
       ctx.textAlign = 'center';
-      ctx.fillText(snippet, n.x, n.y + r + 12 / scale);
+      ctx.fillText(snippet, n.x, n.y + r + 14 / scale);
     }
     ctx.restore();
   }, [selected, getFilteredIds]);
