@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Zap, Plus, Bot, Coins, ArrowRight, Check, Loader2,
-  Clock, ExternalLink, RefreshCw, ArrowLeft, Sparkles,
+  ExternalLink, RefreshCw, ArrowLeft, Sparkles, Play, Database,
 } from 'lucide-react';
 
 interface Agent { id: string; name: string; model: string; }
@@ -242,6 +242,9 @@ export default function MarketplacePage() {
   const [loading,    setLoading]    = useState(true);
   const [showModal,  setShowModal]  = useState(false);
   const [filter,     setFilter]     = useState<'open' | 'completed' | 'all'>('open');
+  const [loopActive, setLoopActive] = useState(false);
+  const [loopMsg,    setLoopMsg]    = useState('');
+  const [seeding,    setSeeding]    = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -256,6 +259,34 @@ export default function MarketplacePage() {
   }, [filter]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Auto-refresh when loop is active
+  useEffect(() => {
+    if (!loopActive) return;
+    const interval = setInterval(() => loadData(), 8000);
+    return () => clearInterval(interval);
+  }, [loopActive, loadData]);
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    try {
+      const r = await fetch('/api/demo/seed', { method: 'POST' });
+      const d = await r.json();
+      setLoopMsg(d.skipped ? 'Já inicializado' : `✓ ${d.agents} agentes + ${d.completedTasks} tarefas criadas`);
+      await loadData();
+    } finally { setSeeding(false); }
+  };
+
+  const handleLoop = async () => {
+    setLoopMsg('Executando ciclo...');
+    try {
+      const r = await fetch('/api/demo/loop', { method: 'POST' });
+      const d = await r.json();
+      setLoopMsg(`✓ ${d.executed} executadas · ${d.posted} postadas · ${d.totalSol} SOL total`);
+      setLoopActive(true);
+      await loadData();
+    } catch { setLoopMsg('Erro no loop'); }
+  };
 
   const totalEarned = tasks
     .filter(t => t.status === 'completed')
@@ -295,6 +326,23 @@ export default function MarketplacePage() {
               className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors disabled:opacity-40">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
+            <button onClick={handleSeed} disabled={seeding}
+              title="Inicializar agentes e tarefas demo"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.1] text-white/60 hover:text-white text-xs font-medium disabled:opacity-40 transition-all">
+              {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+              Seed
+            </button>
+            <button onClick={handleLoop}
+              title="Executar ciclo de bot: executa tarefas abertas e posta novas"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                loopActive
+                  ? 'bg-[#14F195]/20 border border-[#14F195]/40 text-[#14F195]'
+                  : 'bg-[#9945FF]/20 border border-[#9945FF]/30 hover:bg-[#9945FF]/30 text-[#9945FF]'
+              }`}>
+              {loopActive
+                ? <><span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" /> Live</>
+                : <><Play className="w-3.5 h-3.5" /> Bot Loop</>}
+            </button>
             <button onClick={() => setShowModal(true)} disabled={agents.length === 0}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white text-xs font-semibold disabled:opacity-40 shadow-lg shadow-[#9945FF]/20">
               <Plus className="w-3.5 h-3.5" /> Nova Tarefa
@@ -302,6 +350,16 @@ export default function MarketplacePage() {
           </div>
         </div>
       </header>
+
+      {loopMsg && (
+        <div className="border-b border-[#14F195]/10 bg-[#14F195]/[0.03] px-4 py-2">
+          <div className="max-w-4xl mx-auto flex items-center gap-2 text-xs text-[#14F195]/70">
+            <Bot className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{loopMsg}</span>
+            {loopActive && <span className="ml-auto text-white/20">auto-refresh ativo</span>}
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
