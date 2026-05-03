@@ -147,6 +147,36 @@ class GeminiHandler implements AIHandler {
   }
 }
 
+// ── GLM-4.7 via NVIDIA NIM (free endpoint) ──────────────────
+class GLMHandler implements AIHandler {
+  name = 'GLM-4.7';
+  model = 'glm';
+
+  async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
+    const client = new OpenAI({
+      apiKey: process.env.NVIDIA_GLM_KEY,
+      baseURL: 'https://integrate.api.nvidia.com/v1',
+    });
+    const systemPrompt = systemPromptOverride ||
+      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma precisa e eficiente.';
+
+    const response = await client.chat.completions.create({
+      model: 'z-ai/glm4.7',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ],
+      max_tokens: getMaxTokens('glm'),
+      temperature: 0.7,
+      top_p: 1,
+    });
+
+    const content = response.choices[0]?.message?.content || 'Sem resposta do GLM.';
+    trackUsage('glm', response.usage?.prompt_tokens ?? estimateTokens(systemPrompt), response.usage?.completion_tokens ?? estimateTokens(content));
+    return content;
+  }
+}
+
 // ── Handlers singleton ───────────────────────────────────────
 const handlers: Record<string, AIHandler> = {
   gpt:      new GPTHandler(),
@@ -154,6 +184,7 @@ const handlers: Record<string, AIHandler> = {
   nvidia:   new NVIDIAHandler(),
   gemini:   new GeminiHandler(),
   deepseek: new DeepSeekHandler(),
+  glm:      new GLMHandler(),
 };
 
 export function getHandler(model: string): AIHandler {
