@@ -21,6 +21,7 @@ const PRICING: Record<string, { input: number; output: number; maxTokens: number
   nvidia:   { input: 0,     output: 0,     maxTokens: 1024 },
   glm:      { input: 0,     output: 0,     maxTokens: 2048 },
   minimax:  { input: 0,     output: 0,     maxTokens: 4096 },
+  qwen:     { input: 0,     output: 0,     maxTokens: 4096 },
 };
 
 // ── Monthly budget caps (USD) ─────────────────────────────────
@@ -32,6 +33,7 @@ const BUDGETS: Record<string, number> = {
   nvidia:   Infinity,
   glm:      Infinity,
   minimax:  Infinity,
+  qwen:     Infinity,
 };
 
 // ── In-memory usage tracker (resets on server restart) ───────

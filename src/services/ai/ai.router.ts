@@ -207,6 +207,36 @@ class MiniMaxHandler implements AIHandler {
   }
 }
 
+// ── Qwen3 80B via NVIDIA NIM (free endpoint) ────────────────
+class QwenHandler implements AIHandler {
+  name = 'Qwen3 80B';
+  model = 'qwen';
+
+  async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
+    const client = new OpenAI({
+      apiKey: process.env.NVIDIA_QWEN_KEY,
+      baseURL: 'https://integrate.api.nvidia.com/v1',
+    });
+    const systemPrompt = systemPromptOverride ||
+      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma precisa e eficiente.';
+
+    const response = await client.chat.completions.create({
+      model: 'qwen/qwen3-next-80b-a3b-instruct',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ],
+      max_tokens: getMaxTokens('qwen'),
+      temperature: 0.6,
+      top_p: 0.7,
+    });
+
+    const content = response.choices[0]?.message?.content || 'Sem resposta do Qwen.';
+    trackUsage('qwen', response.usage?.prompt_tokens ?? estimateTokens(systemPrompt), response.usage?.completion_tokens ?? estimateTokens(content));
+    return content;
+  }
+}
+
 // ── Handlers singleton ───────────────────────────────────────
 const handlers: Record<string, AIHandler> = {
   gpt:      new GPTHandler(),
@@ -216,6 +246,7 @@ const handlers: Record<string, AIHandler> = {
   deepseek: new DeepSeekHandler(),
   glm:      new GLMHandler(),
   minimax:  new MiniMaxHandler(),
+  qwen:     new QwenHandler(),
 };
 
 export function getHandler(model: string): AIHandler {
