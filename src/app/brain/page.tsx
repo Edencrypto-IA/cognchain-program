@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
 
 const MODEL_COLORS: Record<string, string> = {
   gpt:      '#10A37F',
@@ -89,6 +89,7 @@ export default function BrainPage() {
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const [stats, setStats] = useState({ total: 0, byModel: {} as Record<string, number> });
   const [, setRawData] = useState<RawData>({ nodes: [], links: [] });
 
@@ -190,12 +191,12 @@ export default function BrainPage() {
         ctx.beginPath(); ctx.arc(n.x, n.y, r + 2, 0, 2 * Math.PI);
         ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 1.5 / scale; ctx.stroke();
       }
-      if (scale >= 1.2) {
-        ctx.font = `${11 / scale}px monospace`;
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.textAlign = 'center';
-        ctx.fillText(n.hash.slice(0, 8) + '…', n.x, n.y + r + 12 / scale);
-      }
+      // Small label below node — model + first words
+      const snippet = n.label.slice(0, 22) + (n.label.length > 22 ? '…' : '');
+      ctx.font = `${9 / scale}px sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.textAlign = 'center';
+      ctx.fillText(snippet, n.x, n.y + r + 12 / scale);
     }
     ctx.restore();
   }, [selected, getFilteredIds]);
@@ -317,7 +318,31 @@ export default function BrainPage() {
             <Brain className="w-5 h-5 text-[#9945FF]" />
             <span className="font-semibold text-white">Memory Brain</span>
           </div>
-          <p className="text-xs text-white/40">Grafo neural de memórias</p>
+          <p className="text-xs text-white/40 mb-3">Grafo neural de memórias</p>
+          <button
+            onClick={async () => {
+              setSeeding(true);
+              await fetch('/api/demo/memories', { method: 'POST' });
+              const data = await fetch('/api/memory/graph').then(r => r.json());
+              const byModel: Record<string, number> = {};
+              const nodes = data.nodes.map((n: GraphNode, i: number) => {
+                const k = Object.keys(MODEL_COLORS).find(k => n.model.toLowerCase().includes(k)) ?? 'other';
+                byModel[k] = (byModel[k] ?? 0) + 1;
+                const angle = (i / data.nodes.length) * 2 * Math.PI;
+                return { ...n, x: Math.cos(angle) * 80, y: Math.sin(angle) * 80, vx: 0, vy: 0 };
+              });
+              nodesRef.current = nodes;
+              linksRef.current = data.links;
+              setStats({ total: nodes.length, byModel });
+              setSeeding(false);
+            }}
+            disabled={seeding}
+            className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg bg-[#9945FF]/10 border border-[#9945FF]/20 hover:bg-[#9945FF]/20 text-[#9945FF] text-xs font-medium transition-all disabled:opacity-40"
+          >
+            {seeding
+              ? <><span className="w-3 h-3 border border-[#9945FF] border-t-transparent rounded-full animate-spin" />Criando...</>
+              : <><Sparkles className="w-3.5 h-3.5" />Seed Memórias Demo</>}
+          </button>
         </div>
 
         <div className="p-4 border-b border-white/[0.06]">
