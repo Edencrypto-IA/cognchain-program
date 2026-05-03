@@ -2075,7 +2075,8 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                         const data = await r.json();
                         const mem = data.memory;
                         if (!mem) throw new Error('Memória inválida');
-                        const ctx = `⚡ Memória Verificada · CognChain on Solana\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nHash: ${mem.hash}\nModelo: ${mem.model} · Score: ${mem.score ?? '—'}/10\nStatus: ${mem.verified ? '✓ Verificado' : 'Pendente'}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${mem.content}`;
+                        const createdAt = new Date(mem.timestamp * 1000).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                        const ctx = `⚡ Memória Verificada · CognChain on Solana\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nHash: ${mem.hash}\nModelo: ${mem.model} · Score: ${mem.score ?? '—'}/10\nCriada em: ${createdAt}\nStatus: ${mem.verified ? '✓ Verificado on-chain' : '⏳ Pendente'}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${mem.content}`;
                         setMessages([{ role: 'assistant', content: ctx }]);
                         setHashInput('');
                         setInputValue('Continue e aprofunde esta memória verificada:');
