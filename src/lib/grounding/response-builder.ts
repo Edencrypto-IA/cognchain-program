@@ -5,7 +5,10 @@ function detectSectionType(query: string): ResponseSection['type'] {
   const q = query.toLowerCase();
   if (q.includes('top') || q.includes('maior') || q.includes('rank')) return 'ranking';
   if (q.includes('vs') || q.includes('compar')) return 'comparison';
-  if (q.includes('preço') || q.includes('price') || q.includes('tvl')) return 'metrics';
+  // Price/market queries → metrics dashboard (gauge + table)
+  if (q.includes('preço') || q.includes('preco') || q.includes('price') ||
+      q.includes('cotação') || q.includes('cotacao') || q.includes('tvl') ||
+      q.includes('volume') || q.includes('market cap')) return 'metrics';
   if (q.includes('como') || q.includes('how')) return 'process';
   return 'analysis';
 }

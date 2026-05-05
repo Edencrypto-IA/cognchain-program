@@ -10,28 +10,6 @@ interface MetricsDashboardProps {
   meta: VerificationMeta;
 }
 
-function GaugeArc({ pct }: { pct: number }) {
-  const color = pct >= 71 ? '#00d4aa' : pct >= 41 ? '#f59e0b' : '#ef4444';
-  const r = 28; const cx = 36; const cy = 36;
-  const startAngle = -180; const endAngle = 0;
-  const angle = startAngle + (pct / 100) * (endAngle - startAngle);
-  const rad = (a: number) => (a * Math.PI) / 180;
-  const x1 = cx + r * Math.cos(rad(startAngle));
-  const y1 = cy + r * Math.sin(rad(startAngle));
-  const x2 = cx + r * Math.cos(rad(angle));
-  const y2 = cy + r * Math.sin(rad(angle));
-  const large = pct > 50 ? 1 : 0;
-  return (
-    <svg width="72" height="40" viewBox="0 0 72 40">
-      <path d={`M ${cx + r * Math.cos(rad(-180))},${cy + r * Math.sin(rad(-180))} A ${r},${r} 0 0,1 ${cx + r},${cy}`}
-        fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" strokeLinecap="round" />
-      {pct > 0 && (
-        <path d={`M ${x1},${y1} A ${r},${r} 0 ${large},1 ${x2},${y2}`}
-          fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" />
-      )}
-    </svg>
-  );
-}
 
 function AnimatedNumber({ target }: { target: number }) {
   const [val, setVal] = useState(0);
@@ -56,30 +34,59 @@ export default function MetricsDashboard({ section, allSources, meta }: MetricsD
         <ConfidenceRing value={meta.avgConfidence} size="md" />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {section.items.map((item, i) => {
-          const key = Object.keys(item)[0];
-          const data = item[key];
-          const raw = data?.value;
-          const numVal = typeof raw === 'number' ? raw : parseFloat(String(raw ?? '0').replace(/[^0-9.]/g, ''));
-          const isValid = !isNaN(numVal);
-          const pct = Math.min(100, Math.max(0, isValid ? (numVal > 1000 ? 80 : numVal) : 50));
-
-          return (
-            <div key={key} className="cogn-animate rounded-xl border border-[#1e293b] bg-[#111118] p-4"
-              style={{ animationDelay: `${i * 80}ms` }}>
-              <div className="flex justify-center mb-1"><GaugeArc pct={pct} /></div>
-              <p className="text-center text-[22px] font-bold font-mono text-[#00d4aa]">
-                {isValid ? <AnimatedNumber target={numVal} /> : String(raw ?? '—')}
+      {/* Price card — first item highlighted */}
+      {section.items[0] && (() => {
+        const key0 = Object.keys(section.items[0])[0];
+        const d0 = section.items[0][key0];
+        const price = typeof d0?.value === 'number' ? d0.value : parseFloat(String(d0?.value ?? '0'));
+        return (
+          <div className="rounded-xl border border-[#00d4aa]/20 bg-[#00d4aa]/5 p-4 mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] text-[#64748b] mb-1">{key0}</p>
+              <p className="text-[36px] font-bold font-mono text-[#00d4aa]">
+                ${!isNaN(price) ? <AnimatedNumber target={price} /> : '—'}
               </p>
-              <p className="text-center text-[11px] text-[#64748b] mt-0.5">{key}</p>
-              <div className="flex justify-center flex-wrap gap-1 mt-2">
-                {(data?.sources ?? []).map(id => <SourceBadge key={id} id={id} sources={allSources} />)}
-              </div>
             </div>
-          );
-        })}
-      </div>
+            <ConfidenceRing value={meta.avgConfidence} size="lg" />
+          </div>
+        );
+      })()}
+
+      {/* Market data table */}
+      {section.items.length > 1 && (
+        <div className="rounded-xl border border-[#1e293b] overflow-hidden mb-2">
+          <table className="w-full text-[13px]">
+            <tbody>
+              {section.items.slice(1).map((item, i) => {
+                const key = Object.keys(item)[0];
+                const data = item[key];
+                const raw = data?.value;
+                const num = typeof raw === 'number' ? raw : parseFloat(String(raw ?? ''));
+                const isNum = !isNaN(num);
+                const isPct = key.toLowerCase().includes('variação') || key.toLowerCase().includes('variacao');
+                const isBig = isNum && Math.abs(num) > 1_000_000;
+                const fmt = isBig
+                  ? `$${(num / 1_000_000_000).toFixed(2)}B`
+                  : isPct
+                    ? `${num > 0 ? '+' : ''}${num.toFixed(2)}%`
+                    : isNum ? `$${num.toLocaleString('pt-BR', { maximumFractionDigits: 8 })}` : String(raw ?? '—');
+                const color = isPct ? (num > 0 ? 'text-[#00d4aa]' : 'text-[#ef4444]') : 'text-[#e2e8f0]';
+                return (
+                  <tr key={key} className={i % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.02]'}>
+                    <td className="px-4 py-2.5 text-[#64748b]">{key}</td>
+                    <td className={`px-4 py-2.5 text-right font-mono font-semibold ${color}`}>{fmt}</td>
+                    <td className="px-4 py-2 text-right w-16">
+                      <div className="flex justify-end gap-0.5">
+                        {(data?.sources ?? []).map(id => <SourceBadge key={id} id={id} sources={allSources} />)}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

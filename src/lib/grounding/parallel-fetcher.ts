@@ -41,15 +41,37 @@ async function fetchJupiter(symbol: string): Promise<RawSource[]> {
 
 // ─── CoinGecko (fallback) ────────────────────────────────────────────────────
 
-/** CoinGecko — fallback if Jupiter unavailable */
+/** CoinGecko full market data — price, 24h high/low, volume, market cap, rank */
 async function fetchCoinGecko(coinId: string): Promise<RawSource[]> {
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`;
-  const data = await safeFetch(url) as Record<string, Record<string, number>>;
-  const coin = data[coinId];
-  if (!coin) return [];
-  return [
-    { name: `CoinGecko Price (${coinId})`, url: `https://www.coingecko.com/en/coins/${coinId}`, value: coin.usd, fromApi: true },
+  const url = `https://api.coingecko.com/api/v3/coins/${coinId}?localization=false&tickers=false&community_data=false&developer_data=false`;
+  type CoinData = {
+    market_data?: {
+      current_price?: { usd?: number };
+      high_24h?: { usd?: number };
+      low_24h?: { usd?: number };
+      total_volume?: { usd?: number };
+      market_cap?: { usd?: number };
+      price_change_percentage_24h?: number;
+      price_change_percentage_7d?: number;
+      market_cap_rank?: number;
+    };
+    symbol?: string;
+  };
+  const data = await safeFetch(url) as CoinData;
+  const m = data?.market_data;
+  if (!m?.current_price?.usd) return [];
+  const pageUrl = `https://www.coingecko.com/en/coins/${coinId}`;
+  const sym = (data.symbol ?? coinId).toUpperCase();
+  const results: RawSource[] = [
+    { name: `Preço ${sym}`,         url: pageUrl, value: m.current_price.usd,           fromApi: true },
+    { name: `Máxima 24h ${sym}`,    url: pageUrl, value: m.high_24h?.usd ?? null,        fromApi: true },
+    { name: `Mínima 24h ${sym}`,    url: pageUrl, value: m.low_24h?.usd ?? null,         fromApi: true },
+    { name: `Volume 24h ${sym}`,    url: pageUrl, value: m.total_volume?.usd ?? null,    fromApi: true },
+    { name: `Market Cap ${sym}`,    url: pageUrl, value: m.market_cap?.usd ?? null,      fromApi: true },
+    { name: `Variação 24h ${sym}`,  url: pageUrl, value: m.price_change_percentage_24h ?? null, fromApi: true },
+    { name: `Variação 7d ${sym}`,   url: pageUrl, value: m.price_change_percentage_7d ?? null,  fromApi: true },
   ];
+  return results.filter(r => r.value !== null && r.value !== undefined);
 }
 
 // ─── EXISTING: DefiLlama ─────────────────────────────────────────────────────
