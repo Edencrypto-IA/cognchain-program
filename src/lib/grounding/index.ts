@@ -55,7 +55,7 @@ export async function groundQuery(query: string): Promise<{
             .replace(/Jupiter\s*/i, '')
             .replace(/Price\s*/i, 'Preço ')
             .replace(/Market Cap\s*/i, 'Market Cap ')
-            .replace(/\s*\(([^)]+)\)/i, (_, sym) => sym.toUpperCase())
+            .replace(/\s*\(([^)]+)\)/i, (_, sym) => ' ' + sym.toUpperCase())
             .trim() || raw;
           return linker.buildVerifiedFact(label, group);
         })
