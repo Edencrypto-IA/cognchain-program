@@ -133,11 +133,35 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
               : isUser
                 ? <p className="whitespace-pre-wrap">{displayContent}</p>
                 : <div className="prose prose-invert prose-sm max-w-none
-                    prose-p:my-1 prose-headings:text-white/90 prose-headings:font-semibold
-                    prose-strong:text-white/90 prose-code:text-[#14F195] prose-code:bg-white/[0.06]
-                    prose-code:px-1 prose-code:rounded prose-li:my-0.5 prose-ul:my-1 prose-ol:my-1
-                    prose-hr:border-white/10 prose-blockquote:border-[#9945FF]/40 prose-blockquote:text-white/60">
-                    <ReactMarkdown>{displayContent}</ReactMarkdown>
+                    prose-p:my-1.5 prose-headings:text-white/90 prose-headings:font-semibold
+                    prose-strong:text-white prose-code:text-[#14F195] prose-code:bg-[#14F195]/10
+                    prose-code:px-1.5 prose-code:rounded prose-code:font-mono prose-code:text-[13px]
+                    prose-li:my-0.5 prose-ul:my-2 prose-ol:my-2 prose-ul:pl-4 prose-ol:pl-4
+                    prose-hr:border-white/10 prose-blockquote:border-l-[#9945FF] prose-blockquote:text-white/60
+                    prose-table:text-[13px] prose-th:border-white/10 prose-td:border-white/[0.06]
+                    prose-pre:bg-[#0d0d1a] prose-pre:border prose-pre:border-white/[0.08] prose-pre:rounded-xl">
+                    <ReactMarkdown
+                      components={{
+                        code({ className, children, ...props }) {
+                          const isBlock = className?.includes('language-');
+                          const [copied, setCopied] = useState(false);
+                          const code = String(children).replace(/\n$/, '');
+                          if (!isBlock) return <code className="font-mono text-[#14F195] bg-[#14F195]/10 px-1.5 py-0.5 rounded text-[13px]" {...props}>{children}</code>;
+                          return (
+                            <div className="relative group">
+                              <div className="flex items-center justify-between px-4 py-1.5 bg-white/[0.04] border-b border-white/[0.06] rounded-t-xl">
+                                <span className="text-[10px] text-white/30 font-mono">{className?.replace('language-', '') ?? 'code'}</span>
+                                <button onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+                                  className="text-[10px] text-white/40 hover:text-[#14F195] transition-colors">
+                                  {copied ? '✅ Copiado' : '📋 Copiar'}
+                                </button>
+                              </div>
+                              <pre className="!mt-0 !rounded-t-none overflow-x-auto"><code className={`${className} text-[13px]`}>{code}</code></pre>
+                            </div>
+                          );
+                        },
+                      }}
+                    >{displayContent}</ReactMarkdown>
                   </div>
             }
           </div>
@@ -1513,8 +1537,8 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
-      const res = await fetch('/api/chat', {
+      const timeout = setTimeout(() => controller.abort(), 90000);
+      const res = await fetch('/api/chat/stream', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
@@ -1523,63 +1547,72 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      const data = await res.json();
-      const responseTime = Date.now() - startTime;
-      const tokensUsed = data.response ? Math.ceil(data.response.length / 3.5) : 0;
-      setOrbMode('typing');
 
-      const fullContent = data.response || data.error || 'Sem resposta.';
+      if (!res.ok || !res.body) throw new Error('Stream failed');
+
+      setOrbMode('typing');
       const msgId = (Date.now() + 1).toString();
       const assistantMsg: Message = {
-        id: msgId, role: 'assistant',
-        content: '',
+        id: msgId, role: 'assistant', content: '',
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         orbMode: 'success', model: selectedModel,
-        memoryHash: data.memoryHash || undefined,
-        responseTime, tokensUsed,
         contextInjected: contextActive || previousModel !== selectedModel,
         previousModel: previousModel !== selectedModel ? previousModel : undefined,
         contextSummary: contextActive ? 'Memorias anteriores injetadas no contexto' : undefined,
-        structuredResponse: data.structuredResponse ?? undefined,
       };
       setMessages(prev => [...prev, assistantMsg]);
       setStreamingId(msgId);
       setStreamedContent('');
 
-      // Typewriter effect
-      let charIdx = 0;
-      const CHUNK = 4;
-      if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
-      streamIntervalRef.current = setInterval(() => {
-        charIdx += CHUNK;
-        if (charIdx >= fullContent.length) {
-          clearInterval(streamIntervalRef.current!);
-          streamIntervalRef.current = null;
-          setStreamedContent(fullContent);
-          setStreamingId(null);
-          setMessages(prev => {
-            const updated = prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m);
-            // Notify parent with session metadata for history sidebar
-            if (onSessionUpdate) {
-              const firstUser = updated.find(m => m.role === 'user');
-              const title = firstUser
-                ? firstUser.content.slice(0, 55) + (firstUser.content.length > 55 ? '...' : '')
-                : 'Conversa';
-              onSessionUpdate({
-                id: sessionIdRef.current,
-                title,
-                lastMessage: fullContent.slice(0, 45) + (fullContent.length > 45 ? '...' : ''),
-                timestamp: 'Agora',
-              });
+      // Real token streaming
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let fullContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        const lines = accumulated.split('\n');
+        accumulated = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.token) {
+              fullContent += evt.token;
+              setStreamedContent(fullContent);
             }
-            return updated;
-          });
-          setOrbMode('idle');
-          setIsTyping(false);
-        } else {
-          setStreamedContent(fullContent.slice(0, charIdx));
+            if (evt.done) {
+              clearTimeout(timeout);
+              setStreamingId(null);
+              const responseTime = Date.now() - startTime;
+              setMessages(prev => {
+                const updated = prev.map(m => m.id === msgId ? {
+                  ...m, content: fullContent,
+                  responseTime, tokensUsed: Math.ceil(fullContent.length / 3.5),
+                  structuredResponse: evt.structuredResponse ?? undefined,
+                } : m);
+                if (onSessionUpdate) {
+                  const firstUser = updated.find(m => m.role === 'user');
+                  const title = firstUser
+                    ? firstUser.content.slice(0, 55) + (firstUser.content.length > 55 ? '...' : '')
+                    : 'Conversa';
+                  onSessionUpdate({
+                    id: sessionIdRef.current, title,
+                    lastMessage: fullContent.slice(0, 45) + (fullContent.length > 45 ? '...' : ''),
+                    timestamp: 'Agora',
+                  });
+                }
+                return updated;
+              });
+              setOrbMode('idle');
+              setIsTyping(false);
+            }
+          } catch { /* malformed SSE line */ }
         }
-      }, 15);
+      }
     } catch (err: unknown) {
       if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
       setStreamingId(null);
