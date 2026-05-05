@@ -12,6 +12,9 @@ import {
 import { isPhantomInstalled, connectPhantom, disconnectPhantom, getSolBalance, truncateAddress } from '@/services/wallet/wallet.service';
 import Orb, { type OrbMode } from './orb';
 import { MODEL_LABELS, type AIModel } from '@/services/memory/memory.model';
+import type { StructuredResponse } from '@/lib/grounding/types';
+import dynamic from 'next/dynamic';
+const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
 
 // ============================================================
 // DESIGN LOCK: Original UI preserved. Only additive features.
@@ -35,6 +38,7 @@ interface Message {
   contextSummary?: string;
   poiTxHash?: string;
   poiVotes?: number;
+  structuredResponse?: StructuredResponse;
 }
 
 // ============================================================
@@ -105,13 +109,27 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
             )}
           </div>
         )}
-        <div className={`rounded-2xl px-4 py-3 text-[15px] leading-relaxed
-          ${isUser
-            ? 'bg-gradient-to-br from-[#9945FF]/30 to-[#9945FF]/15 border border-[#9945FF]/20 text-white/90'
-            : 'bg-white/[0.04] border border-white/[0.06] text-white/80'
-          }`}>
-          <p className="whitespace-pre-wrap">{displayContent}{isStreaming && <span className="animate-pulse text-[#9945FF]">▌</span>}</p>
-        </div>
+        {!isUser && message.structuredResponse ? (
+          (() => {
+            try {
+              return <ResponseRouter response={message.structuredResponse} />;
+            } catch {
+              return (
+                <div className="rounded-2xl px-4 py-3 text-[15px] leading-relaxed bg-white/[0.04] border border-white/[0.06] text-white/80">
+                  <p className="whitespace-pre-wrap">{displayContent}</p>
+                </div>
+              );
+            }
+          })()
+        ) : (
+          <div className={`rounded-2xl px-4 py-3 text-[15px] leading-relaxed
+            ${isUser
+              ? 'bg-gradient-to-br from-[#9945FF]/30 to-[#9945FF]/15 border border-[#9945FF]/20 text-white/90'
+              : 'bg-white/[0.04] border border-white/[0.06] text-white/80'
+            }`}>
+            <p className="whitespace-pre-wrap">{displayContent}{isStreaming && <span className="animate-pulse text-[#9945FF]">▌</span>}</p>
+          </div>
+        )}
         {isLatest && !isUser && (
           <div className="flex items-center gap-1 mt-2 flex-wrap">
             <button className="p-1 rounded hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors" title="Copiar"><CopyIcon className="w-4 h-4" /></button>
@@ -1498,6 +1516,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         contextInjected: contextActive || previousModel !== selectedModel,
         previousModel: previousModel !== selectedModel ? previousModel : undefined,
         contextSummary: contextActive ? 'Memorias anteriores injetadas no contexto' : undefined,
+        structuredResponse: data.structuredResponse ?? undefined,
       };
       setMessages(prev => [...prev, assistantMsg]);
       setStreamingId(msgId);
@@ -2077,7 +2096,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                         if (!mem) throw new Error('Memória inválida');
                         const createdAt = new Date(mem.timestamp * 1000).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
                         const ctx = `⚡ Memória Verificada · CognChain on Solana\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nHash: ${mem.hash}\nModelo: ${mem.model} · Score: ${mem.score ?? '—'}/10\nCriada em: ${createdAt}\nStatus: ${mem.verified ? '✓ Verificado on-chain' : '⏳ Pendente'}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${mem.content}`;
-                        setMessages([{ role: 'assistant', content: ctx }]);
+                        setMessages([{ id: Date.now().toString(), role: 'assistant', content: ctx, timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }]);
                         setHashInput('');
                         setInputValue('Continue e aprofunde esta memória verificada:');
                       } catch (err) {
