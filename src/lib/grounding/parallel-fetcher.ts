@@ -12,17 +12,43 @@ async function safeFetch(url: string, opts?: RequestInit): Promise<unknown> {
   return res.json();
 }
 
-// ─── EXISTING: CoinGecko ─────────────────────────────────────────────────────
+// ─── Jupiter Price API (Solana-native, no rate limit) ────────────────────────
 
-/** CoinGecko free API — no key needed */
+const JUPITER_IDS: Record<string, string> = {
+  solana: 'SOL',
+  bonk:   'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+  jup:    'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
+  ray:    '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
+};
+
+type JupiterResponse = { data: Record<string, { price: number; mintSymbol?: string }> };
+
+/** Jupiter Price API — Solana-native, no key, no rate limit */
+async function fetchJupiter(symbol: string): Promise<RawSource[]> {
+  const id = JUPITER_IDS[symbol.toLowerCase()];
+  if (!id) return [];
+  const url = `https://price.jup.ag/v6/price?ids=${id}`;
+  const data = await safeFetch(url) as JupiterResponse;
+  const entry = data?.data?.[id];
+  if (!entry?.price) return [];
+  return [{
+    name: `Jupiter Price (${symbol.toUpperCase()})`,
+    url: `https://jup.ag/swap/SOL-${id}`,
+    value: entry.price,
+    fromApi: true,
+  }];
+}
+
+// ─── CoinGecko (fallback) ────────────────────────────────────────────────────
+
+/** CoinGecko — fallback if Jupiter unavailable */
 async function fetchCoinGecko(coinId: string): Promise<RawSource[]> {
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_market_cap=true&include_24hr_change=true`;
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`;
   const data = await safeFetch(url) as Record<string, Record<string, number>>;
   const coin = data[coinId];
   if (!coin) return [];
   return [
-    { name: 'CoinGecko', url: `https://www.coingecko.com/en/coins/${coinId}`, value: coin.usd, fromApi: true },
-    { name: 'CoinGecko Market Cap', url: `https://www.coingecko.com/en/coins/${coinId}`, value: coin.usd_market_cap, fromApi: true },
+    { name: `CoinGecko Price (${coinId})`, url: `https://www.coingecko.com/en/coins/${coinId}`, value: coin.usd, fromApi: true },
   ];
 }
 
@@ -172,20 +198,22 @@ export async function fetchSourcesForQuery(query: string): Promise<RawSource[]> 
   const q = query.toLowerCase();
   const tasks: Promise<RawSource[]>[] = [];
 
-  // ── Existing coin detection ─────────────────────────────────────────────────
+  // ── Jupiter (primary — Solana-native, no rate limits) ──────────────────────
   if (q.includes('sol') || q.includes('solana')) {
-    tasks.push(fetchCoinGecko('solana').catch(() => []));
-    tasks.push(fetchSolanaFM('sol').catch(() => []));
+    tasks.push(fetchJupiter('solana').catch(() => []));
+    tasks.push(fetchCoinGecko('solana').catch(() => [])); // fallback
   }
   if (q.includes('bonk')) {
+    tasks.push(fetchJupiter('bonk').catch(() => []));
     tasks.push(fetchCoinGecko('bonk').catch(() => []));
-    tasks.push(fetchSolanaFM('bonk').catch(() => []));
   }
   if (q.includes('jup') || q.includes('jupiter')) {
+    tasks.push(fetchJupiter('jup').catch(() => []));
     tasks.push(fetchCoinGecko('jupiter-exchange-solana').catch(() => []));
     tasks.push(fetchSolanaFM('jup').catch(() => []));
   }
   if (q.includes('ray') || q.includes('raydium')) {
+    tasks.push(fetchJupiter('ray').catch(() => []));
     tasks.push(fetchCoinGecko('raydium').catch(() => []));
     tasks.push(fetchSolanaFM('ray').catch(() => []));
     tasks.push(fetchDefiLlama('raydium').catch(() => []));
