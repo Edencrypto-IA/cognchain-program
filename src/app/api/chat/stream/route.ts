@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   let userPlan: 'free' | 'pro' = isAdmin ? 'pro' : 'free';
   if (!isAdmin && hasApiKey) {
     const auth = await requireApiKey(req);
-    if ('key' in auth) userPlan = (auth.key.plan === 'pro' || auth.key.plan === 'enterprise') ? 'pro' : 'free';
+    if ('key' in auth && auth.key) userPlan = (auth.key.plan === 'pro' || auth.key.plan === 'enterprise') ? 'pro' : 'free';
   }
 
   let selectedModel = 'nvidia';
@@ -96,28 +96,45 @@ export async function POST(req: NextRequest) {
     if (!rate.allowed) return new Response('Rate limit exceeded', { status: 429 });
   }
 
-  // Grounding
   const lastMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user');
-  let groundingPrefix = '';
-  let structuredResponse = null;
-  if (lastMsg && needsGrounding(lastMsg.content)) {
-    try {
-      const grounded = await groundQuery(lastMsg.content);
-      structuredResponse = grounded.response;
-      if (grounded.markdown) groundingPrefix = `[Dados verificados]\n${grounded.markdown}\n\n`;
-    } catch { /* silent */ }
+
+  function encStatus(text: string) {
+    return new TextEncoder().encode(`data: ${JSON.stringify({ status: text })}\n\n`);
   }
-
-  const augmented = groundingPrefix && lastMsg
-    ? messages.map((m: { role: string; content: string }) => m === lastMsg ? { ...m, content: groundingPrefix + m.content } : m)
-    : messages;
-
-  const validMsgs = augmented.map((m: { role: string; content: string }) => ({ role: m.role, content: String(m.content).slice(0, Limits.MAX_PROMPT_LENGTH) }));
 
   const stream = new ReadableStream({
     async start(controller) {
       try {
         let full = '';
+
+        // Grounding with live status events
+        let groundingPrefix = '';
+        let structuredResponse: import('@/lib/grounding/types').StructuredResponse | null = null;
+        if (lastMsg && needsGrounding(lastMsg.content)) {
+          controller.enqueue(encStatus('🔍 Analisando query...'));
+          await new Promise(r => setTimeout(r, 100));
+          controller.enqueue(encStatus('📡 Consultando exchanges em tempo real...'));
+          try {
+            const grounded = await groundQuery(lastMsg.content);
+            structuredResponse = grounded.response;
+            const srcCount = grounded.response.allSources.length;
+            if (grounded.markdown) {
+              groundingPrefix = `[Dados verificados]\n${grounded.markdown}\n\n`;
+              controller.enqueue(encStatus(`✅ ${srcCount} fonte${srcCount !== 1 ? 's' : ''} verificada${srcCount !== 1 ? 's' : ''} · Gerando resposta...`));
+            } else {
+              controller.enqueue(encStatus('🧠 Gerando resposta...'));
+            }
+          } catch {
+            controller.enqueue(encStatus('🧠 Gerando resposta...'));
+          }
+        } else {
+          controller.enqueue(encStatus('🧠 Gerando resposta...'));
+        }
+
+        const augmented = groundingPrefix && lastMsg
+          ? messages.map((m: { role: string; content: string }) => m === lastMsg ? { ...m, content: groundingPrefix + m.content } : m)
+          : messages;
+        const validMsgs = augmented.map((m: { role: string; content: string }) => ({ role: m.role, content: String(m.content).slice(0, Limits.MAX_PROMPT_LENGTH) }));
         if (selectedModel === 'gpt') {
           full = await streamOpenAI(validMsgs, 'gpt-4o', controller);
         } else if (selectedModel === 'claude') {

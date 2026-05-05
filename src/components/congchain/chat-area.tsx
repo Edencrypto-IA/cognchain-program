@@ -1423,6 +1423,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isWalletConnecting, setIsWalletConnecting] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [thinkingStatus, setThinkingStatus] = useState('Analisando...');
   const [showSolanaOverlay, setShowSolanaOverlay] = useState(false);
   const [solanaTxHash, setSolanaTxHash] = useState<string | null>(null);
   const [auditHash, setAuditHash] = useState<string | null>(null);
@@ -1580,11 +1581,15 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           if (!line.startsWith('data: ')) continue;
           try {
             const evt = JSON.parse(line.slice(6));
+            if (evt.status) {
+              setThinkingStatus(evt.status);
+            }
             if (evt.token) {
               fullContent += evt.token;
               setStreamedContent(fullContent);
             }
             if (evt.done) {
+              setThinkingStatus('Analisando...');
               clearTimeout(timeout);
               setStreamingId(null);
               const responseTime = Date.now() - startTime;
@@ -2211,14 +2216,21 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               ))}
               {isTyping && !streamingId && (
                 <div className="flex gap-4 px-4 md:px-6 lg:px-8">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-visible"><Orb mode={orbMode} size="sm" interactive={false} /></div>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-visible">
+                    <Orb mode={orbMode} size="sm" interactive={false} />
+                  </div>
                   <div className="flex-1 max-w-[70%]">
-                    <div className="flex items-center gap-2 mb-1.5"><span className="text-xs font-semibold text-white/60">CONGCHAIN</span></div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs font-semibold text-white/60">CONGCHAIN</span>
+                    </div>
                     <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                        <span className="text-[12px] text-white/40 transition-all duration-300">{thinkingStatus}</span>
                       </div>
                     </div>
                   </div>
