@@ -101,7 +101,9 @@ export async function POST(request: NextRequest) {
     // ── Cache lookup — serve instantly, zero API cost ─────────
     await ensureSeeded();
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
-    const cached = lastUserMessage ? await getCachedResponse(lastUserMessage.content) : null;
+    // Skip cache for grounding queries — they need fresh real-time data
+    const isGroundingQuery = lastUserMessage ? needsGrounding(lastUserMessage.content) : false;
+    const cached = (!isGroundingQuery && lastUserMessage) ? await getCachedResponse(lastUserMessage.content) : null;
 
     if (cached) {
       return NextResponse.json({
