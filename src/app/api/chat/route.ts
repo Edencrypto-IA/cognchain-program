@@ -114,21 +114,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Grounding Engine — inject verified data + return structured response ─
+    // ── Grounding Engine ──────────────────────────────────────────
     let groundingPrefix = '';
     let structuredResponse: import('@/lib/grounding/types').StructuredResponse | null = null;
     if (lastUserMessage && needsGrounding(lastUserMessage.content)) {
-      // 8s total budget — never block the chat
-      const grounded = await Promise.race([
-        groundQuery(lastUserMessage.content),
-        new Promise<null>(r => setTimeout(() => r(null), 8000)),
-      ]).catch(() => null);
-      if (grounded && 'response' in grounded) {
-        groundingPrefix = grounded.markdown
-          ? `[Dados verificados]\n${grounded.markdown}\n\n`
-          : '';
+      try {
+        const grounded = await groundQuery(lastUserMessage.content);
         structuredResponse = grounded.response;
-      }
+        if (grounded.markdown) {
+          groundingPrefix = `[Dados verificados]\n${grounded.markdown}\n\n`;
+        }
+      } catch { /* grounding failed silently */ }
     }
 
     const augmentedMessages = groundingPrefix && lastUserMessage
