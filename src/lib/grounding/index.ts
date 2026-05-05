@@ -2,7 +2,7 @@ import { fetchSourcesForQuery } from './parallel-fetcher';
 import { filterTrustedSources } from './trust-filter';
 import { createSourceLinker } from './source-linker';
 import { buildVerifiedResponse, formatResponseAsMarkdown } from './response-builder';
-import type { StructuredResponse } from './types';
+import type { StructuredResponse, RawSource } from './types';
 
 export * from './types';
 export * from './trust-filter';
@@ -13,8 +13,22 @@ export * from './response-builder';
 export * from './parallel-fetcher';
 
 /**
+ * Group raw sources by metric (same source name = same metric).
+ * This prevents consensus engine from treating price vs market-cap as a conflict.
+ */
+function groupByMetric(sources: RawSource[]): RawSource[][] {
+  const map = new Map<string, RawSource[]>();
+  for (const s of sources) {
+    const key = s.name;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(s);
+  }
+  return [...map.values()];
+}
+
+/**
  * Full grounding pipeline:
- * fetch → filter → link → build → format
+ * fetch → filter → group by metric → one fact per metric → build → format
  */
 export async function groundQuery(query: string): Promise<{
   response: StructuredResponse;
@@ -28,9 +42,15 @@ export async function groundQuery(query: string): Promise<{
   // 2. Trust filter
   const trusted = filterTrustedSources(rawSources);
 
-  // 3. Build verified facts — group by claim
+  // 3. Build one verified fact per metric group (avoids conflict on price vs market cap)
   const facts = trusted.length > 0
-    ? [linker.buildVerifiedFact(query, rawSources)]
+    ? groupByMetric(rawSources)
+        .filter(group => group.length > 0)
+        .slice(0, 6) // max 6 facts
+        .map(group => linker.buildVerifiedFact(
+          `${group[0].name}: ${query}`,
+          group,
+        ))
     : [];
 
   // 4. Build structured response
@@ -45,9 +65,10 @@ export async function groundQuery(query: string): Promise<{
 /** Check if a query is data-heavy (needs grounding) */
 export function needsGrounding(query: string): boolean {
   const triggers = [
-    'preço', 'price', 'valor', 'market cap', 'tvl', 'token', 'sol ',
-    'volume', 'variação', '24h', 'rank', 'top ', 'maior', 'estatística',
-    'dados', 'número', 'quantos', 'quanto', 'how much', 'how many',
+    'preço', 'preco', 'price', 'valor', 'market cap', 'tvl', 'token', 'sol ',
+    'volume', 'variação', 'variacao', '24h', 'rank', 'top ', 'maior',
+    'estatística', 'dados', 'número', 'quantos', 'quanto', 'how much', 'how many',
+    'cotação', 'cotacao', 'hoje',
   ];
   const q = query.toLowerCase();
   return triggers.some(t => q.includes(t));
