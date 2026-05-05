@@ -19,6 +19,7 @@ const JUPITER_IDS: Record<string, string> = {
   bonk:   'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
   jup:    'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
   ray:    '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
+  pengu:  '2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv',
 };
 
 type JupiterResponse = { data: Record<string, { price: number; mintSymbol?: string }> };
@@ -197,10 +198,10 @@ function parseDDGResults(html: string): WebResult[] {
 // ─── Exchange APIs (free, no key) ────────────────────────────────────────────
 
 const EXCHANGE_SYMBOLS: Record<string, Record<string, string>> = {
-  binance: { solana: 'SOLUSDT', bonk: 'BONKUSDT', jup: 'JUPUSDT', ray: 'RAYUSDT' },
-  bybit:   { solana: 'SOLUSDT', bonk: 'BONKUSDT', jup: 'JUPUSDT', ray: 'RAYUSDT' },
-  kraken:  { solana: 'SOLUSD',  bonk: 'BONKUSD'  },
-  okx:     { solana: 'SOL-USDT', bonk: 'BONK-USDT', jup: 'JUP-USDT', ray: 'RAY-USDT' },
+  binance: { solana: 'SOLUSDT', bonk: 'BONKUSDT', jup: 'JUPUSDT', ray: 'RAYUSDT', pengu: 'PENGUUSDT' },
+  bybit:   { solana: 'SOLUSDT', bonk: 'BONKUSDT', jup: 'JUPUSDT', ray: 'RAYUSDT', pengu: 'PENGUUSDT' },
+  kraken:  { solana: 'SOLUSD',  bonk: 'BONKUSD' },
+  okx:     { solana: 'SOL-USDT', bonk: 'BONK-USDT', jup: 'JUP-USDT', ray: 'RAY-USDT', pengu: 'PENGU-USDT' },
 };
 
 type BinanceTicker  = { price: string };
@@ -294,6 +295,13 @@ export async function fetchSourcesForQuery(query: string): Promise<RawSource[]> 
     tasks.push(fetchBinance('ray').catch(() => []));
     tasks.push(fetchOKX('ray').catch(() => []));
     tasks.push(fetchDefiLlama('raydium').catch(() => []));
+  }
+  if (q.includes('pengu') || q.includes('pudgy')) {
+    tasks.push(fetchJupiter('pengu').catch(() => []));
+    tasks.push(fetchCoinGecko('pudgy-penguins').catch(() => []));
+    tasks.push(fetchBinance('pengu').catch(() => []));
+    tasks.push(fetchBybit('pengu').catch(() => []));
+    tasks.push(fetchOKX('pengu').catch(() => []));
   }
   if (q.includes('jto') || q.includes('jito')) {
     tasks.push(fetchSolanaFM('jto').catch(() => []));
