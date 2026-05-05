@@ -116,14 +116,16 @@ export async function POST(request: NextRequest) {
 
     // ── Grounding Engine — inject verified data + return structured response ─
     let groundingPrefix = '';
-    let structuredResponse = null;
+    let structuredResponse: import('@/lib/grounding/types').StructuredResponse | null = null;
     if (lastUserMessage && needsGrounding(lastUserMessage.content)) {
       // 8s total budget — never block the chat
       const grounded = await Promise.race([
         groundQuery(lastUserMessage.content),
         new Promise<null>(r => setTimeout(() => r(null), 8000)),
       ]).catch(() => null);
-      if (grounded && grounded.response.meta.approvedFacts > 0) {
+      const hasVisibleFacts = grounded &&
+        grounded.response.facts.some(f => f.status !== 'blocked');
+      if (hasVisibleFacts && grounded) {
         groundingPrefix = `[Dados verificados em tempo real]\n${grounded.markdown}\n\n[Responda com base nesses dados verificados]\n`;
         structuredResponse = grounded.response;
       }
