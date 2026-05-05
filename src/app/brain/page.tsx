@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2 } from 'lucide-react';
+import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2, ArrowLeft, Trash2, Send, MessageSquare } from 'lucide-react';
 
 const MODEL_COLORS: Record<string, string> = {
   gpt:      '#10A37F',
@@ -55,7 +55,6 @@ function getNodeRadius(id: string, links: GraphLink[]): number {
 function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
   const idxMap = new Map(nodes.map((n, i) => [n.id, i]));
   for (let iter = 0; iter < ITERATIONS_PER_FRAME; iter++) {
-    // Repulsion between all nodes
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const dx = nodes[j].x - nodes[i].x;
@@ -68,7 +67,6 @@ function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
         nodes[j].vx += fx; nodes[j].vy += fy;
       }
     }
-    // Spring forces — strength-weighted
     for (const l of links) {
       const si = idxMap.get(l.source); const ti = idxMap.get(l.target);
       if (si == null || ti == null) continue;
@@ -81,7 +79,6 @@ function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
       const fx = (dx / dist) * force; const fy = (dy / dist) * force;
       s.vx += fx; s.vy += fy; t.vx -= fx; t.vy -= fy;
     }
-    // Gravity toward center
     for (const n of nodes) {
       n.vx -= n.x * GRAVITY;
       n.vy -= n.y * GRAVITY;
@@ -104,6 +101,7 @@ export default function BrainPage() {
   const draggingRef = useRef<{ nodeId: string | null; offsetX: number; offsetY: number }>({ nodeId: null, offsetX: 0, offsetY: 0 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+  const mouseDownPosRef = useRef({ x: 0, y: 0 });
 
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [filter, setFilter] = useState('all');
@@ -115,33 +113,40 @@ export default function BrainPage() {
   const [stats, setStats] = useState({ total: 0, byModel: {} as Record<string, number> });
   const [, setRawData] = useState<RawData>({ nodes: [], links: [] });
 
-  useEffect(() => {
-    fetch('/api/memory/graph')
-      .then(r => r.json())
-      .then((data: RawData) => {
-        const byModel: Record<string, number> = {};
-        const nodes: GraphNode[] = data.nodes.map((n, i) => {
-          const k = modelKey(n.model);
-          byModel[k] = (byModel[k] ?? 0) + 1;
-          const angle = (i / data.nodes.length) * 2 * Math.PI + (Math.random() - 0.5) * 0.8;
-          const radius = 150 + Math.random() * 120;
-          return { ...n, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, vx: 0, vy: 0 };
-        });
-        nodesRef.current = nodes;
-        linksRef.current = data.links;
-        setRawData(data);
-        setStats({ total: nodes.length, byModel });
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+  // New command input state
+  const [cmdText, setCmdText] = useState('');
+  const [cmdModel, setCmdModel] = useState('nvidia');
+  const [cmdSending, setCmdSending] = useState(false);
+  const [cmdMsg, setCmdMsg] = useState('');
+
+  // Delete state
+  const [deleting, setDeleting] = useState(false);
+
+  const loadGraph = useCallback(async () => {
+    setLoading(true);
+    const data: RawData = await fetch('/api/memory/graph').then(r => r.json());
+    const byModel: Record<string, number> = {};
+    const nodes: GraphNode[] = data.nodes.map((n, i) => {
+      const k = modelKey(n.model);
+      byModel[k] = (byModel[k] ?? 0) + 1;
+      const angle = (i / data.nodes.length) * 2 * Math.PI + (Math.random() - 0.5) * 0.8;
+      const radius = 150 + Math.random() * 120;
+      return { ...n, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, vx: 0, vy: 0 };
+    });
+    nodesRef.current = nodes;
+    linksRef.current = data.links;
+    setRawData(data);
+    setStats({ total: nodes.length, byModel });
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadGraph().catch(() => setLoading(false)); }, [loadGraph]);
 
   const getFilteredIds = useCallback(() => {
     if (filter === 'all') return null;
     return new Set(nodesRef.current.filter(n => n.model.toLowerCase().includes(filter)).map(n => n.id));
   }, [filter]);
 
-  // Static star field generated once
   const starsRef = useRef<{x:number;y:number;r:number;o:number}[]>([]);
   if (starsRef.current.length === 0) {
     for (let i = 0; i < 180; i++) {
@@ -162,7 +167,6 @@ export default function BrainPage() {
     const { x: tx, y: ty, scale } = transformRef.current;
     const w = canvas.width; const h = canvas.height;
 
-    // Dark universe background
     ctx.fillStyle = '#050510';
     ctx.fillRect(0, 0, w, h);
 
@@ -170,7 +174,6 @@ export default function BrainPage() {
     ctx.translate(tx + w / 2, ty + h / 2);
     ctx.scale(scale, scale);
 
-    // Draw stars
     for (const s of starsRef.current) {
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r / scale, 0, 2 * Math.PI);
@@ -183,7 +186,6 @@ export default function BrainPage() {
     const links = linksRef.current;
     const idxMap = new Map(nodes.map((n, i) => [n.id, i]));
 
-    // Draw links
     for (const l of links) {
       const si = idxMap.get(l.source); const ti = idxMap.get(l.target);
       if (si == null || ti == null) continue;
@@ -197,7 +199,6 @@ export default function BrainPage() {
       ctx.setLineDash([]);
 
       if (l.type === 'chain') {
-        // Bright solid white — strongest link
         const grad = ctx.createLinearGradient(s.x, s.y, t.x, t.y);
         grad.addColorStop(0, modelColor(s.model) + 'cc');
         grad.addColorStop(1, modelColor(t.model) + 'cc');
@@ -229,25 +230,21 @@ export default function BrainPage() {
       ctx.setLineDash([]);
     }
 
-    // Draw nodes
     for (const n of nodes) {
       if (filteredIds && !filteredIds.has(n.id)) continue;
       const color = modelColor(n.model);
       const r = getNodeRadius(n.id, links);
       const isSelected = selected?.id === n.id;
 
-      // Outer glow
       const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3);
       glow.addColorStop(0, color + '55');
       glow.addColorStop(1, 'transparent');
       ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, 2 * Math.PI);
       ctx.fillStyle = glow; ctx.fill();
 
-      // Inner glow ring
       ctx.beginPath(); ctx.arc(n.x, n.y, r * 1.6, 0, 2 * Math.PI);
       ctx.fillStyle = color + '33'; ctx.fill();
 
-      // Core node
       ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
       ctx.fillStyle = isSelected ? '#ffffff' : color;
       ctx.shadowColor = color;
@@ -255,12 +252,10 @@ export default function BrainPage() {
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Selected ring
       if (isSelected) {
         ctx.beginPath(); ctx.arc(n.x, n.y, r + 4, 0, 2 * Math.PI);
         ctx.strokeStyle = '#ffffff88'; ctx.lineWidth = 1.5 / scale; ctx.stroke();
       }
-      // ZK ring
       if (n.zkVerified) {
         ctx.beginPath(); ctx.arc(n.x, n.y, r + 3, 0, 2 * Math.PI);
         ctx.strokeStyle = '#FFD700cc'; ctx.lineWidth = 1.5 / scale;
@@ -268,7 +263,6 @@ export default function BrainPage() {
         ctx.stroke(); ctx.shadowBlur = 0;
       }
 
-      // Label
       const snippet = n.label.slice(0, 24) + (n.label.length > 24 ? '…' : '');
       ctx.font = `${10 / scale}px sans-serif`;
       ctx.fillStyle = 'rgba(255,255,255,0.65)';
@@ -292,7 +286,6 @@ export default function BrainPage() {
     return () => { stopped = true; cancelAnimationFrame(animRef.current); };
   }, [loading, draw]);
 
-  // Resize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -330,6 +323,7 @@ export default function BrainPage() {
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const sx = e.clientX - rect.left; const sy = e.clientY - rect.top;
+    mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
     const { x: wx, y: wy } = screenToWorld(sx, sy);
     const hit = hitTest(wx, wy);
     if (hit) {
@@ -355,23 +349,26 @@ export default function BrainPage() {
   }, [screenToWorld, draw]);
 
   const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!draggingRef.current.nodeId && !isPanningRef.current) return;
     const wasDraggingNode = !!draggingRef.current.nodeId;
+    const wasPanning = isPanningRef.current;
     draggingRef.current = { nodeId: null, offsetX: 0, offsetY: 0 };
     isPanningRef.current = false;
-    if (!wasDraggingNode) {
-      // click on canvas = deselect
+
+    // Only select on click (not drag)
+    const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+    const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+    if (dx < 5 && dy < 5 && !wasDraggingNode) {
+      const rect = canvasRef.current!.getBoundingClientRect();
+      const { x: wx, y: wy } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      const hit = hitTest(wx, wy);
+      setSelected(hit);
+    } else if (dx < 5 && dy < 5 && wasDraggingNode && !wasPanning) {
+      // dragged minimally = click on node
       const rect = canvasRef.current!.getBoundingClientRect();
       const { x: wx, y: wy } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
       const hit = hitTest(wx, wy);
       setSelected(hit);
     }
-  }, [screenToWorld, hitTest]);
-
-  const onClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const { x: wx, y: wy } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-    setSelected(hitTest(wx, wy));
   }, [screenToWorld, hitTest]);
 
   const onWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -391,21 +388,89 @@ export default function BrainPage() {
     nodesRef.current = nodesRef.current.map((node, i) => {
       const angle = (i / n) * 2 * Math.PI + (Math.random() - 0.5) * 1.2;
       const radius = 180 + Math.random() * 200;
-      return {
-        ...node,
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
-        vx: (Math.random() - 0.5) * 40,
-        vy: (Math.random() - 0.5) * 40,
-      };
+      return { ...node, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40 };
     });
+  };
+
+  const deleteNode = async (node: GraphNode) => {
+    if (!confirm(`Excluir esta memória?\n\n"${node.label}"`) ) return;
+    setDeleting(true);
+    try {
+      await fetch(`/api/memory/${node.hash}`, { method: 'DELETE' });
+      nodesRef.current = nodesRef.current.filter(n => n.id !== node.id);
+      linksRef.current = linksRef.current.filter(l => l.source !== node.id && l.target !== node.id);
+      setStats(s => {
+        const k = modelKey(node.model);
+        const byModel = { ...s.byModel, [k]: Math.max(0, (s.byModel[k] ?? 1) - 1) };
+        return { total: s.total - 1, byModel };
+      });
+      setSelected(null);
+    } catch {
+      alert('Erro ao excluir memória');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const sendCommand = async () => {
+    if (!cmdText.trim() || cmdSending) return;
+    setCmdSending(true);
+    setCmdMsg('Enviando...');
+    try {
+      // Save as memory directly
+      const res = await fetch('/api/save-memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: cmdText.trim(), model: cmdModel }),
+      });
+      if (!res.ok) throw new Error('Erro ao salvar');
+      const saved = await res.json();
+
+      // Add node to graph immediately
+      const newNode: GraphNode = {
+        id: saved.hash,
+        hash: saved.hash,
+        label: cmdText.trim().slice(0, 60),
+        model: cmdModel,
+        timestamp: Math.floor(Date.now() / 1000),
+        score: 7,
+        verified: false,
+        zkVerified: false,
+        onChain: false,
+        x: (Math.random() - 0.5) * 300,
+        y: (Math.random() - 0.5) * 300,
+        vx: (Math.random() - 0.5) * 20,
+        vy: (Math.random() - 0.5) * 20,
+      };
+      nodesRef.current = [...nodesRef.current, newNode];
+      setStats(s => {
+        const k = modelKey(cmdModel);
+        return { total: s.total + 1, byModel: { ...s.byModel, [k]: (s.byModel[k] ?? 0) + 1 } };
+      });
+      setCmdText('');
+      setCmdMsg('✓ Memória salva no grafo');
+      setSelected(newNode);
+      setTimeout(() => setCmdMsg(''), 3000);
+    } catch {
+      setCmdMsg('Erro ao salvar');
+    } finally {
+      setCmdSending(false);
+    }
   };
 
   return (
     <div className="flex h-screen bg-[#060610] text-white overflow-hidden">
       {/* Left panel */}
-      <div className="w-60 flex-shrink-0 flex flex-col border-r border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl z-10">
+      <div className="w-64 flex-shrink-0 flex flex-col border-r border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl z-10">
+
+        {/* Header with back button */}
         <div className="p-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2 mb-3">
+            <a href="/" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-white/50 hover:text-white text-xs transition-all">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Voltar ao Chat</span>
+            </a>
+          </div>
           <div className="flex items-center gap-2 mb-1">
             <Brain className="w-5 h-5 text-[#9945FF]" />
             <span className="font-semibold text-white">Memory Brain</span>
@@ -415,19 +480,7 @@ export default function BrainPage() {
             onClick={async () => {
               setSeeding(true);
               await fetch('/api/demo/memories', { method: 'POST' });
-              const data = await fetch('/api/memory/graph').then(r => r.json());
-              const byModel: Record<string, number> = {};
-              const nodes = data.nodes.map((n: GraphNode, i: number) => {
-                const k = Object.keys(MODEL_COLORS).find(k => n.model.toLowerCase().includes(k)) ?? 'other';
-                byModel[k] = (byModel[k] ?? 0) + 1;
-                const angle = (i / data.nodes.length) * 2 * Math.PI;
-                const a = (i / data.nodes.length) * 2 * Math.PI + (Math.random() - 0.5) * 0.8;
-                const rad = 150 + Math.random() * 120;
-                return { ...n, x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20 };
-              });
-              nodesRef.current = nodes;
-              linksRef.current = data.links;
-              setStats({ total: nodes.length, byModel });
+              await loadGraph();
               setSeeding(false);
             }}
             disabled={seeding}
@@ -439,6 +492,7 @@ export default function BrainPage() {
           </button>
         </div>
 
+        {/* Stats */}
         <div className="p-4 border-b border-white/[0.06]">
           <div className="text-3xl font-bold text-white mb-0.5">{stats.total}</div>
           <div className="text-xs text-white/40 mb-3">memórias totais</div>
@@ -459,7 +513,46 @@ export default function BrainPage() {
           </div>
         </div>
 
+        {/* New Command Input */}
         <div className="p-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-1.5 mb-2 text-xs text-white/50">
+            <MessageSquare className="w-3.5 h-3.5 text-[#14F195]" />
+            <span className="font-semibold text-[#14F195]">Nova Memória</span>
+          </div>
+          <textarea
+            value={cmdText}
+            onChange={e => setCmdText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCommand(); } }}
+            placeholder="Digite um conhecimento para salvar no grafo..."
+            rows={3}
+            className="w-full px-2.5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] focus:border-[#14F195]/40 text-xs text-white/80 placeholder-white/25 outline-none resize-none transition-colors mb-2"
+          />
+          <div className="flex gap-1.5">
+            <select
+              value={cmdModel}
+              onChange={e => setCmdModel(e.target.value)}
+              className="flex-1 px-2 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white/60 outline-none"
+            >
+              <option value="nvidia">NVIDIA</option>
+              <option value="glm">GLM-4.7</option>
+              <option value="minimax">MiniMax</option>
+              <option value="qwen">Qwen3</option>
+              <option value="gpt">GPT-4o</option>
+              <option value="claude">Claude</option>
+            </select>
+            <button
+              onClick={sendCommand}
+              disabled={cmdSending || !cmdText.trim()}
+              className="px-3 py-1.5 rounded-lg bg-[#14F195]/10 border border-[#14F195]/20 hover:bg-[#14F195]/20 text-[#14F195] transition-all disabled:opacity-40 flex items-center gap-1"
+            >
+              {cmdSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+          {cmdMsg && <p className="text-[10px] text-[#14F195]/70 mt-1.5">{cmdMsg}</p>}
+        </div>
+
+        {/* Filter */}
+        <div className="p-4 border-b border-white/[0.06] overflow-y-auto">
           <div className="flex items-center gap-1.5 mb-2 text-xs text-white/40">
             <Filter className="w-3.5 h-3.5" /><span>Filtrar por modelo</span>
           </div>
@@ -473,11 +566,12 @@ export default function BrainPage() {
           </div>
         </div>
 
+        {/* Legend */}
         <div className="p-4 mt-auto">
           <div className="text-xs text-white/25 space-y-1.5">
             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full border border-yellow-400/50" /><span>ZK verificado</span></div>
             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-white/10 ring-1 ring-white/20" /><span>On-chain</span></div>
-            <div className="flex items-center gap-2 mt-1"><span className="text-white/20">Tamanho</span><span className="text-white/30">= score</span></div>
+            <div className="flex items-center gap-2 mt-1 text-white/20"><span>Clique</span><span className="text-white/30">= ver detalhes</span></div>
           </div>
         </div>
       </div>
@@ -497,19 +591,17 @@ export default function BrainPage() {
             <div className="text-center">
               <Brain className="w-12 h-12 text-white/10 mx-auto mb-3" />
               <p className="text-white/40 text-sm">Nenhuma memória salva ainda.</p>
-              <p className="text-white/20 text-xs mt-1">Salve memórias no chat para ver o grafo.</p>
+              <p className="text-white/20 text-xs mt-1">Use o campo ao lado para criar a primeira.</p>
             </div>
           </div>
         )}
         <canvas
           ref={canvasRef}
-          className="w-full h-full"
+          className="w-full h-full cursor-grab active:cursor-grabbing"
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
-          onClick={onClick}
           onWheel={onWheel}
-          style={{ cursor: draggingRef.current.nodeId ? 'grabbing' : 'grab' }}
         />
         {/* Zoom + Scatter controls */}
         <div className="absolute bottom-4 right-4 flex flex-col gap-1">
@@ -525,11 +617,11 @@ export default function BrainPage() {
         </div>
       </div>
 
-      {/* Detail panel */}
+      {/* Detail panel — opens when node is clicked */}
       {selected && (
         <div className="w-72 flex-shrink-0 border-l border-white/[0.06] bg-[#0a0a14]/90 backdrop-blur-xl flex flex-col z-10 overflow-y-auto">
           <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-            <span className="text-sm font-semibold text-white">Memória</span>
+            <span className="text-sm font-semibold text-white">Memória Selecionada</span>
             <button onClick={() => setSelected(null)} className="p-1 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white transition-colors">
               <X className="w-4 h-4" />
             </button>
@@ -564,6 +656,7 @@ export default function BrainPage() {
               <span className="text-xs text-white/40">Data</span>
               <span className="text-xs text-white/60">{dateStr(selected.timestamp)}</span>
             </div>
+
             {/* Continue Memory */}
             <div className="border border-white/[0.06] rounded-xl p-3">
               <div className="flex items-center gap-1.5 mb-2">
@@ -628,6 +721,16 @@ export default function BrainPage() {
               className="w-full py-2 rounded-xl text-center text-sm font-medium bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/10 border border-[#9945FF]/30 hover:border-[#9945FF]/60 text-white/70 hover:text-white transition-all block">
               Ver memória completa →
             </a>
+
+            {/* Delete button */}
+            <button
+              onClick={() => deleteNode(selected)}
+              disabled={deleting}
+              className="w-full py-2 rounded-xl text-center text-xs font-medium bg-red-500/5 border border-red-500/20 hover:bg-red-500/15 hover:border-red-500/40 text-red-400/60 hover:text-red-400 transition-all flex items-center justify-center gap-2 disabled:opacity-40"
+            >
+              {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              Excluir esta memória
+            </button>
           </div>
         </div>
       )}

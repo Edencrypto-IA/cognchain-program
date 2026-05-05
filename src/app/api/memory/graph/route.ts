@@ -15,9 +15,23 @@ export async function GET() {
     orderBy: { timestamp: 'asc' },
   });
 
-  const nodes = memories.map((m) => ({
+  const WELCOME_PATTERNS = [
+    /^(assistant:\s*)?(olá|ola)[\s!].*sou o (congchain|cognchain)/i,
+    /^(assistant:\s*)?novo inicio/i,
+    /^assistant:\s*novo/i,
+  ];
+
+  const nodes = memories
+    .filter(m => !WELCOME_PATTERNS.some(p => p.test(m.content.trim())))
+    .map((m) => ({
     id: m.hash,
-    label: m.content.slice(0, 60).replace(/\n/g, ' '),
+    label: m.content
+      .replace(/^(assistant:|user:|Q:|A:)\s*/i, '')
+      .replace(/^#+\s*/, '')
+      .replace(/\*\*/g, '')
+      .replace(/\n/g, ' ')
+      .trim()
+      .slice(0, 60),
     model: m.model,
     timestamp: m.timestamp,
     score: m.score ?? 0,
@@ -28,7 +42,7 @@ export async function GET() {
   }));
 
   const links: { source: string; target: string; type: string; strength: number }[] = [];
-  const hashSet = new Set(memories.map(m => m.hash));
+  const hashSet = new Set(nodes.map(n => n.hash));
   const linkedPairs = new Set<string>();
 
   const addLink = (src: string, tgt: string, type: string, strength: number) => {
@@ -38,16 +52,19 @@ export async function GET() {
     links.push({ source: src, target: tgt, type, strength });
   };
 
+  // Use only filtered node hashes for link building
+  const filteredMems = memories.filter(m => hashSet.has(m.hash));
+
   // 1. Parent-child chain (strongest)
-  for (const m of memories) {
+  for (const m of filteredMems) {
     if (m.parentHash && hashSet.has(m.parentHash)) {
       addLink(m.parentHash, m.hash, 'chain', 1.0);
     }
   }
 
   // 2. Same model — connect all memories of same model in order (cluster effect)
-  const byModel = new Map<string, typeof memories>();
-  for (const m of memories) {
+  const byModel = new Map<string, typeof filteredMems>();
+  for (const m of filteredMems) {
     const k = modelKey(m.model);
     if (!byModel.has(k)) byModel.set(k, []);
     byModel.get(k)!.push(m);
@@ -60,11 +77,11 @@ export async function GET() {
 
   // 3. Temporal proximity (24h window, cross-model)
   const WINDOW = 86400;
-  for (let i = 0; i < memories.length; i++) {
-    for (let j = i + 1; j < memories.length; j++) {
-      if (memories[j].timestamp - memories[i].timestamp > WINDOW) break;
-      if (modelKey(memories[i].model) !== modelKey(memories[j].model)) {
-        addLink(memories[i].hash, memories[j].hash, 'temporal', 0.3);
+  for (let i = 0; i < filteredMems.length; i++) {
+    for (let j = i + 1; j < filteredMems.length; j++) {
+      if (filteredMems[j].timestamp - filteredMems[i].timestamp > WINDOW) break;
+      if (modelKey(filteredMems[i].model) !== modelKey(filteredMems[j].model)) {
+        addLink(filteredMems[i].hash, filteredMems[j].hash, 'temporal', 0.3);
       }
     }
   }
@@ -80,8 +97,8 @@ export async function GET() {
   }
 
   // 5. Fallback — ensure no isolated nodes
-  for (let i = 0; i < memories.length - 1; i++) {
-    addLink(memories[i].hash, memories[i + 1].hash, 'temporal', 0.2);
+  for (let i = 0; i < filteredMems.length - 1; i++) {
+    addLink(filteredMems[i].hash, filteredMems[i + 1].hash, 'temporal', 0.2);
   }
 
   return NextResponse.json({ nodes, links });
