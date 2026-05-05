@@ -114,12 +114,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Grounding Engine — inject verified data for data queries ─
+    // ── Grounding Engine — inject verified data + return structured response ─
     let groundingPrefix = '';
+    let structuredResponse = null;
     if (lastUserMessage && needsGrounding(lastUserMessage.content)) {
-      const grounded = await groundQuery(lastUserMessage.content).catch(() => null);
+      // 8s total budget — never block the chat
+      const grounded = await Promise.race([
+        groundQuery(lastUserMessage.content),
+        new Promise<null>(r => setTimeout(() => r(null), 8000)),
+      ]).catch(() => null);
       if (grounded && grounded.response.meta.approvedFacts > 0) {
         groundingPrefix = `[Dados verificados em tempo real]\n${grounded.markdown}\n\n[Responda com base nesses dados verificados]\n`;
+        structuredResponse = grounded.response;
       }
     }
 
@@ -157,6 +163,7 @@ export async function POST(request: NextRequest) {
       model: selectedModel,
       memoryHash,
       chunkCount: chunkCount || undefined,
+      structuredResponse: structuredResponse ?? undefined,
     });
   } catch (error: unknown) {
     const status = error instanceof Error && error.name === 'ValidationError' ? 400 : 500;
