@@ -154,7 +154,8 @@ async function fetchWebSearch(query: string): Promise<RawSource[]> {
     TIMEOUT_MS,
   );
   if (!res.ok) return [];
-  const html = await res.text();
+  // Wrap res.text() in timeout too — prevents hanging on large responses
+  const html = await withTimeout(res.text() as Promise<string>, TIMEOUT_MS);
   const parsed = parseDDGResults(html);
   return parsed.map(r => ({
     name: r.title.slice(0, 60),
@@ -210,9 +211,10 @@ export async function fetchSourcesForQuery(query: string): Promise<RawSource[]> 
     tasks.push(fetchCoinMarketCap(cmcSymbols.join(',')).catch(() => []));
   }
 
-  // ── NEW: Web search for all queries ─────────────────────────────────────────
-  if (tasks.length > 0 || q.length > 10) {
-    tasks.push(fetchWebSearch(`${query} site:coingecko.com OR site:solana.com`).catch(() => []));
+  // ── NEW: Web search — only for queries where APIs returned nothing ───────────
+  // (avoids blocking the pipeline on DDG rate-limiting)
+  if (tasks.length === 0 && q.length > 10) {
+    tasks.push(fetchWebSearch(`${query} solana blockchain`).catch(() => []));
   }
 
   if (tasks.length === 0) return [];
