@@ -1284,6 +1284,11 @@ function UpgradeModal({ model, onClose }: { model: string; onClose: () => void }
 // ── Model Selector ────────────────────────────────────────────
 function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIModel; onModelChange: (model: AIModel) => void }) {
   const [showUpgrade, setShowUpgrade] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/verify').then(r => r.json()).then(d => setIsAdmin(!!d.admin)).catch(() => {});
+  }, []);
 
   const FREE = [
     { key: 'nvidia'  as AIModel, name: 'NVIDIA',   color: '#76B900' },
@@ -1299,7 +1304,7 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
   ];
 
   const handleClick = (key: AIModel, isPro: boolean) => {
-    if (isPro) { setShowUpgrade(key); return; }
+    if (isPro && !isAdmin) { setShowUpgrade(key); return; }
     onModelChange(key);
   };
 
@@ -1318,10 +1323,17 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
         <span className="w-px h-4 bg-white/10 mx-0.5" />
         {PRO.map(m => (
           <button key={m.key} onClick={() => handleClick(m.key, true)}
-            className="relative px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 text-white/25 hover:text-white/40 hover:bg-white/[0.03] group">
-            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 opacity-40" style={{ backgroundColor: m.color }} />
+            className={`relative px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 group
+              ${selectedModel === m.key
+                ? 'bg-white/[0.08] border border-white/[0.12] text-white/90 shadow-sm'
+                : isAdmin
+                  ? 'text-white/60 hover:text-white/90 hover:bg-white/[0.04]'
+                  : 'text-white/25 hover:text-white/40 hover:bg-white/[0.03]'
+              }`}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: m.color, opacity: isAdmin ? 1 : 0.4 }} />
             {m.name}
-            <span className="ml-1 text-[9px] font-bold text-[#9945FF]/70 group-hover:text-[#9945FF]">PRO</span>
+            {!isAdmin && <span className="ml-1 text-[9px] font-bold text-[#9945FF]/70 group-hover:text-[#9945FF]">PRO</span>}
+            {isAdmin && selectedModel === m.key && <span className="ml-1 text-[9px] text-[#00d4aa]/60">✓</span>}
           </button>
         ))}
       </div>
