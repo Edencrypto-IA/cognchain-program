@@ -20,7 +20,7 @@ class GPTHandler implements AIHandler {
   async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda de forma precisa e amigavel em portugues.';
+      'Você é um assistente de IA integrado ao CognChain. Responda de forma direta, precisa e amigável em português. NUNCA invente dados, estatísticas, hashes, transaction IDs ou fatos sobre o CognChain que não foram fornecidos pelo usuário. Se não souber algo, diga claramente que não sabe. Seja conciso.';
 
     const response = await client.chat.completions.create({
       model: 'gpt-4o',
@@ -45,7 +45,7 @@ class ClaudeHandler implements AIHandler {
   async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues com precisao e profundidade tecnica.';
+      'Você é um assistente de IA integrado ao CognChain. Responda em português com precisão e profundidade técnica. NUNCA invente dados, hashes, estatísticas ou fatos sobre o CognChain. Se não souber, diga que não sabe.';
 
     const response = await client.messages.create({
       model: 'claude-opus-4-7',
@@ -72,7 +72,7 @@ class NVIDIAHandler implements AIHandler {
       baseURL: 'https://integrate.api.nvidia.com/v1',
     });
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma direta e eficiente.';
+      'Você é um assistente de IA integrado ao CognChain. Responda em português de forma direta e eficiente. NUNCA invente dados, hashes ou fatos sobre o CognChain. Se não souber, diga claramente.';
 
     const response = await client.chat.completions.create({
       model: 'meta/llama-3.3-70b-instruct',
@@ -100,7 +100,7 @@ class DeepSeekHandler implements AIHandler {
       baseURL: 'https://api.deepseek.com',
     });
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma precisa e eficiente.';
+      'Você é um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain. Responda em portugues de forma precisa e eficiente.';
 
     const response = await client.chat.completions.create({
       model: 'deepseek-chat',
@@ -125,7 +125,7 @@ class GeminiHandler implements AIHandler {
   async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues com precisao e criatividade.';
+      'Você é um assistente de IA integrado ao CognChain. Responda em português com precisão e criatividade. NUNCA invente dados, hashes ou fatos sobre o CognChain. Se não souber, diga claramente.';
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.0-flash-lite',
@@ -158,7 +158,7 @@ class GLMHandler implements AIHandler {
       baseURL: 'https://integrate.api.nvidia.com/v1',
     });
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma precisa e eficiente.';
+      'Você é um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain. Responda em portugues de forma precisa e eficiente.';
 
     const response = await client.chat.completions.create({
       model: 'z-ai/glm4.7',
@@ -188,7 +188,7 @@ class MiniMaxHandler implements AIHandler {
       baseURL: 'https://integrate.api.nvidia.com/v1',
     });
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma precisa e eficiente.';
+      'Você é um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain. Responda em portugues de forma precisa e eficiente.';
 
     const response = await client.chat.completions.create({
       model: 'minimaxai/minimax-m2.7',
@@ -218,7 +218,7 @@ class QwenHandler implements AIHandler {
       baseURL: 'https://integrate.api.nvidia.com/v1',
     });
     const systemPrompt = systemPromptOverride ||
-      'Voce e o CONGCHAIN — Verifiable AI Memory Layer. Responda em portugues de forma precisa e eficiente.';
+      'Você é um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain. Responda em portugues de forma precisa e eficiente.';
 
     const response = await client.chat.completions.create({
       model: 'qwen/qwen3-next-80b-a3b-instruct',
@@ -289,7 +289,7 @@ export async function callModel(options: CallModelOptions): Promise<CallModelRes
   } else if (useContext) {
     systemPrompt = await buildSystemPrompt(model, messages, undefined);
   } else {
-    systemPrompt = 'Voce e o CONGCHAIN — Verifiable AI Memory Layer.';
+    systemPrompt = 'Você é um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain.';
   }
 
   if (agentName) {

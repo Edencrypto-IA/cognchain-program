@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { routeChat } from '@/services/ai';
 import { saveMemory, chunkContent } from '@/services/memory';
 import { checkRateLimit, validateModel, Limits, safeErrorMessage, MODEL_TIER } from '@/lib/security';
+import { needsGrounding, groundQuery } from '@/lib/grounding';
 import { getCachedResponse, cacheResponse, seedFAQCache } from '@/services/cache/response-cache';
 import { extractRawKey, requireApiKey } from '@/lib/api-key-auth';
 import { verifyAdminToken } from '@/app/api/auth/verify/route';
@@ -113,7 +114,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const response = await routeChat(selectedModel, messages, previousModel);
+    // ── Grounding Engine — inject verified data for data queries ─
+    let groundingPrefix = '';
+    if (lastUserMessage && needsGrounding(lastUserMessage.content)) {
+      const grounded = await groundQuery(lastUserMessage.content).catch(() => null);
+      if (grounded && grounded.response.meta.approvedFacts > 0) {
+        groundingPrefix = `[Dados verificados em tempo real]\n${grounded.markdown}\n\n[Responda com base nesses dados verificados]\n`;
+      }
+    }
+
+    const augmentedMessages = groundingPrefix && lastUserMessage
+      ? messages.map(m =>
+          m === lastUserMessage
+            ? { ...m, content: groundingPrefix + m.content }
+            : m
+        )
+      : messages;
+
+    const response = await routeChat(selectedModel, augmentedMessages, previousModel);
 
     // ── Store in cache for future requests ────────────────────
     if (lastUserMessage) {
