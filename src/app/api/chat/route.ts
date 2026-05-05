@@ -123,10 +123,10 @@ export async function POST(request: NextRequest) {
         groundQuery(lastUserMessage.content),
         new Promise<null>(r => setTimeout(() => r(null), 8000)),
       ]).catch(() => null);
-      const hasVisibleFacts = grounded &&
-        grounded.response.facts.some(f => f.status !== 'blocked');
-      if (hasVisibleFacts && grounded) {
-        groundingPrefix = `[Dados verificados em tempo real]\n${grounded.markdown}\n\n[Responda com base nesses dados verificados]\n`;
+      if (grounded && 'response' in grounded) {
+        groundingPrefix = grounded.markdown
+          ? `[Dados verificados]\n${grounded.markdown}\n\n`
+          : '';
         structuredResponse = grounded.response;
       }
     }
