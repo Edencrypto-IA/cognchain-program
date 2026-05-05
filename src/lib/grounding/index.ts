@@ -47,10 +47,18 @@ export async function groundQuery(query: string): Promise<{
     ? groupByMetric(rawSources)
         .filter(group => group.length > 0)
         .slice(0, 6) // max 6 facts
-        .map(group => linker.buildVerifiedFact(
-          `${group[0].name}: ${query}`,
-          group,
-        ))
+        .map(group => {
+          // Clean label: "CoinGecko Price (solana)" → "Preço SOL"
+          const raw = group[0].name;
+          const label = raw
+            .replace(/CoinGecko\s*/i, '')
+            .replace(/Jupiter\s*/i, '')
+            .replace(/Price\s*/i, 'Preço ')
+            .replace(/Market Cap\s*/i, 'Market Cap ')
+            .replace(/\s*\(([^)]+)\)/i, (_, sym) => sym.toUpperCase())
+            .trim() || raw;
+          return linker.buildVerifiedFact(label, group);
+        })
     : [];
 
   // 4. Build structured response

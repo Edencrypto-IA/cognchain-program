@@ -15,6 +15,7 @@ import { MODEL_LABELS, type AIModel } from '@/services/memory/memory.model';
 import type { StructuredResponse } from '@/lib/grounding/types';
 import dynamic from 'next/dynamic';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
+const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
 
 // ============================================================
 // DESIGN LOCK: Original UI preserved. Only additive features.
@@ -127,7 +128,18 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
               ? 'bg-gradient-to-br from-[#9945FF]/30 to-[#9945FF]/15 border border-[#9945FF]/20 text-white/90'
               : 'bg-white/[0.04] border border-white/[0.06] text-white/80'
             }`}>
-            <p className="whitespace-pre-wrap">{displayContent}{isStreaming && <span className="animate-pulse text-[#9945FF]">▌</span>}</p>
+            {isStreaming
+              ? <p className="whitespace-pre-wrap">{displayContent}<span className="animate-pulse text-[#9945FF]">▌</span></p>
+              : isUser
+                ? <p className="whitespace-pre-wrap">{displayContent}</p>
+                : <div className="prose prose-invert prose-sm max-w-none
+                    prose-p:my-1 prose-headings:text-white/90 prose-headings:font-semibold
+                    prose-strong:text-white/90 prose-code:text-[#14F195] prose-code:bg-white/[0.06]
+                    prose-code:px-1 prose-code:rounded prose-li:my-0.5 prose-ul:my-1 prose-ol:my-1
+                    prose-hr:border-white/10 prose-blockquote:border-[#9945FF]/40 prose-blockquote:text-white/60">
+                    <ReactMarkdown>{displayContent}</ReactMarkdown>
+                  </div>
+            }
           </div>
         )}
         {isLatest && !isUser && (
