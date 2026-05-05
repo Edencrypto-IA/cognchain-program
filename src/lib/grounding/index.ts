@@ -53,7 +53,11 @@ export async function groundQuery(query: string): Promise<{
           const label = raw
             .replace(/CoinGecko\s*/i, '')
             .replace(/Jupiter\s*/i, '')
-            .replace(/Price\s*/i, 'Preço ')
+            .replace(/Binance\s*/i, 'Binance ')
+            .replace(/Bybit\s*/i, 'Bybit ')
+            .replace(/Kraken\s*/i, 'Kraken ')
+            .replace(/OKX\s*/i, 'OKX ')
+            .replace(/^Price\s*/i, 'Preço ')
             .replace(/Market Cap\s*/i, 'Market Cap ')
             .replace(/\s*\(([^)]+)\)/i, (_, sym) => ' ' + sym.toUpperCase())
             .trim() || raw;

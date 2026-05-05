@@ -194,6 +194,52 @@ function parseDDGResults(html: string): WebResult[] {
   return results;
 }
 
+// ─── Exchange APIs (free, no key) ────────────────────────────────────────────
+
+const EXCHANGE_SYMBOLS: Record<string, Record<string, string>> = {
+  binance: { solana: 'SOLUSDT', bonk: 'BONKUSDT', jup: 'JUPUSDT', ray: 'RAYUSDT' },
+  bybit:   { solana: 'SOLUSDT', bonk: 'BONKUSDT', jup: 'JUPUSDT', ray: 'RAYUSDT' },
+  kraken:  { solana: 'SOLUSD',  bonk: 'BONKUSD'  },
+  okx:     { solana: 'SOL-USDT', bonk: 'BONK-USDT', jup: 'JUP-USDT', ray: 'RAY-USDT' },
+};
+
+type BinanceTicker  = { price: string };
+type BybitTicker    = { result: { list: Array<{ lastPrice: string; highPrice24h: string; lowPrice24h: string; volume24h: string }> } };
+type KrakenTicker   = { result: Record<string, { c: [string] }> };
+type OkxTicker      = { data: Array<{ last: string; high24h: string; low24h: string; vol24h: string }> };
+
+async function fetchBinance(coin: string): Promise<RawSource[]> {
+  const sym = EXCHANGE_SYMBOLS.binance[coin]; if (!sym) return [];
+  const d = await safeFetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`) as BinanceTicker;
+  if (!d?.price) return [];
+  return [{ name: `Binance (${coin.toUpperCase()})`, url: 'https://www.binance.com', value: parseFloat(d.price), fromApi: true }];
+}
+
+async function fetchBybit(coin: string): Promise<RawSource[]> {
+  const sym = EXCHANGE_SYMBOLS.bybit[coin]; if (!sym) return [];
+  const d = await safeFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${sym}`) as BybitTicker;
+  const item = d?.result?.list?.[0]; if (!item) return [];
+  return [
+    { name: `Bybit (${coin.toUpperCase()})`,          url: 'https://www.bybit.com', value: parseFloat(item.lastPrice),    fromApi: true },
+    { name: `Máxima 24h Bybit (${coin.toUpperCase()})`, url: 'https://www.bybit.com', value: parseFloat(item.highPrice24h), fromApi: true },
+    { name: `Mínima 24h Bybit (${coin.toUpperCase()})`, url: 'https://www.bybit.com', value: parseFloat(item.lowPrice24h),  fromApi: true },
+  ];
+}
+
+async function fetchKraken(coin: string): Promise<RawSource[]> {
+  const sym = EXCHANGE_SYMBOLS.kraken[coin]; if (!sym) return [];
+  const d = await safeFetch(`https://api.kraken.com/0/public/Ticker?pair=${sym}`) as KrakenTicker;
+  const entry = d?.result ? Object.values(d.result)[0] : null; if (!entry) return [];
+  return [{ name: `Kraken (${coin.toUpperCase()})`, url: 'https://www.kraken.com', value: parseFloat(entry.c[0]), fromApi: true }];
+}
+
+async function fetchOKX(coin: string): Promise<RawSource[]> {
+  const sym = EXCHANGE_SYMBOLS.okx[coin]; if (!sym) return [];
+  const d = await safeFetch(`https://www.okx.com/api/v5/market/ticker?instId=${sym}`) as OkxTicker;
+  const item = d?.data?.[0]; if (!item) return [];
+  return [{ name: `OKX (${coin.toUpperCase()})`, url: 'https://www.okx.com', value: parseFloat(item.last), fromApi: true }];
+}
+
 /** DuckDuckGo HTML web search — no API key required */
 async function fetchWebSearch(query: string): Promise<RawSource[]> {
   const url = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
@@ -220,24 +266,33 @@ export async function fetchSourcesForQuery(query: string): Promise<RawSource[]> 
   const q = query.toLowerCase();
   const tasks: Promise<RawSource[]>[] = [];
 
-  // ── Jupiter (primary — Solana-native, no rate limits) ──────────────────────
+  // ── Price queries — all exchanges in parallel ──────────────────────────────
   if (q.includes('sol') || q.includes('solana')) {
     tasks.push(fetchJupiter('solana').catch(() => []));
-    tasks.push(fetchCoinGecko('solana').catch(() => [])); // fallback
+    tasks.push(fetchCoinGecko('solana').catch(() => []));
+    tasks.push(fetchBinance('solana').catch(() => []));
+    tasks.push(fetchBybit('solana').catch(() => []));
+    tasks.push(fetchKraken('solana').catch(() => []));
+    tasks.push(fetchOKX('solana').catch(() => []));
   }
   if (q.includes('bonk')) {
     tasks.push(fetchJupiter('bonk').catch(() => []));
     tasks.push(fetchCoinGecko('bonk').catch(() => []));
+    tasks.push(fetchBinance('bonk').catch(() => []));
+    tasks.push(fetchBybit('bonk').catch(() => []));
+    tasks.push(fetchOKX('bonk').catch(() => []));
   }
   if (q.includes('jup') || q.includes('jupiter')) {
     tasks.push(fetchJupiter('jup').catch(() => []));
     tasks.push(fetchCoinGecko('jupiter-exchange-solana').catch(() => []));
-    tasks.push(fetchSolanaFM('jup').catch(() => []));
+    tasks.push(fetchBinance('jup').catch(() => []));
+    tasks.push(fetchOKX('jup').catch(() => []));
   }
   if (q.includes('ray') || q.includes('raydium')) {
     tasks.push(fetchJupiter('ray').catch(() => []));
     tasks.push(fetchCoinGecko('raydium').catch(() => []));
-    tasks.push(fetchSolanaFM('ray').catch(() => []));
+    tasks.push(fetchBinance('ray').catch(() => []));
+    tasks.push(fetchOKX('ray').catch(() => []));
     tasks.push(fetchDefiLlama('raydium').catch(() => []));
   }
   if (q.includes('jto') || q.includes('jito')) {
