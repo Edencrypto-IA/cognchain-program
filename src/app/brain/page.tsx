@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2, ArrowLeft, Trash2, Send, MessageSquare } from 'lucide-react';
+import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2, ArrowLeft, Trash2, Send, MessageSquare, Menu } from 'lucide-react';
 
 const MODEL_COLORS: Record<string, string> = {
   gpt:      '#10A37F',
@@ -121,6 +121,8 @@ export default function BrainPage() {
 
   // Delete state
   const [deleting, setDeleting] = useState(false);
+  // Mobile panel toggle
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
@@ -460,8 +462,18 @@ export default function BrainPage() {
 
   return (
     <div className="flex h-screen bg-[#060610] text-white overflow-hidden">
-      {/* Left panel */}
-      <div className="w-64 flex-shrink-0 flex flex-col border-r border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl z-10">
+      {/* Mobile overlay behind left panel */}
+      {mobilePanelOpen && (
+        <div className="fixed inset-0 bg-black/60 z-20 md:hidden" onClick={() => setMobilePanelOpen(false)} />
+      )}
+
+      {/* Left panel — slide-in on mobile */}
+      <div className={`
+        fixed md:relative inset-y-0 left-0 w-64 flex-shrink-0 flex flex-col
+        border-r border-white/[0.06] bg-[#0a0a14]/95 backdrop-blur-xl z-30
+        transition-transform duration-300 ease-in-out
+        ${mobilePanelOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
 
         {/* Header with back button */}
         <div className="p-4 border-b border-white/[0.06]">
@@ -470,6 +482,12 @@ export default function BrainPage() {
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Voltar ao Chat</span>
             </a>
+            <button
+              className="ml-auto md:hidden p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white transition-colors"
+              onClick={() => setMobilePanelOpen(false)}
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
           <div className="flex items-center gap-2 mb-1">
             <Brain className="w-5 h-5 text-[#9945FF]" />
@@ -578,6 +596,13 @@ export default function BrainPage() {
 
       {/* Canvas */}
       <div className="flex-1 relative">
+        {/* Mobile: floating button to open left panel */}
+        <button
+          className="fixed top-3 left-3 z-40 md:hidden w-9 h-9 rounded-xl bg-[#0a0a14]/90 border border-white/[0.08] flex items-center justify-center text-white/60 backdrop-blur-xl shadow-lg"
+          onClick={() => setMobilePanelOpen(true)}
+        >
+          <Menu className="w-4 h-4" />
+        </button>
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <div className="flex flex-col items-center gap-3">
@@ -617,9 +642,9 @@ export default function BrainPage() {
         </div>
       </div>
 
-      {/* Detail panel — opens when node is clicked */}
+      {/* Detail panel — full-screen on mobile, sidebar on desktop */}
       {selected && (
-        <div className="w-72 flex-shrink-0 border-l border-white/[0.06] bg-[#0a0a14]/90 backdrop-blur-xl flex flex-col z-10 overflow-y-auto">
+        <div className="fixed inset-0 md:relative md:inset-auto md:w-72 md:flex-shrink-0 border-l border-white/[0.06] bg-[#0a0a14]/90 backdrop-blur-xl flex flex-col z-50 md:z-10 overflow-y-auto">
           <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
             <span className="text-sm font-semibold text-white">Memória Selecionada</span>
             <button onClick={() => setSelected(null)} className="p-1 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white transition-colors">

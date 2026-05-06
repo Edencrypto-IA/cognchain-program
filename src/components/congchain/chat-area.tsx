@@ -1046,7 +1046,7 @@ function MintNFTButton({ message, walletAddress }: { message: Message; walletAdd
 function RightPanel({ isOpen, onClose, message, walletAddress }: { isOpen: boolean; onClose: () => void; message: Message | null; walletAddress: string | null }) {
   if (!isOpen || !message) return null;
   return (
-    <div className="w-full md:w-80 lg:w-96 border-l border-white/[0.06] bg-[#0a0a14]/95 backdrop-blur-xl flex flex-col h-full overflow-hidden">
+    <div className="fixed inset-0 md:relative md:inset-auto md:w-80 lg:w-96 border-l border-white/[0.06] bg-[#0a0a14]/95 backdrop-blur-xl flex flex-col z-50 md:z-auto overflow-y-auto md:overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
         <div className="flex items-center gap-2">
           <Link2 className="w-4 h-4 text-[#9945FF]" />
@@ -2039,7 +2039,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     <div className="flex-1 flex h-full relative">
       <div className="flex-1 flex flex-col h-full min-w-0">
         {/* Header — #6 microcopy + model selector + timeline btn */}
-        <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl">
+        <header className="flex items-center justify-between pl-14 pr-4 md:px-6 py-3 border-b border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             {/* #10 Mascote micro-state tooltip */}
             <div className="relative group">
@@ -2060,52 +2060,54 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               <p className="text-[11px] text-white/35">Memory that any AI can continue.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Wallet Connect */}
-            <WalletButton
-              walletAddress={walletAddress}
-              balance={walletBalance}
-              isConnecting={isWalletConnecting}
-              onConnect={handleWalletConnect}
-              onDisconnect={handleWalletDisconnect}
-            />
-            {/* Translation button */}
-            <div className="relative">
-              <button onClick={() => setShowLangMenu(!showLangMenu)} className={`p-1.5 rounded-lg transition-colors ${showLangMenu ? 'bg-white/[0.08] text-white/70' : 'hover:bg-white/[0.06] text-white/30 hover:text-white/60'}`} title="Traduzir">
-                {isTranslating ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white/70 rounded-full animate-spin block" />
-                ) : (
-                  <Languages className="w-4 h-4" />
+          <div className="flex items-center gap-1.5">
+            {/* Desktop-only: Wallet + Lang + Timeline */}
+            <div className="hidden sm:flex items-center gap-1.5">
+              <WalletButton
+                walletAddress={walletAddress}
+                balance={walletBalance}
+                isConnecting={isWalletConnecting}
+                onConnect={handleWalletConnect}
+                onDisconnect={handleWalletDisconnect}
+              />
+              <div className="relative">
+                <button onClick={() => setShowLangMenu(!showLangMenu)} className={`p-1.5 rounded-lg transition-colors ${showLangMenu ? 'bg-white/[0.08] text-white/70' : 'hover:bg-white/[0.06] text-white/30 hover:text-white/60'}`} title="Traduzir">
+                  {isTranslating ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white/70 rounded-full animate-spin block" />
+                  ) : (
+                    <Languages className="w-4 h-4" />
+                  )}
+                </button>
+                {showLangMenu && (
+                  <div className="absolute right-0 top-full mt-1.5 bg-[#0f0f1e] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-50 min-w-[120px]">
+                    <button onClick={() => handleTranslate('pt')} className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${chatLang === 'pt' ? 'bg-white/[0.08] text-white/80' : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'}`}>
+                      <span className="text-sm">🇧🇷</span> Portugues
+                    </button>
+                    <button onClick={() => handleTranslate('en')} className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${chatLang === 'en' ? 'bg-white/[0.08] text-white/80' : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'}`}>
+                      <span className="text-sm">🇺🇸</span> English
+                    </button>
+                    <button onClick={() => handleTranslate('zh')} className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${chatLang === 'zh' ? 'bg-white/[0.08] text-white/80' : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'}`}>
+                      <span className="text-sm">🇨🇳</span> Chinese
+                    </button>
+                  </div>
                 )}
+              </div>
+              <button onClick={() => setShowTimeline(true)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors" title="Evolution Timeline">
+                <GitBranch className="w-4 h-4" />
               </button>
-              {showLangMenu && (
-                <div className="absolute right-0 top-full mt-1.5 bg-[#0f0f1e] border border-white/[0.1] rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-50 min-w-[120px]">
-                  <button onClick={() => handleTranslate('pt')} className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${chatLang === 'pt' ? 'bg-white/[0.08] text-white/80' : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'}`}>
-                    <span className="text-sm">🇧🇷</span> Portugues
-                  </button>
-                  <button onClick={() => handleTranslate('en')} className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${chatLang === 'en' ? 'bg-white/[0.08] text-white/80' : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'}`}>
-                    <span className="text-sm">🇺🇸</span> English
-                  </button>
-                  <button onClick={() => handleTranslate('zh')} className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${chatLang === 'zh' ? 'bg-white/[0.08] text-white/80' : 'text-white/50 hover:bg-white/[0.04] hover:text-white/70'}`}>
-                    <span className="text-sm">🇨🇳</span> Chinese
-                  </button>
-                </div>
-              )}
             </div>
-            {/* #4 Evolution timeline button */}
-            <button onClick={() => setShowTimeline(true)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors" title="Evolution Timeline">
-              <GitBranch className="w-4 h-4" />
-            </button>
-            {/* Nova conversa */}
+            {/* Always visible: new chat */}
             {messages.length > 1 && (
               <button onClick={handleNewChat} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors" title="Nova conversa">
                 <PenSquare className="w-4 h-4" />
               </button>
             )}
-            {/* #8 Model Selector with switch modal */}
-            <ModelSelector selectedModel={selectedModel} onModelChange={handleModelSwitch} />
-            {/* Status */}
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium
+            {/* Model selector: desktop header only */}
+            <div className="hidden md:flex">
+              <ModelSelector selectedModel={selectedModel} onModelChange={handleModelSwitch} />
+            </div>
+            {/* Status badge: desktop only */}
+            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium
               ${orbMode === 'idle' ? 'bg-[#14F195]/10 text-[#14F195]/70 border border-[#14F195]/20' :
                 orbMode === 'thinking' ? 'bg-[#00D1FF]/10 text-[#00D1FF]/70 border border-[#00D1FF]/20' :
                 orbMode === 'typing' ? 'bg-[#14F195]/10 text-[#14F195]/70 border border-[#14F195]/20' :
@@ -2119,6 +2121,11 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
             </div>
           </div>
         </header>
+
+        {/* Mobile model selector row — visible only on small screens */}
+        <div className="flex md:hidden overflow-x-auto gap-1 px-3 py-2 border-b border-white/[0.06] bg-[#0a0a14]/50">
+          <ModelSelector selectedModel={selectedModel} onModelChange={handleModelSwitch} />
+        </div>
 
         {/* Messages */}
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto relative"
@@ -2259,7 +2266,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               </div>
             )}
             <div className="relative flex items-end gap-2 bg-white/[0.04] border border-white/[0.08] rounded-2xl px-4 py-3 focus-within:border-[#9945FF]/40 focus-within:bg-white/[0.06] transition-all duration-200">
-              <div className="flex items-center gap-0.5 pb-0.5">
+              <div className="hidden sm:flex items-center gap-0.5 pb-0.5">
                 <button className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors"><Paperclip className="w-5 h-5" /></button>
                 <button className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors"><ImagePlus className="w-5 h-5" /></button>
               </div>
