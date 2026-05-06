@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { ArrowLeft, Zap, Brain, CheckCircle, AlertTriangle, XCircle, TrendingUp, TrendingDown, DollarSign, Users, Activity, Plus } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { ArrowLeft, Zap, Brain, CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, Users, Activity, Plus, Play, Loader2 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -195,14 +195,15 @@ function AgentCard({ agent, isNew }: { agent: AgentState; isNew?: boolean }) {
 // ─── Feed Event Row ───────────────────────────────────────────────────────────
 
 function EventRow({ event }: { event: FeedEvent }) {
-  const config: Record<string, { icon: JSX.Element; color: string; label: string }> = {
-    thinking:     { icon: <Brain className="w-3.5 h-3.5" />,       color: '#00D1FF', label: 'Pensando' },
-    task_start:   { icon: <Activity className="w-3.5 h-3.5" />,    color: '#9945FF', label: 'Iniciou' },
-    task_done:    { icon: <CheckCircle className="w-3.5 h-3.5" />,  color: '#14F195', label: 'Concluiu' },
-    memory_saved: { icon: <Brain className="w-3.5 h-3.5" />,       color: '#9945FF', label: 'Memória' },
-    sol_payment:  { icon: <DollarSign className="w-3.5 h-3.5" />,  color: '#F59E0B', label: 'Pagou' },
-    agent_fired:  { icon: <XCircle className="w-3.5 h-3.5" />,     color: '#EF4444', label: 'Demitido' },
-    agent_hired:  { icon: <Plus className="w-3.5 h-3.5" />,        color: '#14F195', label: 'Contratado' },
+  const config: Record<string, { icon: React.ReactElement; color: string; label: string }> = {
+    thinking:       { icon: <Brain className="w-3.5 h-3.5" />,       color: '#00D1FF', label: 'Pensando'    },
+    task_start:     { icon: <Activity className="w-3.5 h-3.5" />,    color: '#9945FF', label: 'Iniciou'     },
+    task_done:      { icon: <CheckCircle className="w-3.5 h-3.5" />, color: '#14F195', label: 'Concluiu'    },
+    memory_saved:   { icon: <Brain className="w-3.5 h-3.5" />,       color: '#9945FF', label: 'Memória'     },
+    sol_payment:    { icon: <DollarSign className="w-3.5 h-3.5" />,  color: '#F59E0B', label: 'Pagou'       },
+    agent_fired:    { icon: <XCircle className="w-3.5 h-3.5" />,     color: '#EF4444', label: 'Demitido'    },
+    agent_hired:    { icon: <Plus className="w-3.5 h-3.5" />,        color: '#14F195', label: 'Contratado'  },
+    real_task_done: { icon: <Zap className="w-3.5 h-3.5" />,         color: '#F59E0B', label: 'IA Real'     },
   };
 
   const c = config[event.type] ?? { icon: <Activity className="w-3.5 h-3.5" />, color: '#64748b', label: '' };
@@ -216,7 +217,8 @@ function EventRow({ event }: { event: FeedEvent }) {
       case 'memory_saved':return `#${event.hash} — ${event.snippet?.slice(0, 35) ?? ''}`;
       case 'sol_payment': return `${event.fromName} → ${event.toName} · ${event.amount} SOL`;
       case 'agent_fired': return `Score ${event.finalScore} · ${event.reason}`;
-      case 'agent_hired': return `${event.agent?.name} (${MODEL_META[event.agent?.model ?? '']?.label ?? ''}) contratado`;
+      case 'agent_hired':    return `${event.agent?.name} (${MODEL_META[event.agent?.model ?? '']?.label ?? ''}) contratado`;
+      case 'real_task_done': return `${(event as {task?:string;result?:string}).task ?? ''} — ${(event as {result?:string}).result?.slice(0, 60) ?? ''}`;
       default: return '';
     }
   }
@@ -240,6 +242,9 @@ function EventRow({ event }: { event: FeedEvent }) {
               {event.newScore.toFixed(1)}
             </span>
           )}
+          {(event as {isReal?: boolean}).isReal && (
+            <span className="text-[8px] font-black text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/25 px-1.5 py-0.5 rounded-full tracking-widest">REAL</span>
+          )}
         </div>
         <p className="text-[10px] text-white/40 leading-relaxed line-clamp-2">{getDesc()}</p>
       </div>
@@ -249,7 +254,7 @@ function EventRow({ event }: { event: FeedEvent }) {
 
 // ─── Stat Block ───────────────────────────────────────────────────────────────
 
-function StatBlock({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: JSX.Element }) {
+function StatBlock({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: React.ReactElement }) {
   return (
     <div className="flex-1 px-6 py-5 border-r border-white/[0.05] last:border-r-0">
       <div className="flex items-center gap-2 mb-2">
@@ -272,9 +277,19 @@ export default function OfficePage() {
   const [newAgentIds, setNewAgentIds] = useState<Set<string>>(new Set());
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState('');
+  const [running, setRunning] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const esRef = useRef<EventSource | null>(null);
   const eventCounter = useRef(0);
+
+  const triggerRealTask = useCallback(async () => {
+    if (running) return;
+    setRunning(true);
+    try {
+      await fetch('/api/office/run-task', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    } catch { /* silent */ }
+    setTimeout(() => setRunning(false), 8000);
+  }, [running]);
 
   // Clock
   useEffect(() => {
@@ -423,7 +438,22 @@ export default function OfficePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Manual real-task trigger */}
+            <button
+              onClick={triggerRealTask}
+              disabled={running || !connected}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-40"
+              style={{
+                background: running ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.12)',
+                border: '1px solid rgba(245,158,11,0.25)',
+                color: '#F59E0B',
+              }}
+            >
+              {running
+                ? <><Loader2 className="w-3 h-3 animate-spin" />Executando...</>
+                : <><Play className="w-3 h-3" />Tarefa Real</>}
+            </button>
             <div className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#14F195] live-dot' : 'bg-[#EF4444]'}`} />
               <span className={`text-[10px] font-semibold ${connected ? 'text-[#14F195]/80' : 'text-[#EF4444]/80'}`}>
