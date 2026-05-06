@@ -26,6 +26,26 @@ function groupByMetric(sources: RawSource[]): RawSource[][] {
   return [...map.values()];
 }
 
+/** Returns true if this source name represents a market-data row (not a spot price) */
+function isMarketDataRow(name: string): boolean {
+  return /máxima|maxima|mínima|minima|volume|market.?cap|variação|variacao|holders/i.test(name);
+}
+
+/** Clean a raw source name into a display label */
+function cleanLabel(raw: string): string {
+  return raw
+    .replace(/CoinGecko\s*/i, '')
+    .replace(/Jupiter\s*/i, '')
+    .replace(/Binance\s*/i, 'Binance ')
+    .replace(/Bybit\s*/i, 'Bybit ')
+    .replace(/Kraken\s*/i, 'Kraken ')
+    .replace(/OKX\s*/i, 'OKX ')
+    .replace(/^Price\s*/i, 'Preço ')
+    .replace(/Market Cap\s*/i, 'Market Cap ')
+    .replace(/\s*\(([^)]+)\)/i, (_, sym) => ' ' + sym.toUpperCase())
+    .trim() || raw;
+}
+
 /**
  * Full grounding pipeline:
  * fetch → filter → group by metric → one fact per metric → build → format
@@ -42,30 +62,49 @@ export async function groundQuery(query: string): Promise<{
   // 2. Trust filter
   const trusted = filterTrustedSources(rawSources);
 
-  // 3. Build one verified fact per metric group (avoids conflict on price vs market cap)
+  // 3. Detect which tokens are in the query
+  const q = query.toLowerCase();
+  const TOKEN_CHECKS: [string, string[]][] = [
+    ['solana', ['solana', 'sol ', ' sol,', ' sol.']],
+    ['bonk',   ['bonk']],
+    ['pengu',  ['pengu', 'pudgy']],
+    ['jup',    ['jupiter', ' jup']],
+    ['ray',    ['raydium', ' ray']],
+  ];
+  const detectedTokens = TOKEN_CHECKS
+    .filter(([, checks]) => checks.some(c => q.includes(c)))
+    .map(([name]) => name);
+
+  const allGroups = groupByMetric(rawSources).filter(g => g.length > 0);
+  let factGroups: RawSource[][];
+
+  if (detectedTokens.length > 1) {
+    // Multi-token: one price fact per detected token (not market data rows)
+    const seenTokens = new Set<string>();
+    factGroups = [];
+    for (const token of detectedTokens) {
+      for (const group of allGroups) {
+        const name = group[0].name.toLowerCase();
+        if (name.includes(token) && !isMarketDataRow(name) && !seenTokens.has(token)) {
+          seenTokens.add(token);
+          factGroups.push(group);
+          break;
+        }
+      }
+    }
+    // Fallback to full data if only one or zero tokens matched
+    if (factGroups.length <= 1) factGroups = allGroups.slice(0, 8);
+  } else {
+    // Single token: full market data table (up to 8 rows)
+    factGroups = allGroups.slice(0, 8);
+  }
+
+  // 4. Build one verified fact per group
   const facts = trusted.length > 0
-    ? groupByMetric(rawSources)
-        .filter(group => group.length > 0)
-        .slice(0, 6) // max 6 facts
-        .map(group => {
-          // Clean label: "CoinGecko Price (solana)" → "Preço SOL"
-          const raw = group[0].name;
-          const label = raw
-            .replace(/CoinGecko\s*/i, '')
-            .replace(/Jupiter\s*/i, '')
-            .replace(/Binance\s*/i, 'Binance ')
-            .replace(/Bybit\s*/i, 'Bybit ')
-            .replace(/Kraken\s*/i, 'Kraken ')
-            .replace(/OKX\s*/i, 'OKX ')
-            .replace(/^Price\s*/i, 'Preço ')
-            .replace(/Market Cap\s*/i, 'Market Cap ')
-            .replace(/\s*\(([^)]+)\)/i, (_, sym) => ' ' + sym.toUpperCase())
-            .trim() || raw;
-          return linker.buildVerifiedFact(label, group);
-        })
+    ? factGroups.map(group => linker.buildVerifiedFact(cleanLabel(group[0].name), group))
     : [];
 
-  // 4. Build structured response
+  // 5. Build structured response
   const response = buildVerifiedResponse(query, facts, linker.getAllSources());
 
   // 5. Format as markdown

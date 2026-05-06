@@ -10,7 +10,8 @@ export function createSourceLinker() {
   let counter = 0;
 
   function addSource(raw: RawSource): FactSource {
-    const existing = sources.find(s => s.url === raw.url);
+    // Deduplicate by (url, name) — same URL with different metric names = different sources
+    const existing = sources.find(s => s.url === raw.url && s.name === raw.name);
     if (existing) return existing;
 
     const id = `[${SUPERSCRIPTS[counter] ?? String(counter + 1)}]`;

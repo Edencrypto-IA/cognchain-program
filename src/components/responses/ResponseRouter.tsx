@@ -28,24 +28,53 @@ export default function ResponseRouter({ response }: ResponseRouterProps) {
   return (
     <div className="w-full max-w-[900px] rounded-2xl border border-[#1e293b] bg-[#0a0a0f] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)] animate-in fade-in slide-in-from-bottom-2 duration-300">
 
-      {/* Global header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#1e293b] bg-[#111118]">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#64748b]">
-            Resposta Verificada · CognChain
+      {/* CONGCHAIN branded header */}
+      <div className="border-b border-[#1e293b] bg-gradient-to-r from-[#0d0d1a] via-[#0f0f1e] to-[#0d0d1a]">
+        {/* Top row: logo + name + confidence */}
+        <div className="flex items-center justify-between px-5 py-3">
+          <div className="flex items-center gap-3">
+            {/* Logo pill */}
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/20 border border-[#9945FF]/30">
+              <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[#9945FF] to-[#14F195] flex items-center justify-center">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M5 1L8.5 3V7L5 9L1.5 7V3L5 1Z" fill="white" fillOpacity="0.9"/>
+                </svg>
+              </div>
+              <span className="text-[11px] font-black tracking-widest bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-transparent">
+                CONGCHAIN
+              </span>
+            </div>
+            {/* Subtitle */}
+            <span className="hidden sm:block text-[10px] text-[#334155] font-medium">
+              Verifiable AI Memory Layer
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-[#334155]">Confiança</span>
+            <ConfidenceRing value={meta.avgConfidence} size="sm" />
+          </div>
+        </div>
+        {/* Bottom row: verified tags */}
+        <div className="flex items-center gap-2 px-5 pb-2.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#1e3a2f] bg-[#14F195]/10 border border-[#14F195]/20 px-2 py-0.5 rounded-full">
+            ✓ Dados em Tempo Real
           </span>
           {meta.approvedFacts > 0 && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#00d4aa]/10 text-[#00d4aa] border border-[#00d4aa]/20">
-              ✅ {meta.approvedFacts} fato{meta.approvedFacts !== 1 ? 's' : ''}
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#14F195]/10 text-[#14F195]/80 border border-[#14F195]/20">
+              {meta.approvedFacts} verificado{meta.approvedFacts !== 1 ? 's' : ''}
+            </span>
+          )}
+          {meta.apiSourcesUsed > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#9945FF]/10 text-[#9945FF]/70 border border-[#9945FF]/20">
+              {meta.apiSourcesUsed} fonte{meta.apiSourcesUsed !== 1 ? 's' : ''} API
             </span>
           )}
           {meta.reviewFacts > 0 && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/20">
-              ⚠️ {meta.reviewFacts} em revisão
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#f59e0b]/10 text-[#f59e0b]/80 border border-[#f59e0b]/20">
+              ⚠ {meta.reviewFacts} em revisão
             </span>
           )}
         </div>
-        <ConfidenceRing value={meta.avgConfidence} size="sm" />
       </div>
 
       {/* Dashboard content */}
