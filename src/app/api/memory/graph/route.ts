@@ -75,18 +75,26 @@ export async function GET() {
     }
   }
 
-  // 3. Temporal proximity (24h window, cross-model)
+  // 3. Temporal proximity — max 2 cross-model links per node (prevents O(n²) link explosion)
   const WINDOW = 86400;
+  const temporalLinksPerNode = new Map<string, number>();
   for (let i = 0; i < filteredMems.length; i++) {
-    for (let j = i + 1; j < filteredMems.length; j++) {
+    let added = 0;
+    for (let j = i + 1; j < filteredMems.length && added < 2; j++) {
       if (filteredMems[j].timestamp - filteredMems[i].timestamp > WINDOW) break;
       if (modelKey(filteredMems[i].model) !== modelKey(filteredMems[j].model)) {
-        addLink(filteredMems[i].hash, filteredMems[j].hash, 'temporal', 0.3);
+        const jCount = temporalLinksPerNode.get(filteredMems[j].hash) ?? 0;
+        if (jCount < 2) {
+          addLink(filteredMems[i].hash, filteredMems[j].hash, 'temporal', 0.3);
+          temporalLinksPerNode.set(filteredMems[i].hash, (temporalLinksPerNode.get(filteredMems[i].hash) ?? 0) + 1);
+          temporalLinksPerNode.set(filteredMems[j].hash, jCount + 1);
+          added++;
+        }
       }
     }
   }
 
-  // 4. Cross-model bridge: connect last of each model to first of next model chronologically
+  // 4. Cross-model bridge: connect last of each model to first of next model
   const modelOrder = [...byModel.entries()].sort((a, b) =>
     (a[1][0]?.timestamp ?? 0) - (b[1][0]?.timestamp ?? 0)
   );
@@ -96,9 +104,10 @@ export async function GET() {
     if (lastA && firstB) addLink(lastA.hash, firstB.hash, 'bridge', 0.4);
   }
 
-  // 5. Fallback — ensure no isolated nodes
+  // 5. Fallback — connect isolated nodes only (sequential, not all pairs)
   for (let i = 0; i < filteredMems.length - 1; i++) {
-    addLink(filteredMems[i].hash, filteredMems[i + 1].hash, 'temporal', 0.2);
+    const degree = links.filter(l => l.source === filteredMems[i].hash || l.target === filteredMems[i].hash).length;
+    if (degree === 0) addLink(filteredMems[i].hash, filteredMems[i + 1].hash, 'temporal', 0.2);
   }
 
   return NextResponse.json({ nodes, links });

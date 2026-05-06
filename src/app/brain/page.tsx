@@ -39,12 +39,11 @@ interface GraphNode {
 interface GraphLink { source: string; target: string; type?: string; strength?: number; }
 interface RawData { nodes: Omit<GraphNode, 'x'|'y'|'vx'|'vy'>[]; links: GraphLink[]; }
 
-const REPULSION = 22000;
-const SPRING_LEN = 180;
-const SPRING_K = 0.02;
-const DAMPING = 0.75;
-const GRAVITY = 0.003;
-const ITERATIONS_PER_FRAME = 5;
+const REPULSION = 18000;
+const SPRING_LEN = 200;
+const SPRING_K = 0.018;
+const DAMPING = 0.72;
+const GRAVITY = 0.002;
 const NODE_MIN_R = 8;
 
 function getNodeRadius(id: string, links: GraphLink[]): number {
@@ -52,9 +51,9 @@ function getNodeRadius(id: string, links: GraphLink[]): number {
   return Math.max(NODE_MIN_R, NODE_MIN_R + degree * 1.8);
 }
 
-function runSimStep(nodes: GraphNode[], links: GraphLink[]) {
+function runSimStep(nodes: GraphNode[], links: GraphLink[], iterations = 3) {
   const idxMap = new Map(nodes.map((n, i) => [n.id, i]));
-  for (let iter = 0; iter < ITERATIONS_PER_FRAME; iter++) {
+  for (let iter = 0; iter < iterations; iter++) {
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const dx = nodes[j].x - nodes[i].x;
@@ -187,6 +186,7 @@ export default function BrainPage() {
     const nodes = nodesRef.current;
     const links = linksRef.current;
     const idxMap = new Map(nodes.map((n, i) => [n.id, i]));
+    const isLargeGraph = nodes.length > 40;
 
     for (const l of links) {
       const si = idxMap.get(l.source); const ti = idxMap.get(l.target);
@@ -238,14 +238,17 @@ export default function BrainPage() {
       const r = getNodeRadius(n.id, links);
       const isSelected = selected?.id === n.id;
 
-      const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3);
-      glow.addColorStop(0, color + '55');
-      glow.addColorStop(1, 'transparent');
-      ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, 2 * Math.PI);
-      ctx.fillStyle = glow; ctx.fill();
+      // Skip expensive outer glow on large graphs
+      if (!isLargeGraph) {
+        const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3);
+        glow.addColorStop(0, color + '55');
+        glow.addColorStop(1, 'transparent');
+        ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, 2 * Math.PI);
+        ctx.fillStyle = glow; ctx.fill();
+      }
 
       ctx.beginPath(); ctx.arc(n.x, n.y, r * 1.6, 0, 2 * Math.PI);
-      ctx.fillStyle = color + '33'; ctx.fill();
+      ctx.fillStyle = color + (isLargeGraph ? '22' : '33'); ctx.fill();
 
       ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
       ctx.fillStyle = isSelected ? '#ffffff' : color;
@@ -274,15 +277,46 @@ export default function BrainPage() {
     ctx.restore();
   }, [selected, getFilteredIds]);
 
+  // On-demand redraw (used after simulation stops)
+  const rafPendingRef = useRef(false);
+  const scheduleRedraw = useCallback(() => {
+    if (rafPendingRef.current) return;
+    rafPendingRef.current = true;
+    animRef.current = requestAnimationFrame(() => {
+      rafPendingRef.current = false;
+      draw();
+    });
+  }, [draw]);
+
   useEffect(() => {
     if (loading || nodesRef.current.length === 0) return;
     let stopped = false;
     let tick = 0;
+    const n = nodesRef.current.length;
+    // Fewer iterations for large graphs
+    const itersPerFrame = n > 50 ? 1 : n > 30 ? 2 : 3;
+    // More ticks needed to spread large graphs
+    const maxTicks = Math.min(400, 150 + n * 2);
+
     function frame() {
       if (stopped) return;
-      if (tick < 200) { runSimStep(nodesRef.current, linksRef.current); tick++; }
-      draw();
-      animRef.current = requestAnimationFrame(frame);
+      if (tick < maxTicks) {
+        runSimStep(nodesRef.current, linksRef.current, itersPerFrame);
+        tick++;
+        draw();
+        animRef.current = requestAnimationFrame(frame);
+      } else {
+        // Simulation done — check if still moving
+        const maxVel = nodesRef.current.reduce((m, nd) => Math.max(m, Math.abs(nd.vx) + Math.abs(nd.vy)), 0);
+        if (maxVel > 0.1) {
+          runSimStep(nodesRef.current, linksRef.current, 1);
+          draw();
+          animRef.current = requestAnimationFrame(frame);
+        } else {
+          // Fully static — stop loop, redraw only on interaction
+          draw();
+        }
+      }
     }
     animRef.current = requestAnimationFrame(frame);
     return () => { stopped = true; cancelAnimationFrame(animRef.current); };
@@ -342,13 +376,13 @@ export default function BrainPage() {
       const { x: wx, y: wy } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
       const n = nodesRef.current.find(n => n.id === draggingRef.current.nodeId);
       if (n) { n.x = wx - draggingRef.current.offsetX; n.y = wy - draggingRef.current.offsetY; n.vx = 0; n.vy = 0; }
-      draw();
+      scheduleRedraw();
     } else if (isPanningRef.current) {
       transformRef.current.x = panStartRef.current.tx + (e.clientX - panStartRef.current.x);
       transformRef.current.y = panStartRef.current.ty + (e.clientY - panStartRef.current.y);
-      draw();
+      scheduleRedraw();
     }
-  }, [screenToWorld, draw]);
+  }, [screenToWorld, scheduleRedraw]);
 
   const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const wasDraggingNode = !!draggingRef.current.nodeId;
@@ -356,33 +390,29 @@ export default function BrainPage() {
     draggingRef.current = { nodeId: null, offsetX: 0, offsetY: 0 };
     isPanningRef.current = false;
 
-    // Only select on click (not drag)
     const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
     const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
-    if (dx < 5 && dy < 5 && !wasDraggingNode) {
+    if (dx < 5 && dy < 5 && !wasPanning) {
       const rect = canvasRef.current!.getBoundingClientRect();
       const { x: wx, y: wy } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
       const hit = hitTest(wx, wy);
       setSelected(hit);
-    } else if (dx < 5 && dy < 5 && wasDraggingNode && !wasPanning) {
-      // dragged minimally = click on node
-      const rect = canvasRef.current!.getBoundingClientRect();
-      const { x: wx, y: wy } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-      const hit = hitTest(wx, wy);
-      setSelected(hit);
+      scheduleRedraw();
+    } else if (wasDraggingNode) {
+      scheduleRedraw();
     }
-  }, [screenToWorld, hitTest]);
+  }, [screenToWorld, hitTest, scheduleRedraw]);
 
   const onWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     transformRef.current.scale = Math.min(4, Math.max(0.2, transformRef.current.scale * factor));
-    draw();
-  }, [draw]);
+    scheduleRedraw();
+  }, [scheduleRedraw]);
 
   const zoom = (dir: 1 | -1) => {
     transformRef.current.scale = Math.min(4, Math.max(0.2, transformRef.current.scale * (dir > 0 ? 1.2 : 0.83)));
-    draw();
+    scheduleRedraw();
   };
 
   const scatter = () => {
@@ -392,6 +422,13 @@ export default function BrainPage() {
       const radius = 180 + Math.random() * 200;
       return { ...node, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40 };
     });
+    // Restart simulation briefly after scatter
+    let tick = 0;
+    const resume = () => {
+      if (tick++ < 150) { runSimStep(nodesRef.current, linksRef.current, 2); draw(); animRef.current = requestAnimationFrame(resume); }
+      else draw();
+    };
+    animRef.current = requestAnimationFrame(resume);
   };
 
   const deleteNode = async (node: GraphNode) => {
