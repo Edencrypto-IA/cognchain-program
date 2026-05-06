@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Bot, Cpu, Wrench, Zap, MessageCircle, Send, Loader2, ArrowLeft } from 'lucide-react';
+import { Plus, Bot, Cpu, Wrench, Zap, MessageCircle, Send, Loader2, ArrowLeft, Activity, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import CognitiveProfileCard from '@/components/agents/cognitive-profile-card';
 
@@ -25,6 +25,77 @@ interface Agent {
   totalInteractions: number;
   createdAt: string;
   intelligence?: IntelligenceScore | null;
+}
+
+interface OfficeSnapshot {
+  id: string; name: string; model: string; score: number;
+  status: string; tasksDone: number; memoryCount: number; solSpent: number;
+}
+interface OfficeData {
+  agents: OfficeSnapshot[]; fired: OfficeSnapshot[];
+  recentTasks: { agentName: string; task: string; model: string; ts: number }[];
+}
+
+const MODEL_COLORS_OFFICE: Record<string, string> = {
+  gpt: '#10A37F', claude: '#9945FF', nvidia: '#76B900',
+  gemini: '#4285F4', deepseek: '#FF6B35', glm: '#00D1FF', qwen: '#A855F7',
+};
+
+function scoreColor(s: number) {
+  if (s >= 7) return '#14F195';
+  if (s >= 5) return '#9945FF';
+  if (s >= 3) return '#F59E0B';
+  return '#EF4444';
+}
+
+function OfficePanelCompact({ data }: { data: OfficeData | null }) {
+  if (!data || data.agents.length === 0) return null;
+  const active = data.agents.filter(a => a.status !== 'fired');
+  const totalSol = active.reduce((s, a) => s + a.solSpent, 0);
+
+  return (
+    <div className="mb-8 rounded-2xl overflow-hidden border border-[#9945FF]/20 bg-gradient-to-br from-[#9945FF]/5 to-[#14F195]/5">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.05]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />
+          <span className="text-xs font-bold uppercase tracking-widest text-white/70">Agent Office — Ao Vivo</span>
+          <span className="text-[10px] text-white/30">{active.length} ativos · {data.fired.length} demitidos</span>
+        </div>
+        <a href="/office" className="flex items-center gap-1 text-[10px] font-semibold text-[#9945FF]/70 hover:text-[#9945FF] transition-colors">
+          <Activity className="w-3 h-3" /> Ver Office →
+        </a>
+      </div>
+      <div className="px-5 py-3">
+        <div className="flex flex-wrap gap-2 mb-3">
+          {active.slice(0, 6).map(a => (
+            <div key={a.id} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: MODEL_COLORS_OFFICE[a.model] ?? '#888' }} />
+              <span className="text-[11px] font-semibold text-white/70">{a.name}</span>
+              <span className="text-[10px] font-mono font-bold" style={{ color: scoreColor(a.score) }}>{a.score.toFixed(1)}</span>
+              {a.status === 'thinking' && <span className="text-[9px] text-[#00D1FF]/60">pensando</span>}
+              {a.status === 'executing' && <span className="text-[9px] text-[#14F195]/60">executando</span>}
+              {a.status === 'warning' && <span className="text-[9px] text-[#F59E0B]/60">⚠</span>}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-4 text-[10px] text-white/30">
+          <span>{active.reduce((s, a) => s + a.tasksDone, 0)} tarefas</span>
+          <span>{active.reduce((s, a) => s + a.memoryCount, 0)} memórias</span>
+          <span>{totalSol.toFixed(3)} SOL</span>
+          {data.fired.length > 0 && (
+            <span className="flex items-center gap-1 text-[#EF4444]/50">
+              <XCircle className="w-3 h-3" />{data.fired.length} demitido{data.fired.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {data.recentTasks[0] && (
+            <span className="ml-auto text-white/20 truncate max-w-[200px]">
+              Última IA: {data.recentTasks[0].agentName} — {data.recentTasks[0].task?.slice(0, 35)}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const LEVEL_COLORS: Record<string, { stroke: string; text: string; badge: string }> = {
@@ -84,6 +155,15 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [creatingSage, setCreatingSage] = useState(false);
+  const [officeData, setOfficeData] = useState<OfficeData | null>(null);
+
+  useEffect(() => {
+    fetch('/api/office/agents').then(r => r.json()).then(setOfficeData).catch(() => {});
+    const t = setInterval(() => {
+      fetch('/api/office/agents').then(r => r.json()).then(setOfficeData).catch(() => {});
+    }, 8000);
+    return () => clearInterval(t);
+  }, []);
 
   async function createSolanaSage() {
     setCreatingSage(true);
@@ -157,6 +237,9 @@ export default function AgentsPage() {
             </button>
           </div>
         </div>
+
+        {/* Office live panel */}
+        <OfficePanelCompact data={officeData} />
 
         {/* Cognitive Profile */}
         <div className="mb-8">

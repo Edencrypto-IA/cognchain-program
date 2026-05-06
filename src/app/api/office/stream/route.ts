@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import OpenAI from 'openai';
 import { saveMemory } from '@/services/memory';
-import { pushRealEvent, getEventsSince, getLatestSeq } from '../shared';
+import { pushRealEvent, getEventsSince, getLatestSeq, updateAgentSnapshot } from '../shared';
 
 function enc(data: object) {
   return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -189,10 +189,14 @@ export async function GET(req: NextRequest) {
         let totalTasks = agents.reduce((s, a) => s + a.tasksDone, 0);
         let statsTimer = 0;
 
-        // Send initial state
+        // Send initial state + push to shared store
         controller.enqueue(enc({ type: 'init', agents, stats: { activeAgents: agents.filter(a => a.status !== 'fired').length, solSpent: totalSol, memories: totalMems, tasks: totalTasks } }));
+        agents.forEach(a => updateAgentSnapshot(a));
 
         const activeAgents = () => agents.filter(a => a.status !== 'fired');
+
+        // Helper: sync agent to shared store after any state change
+        const sync = (a: AgentState) => updateAgentSnapshot(a);
 
         // Track which real events this connection has already seen
         let lastRealSeq = getLatestSeq();
@@ -223,76 +227,62 @@ export async function GET(req: NextRequest) {
           }
 
           if (roll < 0.35) {
-            // Thinking event
-            const thoughts = THOUGHTS[agent.model] ?? THOUGHTS.nvidia;
-            const thought = pick(thoughts);
             agent.status = 'thinking';
+            sync(agent);
+            const thought = pick(THOUGHTS[agent.model] ?? THOUGHTS.nvidia);
             controller.enqueue(enc({ type: 'thinking', agentId: agent.id, name: agent.name, model: agent.model, text: thought, ts }));
 
           } else if (roll < 0.60) {
-            // Task execution
             const task = pick(TASK_TITLES);
             const reward = parseFloat(rand(0.005, 0.025).toFixed(4));
-            agent.status = 'executing';
-            agent.currentTask = task;
+            agent.status = 'executing'; agent.currentTask = task;
+            sync(agent);
             controller.enqueue(enc({ type: 'task_start', agentId: agent.id, name: agent.name, model: agent.model, task, reward, ts }));
 
             await sleep(rand(1500, 3500));
             if (stopped) break;
 
             const success = Math.random() > 0.22;
-            const scoreDelta = success ? rand(0.1, 0.4) : -rand(0.3, 0.9);
             const oldScore = agent.score;
-            agent.score = Math.min(10, Math.max(0.5, agent.score + scoreDelta));
-            agent.tasksDone++;
-            agent.solSpent += reward;
-            totalSol += reward;
-            totalTasks++;
+            agent.score = Math.min(10, Math.max(0.5, agent.score + (success ? rand(0.1, 0.4) : -rand(0.3, 0.9))));
+            agent.tasksDone++; agent.solSpent += reward;
+            totalSol += reward; totalTasks++;
             agent.currentTask = undefined;
             agent.status = agent.score < 4.5 ? 'warning' : 'idle';
-
-            if (!success) {
-              agent.consecutivePoor++;
-            } else {
-              agent.consecutivePoor = 0;
-            }
+            agent.consecutivePoor = success ? 0 : agent.consecutivePoor + 1;
+            sync(agent);
 
             controller.enqueue(enc({ type: 'task_done', agentId: agent.id, name: agent.name, model: agent.model, task, reward, success, duration: Math.round(rand(800, 3200)), oldScore: parseFloat(oldScore.toFixed(1)), newScore: parseFloat(agent.score.toFixed(1)), ts }));
 
-            // Fire check
             if (agent.consecutivePoor >= 3 || agent.score < 3.0) {
               await sleep(800);
-              agent.status = 'fired';
+              agent.status = 'fired'; sync(agent);
               controller.enqueue(enc({ type: 'agent_fired', agentId: agent.id, name: agent.name, model: agent.model, finalScore: parseFloat(agent.score.toFixed(1)), reason: agent.score < 3.0 ? 'Score crítico abaixo de 3.0' : '3 falhas consecutivas', ts: Date.now() }));
 
-              // Hire replacement after 3s
               await sleep(3000);
               if (stopped) break;
-              const models = ['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'qwen'];
-              const newAgent = generateNewAgent(pick(models));
-              agents.push(newAgent);
+              const newAgent = generateNewAgent(pick(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'qwen']));
+              agents.push(newAgent); sync(newAgent);
               controller.enqueue(enc({ type: 'agent_hired', agent: newAgent, ts: Date.now() }));
             }
 
           } else if (roll < 0.80) {
-            // Memory saved
             const mem = recentMems.length > 0 ? pick(recentMems) : null;
             const snippet = mem ? mem.content.replace(/\n/g, ' ').slice(0, 60) : pick(MEMORY_SNIPPETS);
             const hash = mem ? mem.hash.slice(0, 8) : Math.random().toString(16).slice(2, 10);
-            agent.memoryCount++;
-            totalMems++;
+            agent.memoryCount++; totalMems++;
             const scoreGain = rand(0.05, 0.2);
             agent.score = Math.min(10, agent.score + scoreGain);
+            sync(agent);
             controller.enqueue(enc({ type: 'memory_saved', agentId: agent.id, name: agent.name, model: agent.model, snippet, hash, scoreGain: parseFloat(scoreGain.toFixed(2)), ts }));
 
           } else {
-            // SOL payment between agents
             const others = pool.filter(a => a.id !== agent.id);
             if (others.length > 0) {
               const receiver = pick(others);
               const amount = parseFloat(rand(0.001, 0.01).toFixed(4));
-              agent.solSpent += amount;
-              totalSol += amount;
+              agent.solSpent += amount; totalSol += amount;
+              sync(agent);
               controller.enqueue(enc({ type: 'sol_payment', fromId: agent.id, fromName: agent.name, toId: receiver.id, toName: receiver.name, amount, ts }));
             }
           }

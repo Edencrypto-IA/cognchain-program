@@ -4,10 +4,87 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Zap, Plus, Bot, Coins, ArrowRight, Check, Loader2,
-  ExternalLink, RefreshCw, ArrowLeft, Sparkles, Play, Database,
+  ExternalLink, RefreshCw, ArrowLeft, Sparkles, Play, Database, Activity, Brain,
 } from 'lucide-react';
 
 interface Agent { id: string; name: string; model: string; }
+interface OfficeSnap { id: string; name: string; model: string; score: number; status: string; tasksDone: number; solSpent: number; }
+interface RealTask { seq: number; agentName: string; modelLabel: string; task: string; result: string; hash: string; ts: number; }
+interface OfficeData { agents: OfficeSnap[]; fired: OfficeSnap[]; recentTasks: RealTask[]; }
+
+const MODEL_META_COLORS: Record<string, string> = {
+  gpt: '#10A37F', claude: '#9945FF', nvidia: '#76B900',
+  gemini: '#4285F4', deepseek: '#FF6B35', glm: '#00D1FF', qwen: '#A855F7',
+};
+
+function timeAgoMs(ts: number) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  return `${Math.floor(s / 3600)}h`;
+}
+
+function RealTasksPanel({ data }: { data: OfficeData | null }) {
+  if (!data || data.recentTasks.length === 0) return null;
+  return (
+    <div className="mb-6 rounded-2xl border border-[#F59E0B]/20 bg-[#F59E0B]/[0.03] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#F59E0B]/10">
+        <div className="flex items-center gap-2">
+          <Zap className="w-3.5 h-3.5 text-[#F59E0B]" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-[#F59E0B]/80">Tarefas Reais — Executadas por IA</span>
+          <span className="text-[9px] text-white/20">zero custo · modelos gratuitos</span>
+        </div>
+        <a href="/office" className="flex items-center gap-1 text-[9px] text-[#F59E0B]/50 hover:text-[#F59E0B] transition-colors">
+          <Activity className="w-3 h-3" /> Office →
+        </a>
+      </div>
+      <div className="divide-y divide-white/[0.03]">
+        {data.recentTasks.slice(0, 5).map(t => (
+          <div key={t.seq} className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+              style={{ background: `${MODEL_META_COLORS[t.modelLabel?.toLowerCase().split(' ')[0]] ?? '#888'}15` }}>
+              <Brain className="w-3 h-3" style={{ color: MODEL_META_COLORS[t.modelLabel?.toLowerCase().split(' ')[0]] ?? '#888' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                <span className="text-[10px] font-bold text-white/70">{t.agentName}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-widest border text-[#F59E0B]/80 bg-[#F59E0B]/10 border-[#F59E0B]/20">REAL</span>
+                <span className="text-[9px] text-white/25">{timeAgoMs(t.ts)}</span>
+                <span className="text-[9px] text-white/20 font-mono">#{t.hash?.slice(0, 8)}</span>
+              </div>
+              <p className="text-[11px] font-semibold text-white/60 mb-0.5">{t.task}</p>
+              <p className="text-[10px] text-white/35 leading-relaxed line-clamp-2">{t.result}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AvailableAgentsPanel({ data }: { data: OfficeData | null }) {
+  if (!data || data.fired.length === 0) return null;
+  return (
+    <div className="mb-6 rounded-2xl border border-[#EF4444]/15 bg-[#EF4444]/[0.02] overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#EF4444]/10">
+        <span className="text-[10px] font-black uppercase tracking-widest text-[#EF4444]/60">Disponíveis — Saíram do Office</span>
+        <span className="text-[9px] text-white/20">disponíveis para contratar</span>
+      </div>
+      <div className="flex flex-wrap gap-2 px-4 py-3">
+        {data.fired.map(a => (
+          <div key={a.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#EF4444]/50" />
+            <span className="text-[11px] font-semibold text-white/60">{a.name}</span>
+            <span className="text-[9px] text-white/30">{a.model}</span>
+            <span className="text-[10px] font-mono text-[#EF4444]/60">{a.score.toFixed(1)}</span>
+            <span className="text-[9px] text-white/20">{a.tasksDone} tarefas</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface Task {
   id: string; title: string; description: string; skill: string;
   solReward: number; status: string; postedAt: string; completedAt?: string;
@@ -245,6 +322,15 @@ export default function MarketplacePage() {
   const [loopActive, setLoopActive] = useState(false);
   const [loopMsg,    setLoopMsg]    = useState('');
   const [seeding,    setSeeding]    = useState(false);
+  const [officeData, setOfficeData] = useState<OfficeData | null>(null);
+
+  useEffect(() => {
+    fetch('/api/office/agents').then(r => r.json()).then(setOfficeData).catch(() => {});
+    const t = setInterval(() => {
+      fetch('/api/office/agents').then(r => r.json()).then(setOfficeData).catch(() => {});
+    }, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -378,6 +464,10 @@ export default function MarketplacePage() {
             <p className="text-[11px] text-white/30 mt-0.5">Agentes ativos</p>
           </div>
         </div>
+
+        {/* Real tasks + Available agents from Office */}
+        <RealTasksPanel data={officeData} />
+        <AvailableAgentsPanel data={officeData} />
 
         {/* Filter tabs */}
         <div className="flex gap-1 border-b border-white/[0.06]">
