@@ -16,6 +16,7 @@ import {
   LogIn,
   LogOut,
   ShieldCheck,
+  Zap,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -143,6 +144,26 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
                 Novo Chat
               </span>
             </button>
+          </div>
+
+          {/* CONGCHAIN PAY Link */}
+          <div className="px-3 pb-1">
+            <a
+              href="/pay"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                bg-gradient-to-r from-[#F59E0B]/10 to-[#9945FF]/5
+                border border-[#F59E0B]/20
+                hover:from-[#F59E0B]/20 hover:to-[#9945FF]/10
+                hover:border-[#F59E0B]/40
+                transition-all duration-200 group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-[#F59E0B]/15 border border-[#F59E0B]/25 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-[#F59E0B]" />
+              </div>
+              <span className="text-sm font-medium text-[#F59E0B]/70 group-hover:text-[#F59E0B] transition-colors">
+                CONGCHAIN Pay
+              </span>
+            </a>
           </div>
 
           {/* Marketplace Link */}
