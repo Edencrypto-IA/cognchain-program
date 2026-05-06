@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Zap, Shield, Brain, Copy, Check, ExternalLink, ChevronRight, Play, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Zap, Shield, Brain, Copy, Check, ExternalLink, ChevronRight, Loader2 } from 'lucide-react';
 
 interface PayResult {
   success: boolean;
@@ -17,11 +17,34 @@ interface PayResult {
 interface GlobalStats { wallet: string; balance: number; stats: { totalPayments: number; totalSolPaid: number; totalMemories: number } }
 
 const DEMO_URLS = [
-  'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd',
-  'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
-  'https://price.jup.ag/v6/price?ids=SOL',
-  'https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT',
-  'https://httpbin.org/json',
+  { label: 'coingecko', url: 'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd' },
+  { label: 'jupiter',   url: 'https://price.jup.ag/v6/price?ids=SOL' },
+  { label: 'binance',   url: 'https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT' },
+  { label: 'defillama', url: 'https://api.llama.fi/tvl/solana' },
+  { label: 'openai',    url: 'https://status.openai.com/api/v2/status.json' },
+  { label: 'httpbin',   url: 'https://httpbin.org/json' },
+];
+
+// ─── API Catalog ─────────────────────────────────────────────────────────────
+const API_CATALOG = [
+  // AI Models
+  { category: 'IA',      name: 'Claude Opus',   provider: 'Anthropic',  color: '#FF6B35', bg: 'rgba(255,107,53,0.08)',  cost: '$0.015/1k',  endpoint: 'api.anthropic.com/v1/messages',              icon: '🤖', working: false },
+  { category: 'IA',      name: 'GPT-4o',        provider: 'OpenAI',     color: '#10A37F', bg: 'rgba(16,163,127,0.08)', cost: '$0.005/1k',  endpoint: 'api.openai.com/v1/chat/completions',         icon: '🧠', working: false },
+  { category: 'IA',      name: 'DeepSeek V3',   provider: 'DeepSeek',   color: '#4285F4', bg: 'rgba(66,133,244,0.08)', cost: '$0.001/1k',  endpoint: 'api.deepseek.com/v1/chat/completions',       icon: '🔍', working: false },
+  { category: 'IA',      name: 'Gemini 2.0',    provider: 'Google',     color: '#FBBC05', bg: 'rgba(251,188,5,0.08)',  cost: '$0.002/1k',  endpoint: 'generativelanguage.googleapis.com/v1',       icon: '✨', working: false },
+  { category: 'IA',      name: 'Llama 3.3',     provider: 'NVIDIA',     color: '#76B900', bg: 'rgba(118,185,0,0.08)',  cost: 'Grátis',     endpoint: 'integrate.api.nvidia.com/v1',                icon: '⚡', working: false },
+  // Blockchain / Solana
+  { category: 'Solana',  name: 'Helius RPC',    provider: 'Helius',     color: '#FF6B35', bg: 'rgba(255,107,53,0.08)', cost: '$0.001/req', endpoint: 'mainnet.helius-rpc.com',                     icon: '⛓', working: false },
+  { category: 'Solana',  name: 'Jupiter Price', provider: 'Jupiter',    color: '#9945FF', bg: 'rgba(153,69,255,0.08)', cost: 'Grátis',     endpoint: 'price.jup.ag/v6/price',                      icon: '🌌', working: true  },
+  { category: 'Solana',  name: 'Solana FM',     provider: 'SolanaFM',   color: '#14F195', bg: 'rgba(20,241,149,0.08)', cost: 'Grátis',     endpoint: 'api.solana.fm/v0',                           icon: '🔗', working: false },
+  // Market Data
+  { category: 'Market',  name: 'CoinGecko',     provider: 'CoinGecko',  color: '#8DC647', bg: 'rgba(141,198,71,0.08)', cost: 'Grátis',     endpoint: 'api.coingecko.com/api/v3',                   icon: '🦎', working: true  },
+  { category: 'Market',  name: 'Binance',       provider: 'Binance',    color: '#F0B90B', bg: 'rgba(240,185,11,0.08)', cost: 'Grátis',     endpoint: 'api.binance.com/api/v3',                     icon: '📈', working: true  },
+  { category: 'Market',  name: 'CoinMarketCap', provider: 'CMC',        color: '#00aff0', bg: 'rgba(0,175,240,0.08)', cost: '$0.001/req',  endpoint: 'pro-api.coinmarketcap.com/v1',               icon: '💹', working: false },
+  { category: 'Market',  name: 'DeFiLlama',     provider: 'DefiLlama',  color: '#00D1FF', bg: 'rgba(0,209,255,0.08)', cost: 'Grátis',     endpoint: 'api.llama.fi',                               icon: '🦙', working: true  },
+  // Infra
+  { category: 'Infra',   name: 'OpenAI Status', provider: 'OpenAI',     color: '#10A37F', bg: 'rgba(16,163,127,0.08)', cost: 'Grátis',    endpoint: 'status.openai.com/api/v2/status.json',       icon: '🟢', working: true  },
+  { category: 'Infra',   name: 'Anthropic',     provider: 'Anthropic',  color: '#FF6B35', bg: 'rgba(255,107,53,0.08)', cost: 'Grátis',    endpoint: 'status.anthropic.com/api/v2/status.json',    icon: '📡', working: true  },
 ];
 
 function CopyButton({ text }: { text: string }) {
@@ -72,7 +95,7 @@ export default function PayPage() {
   const [result, setResult] = useState<PayResult | null>(null);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<GlobalStats | null>(null);
-  const [activeStep, setActiveStep] = useState(-1);
+  const [_activeStep, setActiveStep] = useState(-1);
   const terminalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -249,15 +272,12 @@ export default function PayPage() {
                 </div>
                 <span className="text-white/10">|</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {DEMO_URLS.map(u => {
-                    const host = new URL(u).hostname.replace('api.', '').split('.')[0];
-                    return (
-                      <button key={u} onClick={() => setUrl(u)}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-mono border transition-all ${url === u ? 'border-[#9945FF]/50 bg-[#9945FF]/10 text-[#9945FF]/80' : 'border-white/[0.06] text-white/25 hover:text-white/50 hover:border-white/[0.12]'}`}>
-                        {host}
-                      </button>
-                    );
-                  })}
+                  {DEMO_URLS.map(({ label, url: dUrl }) => (
+                    <button key={dUrl} onClick={() => setUrl(dUrl)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-mono border transition-all ${url === dUrl ? 'border-[#9945FF]/50 bg-[#9945FF]/10 text-[#9945FF]/80' : 'border-white/[0.06] text-white/25 hover:text-white/50 hover:border-white/[0.12]'}`}>
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -349,6 +369,54 @@ export default function PayPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ── API Catalog ── */}
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/25">APIs Suportadas — Pague em SOL</h2>
+              <span className="text-[9px] text-white/15 font-mono">14 provedores · qualquer endpoint</span>
+            </div>
+
+            {['IA', 'Solana', 'Market', 'Infra'].map(cat => (
+              <div key={cat} className="mb-5">
+                <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20 mb-2 px-1">{cat}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {API_CATALOG.filter(a => a.category === cat).map(api => (
+                    <button
+                      key={api.name}
+                      onClick={() => {
+                        if (api.working) setUrl(`https://${api.endpoint}`);
+                      }}
+                      className="group text-left rounded-xl p-3 border transition-all hover:scale-[1.02]"
+                      style={{
+                        background: api.bg,
+                        borderColor: `${api.color}25`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-base leading-none">{api.icon}</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full"
+                          style={{ background: `${api.color}20`, color: api.color }}>
+                          {api.cost}
+                        </span>
+                      </div>
+                      <div className="text-[12px] font-bold text-white/80 leading-tight mb-0.5">{api.name}</div>
+                      <div className="text-[10px] text-white/30">{api.provider}</div>
+                      {api.working && (
+                        <div className="mt-2 text-[9px] font-semibold text-[#14F195]/60 group-hover:text-[#14F195]">
+                          ▶ testar agora
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <p className="text-center text-[10px] text-white/15 mt-2">
+              Cards verdes são clicáveis — funcionam sem chave API. Os demais precisam de autenticação.
+            </p>
           </div>
 
           {/* ── Comparison table ── */}
