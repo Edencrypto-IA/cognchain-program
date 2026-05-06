@@ -199,6 +199,29 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
             </a>
           </div>
 
+          {/* Agent Office Link */}
+          <div className="px-3 pb-1">
+            <a
+              href="/office"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                bg-gradient-to-r from-[#9945FF]/10 to-[#14F195]/5
+                border border-[#9945FF]/20
+                hover:from-[#9945FF]/20 hover:to-[#14F195]/10
+                hover:border-[#9945FF]/40
+                transition-all duration-200 group relative overflow-hidden"
+            >
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#9945FF]/30 to-[#14F195]/20 border border-[#9945FF]/30 flex items-center justify-center">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-[#9945FF]">
+                  <path d="M7 1L12.5 4V10L7 13L1.5 10V4L7 1Z" fill="currentColor" fillOpacity="0.9"/>
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-[#9945FF]/80 group-hover:text-[#9945FF] transition-colors">
+                Agent Office
+              </span>
+              <span className="ml-auto text-[8px] font-black text-[#14F195]/60 bg-[#14F195]/10 border border-[#14F195]/20 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
+            </a>
+          </div>
+
           {/* Agent Builder Link */}
           <div className="px-3 pb-3">
             <a
