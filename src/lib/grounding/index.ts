@@ -78,14 +78,20 @@ export async function groundQuery(query: string): Promise<{
   const allGroups = groupByMetric(rawSources).filter(g => g.length > 0);
   let factGroups: RawSource[][];
 
+  // Map token key → abbreviation used in source names (e.g. "Preço SOL", "Binance (SOL)")
+  const TOKEN_ABBREVS: Record<string, string> = {
+    solana: 'sol', bonk: 'bonk', pengu: 'pengu', jup: 'jup', ray: 'ray',
+  };
+
   if (detectedTokens.length > 1) {
     // Multi-token: one price fact per detected token (not market data rows)
     const seenTokens = new Set<string>();
     factGroups = [];
     for (const token of detectedTokens) {
+      const abbrev = TOKEN_ABBREVS[token] ?? token;
       for (const group of allGroups) {
         const name = group[0].name.toLowerCase();
-        if (name.includes(token) && !isMarketDataRow(name) && !seenTokens.has(token)) {
+        if (name.includes(abbrev) && !isMarketDataRow(name) && !seenTokens.has(token)) {
           seenTokens.add(token);
           factGroups.push(group);
           break;
