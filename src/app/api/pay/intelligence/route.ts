@@ -358,11 +358,23 @@ export async function POST(req: NextRequest) {
     if (!analysis.trim()) return NextResponse.json({ error: 'AI não retornou análise' }, { status: 502 });
     steps.push('Análise gerada');
 
-    // Step 4: Save as verified memory
+    // Step 4: Save as verified memory — score from data source confidence
     steps.push('Salvando como memória verificável na Solana...');
     const inputSummary = Object.entries(inputs).map(([k, v]) => `${k}: ${v}`).join(', ');
     const content = `[INTELLIGENCE_SERVICE]\nServiço: ${service.name}\nCategoria: ${service.category}\nPago: ${service.priceSol} SOL · TX: ${payment.txHash}\nData: ${new Date().toISOString()}\n${inputSummary ? `Inputs: ${inputSummary}\n` : ''}\n${analysis}`;
-    const mem = await saveMemory({ content, model: service.model, parentHash: null });
+    // Dynamic score: price router confidence (1-5 sources) → 6.0-10.0; other services fixed
+    const payScore = (() => {
+      if (Array.isArray(marketData) && marketData.length > 0) {
+        const avg = (marketData as { confidence: number }[]).reduce((s, p) => s + p.confidence, 0) / marketData.length;
+        return parseFloat((4 + avg * 1.2).toFixed(1)); // 1 source=5.2 … 5 sources=10.0
+      }
+      if (serviceId === 'defi-yield') {
+        const d = marketData as { pools: unknown[]; protocols: unknown[] };
+        return d.pools.length >= 5 ? 9.0 : d.pools.length > 0 ? 7.5 : 6.0;
+      }
+      return 8.0; // research/audit/wallet default
+    })();
+    const mem = await saveMemory({ content, model: service.model, parentHash: null, score: payScore });
     steps.push(`Memória ancorada · Hash: ${mem.hash.slice(0, 12)}...`);
 
     const duration = Date.now() - startTs;

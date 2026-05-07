@@ -50,6 +50,7 @@ export async function saveMemory(input: MemoryCreateInput): Promise<MemoryEntry>
       timestamp,
       parentHash: input.parentHash || null,
       clientId: input.clientId ?? null,
+      score: input.score ?? null,
       verified: false,
     },
     update: {}, // Don't overwrite existing data

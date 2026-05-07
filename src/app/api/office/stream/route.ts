@@ -342,6 +342,44 @@ async function getAgentHistory(agentName: string, limit = 3): Promise<string> {
   }
 }
 
+// ─── Dynamic confidence score based on data quality ──────────────────────────
+
+function calcDataScore(category: string, data: Record<string, unknown>, agentName: string): number {
+  if (agentName === 'Zion') {
+    // ZION: score by how many agents reported
+    const reports = (data.reports as unknown[]) ?? [];
+    return Math.min(10, 4 + reports.length * 0.9); // 2 agents=5.8 … 7 agents=10.3→10
+  }
+  switch (category) {
+    case 'trade': {
+      // Each token that returned data = +2 points (max 3 tokens = 6 + base 4 = 10)
+      const hits = ['sol', 'bonk', 'pengu'].filter(k => {
+        const d = data[k] as Record<string, string> | null;
+        return d && parseFloat(d.lastPrice ?? '0') > 0;
+      }).length;
+      return hits === 0 ? 2 : Math.min(10, 4 + hits * 2);
+    }
+    case 'defi': {
+      const protos = (data.protocols as unknown[]) ?? [];
+      return protos.length >= 6 ? 9.0 : protos.length >= 3 ? 7.5 : protos.length > 0 ? 6.0 : 2.0;
+    }
+    case 'sentiment': {
+      const prices = data.prices as Record<string, unknown> | null;
+      const btcOk = !!(data.btc as Record<string, string> | null)?.lastPrice;
+      const count = (prices?.solana ? 1 : 0) + (prices?.bitcoin ? 1 : 0) + (prices?.ethereum ? 1 : 0) + (btcOk ? 1 : 0);
+      return count === 0 ? 2 : Math.min(10, 4 + count * 1.5);
+    }
+    case 'onchain': {
+      return (data.slotOk as boolean) ? 8.0 : 5.0;
+    }
+    case 'synthesis': {
+      return 8.5; // synthesis always high quality if it runs
+    }
+    default:
+      return 6.0;
+  }
+}
+
 export async function runRealTask(forceModelKey?: string): Promise<boolean> {
   const available = FREE_MODELS.filter(m => !!process.env[m.envKey]);
   if (available.length === 0) return false;
@@ -385,11 +423,15 @@ export async function runRealTask(forceModelKey?: string): Promise<boolean> {
     const content = resp.choices[0]?.message?.content ?? '';
     if (!content.trim()) return false;
 
-    // Step 4: Save as AGENT_INSIGHT with continuity flag
+    // Step 4: Calculate data-quality score (dynamic confidence)
+    // Score = how many live data sources actually returned real data (0-10)
+    const dataScore = calcDataScore(skill.category, liveData, agentName);
+
+    // Step 5: Save as AGENT_INSIGHT with score
     const hasContinuity = history.length > 0;
     const insightContent = `[AGENT_INSIGHT]\nAgente: ${agentName} (${cfg.label})\nTópico: ${skill.name}\nCategoria: ${skill.category}\nContinuidade: ${hasContinuity ? 'sim — baseado em histórico' : 'primeira análise'}\nData: ${new Date().toISOString()}\n\n${content}`;
     const { saveMemory } = await import('@/services/memory');
-    const mem = await saveMemory({ content: insightContent, model: cfg.key, parentHash: null });
+    const mem = await saveMemory({ content: insightContent, model: cfg.key, parentHash: null, score: dataScore });
 
     const { pushRealEvent } = await import('../shared');
     pushRealEvent({
