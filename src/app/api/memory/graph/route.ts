@@ -19,7 +19,8 @@ export async function GET() {
     /^(assistant:\s*)?(olá|ola)[\s!].*sou o (congchain|cognchain)/i,
     /^(assistant:\s*)?novo inicio/i,
     /^assistant:\s*novo/i,
-    // Agent-generated content — stays in Office, not in Brain
+    // Agent-generated content — stays in Office/insights, not in Brain
+    /^\[AGENT_INSIGHT\]/i,
     /^\[.*SYNTHESIS\]/i,
     /^\[CONGCHAIN PAY/i,
     /^\[Autonomous Decision/i,

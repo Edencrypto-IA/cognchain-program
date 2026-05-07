@@ -1402,6 +1402,24 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [selectedModel, setSelectedModel] = useState<AIModel>('nvidia');
   const [previousModel, setPreviousModel] = useState<string>('gpt');
   const [contextActive, setContextActive] = useState(false);
+  const [agentInsights, setAgentInsights] = useState<{ count: number; latest: string } | null>(null);
+
+  // Load agent insights count on mount + every 2min
+  useEffect(() => {
+    const load = () => {
+      fetch('/api/agents/insights?hours=24&limit=5').then(r => r.json()).then(d => {
+        if (d.count > 0) {
+          const latest = d.insights?.[0]?.topic ?? '';
+          setAgentInsights({ count: d.count, latest });
+        } else {
+          setAgentInsights(null);
+        }
+      }).catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 120_000);
+    return () => clearInterval(t);
+  }, []);
 
   // State for features
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -2258,6 +2276,21 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         {/* Input area — with context chip */}
         <div className="border-t border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl p-3 md:p-4">
           <div className="max-w-3xl mx-auto">
+            {/* Agent insights notification */}
+            {agentInsights && (
+              <div className="flex items-center justify-between mb-2 px-1">
+                <button
+                  onClick={() => setInputValue('O que seus agentes descobriram nas últimas 24h?')}
+                  className="flex items-center gap-2 text-[11px] text-[#F59E0B]/70 hover:text-[#F59E0B] transition-colors group"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse" />
+                  <span className="font-semibold">{agentInsights.count} insight{agentInsights.count > 1 ? 's' : ''} dos agentes</span>
+                  <span className="text-white/25 group-hover:text-white/40 truncate max-w-[200px]">— {agentInsights.latest}</span>
+                  <span className="text-[#F59E0B]/40 group-hover:text-[#F59E0B]/70">→ perguntar</span>
+                </button>
+                <button onClick={() => setAgentInsights(null)} className="text-white/15 hover:text-white/40 text-xs">✕</button>
+              </div>
+            )}
             {/* #1 Context chip above input */}
             {contextActive && (
               <div className="flex items-center justify-between mb-2">

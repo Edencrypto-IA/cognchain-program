@@ -6,7 +6,32 @@ import { verifyAdminToken } from '@/app/api/auth/verify/route';
 import { needsGrounding, groundQuery } from '@/lib/grounding';
 import { requireApiKey } from '@/lib/api-key-auth';
 
-const SYSTEM = `Você é o CONGCHAIN — Verifiable AI Memory Layer na Solana. Responda em português de forma precisa, bem formatada com markdown. Use **negrito** para termos importantes, ### para seções, listas quando apropriado, e blocos de código com \`\`\`linguagem quando mostrar código. Nunca invente dados.`;
+const BASE_SYSTEM = `Você é o CONGCHAIN — Verifiable AI Memory Layer na Solana. Responda em português de forma precisa, bem formatada com markdown. Use **negrito** para termos importantes, ### para seções, listas quando apropriado, e blocos de código com \`\`\`linguagem quando mostrar código. Nunca invente dados.`;
+
+// Returns recent agent insights to inject as context
+async function getAgentInsightContext(): Promise<string> {
+  try {
+    const { db } = await import('@/lib/db');
+    const since = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const mems = await db.memory.findMany({
+      where: { content: { startsWith: '[AGENT_INSIGHT]' }, timestamp: { gte: since } },
+      orderBy: { timestamp: 'desc' },
+      take: 5,
+    });
+    if (!mems.length) return '';
+    const summaries = mems.map(m => {
+      const lines = m.content.split('\n');
+      const topic = lines.find(l => l.startsWith('Tópico:'))?.replace('Tópico: ', '') ?? '';
+      const body = lines.slice(6).join(' ').trim().slice(0, 200);
+      return `• ${topic}: ${body}`;
+    });
+    return `\n\n[INSIGHTS DOS SEUS AGENTES — últimas 24h]\n${summaries.join('\n')}\n[Use esses insights quando relevante para a conversa]`;
+  } catch { return ''; }
+}
+
+function isAgentQuery(msg: string): boolean {
+  return /agente|descobri|analise|insight|encontrou|monitorou|pesquisou|mercado hoje|sol hoje|defi hoje|trade|sinal|compra|venda/i.test(msg);
+}
 
 function enc(text: string) {
   return new TextEncoder().encode(`data: ${JSON.stringify({ token: text })}\n\n`);
@@ -97,6 +122,10 @@ export async function POST(req: NextRequest) {
   }
 
   const lastMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user');
+
+  // Build dynamic system prompt: inject agent insights if query is relevant
+  const agentCtx = lastMsg && isAgentQuery(lastMsg.content) ? await getAgentInsightContext() : '';
+  const SYSTEM = BASE_SYSTEM + agentCtx;
 
   function encStatus(text: string) {
     return new TextEncoder().encode(`data: ${JSON.stringify({ status: text })}\n\n`);

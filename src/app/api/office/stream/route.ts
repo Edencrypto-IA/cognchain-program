@@ -88,17 +88,122 @@ function generateNewAgent(model: string): AgentState {
   };
 }
 
-// ─── Real Task Scheduler (free models only — zero API cost) ──────────────────
+// ─── Agent Skills — real data fetching + AI analysis ─────────────────────────
 
-const REAL_TASKS = [
-  { title: 'Análise de tendências DeFi Solana',  prompt: 'Em 3 pontos concisos, quais as principais tendências DeFi na Solana em 2025? Seja técnico.' },
-  { title: 'Vantagens do Proof of History',       prompt: 'Explique em 3 bullets as vantagens do Proof of History vs Proof of Work. Máximo 120 palavras.' },
-  { title: 'Oportunidades NFT na Solana',         prompt: 'Liste 3 oportunidades concretas no mercado NFT da Solana agora. Seja direto e analítico.' },
-  { title: 'Riscos de liquidez em DeFi',          prompt: 'Quais os 3 principais riscos de liquidez em protocolos DeFi na Solana? Resposta técnica.' },
-  { title: 'Jupiter vs Raydium',                  prompt: 'Compare Jupiter e Raydium em 3 pontos técnicos. Qual é superior para trading e por quê?' },
-  { title: 'AI Agents em blockchain',             prompt: 'Em 3 pontos, como agentes de IA transformarão o ecossistema blockchain Solana?' },
-  { title: 'Segurança de contratos SPL',          prompt: 'Quais os 3 vetores de ataque mais comuns em smart contracts SPL? Explique brevemente.' },
-  { title: 'Yield farming otimizado',             prompt: 'Descreva 3 estratégias de yield farming na Solana com melhor relação risco/retorno em 2025.' },
+async function safeFetch(url: string, ms = 5000, opts?: RequestInit): Promise<unknown> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    return r.json();
+  } catch { clearTimeout(t); return null; }
+}
+
+function fmt(n: number, decimals = 2) { return n.toFixed(decimals); }
+function fmtB(n: number) { return n >= 1e9 ? `$${(n/1e9).toFixed(2)}B` : `$${(n/1e6).toFixed(1)}M`; }
+
+interface AgentSkill {
+  name: string;
+  category: string;
+  fetchData: () => Promise<Record<string, unknown>>;
+  buildPrompt: (data: Record<string, unknown>) => string | null;
+}
+
+const AGENT_SKILLS: AgentSkill[] = [
+  // 1. Trader — live price analysis + signal
+  {
+    name: 'Análise de Trade — SOL/BONK ao Vivo',
+    category: 'trade',
+    async fetchData() {
+      const [sol, bonk, pengu] = await Promise.all([
+        safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=SOLUSDT'),
+        safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BONKUSDT'),
+        safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=PENGUUSDT'),
+      ]);
+      return { sol, bonk, pengu };
+    },
+    buildPrompt(data) {
+      const s = data.sol as Record<string, string> | null;
+      const b = data.bonk as Record<string, string> | null;
+      const p = data.pengu as Record<string, string> | null;
+      if (!s) return null;
+      const lines = [`SOL: $${fmt(+s.lastPrice)} | Vol: ${fmtB(+s.quoteVolume)} | Var 24h: ${fmt(+s.priceChangePercent)}% | Max: $${fmt(+s.highPrice)} | Min: $${fmt(+s.lowPrice)}`];
+      if (b) lines.push(`BONK: $${(+b.lastPrice).toFixed(8)} | Vol: ${fmtB(+b.quoteVolume)} | Var 24h: ${fmt(+b.priceChangePercent)}%`);
+      if (p) lines.push(`PENGU: $${fmt(+p.lastPrice, 4)} | Vol: ${fmtB(+p.quoteVolume)} | Var 24h: ${fmt(+p.priceChangePercent)}%`);
+      return `Dados de mercado AO VIVO (Binance, ${new Date().toLocaleTimeString('pt-BR')}):\n${lines.join('\n')}\n\nCom esses dados reais, forneça:\n1. Sinal COMPRA / VENDA / NEUTRO para SOL com justificativa baseada nos números\n2. Suporte e resistência mais próximos para SOL\n3. Anomalia de volume ou preço que merece atenção agora\nSeja direto, use os números, não invente.`;
+    },
+  },
+
+  // 2. DeFi Scout — real TVL data
+  {
+    name: 'Scout DeFi — Oportunidades de Yield',
+    category: 'defi',
+    async fetchData() {
+      const raw = await safeFetch('https://api.llama.fi/protocols') as unknown[] | null;
+      if (!Array.isArray(raw)) return { protocols: [] };
+      const solana = raw
+        .filter((p: unknown) => { const x = p as Record<string, unknown>; return (x.chains as string[] | undefined)?.includes('Solana') && (x.tvl as number) > 500_000; })
+        .sort((a: unknown, b: unknown) => ((b as Record<string,number>).tvl) - ((a as Record<string,number>).tvl))
+        .slice(0, 8)
+        .map((p: unknown) => { const x = p as Record<string, unknown>; return { name: x.name, tvl: x.tvl, c1d: x.change_1d, c7d: x.change_7d }; });
+      return { protocols: solana };
+    },
+    buildPrompt(data) {
+      const protos = data.protocols as { name: string; tvl: number; c1d?: number; c7d?: number }[];
+      if (!protos.length) return null;
+      const list = protos.map(p => `${p.name}: TVL ${fmtB(p.tvl)} | 1d: ${p.c1d?.toFixed(1) ?? '?'}% | 7d: ${p.c7d?.toFixed(1) ?? '?'}%`).join('\n');
+      return `Protocolos DeFi Solana — dados ao vivo DeFiLlama:\n${list}\n\nAnalise:\n1. Qual protocolo está captando mais capital (TVL crescendo)? Por que isso importa?\n2. Existe oportunidade de yield/liquidez com bom risco/retorno baseado nesses TVLs?\n3. Algum protocolo com queda abrupta que indica risco? Alerte com os números.`;
+    },
+  },
+
+  // 3. Sentimento multi-asset
+  {
+    name: 'Sentimento de Mercado — Crypto Global',
+    category: 'sentiment',
+    async fetchData() {
+      const [prices, btc] = await Promise.all([
+        safeFetch('https://api.coingecko.com/api/v3/simple/price?ids=solana,bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true'),
+        safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT'),
+      ]);
+      return { prices, btc };
+    },
+    buildPrompt(data) {
+      const p = data.prices as Record<string, Record<string, number>> | null;
+      const btc = data.btc as Record<string, string> | null;
+      if (!p?.solana) return null;
+      const lines = [
+        `SOL: $${p.solana.usd} (${p.solana.usd_24h_change?.toFixed(2)}% 24h)`,
+        `BTC: $${p.bitcoin?.usd?.toLocaleString()} (${p.bitcoin?.usd_24h_change?.toFixed(2)}% 24h)`,
+        `ETH: $${p.ethereum?.usd?.toLocaleString()} (${p.ethereum?.usd_24h_change?.toFixed(2)}% 24h)`,
+      ];
+      if (btc) lines.push(`BTC Vol 24h: ${fmtB(+btc.quoteVolume)}`);
+      return `Snapshot ao vivo do mercado crypto:\n${lines.join('\n')}\n\nAnalise o sentimento:\n1. Mercado em modo RISK-ON ou RISK-OFF agora? Justifique com os dados.\n2. SOL está descolando de BTC/ETH? O que isso sinaliza?\n3. Posicionamento recomendado para as próximas 24h com base nesses números.`;
+    },
+  },
+
+  // 4. Whale monitor via Helius
+  {
+    name: 'Monitor Whale — Atividade On-Chain',
+    category: 'onchain',
+    async fetchData() {
+      const key = (() => {
+        if (process.env.HELIUS_API_KEY) return process.env.HELIUS_API_KEY;
+        const m = (process.env.SOLANA_RPC_URL ?? '').match(/api-key=([a-f0-9-]+)/i);
+        return m?.[1] ?? '';
+      })();
+      if (!key) return { slot: null, txCount: 0 };
+      const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getRecentBlockhash', params: [] });
+      const data = await safeFetch(`https://mainnet.helius-rpc.com/?api-key=${key}`, 5000, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }) as Record<string, unknown> | null;
+      const sol = await safeFetch('https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT') as Record<string, string> | null;
+      return { slotOk: !!data?.result, solPrice: sol?.price ?? '?' };
+    },
+    buildPrompt(data) {
+      const { slotOk, solPrice } = data as { slotOk: boolean; solPrice: string };
+      return `Contexto on-chain Solana (Helius RPC ${slotOk ? 'ativo' : 'offline'}) | SOL atual: $${solPrice}\n\nCom base em padrões históricos de atividade on-chain na Solana:\n1. Quais métricas on-chain (velocidade tx, congestionamento, fees) indicam acumulação institucional vs distribuição?\n2. Como identificar movimento de whale antes que apareça no price? Dê exemplo com SOL.\n3. Qual nível de preço do SOL costuma ativar grandes movimentações? Analise o preço atual.`;
+    },
+  },
 ];
 
 const FREE_MODELS = [
@@ -141,31 +246,42 @@ export async function runRealTask(forceModelKey?: string): Promise<boolean> {
   const available = FREE_MODELS.filter(m => !!process.env[m.envKey]);
   if (available.length === 0) return false;
   const cfg = forceModelKey ? (available.find(m => m.key === forceModelKey) ?? pick(available)) : pick(available);
-  const task = pick(REAL_TASKS);
+  const skill = pick(AGENT_SKILLS);
   const agentName = pick(AGENT_NAMES[cfg.key] ?? ['Agent']);
 
   try {
+    // Step 1: Fetch real live data
+    const liveData = await skill.fetchData().catch(() => ({}));
+
+    // Step 2: Build prompt with real numbers
+    const prompt = skill.buildPrompt(liveData);
+    if (!prompt) return false;
+
+    // Step 3: Call free AI with data-enriched prompt
     const { default: OpenAI } = await import('openai');
     const client = new OpenAI({ apiKey: process.env[cfg.envKey] ?? '', baseURL: 'https://integrate.api.nvidia.com/v1' });
     const resp = await client.chat.completions.create({
       model: cfg.model,
       messages: [
-        { role: 'system', content: 'Você é um agente de IA especializado em blockchain Solana. Responda de forma concisa, técnica e direta em português.' },
-        { role: 'user', content: task.prompt },
+        { role: 'system', content: 'Você é um agente trader/analista especializado em Solana e DeFi. Analise os dados reais fornecidos e dê insights acionáveis em português. Nunca invente números — use apenas os dados fornecidos.' },
+        { role: 'user', content: prompt },
       ],
-      max_tokens: 280,
+      max_tokens: 350,
     });
     const content = resp.choices[0]?.message?.content ?? '';
     if (!content.trim()) return false;
 
-    // Agent task results go to Office feed ONLY — not to Memory Brain (chat memories only)
-    const fakeHash = Math.random().toString(16).slice(2, 18);
+    // Step 4: Save as AGENT_INSIGHT — accessible to chat AI as context
+    const insightContent = `[AGENT_INSIGHT]\nAgente: ${agentName} (${cfg.label})\nTópico: ${skill.name}\nCategoria: ${skill.category}\nData: ${new Date().toISOString()}\n\n${content}`;
+    const { saveMemory } = await import('@/services/memory');
+    const mem = await saveMemory({ content: insightContent, model: cfg.key, parentHash: null });
+
     const { pushRealEvent } = await import('../shared');
     pushRealEvent({
       type: 'real_task_done', model: cfg.key, modelLabel: cfg.label,
-      agentName, task: task.title,
+      agentName, task: skill.name,
       result: content.replace(/\n+/g, ' ').trim().slice(0, 160),
-      hash: fakeHash, ts: Date.now(), isReal: true,
+      hash: mem.hash, ts: Date.now(), isReal: true,
     });
     return true;
   } catch { return false; }
