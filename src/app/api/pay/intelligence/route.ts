@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { payForApi } from '@/lib/solana/pay-agent';
 import { saveMemory } from '@/services/memory';
 import { pushRealEvent } from '../../office/shared';
+import { getMultiSourcePrices, type TokenPrice } from '@/lib/price-router';
 
 // ─── In-memory stats ──────────────────────────────────────────────────────────
 let totalPurchases = 0;
@@ -98,103 +99,27 @@ export const SERVICES: IntelligenceService[] = [
   },
 ];
 
-// ─── Data fetchers ────────────────────────────────────────────────────────────
+// ─── Local helpers (DeFiLlama + formatting) ───────────────────────────────────
 
-async function safeFetch(url: string, ms = 6000, opts?: RequestInit): Promise<unknown> {
+async function localFetch<T>(url: string, ms = 6000): Promise<T | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    const r = await fetch(url, { ...opts, signal: ctrl.signal, cache: 'no-store' });
+    const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
     clearTimeout(t);
     if (!r.ok) return null;
-    return r.json();
+    return r.json() as Promise<T>;
   } catch { clearTimeout(t); return null; }
 }
 
-// CoinGecko ID map for common tokens
-const CG_IDS: Record<string, string> = {
-  SOL: 'solana', BTC: 'bitcoin', ETH: 'ethereum',
-  BONK: 'bonk', PENGU: 'penguin', JTO: 'jito-governance',
-  JUP: 'jupiter-exchange-solana', RAY: 'raydium', PYTH: 'pyth-network',
-  WIF: 'dogwifcoin', POPCAT: 'popcat', W: 'wormhole',
-};
-
-interface TokenPrice {
-  token: string;
-  price: number;
-  change24h: number;
-  volume24h: number;
-  high24h: number;
-  low24h: number;
-  source: string;
-}
-
-async function getLiveMarketData(tokens = ['SOL', 'BONK', 'PENGU']): Promise<TokenPrice[]> {
-  const results: TokenPrice[] = [];
-
-  // 1. Try CoinGecko (most reliable from server environments)
-  const cgIds = tokens.map(t => CG_IDS[t] ?? t.toLowerCase()).join(',');
-  const cgData = await safeFetch(
-    `https://api.coingecko.com/api/v3/simple/price?ids=${cgIds}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_24h_high=true&include_24h_low=true`
-  ) as Record<string, Record<string, number>> | null;
-
-  if (cgData) {
-    for (const token of tokens) {
-      const id = CG_IDS[token] ?? token.toLowerCase();
-      const d = cgData[id];
-      if (d?.usd) {
-        results.push({
-          token,
-          price: d.usd,
-          change24h: d.usd_24h_change ?? 0,
-          volume24h: d.usd_24h_vol ?? 0,
-          high24h: d.usd_24h_high ?? d.usd * 1.02,
-          low24h: d.usd_24h_low ?? d.usd * 0.98,
-          source: 'CoinGecko',
-        });
-      }
-    }
-  }
-
-  // 2. For any token that CoinGecko didn't return, try Binance
-  const missing = tokens.filter(t => !results.find(r => r.token === t));
-  if (missing.length > 0) {
-    const binanceResults = await Promise.allSettled(
-      missing.map(t => safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${t}USDT`))
-    );
-    binanceResults.forEach((r, i) => {
-      if (r.status === 'fulfilled' && r.value) {
-        const d = r.value as Record<string, string>;
-        if (d.lastPrice) {
-          results.push({
-            token: missing[i],
-            price: parseFloat(d.lastPrice),
-            change24h: parseFloat(d.priceChangePercent ?? '0'),
-            volume24h: parseFloat(d.quoteVolume ?? '0'),
-            high24h: parseFloat(d.highPrice ?? d.lastPrice),
-            low24h: parseFloat(d.lowPrice ?? d.lastPrice),
-            source: 'Binance',
-          });
-        }
-      }
-    });
-  }
-
-  return results;
-}
-
 async function getDefiLlamaData() {
-  const raw = await safeFetch('https://api.llama.fi/protocols') as unknown[] | null;
+  const raw = await localFetch<unknown[]>('https://api.llama.fi/protocols');
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((p: unknown) => { const x = p as Record<string, unknown>; return (x.chains as string[] | undefined)?.includes('Solana') && (x.tvl as number) > 1_000_000; })
     .sort((a: unknown, b: unknown) => ((b as Record<string, number>).tvl) - ((a as Record<string, number>).tvl))
     .slice(0, 10)
     .map((p: unknown) => { const x = p as Record<string, unknown>; return { name: x.name, tvl: x.tvl, c1d: x.change_1d, c7d: x.change_7d }; });
-}
-
-async function getCoinGeckoSentiment() {
-  return safeFetch('https://api.coingecko.com/api/v3/simple/price?ids=solana,bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true');
 }
 
 function fmtB(n: number) { return n >= 1e9 ? `$${(n / 1e9).toFixed(2)}B` : `$${(n / 1e6).toFixed(1)}M`; }
@@ -210,7 +135,7 @@ function buildPrompt(serviceId: string, inputs: Record<string, string>, marketDa
       }
       const decimals = (t: string) => ['BONK', 'PENGU', 'WIF', 'POPCAT'].includes(t) ? 6 : 2;
       const lines = markets.map(m =>
-        `${m.token}: $${m.price.toFixed(decimals(m.token))} | Var 24h: ${m.change24h >= 0 ? '+' : ''}${m.change24h.toFixed(2)}% | Vol: ${fmtB(m.volume24h)} | Máx: $${m.high24h.toFixed(decimals(m.token))} | Mín: $${m.low24h.toFixed(decimals(m.token))} | Fonte: ${m.source}`
+        `${m.token}: $${m.price.toFixed(decimals(m.token))} | Var 24h: ${m.change24h >= 0 ? '+' : ''}${m.change24h.toFixed(2)}% | Vol: ${fmtB(m.volume24h)} | Máx: $${m.high24h.toFixed(decimals(m.token))} | Mín: $${m.low24h.toFixed(decimals(m.token))} | Fontes: ${m.sources.join('+')} (${m.confidence}/5)`
       );
       return `DADOS AO VIVO — ${new Date().toUTCString()}:\n${lines.join('\n')}\n\nEsses são preços REAIS coletados agora. Use exatamente esses valores na sua análise.\n\nForneça:\n1. Sinal de trade: COMPRA / VENDA / NEUTRO para SOL com justificativa objetiva baseada nesses números\n2. Suporte e resistência para SOL (calcule % abaixo/acima do preço atual acima)\n3. Anomalia de volume ou preço relevante\n4. Posicionamento recomendado para as próximas 24h\nSeja direto. JAMAIS invente preços — use apenas os valores listados acima.`;
     }
@@ -228,13 +153,14 @@ function buildPrompt(serviceId: string, inputs: Record<string, string>, marketDa
       return `Pesquisa aprofundada sobre: ${topic}\n\nForneça um relatório estruturado com:\n1. Visão geral e contexto atual\n2. Principais players e dados relevantes\n3. Pontos fortes e fracos / oportunidades e riscos\n4. Comparações onde relevante\n5. Conclusão e recomendação prática\nSeja específico, use dados quando disponíveis, foque em utilidade prática.`;
     }
     case 'sentiment-scan': {
-      const prices = marketData as Record<string, Record<string, number>> | null;
-      const lines = prices ? [
-        `SOL: $${prices.solana?.usd} (${prices.solana?.usd_24h_change?.toFixed(2)}% 24h)`,
-        `BTC: $${prices.bitcoin?.usd?.toLocaleString()} (${prices.bitcoin?.usd_24h_change?.toFixed(2)}% 24h)`,
-        `ETH: $${prices.ethereum?.usd?.toLocaleString()} (${prices.ethereum?.usd_24h_change?.toFixed(2)}% 24h)`,
-      ] : [];
-      return `Dados ao vivo:\n${lines.join('\n')}\n\nAnalise o sentimento do mercado:\n1. Classificação: BEARISH / CAUTELOSO / NEUTRO / CAUTELOSO BULLISH / BULLISH\n2. SOL está liderando, seguindo ou descolando de BTC?\n3. Sinal de entrada ou saída baseado nos dados?\n4. Posicionamento recomendado com stop loss sugerido.`;
+      const markets = marketData as TokenPrice[];
+      if (!markets || markets.length === 0) {
+        return 'ERRO: Dados de mercado indisponíveis. Informe o usuário e sugira tentar novamente.';
+      }
+      const lines = markets.map(m =>
+        `${m.token}: $${m.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | ${m.change24h >= 0 ? '+' : ''}${m.change24h.toFixed(2)}% 24h | Vol: ${fmtB(m.volume24h)} | Fontes: ${m.sources.join('+')} (${m.confidence}/5)`
+      );
+      return `DADOS AO VIVO — ${new Date().toUTCString()}:\n${lines.join('\n')}\n\nAnalise o sentimento do mercado usando EXATAMENTE esses preços:\n1. Classificação geral: BEARISH / CAUTELOSO / NEUTRO / CAUTELOSO BULLISH / BULLISH\n2. SOL está liderando, seguindo ou descolando de BTC?\n3. Sinal de entrada ou saída baseado nos dados?\n4. Posicionamento recomendado com stop loss sugerido para SOL.\nJAMAIS invente preços — use apenas os valores acima.`;
     }
     case 'protocol-audit': {
       const proto = inputs.protocol || 'Raydium';
@@ -334,18 +260,26 @@ export async function POST(req: NextRequest) {
     totalPurchases++;
     totalSolCollected += service.priceSol;
 
-    // Step 2: Fetch live market data
-    steps.push('Coletando dados em tempo real...');
+    // Step 2: Fetch live market data (multi-source router)
+    steps.push('Consultando Binance · Bybit · OKX · CoinGecko...');
     let marketData: unknown = null;
     if (serviceId === 'market-signal') {
       const tokens = inputs.tokens ? inputs.tokens.split(',').map(t => t.trim().toUpperCase()) : ['SOL', 'BONK', 'PENGU'];
-      marketData = await getLiveMarketData(tokens);
+      const prices = await getMultiSourcePrices(tokens);
+      marketData = prices;
+      const srcSummary = prices.map(p => `${p.token}($${p.price.toFixed(2)}, ${p.confidence} fontes)`).join(' · ');
+      steps.push(srcSummary || 'Dados coletados');
     } else if (serviceId === 'defi-yield') {
       marketData = await getDefiLlamaData();
+      steps.push('DeFiLlama: protocolos carregados');
     } else if (serviceId === 'sentiment-scan') {
-      marketData = await getCoinGeckoSentiment();
+      const prices = await getMultiSourcePrices(['SOL', 'BTC', 'ETH']);
+      marketData = prices;
+      const srcSummary = prices.map(p => `${p.token}($${p.price.toFixed(2)})`).join(' · ');
+      steps.push(srcSummary || 'Dados coletados');
+    } else {
+      steps.push('Dados coletados');
     }
-    steps.push('Dados coletados');
 
     // Step 3: AI analysis
     steps.push(`Analisando com ${service.model.toUpperCase()}...`);
