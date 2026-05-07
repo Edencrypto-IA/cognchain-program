@@ -21,6 +21,7 @@ export async function GET() {
     /^assistant:\s*novo/i,
     // Agent-generated content — stays in Office/insights, not in Brain
     /^\[AGENT_INSIGHT\]/i,
+    /^\[INTELLIGENCE_SERVICE\]/i,
     /^\[.*SYNTHESIS\]/i,
     /^\[CONGCHAIN PAY/i,
     /^\[Autonomous Decision/i,
