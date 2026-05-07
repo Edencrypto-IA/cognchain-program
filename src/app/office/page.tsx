@@ -312,9 +312,31 @@ export default function OfficePage() {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState('');
   const [running, setRunning] = useState(false);
+  const [schedulerOn, setSchedulerOn] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const esRef = useRef<EventSource | null>(null);
   const eventCounter = useRef(0);
+
+  // Check scheduler state on mount
+  useEffect(() => {
+    fetch('/api/office/scheduler').then(r => r.json()).then(d => setSchedulerOn(d.active)).catch(() => {});
+  }, []);
+
+  // Stop scheduler when leaving the page
+  useEffect(() => {
+    return () => {
+      fetch('/api/office/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) }).catch(() => {});
+    };
+  }, []);
+
+  const toggleScheduler = useCallback(async () => {
+    const action = schedulerOn ? 'stop' : 'start';
+    try {
+      const r = await fetch('/api/office/scheduler', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      const d = await r.json();
+      setSchedulerOn(d.active);
+    } catch { /* silent */ }
+  }, [schedulerOn]);
 
   const triggerRealTask = useCallback(async () => {
     if (running) return;
@@ -478,20 +500,30 @@ export default function OfficePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Manual real-task trigger */}
+            {/* Scheduler Play/Pause — main control */}
+            <button
+              onClick={toggleScheduler}
+              disabled={!connected}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-40"
+              style={{
+                background: schedulerOn ? 'rgba(20,241,149,0.12)' : 'rgba(153,69,255,0.12)',
+                border: schedulerOn ? '1px solid rgba(20,241,149,0.35)' : '1px solid rgba(153,69,255,0.35)',
+                color: schedulerOn ? '#14F195' : '#9945FF',
+              }}
+            >
+              {schedulerOn
+                ? <><span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />Pausar Agentes</>
+                : <><Play className="w-3 h-3" />Iniciar Agentes</>}
+            </button>
+            {/* One-shot manual trigger */}
             <button
               onClick={triggerRealTask}
               disabled={running || !connected}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-40"
-              style={{
-                background: running ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.12)',
-                border: '1px solid rgba(245,158,11,0.25)',
-                color: '#F59E0B',
-              }}
+              title="Executar uma tarefa real agora"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-30"
+              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}
             >
-              {running
-                ? <><Loader2 className="w-3 h-3 animate-spin" />Executando...</>
-                : <><Play className="w-3 h-3" />Tarefa Real</>}
+              {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
             </button>
             <div className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#14F195] live-dot' : 'bg-[#EF4444]'}`} />

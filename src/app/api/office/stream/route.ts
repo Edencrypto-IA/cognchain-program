@@ -113,7 +113,29 @@ const AGENT_NAMES: Record<string, string[]> = {
   minimax: ['Nova', 'Flux', 'Wave'], qwen: ['Echo', 'Apex', 'Zion'],
 };
 
-let schedulerStarted = false;
+// Manual on/off — only runs when user presses Play in the Office
+let schedulerActive = false;
+let schedulerRunning = false;
+
+export function setSchedulerActive(active: boolean) {
+  schedulerActive = active;
+  if (active && !schedulerRunning) startSchedulerLoop();
+}
+
+export function isSchedulerActive() { return schedulerActive; }
+
+function startSchedulerLoop() {
+  if (schedulerRunning) return;
+  schedulerRunning = true;
+  (async () => {
+    while (schedulerActive) {
+      try { await runRealTask(); } catch { /* silent */ }
+      // Wait 55s but check every second if still active
+      for (let i = 0; i < 55 && schedulerActive; i++) await sleep(1000);
+    }
+    schedulerRunning = false;
+  })();
+}
 
 export async function runRealTask(forceModelKey?: string): Promise<boolean> {
   const available = FREE_MODELS.filter(m => !!process.env[m.envKey]);
@@ -149,22 +171,10 @@ export async function runRealTask(forceModelKey?: string): Promise<boolean> {
   } catch { return false; }
 }
 
-function ensureScheduler() {
-  if (schedulerStarted) return;
-  schedulerStarted = true;
-  (async () => {
-    await sleep(12000); // First run after 12s
-    while (true) {
-      try { await runRealTask(); } catch { /* silent */ }
-      await sleep(55000); // Every ~55s after that
-    }
-  })();
-}
-
 export async function GET(req: NextRequest) {
   let stopped = false;
   req.signal.addEventListener('abort', () => { stopped = true; });
-  ensureScheduler();
+  // No auto-start — user controls via Play button
 
   const stream = new ReadableStream({
     async start(controller) {
