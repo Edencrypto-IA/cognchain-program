@@ -3,6 +3,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Wallet Adapter Modal — dark theme override ── */
+.wallet-adapter-modal-wrapper {
+  background: #0a0a14 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 20px !important;
+}
+.wallet-adapter-modal-title {
+  color: rgba(255,255,255,0.85) !important;
+  font-weight: 600 !important;
+}
+.wallet-adapter-modal-list li {
+  border-radius: 12px !important;
+}
+.wallet-adapter-modal-list li:hover {
+  background: rgba(153,69,255,0.08) !important;
+}
+.wallet-adapter-button {
+  background: rgba(153,69,255,0.12) !important;
+  border: 1px solid rgba(153,69,255,0.25) !important;
+  border-radius: 12px !important;
+  color: #b794ff !important;
+  font-weight: 600 !important;
+}
+.wallet-adapter-button:hover:not([disabled]) {
+  background: rgba(153,69,255,0.2) !important;
+}
+.wallet-adapter-modal-overlay {
+  background: rgba(0,0,0,0.75) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
