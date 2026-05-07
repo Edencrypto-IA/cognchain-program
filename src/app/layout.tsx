@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "@/styles/dashboards.css";
+import "@solana/wallet-adapter-react-ui/styles.css";
 import { Toaster } from "@/components/ui/toaster";
 import AppProviders from "@/components/providers/app-providers";
 

@@ -4,10 +4,10 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useEffect, useState, useCallback } from 'react';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { Wallet, LogOut, ChevronDown, Copy, ExternalLink, Check } from 'lucide-react';
+import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown } from 'lucide-react';
 
 export default function WalletButton() {
-  const { publicKey, connected, disconnect, connecting } = useWallet();
+  const { publicKey, connected, disconnect, connecting, wallet } = useWallet();
   const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
@@ -38,12 +38,12 @@ export default function WalletButton() {
 
   function copyAddress() {
     if (!publicKey) return;
-    navigator.clipboard.writeText(publicKey.toString());
+    navigator.clipboard.writeText(publicKey.toString()).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // ── Not connected ────────────────────────────────────────────
+  // ── Not connected ──────────────────────────────────────────────
   if (!connected) {
     return (
       <button
@@ -57,12 +57,12 @@ export default function WalletButton() {
     );
   }
 
-  // ── Connected ────────────────────────────────────────────────
+  // ── Connected ──────────────────────────────────────────────────
   return (
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/8 px-3 py-2 text-xs font-semibold text-[#14F195] transition-all hover:bg-[#14F195]/15"
+        className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/[0.08] px-3 py-2 text-xs font-semibold text-[#14F195] transition-all hover:bg-[#14F195]/15"
       >
         <div className="h-2 w-2 rounded-full bg-[#14F195] animate-pulse" />
         <span>{truncate(publicKey!.toString())}</span>
@@ -76,9 +76,20 @@ export default function WalletButton() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f0f1e] shadow-xl shadow-black/40">
+            {/* Wallet name */}
+            {wallet && (
+              <div className="border-b border-white/[0.06] px-4 py-3 flex items-center gap-2">
+                {wallet.adapter.icon && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={wallet.adapter.icon} alt="" className="h-4 w-4 rounded" />
+                )}
+                <span className="text-[11px] font-semibold text-white/60">{wallet.adapter.name}</span>
+              </div>
+            )}
+
             {/* Address */}
             <div className="border-b border-white/[0.06] p-4">
-              <p className="mb-1 text-[10px] uppercase tracking-wider text-white/30">Carteira Conectada</p>
+              <p className="mb-1 text-[10px] uppercase tracking-wider text-white/30">Endereço</p>
               <p className="break-all font-mono text-[11px] text-white/60">{publicKey!.toString()}</p>
             </div>
 
@@ -87,7 +98,6 @@ export default function WalletButton() {
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <p className="text-[10px] uppercase tracking-wider text-white/30">Saldo</p>
                 <p className="mt-0.5 text-lg font-bold text-white/80">{balance.toFixed(4)} SOL</p>
-                <p className="text-[10px] text-white/25">Rede: devnet</p>
               </div>
             )}
 
@@ -101,7 +111,7 @@ export default function WalletButton() {
                 {copied ? 'Copiado!' : 'Copiar endereço'}
               </button>
               <a
-                href={`https://explorer.solana.com/address/${publicKey!.toString()}?cluster=devnet`}
+                href={`https://explorer.solana.com/address/${publicKey!.toString()}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/70"
