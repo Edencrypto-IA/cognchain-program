@@ -204,6 +204,76 @@ const AGENT_SKILLS: AgentSkill[] = [
   },
 ];
 
+// ─── ZION Synthesis Skill — reads other agents' DB memories ──────────────────
+
+function extractBody(content: string, maxLen = 280): string {
+  const lines = content.split('\n');
+  const blankIdx = lines.findIndex((l, i) => i >= 4 && l.trim() === '');
+  return lines.slice(blankIdx > 0 ? blankIdx + 1 : 5)
+    .join(' ').replace(/\*\*/g, '').trim().slice(0, maxLen);
+}
+
+const ZION_SKILL: AgentSkill = {
+  name: 'Síntese Executiva — ZION Multi-Agente',
+  category: 'synthesis',
+  async fetchData() {
+    const trackedAgents = ['Vega', 'Nexus', 'Nova', 'Echo', 'Apex', 'Ares', 'Flux'];
+    const results = await Promise.all(
+      trackedAgents.map(async name => {
+        const mem = await db.memory.findFirst({
+          where: {
+            AND: [
+              { content: { startsWith: '[AGENT_INSIGHT]' } },
+              { content: { contains: `Agente: ${name}` } },
+            ],
+          },
+          orderBy: { timestamp: 'desc' },
+          select: { content: true, timestamp: true },
+        });
+        return { name, mem };
+      })
+    );
+    // Also grab current SOL price for context
+    const sol = await safeFetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true') as Record<string, Record<string, number>> | null;
+    return {
+      reports: results.filter(r => r.mem !== null),
+      solPrice: sol?.solana?.usd ?? null,
+      solChange: sol?.solana?.usd_24h_change ?? null,
+    };
+  },
+  buildPrompt(data) {
+    const { reports, solPrice, solChange } = data as {
+      reports: { name: string; mem: { content: string; timestamp: number } }[];
+      solPrice: number | null;
+      solChange: number | null;
+    };
+    if (reports.length < 2) return null;
+
+    const priceCtx = solPrice
+      ? `SOL atual: $${solPrice.toFixed(2)} (${solChange && solChange >= 0 ? '+' : ''}${solChange?.toFixed(2) ?? '?'}% 24h)`
+      : '';
+
+    const briefings = reports.map(r => {
+      const body = extractBody(r.mem.content);
+      const date = new Date(r.mem.timestamp * 1000).toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      });
+      return `▸ ${r.name.toUpperCase()} [${date}]:\n  ${body}`;
+    }).join('\n\n');
+
+    return `BRIEFING DOS AGENTES CONGCHAIN — ${new Date().toLocaleString('pt-BR')}
+${priceCtx ? `Contexto: ${priceCtx}\n` : ''}
+${briefings}
+
+Você é ZION, o agente de síntese executiva da CONGCHAIN. Com base nos relatórios acima:
+1. CONSENSO: Qual é o estado atual do mercado Solana segundo os agentes? Há convergência entre eles?
+2. DIVERGÊNCIAS: Algum agente contradiz outro? Quem tem o argumento mais sólido?
+3. SÍNTESE: Qual ação/posicionamento você recomenda para as próximas 24h baseado em todos os dados?
+4. ALERTA: Algum sinal urgente que merece atenção imediata?
+Cite os agentes pelos nomes. Seja objetivo e acionável.`;
+  },
+};
+
 const FREE_MODELS = [
   { key: 'nvidia',  label: 'NVIDIA Llama', model: 'meta/llama-3.3-70b-instruct',        envKey: 'NVIDIA_API_KEY'      },
   { key: 'glm',     label: 'GLM-4.7',      model: 'z-ai/glm4.7',                        envKey: 'NVIDIA_GLM_KEY'      },
@@ -276,14 +346,16 @@ export async function runRealTask(forceModelKey?: string): Promise<boolean> {
   const available = FREE_MODELS.filter(m => !!process.env[m.envKey]);
   if (available.length === 0) return false;
   const cfg = forceModelKey ? (available.find(m => m.key === forceModelKey) ?? pick(available)) : pick(available);
-  const skill = pick(AGENT_SKILLS);
   const agentName = pick(AGENT_NAMES[cfg.key] ?? ['Agent']);
+  // ZION always synthesizes from other agents' memories; others run random skills
+  const skill = agentName === 'Zion' ? ZION_SKILL : pick(AGENT_SKILLS);
 
   try {
     // Step 1: Fetch real live data + agent's own memory history (in parallel)
+    // For ZION: history is already embedded in ZION_SKILL.fetchData, so skip personal history
     const [liveData, history] = await Promise.all([
       skill.fetchData().catch(() => ({})),
-      getAgentHistory(agentName),
+      agentName === 'Zion' ? Promise.resolve('') : getAgentHistory(agentName),
     ]);
 
     // Step 2: Build prompt with real data + memory context
