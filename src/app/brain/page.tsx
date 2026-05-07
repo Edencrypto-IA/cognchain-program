@@ -1,7 +1,215 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2, ArrowLeft, Trash2, Send, MessageSquare, Menu } from 'lucide-react';
+import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2, ArrowLeft, Trash2, Send, MessageSquare, Menu, Zap, ChevronRight } from 'lucide-react';
+
+// ─── Agent card types ──────────────────────────────────────────────────────────
+interface AgentCard {
+  hash: string; model: string; timestamp: number; score: number | null;
+  service: string; category: string; solPaid: number;
+  snippet: string; fullContent: string;
+  tag: 'intelligence' | 'insight' | 'pay' | 'agent';
+}
+
+const CAT_COLORS: Record<string, string> = {
+  Trade: '#F59E0B', DeFi: '#14F195', 'On-Chain': '#9945FF',
+  Pesquisa: '#4285F4', Sentimento: '#00D1FF', Segurança: '#FF6B35',
+  Pay: '#F59E0B', Insight: '#9945FF', Agente: '#76B900',
+};
+
+const MODEL_LABELS_MAP: Record<string, string> = {
+  gpt: 'GPT-4o', claude: 'Claude', nvidia: 'NVIDIA',
+  gemini: 'Gemini', deepseek: 'DeepSeek', glm: 'GLM-4.7',
+  minimax: 'MiniMax', qwen: 'Qwen3',
+};
+
+// ─── Hologram face (mini version for cards) ────────────────────────────────────
+function HologramFaceMini({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 120 145" fill="none" style={{ width: '100%', height: '100%' }}>
+      <ellipse cx="60" cy="72" rx="38" ry="44" fill={color} opacity="0.07" />
+      <ellipse cx="60" cy="64" rx="44" ry="50" stroke={color} strokeWidth="1.2" opacity="0.85" />
+      {[38,48,58,68,78,88,100].map(y => {
+        const w = Math.max(8, 42 - Math.abs(y - 64) * 0.35);
+        return <line key={y} x1={60 - w} y1={y} x2={60 + w} y2={y} stroke={color} strokeWidth="0.4" opacity="0.2" />;
+      })}
+      <ellipse cx="43" cy="58" rx="9" ry="6" stroke={color} strokeWidth="1.2" opacity="0.9" />
+      <ellipse cx="77" cy="58" rx="9" ry="6" stroke={color} strokeWidth="1.2" opacity="0.9" />
+      <circle cx="43" cy="58" r="2.5" fill={color} opacity="0.8" />
+      <circle cx="77" cy="58" r="2.5" fill={color} opacity="0.8" />
+      <path d="M60 64 L54 78 L60 80 L66 78 Z" stroke={color} strokeWidth="0.9" opacity="0.6" />
+      <path d="M46 90 Q60 100 74 90" stroke={color} strokeWidth="1.1" opacity="0.75" />
+      <path d="M34 108 Q60 122 86 108" stroke={color} strokeWidth="0.8" opacity="0.45" />
+      <circle cx="60" cy="14" r="2" fill={color} opacity="0.6" />
+      <circle cx="16" cy="64" r="2" fill={color} opacity="0.6" />
+      <circle cx="104" cy="64" r="2" fill={color} opacity="0.6" />
+    </svg>
+  );
+}
+
+// ─── Agent Memory Card ─────────────────────────────────────────────────────────
+function AgentMemoryCard({ card, onClick }: { card: AgentCard; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  const mk = Object.keys({ gpt: 1, claude: 1, nvidia: 1, gemini: 1, deepseek: 1, glm: 1, minimax: 1, qwen: 1 })
+    .find(k => card.model.toLowerCase().includes(k)) ?? 'nvidia';
+  const color = ({ gpt: '#10A37F', claude: '#9945FF', nvidia: '#76B900', gemini: '#4285F4', deepseek: '#FF6B35', glm: '#00D1FF', minimax: '#FF6B9D', qwen: '#A855F7' } as Record<string, string>)[mk] ?? '#888';
+  const catColor = CAT_COLORS[card.category] ?? color;
+
+  return (
+    <div onClick={onClick}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{
+        borderColor: hover ? `${color}40` : `${color}18`,
+        boxShadow: hover ? `0 0 32px ${color}15, 0 8px 32px rgba(0,0,0,0.5)` : '0 4px 20px rgba(0,0,0,0.4)',
+        transform: hover ? 'translateY(-3px)' : 'translateY(0)',
+        background: hover ? `linear-gradient(180deg, ${color}08 0%, #0a0a14 100%)` : '#0a0a14',
+      }}
+      className="rounded-2xl overflow-hidden border cursor-pointer transition-all duration-300">
+
+      {/* Hologram area */}
+      <div className="relative flex justify-center pt-5 pb-3" style={{ background: `linear-gradient(180deg, ${color}12, transparent)` }}>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full blur-3xl opacity-15" style={{ background: color }} />
+        <div className="relative w-20 h-24">
+          <HologramFaceMini color={color} />
+        </div>
+        {/* Tag badge */}
+        <div className="absolute top-2.5 right-2.5 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+          style={{ background: `${color}20`, color, border: `1px solid ${color}30` }}>
+          {card.tag === 'intelligence' ? 'SERVIÇO' : card.tag === 'insight' ? 'INSIGHT' : card.tag === 'pay' ? 'PAY' : 'AGENTE'}
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="px-3.5 pb-4">
+        {/* Model + Category */}
+        <div className="flex flex-wrap gap-1 mb-2.5">
+          <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+            style={{ background: `${color}18`, color, border: `1px solid ${color}25` }}>
+            {MODEL_LABELS_MAP[mk] ?? mk}
+          </span>
+          {card.category && (
+            <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+              style={{ background: `${catColor}12`, color: catColor, border: `1px solid ${catColor}20` }}>
+              {card.category}
+            </span>
+          )}
+        </div>
+
+        {/* Service name */}
+        <h3 className="text-[12px] font-bold text-white/80 leading-tight mb-2 line-clamp-2">{card.service}</h3>
+
+        {/* SOL paid */}
+        {card.solPaid > 0 && (
+          <div className="flex items-center gap-1 mb-2">
+            <Zap className="w-3 h-3 text-[#F59E0B]" />
+            <span className="text-[10px] font-mono font-bold text-[#F59E0B]">{card.solPaid} SOL</span>
+          </div>
+        )}
+
+        {/* Snippet */}
+        <p className="text-[10px] text-white/38 leading-relaxed line-clamp-3 mb-3">{card.snippet}</p>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-white/[0.04] pt-2.5">
+          <span className="font-mono text-[9px] text-white/20">{card.hash.slice(0, 8)}…</span>
+          <span className="text-[9px] text-white/20">
+            {new Date(card.timestamp * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Agent Detail Modal ────────────────────────────────────────────────────────
+function AgentDetailModal({ card, onClose }: { card: AgentCard; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const mk = Object.keys({ gpt:1,claude:1,nvidia:1,gemini:1,deepseek:1,glm:1,minimax:1,qwen:1 })
+    .find(k => card.model.toLowerCase().includes(k)) ?? 'nvidia';
+  const color = ({ gpt:'#10A37F',claude:'#9945FF',nvidia:'#76B900',gemini:'#4285F4',deepseek:'#FF6B35',glm:'#00D1FF',minimax:'#FF6B9D',qwen:'#A855F7' } as Record<string,string>)[mk] ?? '#888';
+
+  // Body content (skip header lines)
+  const bodyLines = card.fullContent.split('\n');
+  const bodyStart = card.tag === 'intelligence' || card.tag === 'insight' ? 6 : 2;
+  const body = bodyLines.slice(bodyStart).join('\n').trim();
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)' }}
+      onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+        style={{ background: '#0b0d14', border: `1px solid ${color}25`, boxShadow: `0 0 60px ${color}15, 0 40px 100px rgba(0,0,0,0.8)` }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-10">
+              <HologramFaceMini color={color} />
+            </div>
+            <div>
+              <div className="text-[13px] font-bold text-white/85">{card.service}</div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+                  style={{ background: `${color}18`, color }}>{MODEL_LABELS_MAP[mk] ?? mk}</span>
+                {card.category && <span className="text-[9px] text-white/30">{card.category}</span>}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors text-xl">×</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Metrics row */}
+          <div className="grid grid-cols-3 gap-3">
+            {card.solPaid > 0 && (
+              <div className="rounded-xl p-3 bg-[#F59E0B]/08 border border-[#F59E0B]/15 text-center">
+                <div className="text-[16px] font-black font-mono text-[#F59E0B]">{card.solPaid}</div>
+                <div className="text-[9px] text-white/30 uppercase tracking-widest">SOL pago</div>
+              </div>
+            )}
+            {card.score !== null && (
+              <div className="rounded-xl p-3 bg-white/[0.03] border border-white/[0.06] text-center">
+                <div className="text-[16px] font-black font-mono text-white/70">{card.score.toFixed(1)}</div>
+                <div className="text-[9px] text-white/30 uppercase tracking-widest">Score</div>
+              </div>
+            )}
+            <div className="rounded-xl p-3 bg-white/[0.03] border border-white/[0.06] text-center">
+              <div className="text-[11px] font-bold text-white/50">
+                {new Date(card.timestamp * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })}
+              </div>
+              <div className="text-[9px] text-white/30 uppercase tracking-widest">Data</div>
+            </div>
+          </div>
+
+          {/* Full analysis */}
+          <div>
+            <div className="text-[9px] font-bold uppercase tracking-widest text-white/25 mb-2">Análise Completa</div>
+            <div className="rounded-xl p-4 bg-white/[0.025] border border-white/[0.05] text-[12px] text-white/70 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+              {body}
+            </div>
+          </div>
+
+          {/* Hash + proof */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] uppercase tracking-widest text-white/20 w-12">Hash</span>
+              <span className="font-mono text-[10px] text-white/40 flex-1 truncate">{card.hash}</span>
+              <button onClick={() => { navigator.clipboard?.writeText(card.hash).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),1500); }}
+                className="text-white/20 hover:text-white/60 transition-colors">
+                {copied ? <ZapIcon className="w-3 h-3 text-[#14F195]" /> : <ChevronRight className="w-3 h-3" />}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] uppercase tracking-widest text-[#14F195]/40 w-12">Proof</span>
+              <span className="font-mono text-[10px] text-[#14F195]/50 flex-1 truncate">CONGCHAIN://memory/{card.hash.slice(0,16)}…</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const MODEL_COLORS: Record<string, string> = {
   gpt:      '#10A37F',
@@ -122,6 +330,20 @@ export default function BrainPage() {
   const [deleting, setDeleting] = useState(false);
   // Mobile panel toggle
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  // View toggle
+  const [view, setView] = useState<'graph' | 'agents'>('graph');
+  const [agentCards, setAgentCards] = useState<AgentCard[]>([]);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<AgentCard | null>(null);
+
+  useEffect(() => {
+    if (view !== 'agents') return;
+    setAgentLoading(true);
+    fetch('/api/memory/cards').then(r => r.json()).then(d => {
+      setAgentCards(d.cards ?? []);
+      setAgentLoading(false);
+    }).catch(() => setAgentLoading(false));
+  }, [view]);
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
@@ -531,6 +753,24 @@ export default function BrainPage() {
             <span className="font-semibold text-white">Memory Brain</span>
           </div>
           <p className="text-xs text-white/40 mb-3">Grafo neural de memórias</p>
+
+          {/* View toggle */}
+          <div className="flex gap-1 p-1 bg-white/[0.04] rounded-lg mb-3 border border-white/[0.04]">
+            <button
+              onClick={() => setView('graph')}
+              className="flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-all"
+              style={{ background: view === 'graph' ? '#9945FF' : 'transparent', color: view === 'graph' ? '#fff' : 'rgba(255,255,255,0.4)' }}
+            >
+              Memórias
+            </button>
+            <button
+              onClick={() => setView('agents')}
+              className="flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-all"
+              style={{ background: view === 'agents' ? '#F59E0B' : 'transparent', color: view === 'agents' ? '#000' : 'rgba(255,255,255,0.4)' }}
+            >
+              Agentes
+            </button>
+          </div>
           <button
             onClick={async () => {
               setSeeding(true);
@@ -631,8 +871,47 @@ export default function BrainPage() {
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1 relative">
+      {/* Agent Cards View */}
+      {view === 'agents' && (
+        <div className="flex-1 overflow-y-auto bg-[#060610]">
+          {/* Mobile: open panel button */}
+          <button className="fixed top-3 left-3 z-40 md:hidden w-9 h-9 rounded-xl bg-[#0a0a14]/90 border border-white/[0.08] flex items-center justify-center text-white/60 backdrop-blur-xl shadow-lg"
+            onClick={() => setMobilePanelOpen(true)}>
+            <Menu className="w-4 h-4" />
+          </button>
+
+          <div className="max-w-5xl mx-auto px-5 py-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F59E0B]/70 mb-1">Decisões dos Agentes</div>
+                <div className="text-[12px] text-white/35">{agentCards.length} registros — insights, serviços comprados e atividade</div>
+              </div>
+            </div>
+
+            {agentLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="w-7 h-7 border-2 border-[#F59E0B]/40 border-t-[#F59E0B] rounded-full animate-spin" />
+                <span className="text-[11px] text-white/25">Carregando memórias dos agentes...</span>
+              </div>
+            ) : agentCards.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Brain className="w-10 h-10 text-white/10" />
+                <p className="text-[12px] text-white/30">Nenhuma memória de agente ainda.</p>
+                <p className="text-[11px] text-white/20">Abra o Office, inicie os agentes ou compre um serviço em /pay.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {agentCards.map(card => (
+                  <AgentMemoryCard key={card.hash} card={card} onClick={() => setSelectedCard(card)} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Canvas — Graph View */}
+      {view === 'graph' && <div className="flex-1 relative">
         {/* Mobile: floating button to open left panel */}
         <button
           className="fixed top-3 left-3 z-40 md:hidden w-9 h-9 rounded-xl bg-[#0a0a14]/90 border border-white/[0.08] flex items-center justify-center text-white/60 backdrop-blur-xl shadow-lg"
@@ -677,7 +956,10 @@ export default function BrainPage() {
             <Shuffle className="w-4 h-4" />
           </button>
         </div>
-      </div>
+      </div>}
+
+      {/* Agent detail modal */}
+      {selectedCard && <AgentDetailModal card={selectedCard} onClose={() => setSelectedCard(null)} />}
 
       {/* Detail panel — full-screen on mobile, sidebar on desktop */}
       {selected && (
