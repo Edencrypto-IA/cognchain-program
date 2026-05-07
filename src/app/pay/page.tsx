@@ -497,6 +497,7 @@ export default function PayPage() {
   const [stats, setStats] = useState<Stats>({ totalPurchases: 0, totalSolCollected: 0 });
   const [selected, setSelected] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('Todos');
 
   useEffect(() => {
     fetch('/api/pay/intelligence').then(r => r.json()).then(d => {
@@ -507,6 +508,8 @@ export default function PayPage() {
   }, []);
 
   const categories = [...new Set(services.map(s => s.category))];
+  const filters = ['Todos', ...categories];
+  const visibleServices = activeFilter === 'Todos' ? services : services.filter(s => s.category === activeFilter);
 
   return (
     <>
@@ -568,26 +571,38 @@ export default function PayPage() {
 
         {/* Services */}
         <div className="max-w-6xl mx-auto px-5 sm:px-8 mb-20">
+          {/* Category filter pills */}
+          {!loading && (
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
+              {filters.map(f => {
+                const isActive = activeFilter === f;
+                const color = f === 'Todos' ? '#9945FF' : (CATEGORY_COLORS[f] ?? '#9945FF');
+                return (
+                  <button key={f} onClick={() => setActiveFilter(f)}
+                    style={{
+                      background: isActive ? `${color}18` : 'transparent',
+                      border: `1px solid ${isActive ? color + '40' : 'rgba(255,255,255,0.07)'}`,
+                      color: isActive ? color : 'rgba(255,255,255,0.35)',
+                      boxShadow: isActive ? `0 0 14px ${color}18` : 'none',
+                    }}
+                    className="px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] transition-all duration-150 hover:border-white/20">
+                    {f}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-6 h-6 animate-spin text-white/20" />
             </div>
           ) : (
-            categories.map(cat => (
-              <div key={cat} className="mb-12">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="h-px flex-1 bg-white/[0.04]" />
-                  <span className="text-[10px] font-bold uppercase tracking-[0.25em]"
-                    style={{ color: CATEGORY_COLORS[cat] ?? '#9945FF' }}>{cat}</span>
-                  <div className="h-px flex-1 bg-white/[0.04]" />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {services.filter(s => s.category === cat).map(s => (
-                    <ServiceCard key={s.id} service={s} onSelect={setSelected} />
-                  ))}
-                </div>
-              </div>
-            ))
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {visibleServices.map(s => (
+                <ServiceCard key={s.id} service={s} onSelect={setSelected} />
+              ))}
+            </div>
           )}
         </div>
 
