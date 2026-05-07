@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { ArrowLeft, Zap, Brain, CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, Users, Activity, Plus, Play, Loader2 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -41,154 +42,187 @@ const MODEL_META: Record<string, { color: string; label: string }> = {
   qwen:     { color: '#A855F7', label: 'Qwen3' },
 };
 
-const STATUS_CONFIG = {
-  idle:      { dot: 'bg-white/30',      label: 'Aguardando',   glow: 'transparent' },
-  thinking:  { dot: 'bg-[#00D1FF]',    label: 'Pensando...',  glow: '#00D1FF' },
-  executing: { dot: 'bg-[#14F195]',    label: 'Executando...',glow: '#14F195' },
-  warning:   { dot: 'bg-[#F59E0B]',    label: 'Atenção',      glow: '#F59E0B' },
-  fired:     { dot: 'bg-[#EF4444]',    label: 'DEMITIDO',     glow: '#EF4444' },
-};
-
-function scoreColor(s: number) {
-  if (s >= 8) return '#14F195';
-  if (s >= 6) return '#9945FF';
-  if (s >= 4) return '#F59E0B';
-  return '#EF4444';
-}
-
 function formatAgo(ts: number) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return `${s}s`;
   return `${Math.floor(s / 60)}m`;
 }
 
-// ─── Score Arc ───────────────────────────────────────────────────────────────
+// ─── Hologram Face SVG ───────────────────────────────────────────────────────
 
-function ScoreArc({ score }: { score: number }) {
-  const r = 22; const cx = 28; const cy = 28;
-  const circ = 2 * Math.PI * r;
-  const pct = Math.min(100, Math.max(0, score / 10)) * 0.75;
-  const dash = pct * circ;
-  const color = scoreColor(score);
+function HologramFace({ color, isActive, isFired }: { color: string; isActive: boolean; isFired: boolean }) {
+  const c = isFired ? '#EF4444' : color;
+  const op = isFired ? 0.4 : 1;
   return (
-    <svg width="56" height="56" className="rotate-[135deg]">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3.5" strokeDasharray={`${circ * 0.75} ${circ}`} strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="3.5"
-        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 0.8s ease, stroke 0.5s ease', filter: `drop-shadow(0 0 4px ${color}80)` }} />
-      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fill={color}
-        fontSize="11" fontWeight="800" fontFamily="monospace"
-        style={{ transform: 'rotate(-135deg)', transformOrigin: `${cx}px ${cy}px` }}>
-        {score.toFixed(1)}
-      </text>
+    <svg viewBox="0 0 120 145" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: op }}>
+      {/* Glow blob behind */}
+      <ellipse cx="60" cy="72" rx="38" ry="44" fill={c} opacity="0.08" />
+      {/* Head outline */}
+      <ellipse cx="60" cy="64" rx="44" ry="50" stroke={c} strokeWidth="1.2" opacity="0.9" />
+      {/* Horizontal scan lines */}
+      {[38,48,58,68,78,88,98,108].map((y, i) => {
+        const w = Math.min(40, 10 + Math.abs(y - 64) * 0.4);
+        return <line key={y} x1={60 - w} y1={y} x2={60 + w} y2={y} stroke={c} strokeWidth="0.4" opacity={0.25 - i * 0.015} />;
+      })}
+      {/* Eyes */}
+      <ellipse cx="43" cy="58" rx="9" ry="6" stroke={c} strokeWidth="1.2" opacity="0.9" />
+      <ellipse cx="77" cy="58" rx="9" ry="6" stroke={c} strokeWidth="1.2" opacity="0.9" />
+      <circle cx="43" cy="58" r="2.5" fill={c} opacity="0.85" />
+      <circle cx="77" cy="58" r="2.5" fill={c} opacity="0.85" />
+      {/* Nose */}
+      <path d="M60 64 L54 78 L60 80 L66 78 Z" stroke={c} strokeWidth="0.9" opacity="0.65" />
+      {/* Mouth */}
+      <path d="M46 90 Q60 100 74 90" stroke={c} strokeWidth="1.1" opacity="0.8" />
+      {/* Chin */}
+      <path d="M34 108 Q60 124 86 108" stroke={c} strokeWidth="0.8" opacity="0.5" />
+      {/* Neck lines */}
+      <line x1="52" y1="113" x2="46" y2="138" stroke={c} strokeWidth="0.7" opacity="0.4" />
+      <line x1="68" y1="113" x2="74" y2="138" stroke={c} strokeWidth="0.7" opacity="0.4" />
+      {/* Node dots */}
+      <circle cx="60" cy="14" r="2.5" fill={c} opacity="0.7" />
+      <circle cx="16" cy="64" r="2.5" fill={c} opacity="0.7" />
+      <circle cx="104" cy="64" r="2.5" fill={c} opacity="0.7" />
+      <circle cx="60" cy="141" r="2.5" fill={c} opacity="0.7" />
+      {/* Connection lines to nodes */}
+      <line x1="60" y1="14" x2="60" y2="14" stroke={c} strokeWidth="0.5" opacity="0.3" />
+      <line x1="16" y1="64" x2="16" y2="64" stroke={c} strokeWidth="0.5" opacity="0.3" />
+      {/* Animated scan line */}
+      {isActive && (
+        <line x1="16" y1="64" x2="104" y2="64" stroke={c} strokeWidth="1" opacity="0.4"
+          style={{ animation: 'scan-v 2s ease-in-out infinite' }} />
+      )}
     </svg>
   );
 }
 
-// ─── Agent Card ───────────────────────────────────────────────────────────────
+// ─── Agent Card — Premium Design ─────────────────────────────────────────────
 
 function AgentCard({ agent, isNew }: { agent: AgentState; isNew?: boolean }) {
   const meta = MODEL_META[agent.model] ?? { color: '#888', label: agent.model };
-  const sc = STATUS_CONFIG[agent.status];
   const isFired = agent.status === 'fired';
   const isActive = agent.status === 'thinking' || agent.status === 'executing';
+  const color = isFired ? '#EF4444' : meta.color;
+  const prevScore = useRef(agent.score);
+  const delta = agent.score - prevScore.current;
+  useEffect(() => { prevScore.current = agent.score; }, [agent.score]);
+
+  const statusLabel = isFired ? 'DEMITIDO'
+    : agent.status === 'thinking' ? 'PENSANDO'
+    : agent.status === 'executing' ? 'EXECUTANDO'
+    : agent.status === 'warning' ? 'ATENÇÃO'
+    : 'ATIVO';
+
+  const description = agent.currentTask ?? agent.goal;
 
   return (
-    <div
-      className="relative rounded-2xl p-5 transition-all duration-700 overflow-hidden"
+    <motion.div
+      initial={isNew ? { opacity: 0, y: 24, scale: 0.95 } : false}
+      animate={isActive ? { scale: [1, 1.008, 1] } : { scale: 1, opacity: isFired ? 0.6 : 1 }}
+      transition={isActive ? { duration: 3.5, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.5 }}
+      whileHover={{ y: -5, scale: 1.015 }}
+      className="relative overflow-hidden rounded-[28px] p-6 cursor-default"
       style={{
-        background: isFired
-          ? 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(239,68,68,0.03) 100%)'
-          : 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
-        border: isFired
-          ? '1px solid rgba(239,68,68,0.25)'
-          : isActive
-            ? `1px solid ${meta.color}30`
-            : '1px solid rgba(255,255,255,0.07)',
-        boxShadow: isFired
-          ? '0 0 30px rgba(239,68,68,0.08)'
-          : isActive
-            ? `0 0 30px ${meta.color}12`
-            : '0 4px 20px rgba(0,0,0,0.4)',
-        animation: isNew ? 'agent-appear 0.5s ease-out' : isFired ? 'agent-fire 0.6s ease-in-out' : undefined,
-        opacity: isFired ? 0.5 : 1,
+        background: '#050505',
+        border: `1px solid ${color}25`,
+        boxShadow: `0 0 40px ${color}18, 0 8px 32px rgba(0,0,0,0.6)`,
       }}
     >
-      {/* Top row */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          {/* Status dot */}
-          <div className="relative flex-shrink-0">
-            <div className={`w-2 h-2 rounded-full ${sc.dot}`} />
-            {isActive && (
-              <div className={`absolute inset-0 w-2 h-2 rounded-full ${sc.dot} animate-ping opacity-50`} />
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] font-bold text-white/90 tracking-wide">{agent.name}</span>
-              {isFired && <span className="text-[9px] font-black text-[#EF4444] bg-[#EF4444]/10 border border-[#EF4444]/20 px-1.5 py-0.5 rounded-full tracking-widest">DEMITIDO</span>}
-            </div>
-            <span className="text-[10px] font-semibold uppercase tracking-widest"
-              style={{ color: meta.color }}>
-              {meta.label}
+      {/* Background glow blob */}
+      <div className="absolute inset-0 opacity-[0.07] blur-3xl rounded-full"
+        style={{ background: color, transform: 'scale(0.8)' }} />
+
+      {/* Grid overlay */}
+      <div className="absolute inset-0 opacity-[0.03]"
+        style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+
+      <div className="relative z-10">
+        {/* Header */}
+        <div className="mb-1">
+          <div className="flex items-center gap-2.5 mb-1">
+            <motion.div className="w-3 h-3 rounded-full flex-shrink-0"
+              style={{ background: color }}
+              animate={isActive ? { opacity: [1, 0.3, 1] } : { opacity: 1 }}
+              transition={{ duration: 1.2, repeat: Infinity }} />
+            <span className="text-[22px] font-black tracking-wide text-white/90 leading-none">
+              {agent.name.toUpperCase()}-{agent.model.toUpperCase().slice(0, 3)}
             </span>
           </div>
-        </div>
-        <ScoreArc score={agent.score} />
-      </div>
-
-      {/* Goal */}
-      <p className="text-[11px] text-white/35 mb-3 leading-relaxed line-clamp-1">{agent.goal}</p>
-
-      {/* Current status */}
-      <div className="h-8 mb-4 flex items-center">
-        {agent.currentTask ? (
-          <p className="text-[11px] text-white/60 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#14F195] animate-pulse" />
-            {agent.currentTask.slice(0, 45)}{agent.currentTask.length > 45 ? '...' : ''}
-          </p>
-        ) : (
-          <p className="text-[11px]" style={{ color: isActive ? sc.dot.replace('bg-', '') : 'rgba(255,255,255,0.25)' }}>
-            {sc.label}
-          </p>
-        )}
-      </div>
-
-      {/* Score bar */}
-      <div className="mb-4">
-        <div className="h-[2px] bg-white/[0.06] rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-1000"
-            style={{ width: `${Math.max(2, agent.score * 10)}%`, background: scoreColor(agent.score), boxShadow: `0 0 6px ${scoreColor(agent.score)}80` }} />
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-[10px] text-white/30">
-            <Brain className="w-3 h-3" />{agent.memoryCount}
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-white/30">
-            <CheckCircle className="w-3 h-3" />{agent.tasksDone}
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-white/30">
-            <DollarSign className="w-3 h-3" />{agent.solSpent.toFixed(3)}
+          <span className="text-[11px] font-bold uppercase tracking-[0.25em]" style={{ color }}>
+            {statusLabel}
           </span>
         </div>
-        {agent.consecutivePoor > 0 && !isFired && (
-          <span className="text-[9px] font-bold text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/20 px-1.5 py-0.5 rounded-full">
-            ⚠ {agent.consecutivePoor}/3
-          </span>
-        )}
+
+        {/* Hologram face */}
+        <div className="relative flex justify-center my-5">
+          <div className="absolute w-36 h-36 rounded-full blur-3xl opacity-15" style={{ background: color }} />
+          <div className="relative w-36">
+            <HologramFace color={color} isActive={isActive} isFired={isFired} />
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-[14px] leading-relaxed text-zinc-400 mb-6 line-clamp-2 min-h-[42px]">
+          {description}
+        </p>
+
+        {/* Score */}
+        <div className="mb-4">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-600 mb-2">Score</p>
+          <div className="flex items-end justify-between">
+            <div className="flex items-end gap-2">
+              <motion.span className="text-[52px] font-black leading-none"
+                key={Math.floor(agent.score * 10)}
+                initial={{ opacity: 0.5, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+                {agent.score.toFixed(1)}
+              </motion.span>
+              <span className="mb-2 text-[20px] text-zinc-600">/10</span>
+            </div>
+            <div className={`flex items-center gap-1 text-[18px] font-bold ${delta >= 0 ? 'text-lime-400' : 'text-red-400'}`}>
+              {delta >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+              <span>{Math.abs(delta).toFixed(1)}</span>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mt-4 h-[5px] rounded-full overflow-hidden bg-zinc-900">
+            <motion.div className="h-full rounded-full"
+              style={{ background: color, boxShadow: `0 0 8px ${color}` }}
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.max(2, agent.score * 10)}%` }}
+              transition={{ duration: 1, ease: 'easeOut' }} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t pt-4" style={{ borderColor: `${color}18` }}>
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-600">Last Action</p>
+            <p className="mt-1 text-[12px] text-zinc-400 flex items-center gap-2">
+              <Brain className="w-3 h-3" />{agent.tasksDone} tarefas
+              <span className="text-zinc-700">·</span>
+              <DollarSign className="w-3 h-3" />{agent.solSpent.toFixed(3)} SOL
+            </p>
+          </div>
+          {isFired ? (
+            <button className="rounded-2xl border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.15em] transition hover:opacity-80"
+              style={{ borderColor: `${color}30`, background: `${color}15`, color }}>
+              View Report
+            </button>
+          ) : agent.consecutivePoor > 0 ? (
+            <span className="text-[10px] font-bold px-2.5 py-1.5 rounded-full border"
+              style={{ color: '#F59E0B', background: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.2)' }}>
+              ⚠ {agent.consecutivePoor}/3 falhas
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {/* Active glow line at top */}
       {isActive && (
         <div className="absolute top-0 left-6 right-6 h-px"
-          style={{ background: `linear-gradient(90deg, transparent, ${meta.color}60, transparent)` }} />
+          style={{ background: `linear-gradient(90deg, transparent, ${color}60, transparent)` }} />
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -388,6 +422,11 @@ export default function OfficePage() {
         @keyframes event-slide {
           from { opacity: 0; transform: translateX(12px); }
           to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes scan-v {
+          0%,100% { transform: translateY(-24px); opacity: 0; }
+          30%,70% { opacity: 0.5; }
+          50%      { transform: translateY(24px); opacity: 0.4; }
         }
         @keyframes agent-appear {
           from { opacity: 0; transform: scale(0.95) translateY(8px); }
