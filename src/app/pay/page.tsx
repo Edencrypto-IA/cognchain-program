@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Zap, Shield, Brain, Copy, Check, ExternalLink, Loader2, ChevronRight, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowLeft, Zap, Shield, Brain, Copy, Check, ExternalLink, Loader2, ChevronRight, ArrowRight, RefreshCw } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -283,6 +283,183 @@ function PurchaseModal({ service, onClose }: { service: Service | null; onClose:
   );
 }
 
+// ─── Live Terminal ────────────────────────────────────────────────────────────
+
+const DEMO_SCRIPTS = [
+  {
+    service: 'Sinal de Mercado — SOL/USDT',
+    price: '0.005 SOL',
+    color: '#F59E0B',
+    lines: [
+      { text: '$ congchain pay market-signal --asset SOL', delay: 0,    color: 'text-white/55' },
+      { text: '⚡ Pagamento: 0.005 SOL → CONGCHAIN vault', delay: 600,  color: 'text-[#F59E0B]/70' },
+      { text: '   TX: 3xKmB7pQ9r...  ✓ 89ms',              delay: 1200, color: 'text-[#14F195]/60' },
+      { text: '[1/4] Conectando ao Binance...',             delay: 1900, color: 'text-white/35' },
+      { text: '   SOL/USDT: $148.23 | Vol 24h: $4.2B  ✓', delay: 2500, color: 'text-[#14F195]/60' },
+      { text: '[2/4] Order book + OHLCV capturado',        delay: 3100, color: 'text-white/35' },
+      { text: '[3/4] NVIDIA Llama 3.3 70B processando...', delay: 3700, color: 'text-white/35' },
+      { text: '[4/4] Gerando análise de trade...',         delay: 4400, color: 'text-white/35' },
+      { text: '',                                          delay: 5000, color: '' },
+      { text: '▶ SINAL: COMPRA | Confiança: 87%',         delay: 5100, color: 'text-[#F59E0B] font-bold' },
+      { text: '  Entrada: $145–149 | Stop: $139.50',      delay: 5700, color: 'text-white/60' },
+      { text: '  Target 1: $158.00 (+6.6%)',              delay: 6200, color: 'text-[#14F195]/70' },
+      { text: '  Target 2: $172.00 (+16.0%)',             delay: 6700, color: 'text-[#14F195]/70' },
+      { text: '',                                          delay: 7200, color: '' },
+      { text: '◆ Hash: a3f9b2c1d7e8...  | SHA-256',       delay: 7400, color: 'text-[#9945FF]/70' },
+      { text: '◆ Ancorado na Solana · Verificável ✓',     delay: 7900, color: 'text-[#9945FF]/70' },
+    ],
+  },
+  {
+    service: 'Scan DeFi Yields — Solana',
+    price: '0.008 SOL',
+    color: '#14F195',
+    lines: [
+      { text: '$ congchain pay defi-yield --chain solana',  delay: 0,    color: 'text-white/55' },
+      { text: '⚡ Pagamento: 0.008 SOL → CONGCHAIN vault',  delay: 600,  color: 'text-[#14F195]/70' },
+      { text: '   TX: 9pNr4vWx2k...  ✓ 71ms',              delay: 1200, color: 'text-[#14F195]/60' },
+      { text: '[1/3] DeFiLlama API — buscando TVL...',      delay: 1900, color: 'text-white/35' },
+      { text: '   23 protocolos · TVL total: $8.41B  ✓',   delay: 2600, color: 'text-[#14F195]/60' },
+      { text: '[2/3] GLM-4.7 Flash analisando yields...',  delay: 3300, color: 'text-white/35' },
+      { text: '[3/3] Ranking + filtro de risco...',         delay: 4100, color: 'text-white/35' },
+      { text: '',                                           delay: 4800, color: '' },
+      { text: '▶ TOP YIELDS IDENTIFICADOS',                delay: 5000, color: 'text-[#14F195] font-bold' },
+      { text: '  #1 Kamino USDC/SOL: 34.2% APY',          delay: 5500, color: 'text-white/60' },
+      { text: '  #2 Meteora SOL/JitoSOL: 28.7% APY',      delay: 6000, color: 'text-white/60' },
+      { text: '  #3 Raydium USDC/USDT: 18.4% APY',        delay: 6500, color: 'text-white/60' },
+      { text: '  Yield ponderado recomendado: 27.4% APY', delay: 7100, color: 'text-[#14F195]/70' },
+      { text: '',                                           delay: 7600, color: '' },
+      { text: '◆ Hash: c8d2e1f3a0b9...  | Solana ✓',      delay: 7800, color: 'text-[#9945FF]/70' },
+    ],
+  },
+];
+
+function LiveTerminal() {
+  const [scriptIdx, setScriptIdx] = useState(0);
+  const [visibleLines, setVisibleLines] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const script = DEMO_SCRIPTS[scriptIdx];
+
+  const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
+
+  const play = useCallback((idx: number) => {
+    clearTimers();
+    setVisibleLines(0);
+    const s = DEMO_SCRIPTS[idx];
+    s.lines.forEach((_, i) => {
+      const t = setTimeout(() => setVisibleLines(i + 1), s.lines[i].delay);
+      timersRef.current.push(t);
+    });
+    // Auto advance to next script after last line + 2s pause
+    const last = s.lines[s.lines.length - 1].delay + 2400;
+    const advance = setTimeout(() => {
+      const next = (idx + 1) % DEMO_SCRIPTS.length;
+      setScriptIdx(next);
+      play(next);
+    }, last);
+    timersRef.current.push(advance);
+  }, []);
+
+  useEffect(() => {
+    if (playing) play(scriptIdx);
+    else clearTimers();
+    return clearTimers;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
+
+  const restart = () => { setScriptIdx(0); setPlaying(true); play(0); };
+
+  return (
+    <div className="max-w-3xl mx-auto px-5 sm:px-8 mb-16">
+      <div className="rounded-2xl border border-white/[0.06] bg-[#050507] overflow-hidden">
+        {/* Title bar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.04] bg-white/[0.015]">
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-[#FF5F57]/80" />
+              <div className="w-3 h-3 rounded-full bg-[#FFBD2E]/80" />
+              <div className="w-3 h-3 rounded-full bg-[#28C840]/80" />
+            </div>
+            <span className="text-[11px] font-mono text-white/25 ml-1">congchain pay — terminal</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full border"
+              style={{ color: script.color, borderColor: `${script.color}30`, background: `${script.color}10` }}>
+              {script.service}
+            </span>
+            <button onClick={restart}
+              className="p-1 rounded hover:bg-white/10 transition-colors text-white/20 hover:text-white/50">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Terminal content */}
+        <div className="p-5 min-h-[240px] font-mono text-[12px] leading-relaxed">
+          {script.lines.slice(0, visibleLines).map((line, i) => (
+            <div key={`${scriptIdx}-${i}`}
+              className={`${line.color} transition-all duration-150`}
+              style={{ animation: 'termFadeIn 0.15s ease-out' }}>
+              {line.text || ' '}
+            </div>
+          ))}
+          {visibleLines < script.lines.length && (
+            <span className="inline-block w-2 h-3.5 bg-white/30 animate-pulse ml-0.5" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Comparison vs Pay.sh ─────────────────────────────────────────────────────
+
+function ComparisonTable() {
+  const rows = [
+    ['Paga por serviço em SOL',                  true,  true ],
+    ['Sem conta / sem cadastro',                 true,  true ],
+    ['Dados de mercado em tempo real',           false, true ],
+    ['Análise com IA integrada',                 false, true ],
+    ['Hash SHA-256 verificável',                 false, true ],
+    ['Resultado ancorado na Solana blockchain',  false, true ],
+    ['Memória salva entre sessões de IA',        false, true ],
+    ['Visível no Agent Office ao vivo',          false, true ],
+    ['Suporte a 8 modelos de IA',                false, true ],
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto px-5 sm:px-8 mb-16">
+      <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/20 mb-5 text-center">
+        CONGCHAIN Pay vs Pay.sh — Comparação de funcionalidades
+      </div>
+      <div className="rounded-2xl border border-white/[0.05] overflow-hidden">
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="border-b border-white/[0.05] bg-white/[0.01]">
+              <th className="px-5 py-3 text-left text-white/25 font-medium">Funcionalidade</th>
+              <th className="px-5 py-3 text-center text-white/25 font-medium text-[11px]">Pay.sh</th>
+              <th className="px-5 py-3 text-center font-bold text-[11px]" style={{ color: '#9945FF' }}>CONGCHAIN</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([feature, paysh, cong]) => (
+              <tr key={String(feature)} className="border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors">
+                <td className="px-5 py-2.5 text-white/45">{String(feature)}</td>
+                <td className="px-5 py-2.5 text-center">
+                  {paysh ? <span className="text-white/35">✓</span> : <span className="text-white/10">—</span>}
+                </td>
+                <td className="px-5 py-2.5 text-center">
+                  {cong ? <span className="text-[#14F195] font-bold">✓</span> : <span className="text-white/10">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── How it works ─────────────────────────────────────────────────────────────
 
 function HowItWorks() {
@@ -336,6 +513,7 @@ export default function PayPage() {
       <style>{`
         @keyframes fade-up { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .fade-up { animation: fade-up 0.4s ease-out forwards; }
+        @keyframes termFadeIn { from{opacity:0;transform:translateX(-4px)} to{opacity:1;transform:translateX(0)} }
       `}</style>
 
       <div className="min-h-screen bg-[#050608] text-white" style={{ fontFamily: '"Geist", system-ui, sans-serif' }}>
@@ -385,6 +563,9 @@ export default function PayPage() {
           </div>
         </div>
 
+        {/* Live Terminal Demo */}
+        <LiveTerminal />
+
         {/* Services */}
         <div className="max-w-6xl mx-auto px-5 sm:px-8 mb-20">
           {loading ? (
@@ -411,6 +592,9 @@ export default function PayPage() {
         </div>
 
         <HowItWorks />
+
+        {/* Comparison */}
+        <ComparisonTable />
 
         {/* Why SOL */}
         <div className="max-w-3xl mx-auto px-5 sm:px-8 mb-20">
