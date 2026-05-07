@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import OpenAI from 'openai';
-import { saveMemory } from '@/services/memory';
-import { pushRealEvent, getEventsSince, getLatestSeq, updateAgentSnapshot } from '../shared';
+import { getEventsSince, getLatestSeq, updateAgentSnapshot } from '../shared';
 
 function enc(data: object) {
   return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -242,6 +240,38 @@ function startSchedulerLoop() {
   })();
 }
 
+// ─── Agent memory history ──────────────────────────────────────────────────
+
+async function getAgentHistory(agentName: string, limit = 3): Promise<string> {
+  try {
+    const mems = await db.memory.findMany({
+      where: {
+        AND: [
+          { content: { startsWith: '[AGENT_INSIGHT]' } },
+          { content: { contains: `Agente: ${agentName}` } },
+        ],
+      },
+      orderBy: { timestamp: 'desc' },
+      take: limit,
+      select: { content: true, timestamp: true },
+    });
+    if (mems.length === 0) return '';
+
+    const entries = mems.map(m => {
+      const lines = m.content.split('\n');
+      // Body starts after the header block (skip tag + metadata lines)
+      const bodyStart = lines.findIndex((l, i) => i > 3 && l.trim() === '') + 1;
+      const body = lines.slice(bodyStart > 0 ? bodyStart : 5).join(' ').replace(/\*\*/g, '').trim().slice(0, 250);
+      const date = new Date(m.timestamp * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return `[${date}] ${body}`;
+    });
+
+    return `\n\n--- HISTÓRICO DAS ÚLTIMAS ${mems.length} ANÁLISE(S) DESTE AGENTE ---\n${entries.join('\n\n')}\n--- FIM DO HISTÓRICO ---\n\nCom base no seu histórico acima e nos dados novos abaixo:\n- O que mudou desde sua última análise?\n- Seu sinal/conclusão anterior se confirmou?\n- O que você ajustaria agora?`;
+  } catch {
+    return '';
+  }
+}
+
 export async function runRealTask(forceModelKey?: string): Promise<boolean> {
   const available = FREE_MODELS.filter(m => !!process.env[m.envKey]);
   if (available.length === 0) return false;
@@ -250,36 +280,50 @@ export async function runRealTask(forceModelKey?: string): Promise<boolean> {
   const agentName = pick(AGENT_NAMES[cfg.key] ?? ['Agent']);
 
   try {
-    // Step 1: Fetch real live data
-    const liveData = await skill.fetchData().catch(() => ({}));
+    // Step 1: Fetch real live data + agent's own memory history (in parallel)
+    const [liveData, history] = await Promise.all([
+      skill.fetchData().catch(() => ({})),
+      getAgentHistory(agentName),
+    ]);
 
-    // Step 2: Build prompt with real numbers
-    const prompt = skill.buildPrompt(liveData);
-    if (!prompt) return false;
+    // Step 2: Build prompt with real data + memory context
+    const basePrompt = skill.buildPrompt(liveData);
+    if (!basePrompt) return false;
 
-    // Step 3: Call free AI with data-enriched prompt
+    // Inject history before the live data if agent has past memories
+    const prompt = history
+      ? `${history}\n\n${basePrompt}`
+      : basePrompt;
+
+    const systemPrompt = history
+      ? `Você é o agente ${agentName}, especializado em Solana e DeFi. Você tem memória contínua — seu histórico de análises anteriores está incluído. Use-o para evoluir seu raciocínio, identificar se suas previsões se confirmaram e ajustar sua perspectiva. Analise os dados reais fornecidos, nunca invente números.`
+      : `Você é o agente ${agentName}, especializado em Solana e DeFi. Analise os dados reais fornecidos e dê insights acionáveis em português. Nunca invente números — use apenas os dados fornecidos.`;
+
+    // Step 3: Call free AI with history-enriched prompt
     const { default: OpenAI } = await import('openai');
     const client = new OpenAI({ apiKey: process.env[cfg.envKey] ?? '', baseURL: 'https://integrate.api.nvidia.com/v1' });
     const resp = await client.chat.completions.create({
       model: cfg.model,
       messages: [
-        { role: 'system', content: 'Você é um agente trader/analista especializado em Solana e DeFi. Analise os dados reais fornecidos e dê insights acionáveis em português. Nunca invente números — use apenas os dados fornecidos.' },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
       ],
-      max_tokens: 350,
+      max_tokens: 400,
     });
     const content = resp.choices[0]?.message?.content ?? '';
     if (!content.trim()) return false;
 
-    // Step 4: Save as AGENT_INSIGHT — accessible to chat AI as context
-    const insightContent = `[AGENT_INSIGHT]\nAgente: ${agentName} (${cfg.label})\nTópico: ${skill.name}\nCategoria: ${skill.category}\nData: ${new Date().toISOString()}\n\n${content}`;
+    // Step 4: Save as AGENT_INSIGHT with continuity flag
+    const hasContinuity = history.length > 0;
+    const insightContent = `[AGENT_INSIGHT]\nAgente: ${agentName} (${cfg.label})\nTópico: ${skill.name}\nCategoria: ${skill.category}\nContinuidade: ${hasContinuity ? 'sim — baseado em histórico' : 'primeira análise'}\nData: ${new Date().toISOString()}\n\n${content}`;
     const { saveMemory } = await import('@/services/memory');
     const mem = await saveMemory({ content: insightContent, model: cfg.key, parentHash: null });
 
     const { pushRealEvent } = await import('../shared');
     pushRealEvent({
       type: 'real_task_done', model: cfg.key, modelLabel: cfg.label,
-      agentName, task: skill.name,
+      agentName: hasContinuity ? `${agentName} ↻` : agentName,
+      task: skill.name,
       result: content.replace(/\n+/g, ' ').trim().slice(0, 160),
       hash: mem.hash, ts: Date.now(), isReal: true,
     });
@@ -316,12 +360,12 @@ export async function GET(req: NextRequest) {
 
         // Send initial state + push to shared store
         controller.enqueue(enc({ type: 'init', agents, stats: { activeAgents: agents.filter(a => a.status !== 'fired').length, solSpent: totalSol, memories: totalMems, tasks: totalTasks } }));
-        agents.forEach(a => updateAgentSnapshot(a));
+        agents.forEach(a => updateAgentSnapshot({ ...a, updatedAt: Date.now() }));
 
         const activeAgents = () => agents.filter(a => a.status !== 'fired');
 
         // Helper: sync agent to shared store after any state change
-        const sync = (a: AgentState) => updateAgentSnapshot(a);
+        const sync = (a: AgentState) => updateAgentSnapshot({ ...a, updatedAt: Date.now() });
 
         // Track which real events this connection has already seen
         let lastRealSeq = getLatestSeq();
