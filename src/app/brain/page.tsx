@@ -335,15 +335,20 @@ export default function BrainPage() {
   const [agentCards, setAgentCards] = useState<AgentCard[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [selectedCard, setSelectedCard] = useState<AgentCard | null>(null);
+  const [seedingAgents, setSeedingAgents] = useState(false);
 
-  useEffect(() => {
-    if (view !== 'agents') return;
+  const loadCards = useCallback(() => {
     setAgentLoading(true);
     fetch('/api/memory/cards').then(r => r.json()).then(d => {
       setAgentCards(d.cards ?? []);
       setAgentLoading(false);
     }).catch(() => setAgentLoading(false));
-  }, [view]);
+  }, []);
+
+  useEffect(() => {
+    if (view !== 'agents') return;
+    loadCards();
+  }, [view, loadCards]);
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
@@ -886,6 +891,20 @@ export default function BrainPage() {
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F59E0B]/70 mb-1">Decisões dos Agentes</div>
                 <div className="text-[12px] text-white/35">{agentCards.length} registros — insights, serviços comprados e atividade</div>
               </div>
+              <button
+                onClick={async () => {
+                  setSeedingAgents(true);
+                  await fetch('/api/memory/agent-seed', { method: 'POST' });
+                  loadCards();
+                  setSeedingAgents(false);
+                }}
+                disabled={seedingAgents}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F59E0B]/10 border border-[#F59E0B]/20 hover:bg-[#F59E0B]/20 text-[#F59E0B] text-[10px] font-bold uppercase tracking-wide transition-all disabled:opacity-40"
+              >
+                {seedingAgents
+                  ? <><span className="w-3 h-3 border border-[#F59E0B] border-t-transparent rounded-full animate-spin" />Gerando...</>
+                  : <><Sparkles className="w-3 h-3" />Demo Real</>}
+              </button>
             </div>
 
             {agentLoading ? (
