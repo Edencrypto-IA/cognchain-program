@@ -65,32 +65,41 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     APPLICATION LAYER                           │
-│   AI Agents · Copilots · Research Tools · Enterprise Apps       │
-│   8 Models: GPT-4o · Claude · Llama · Gemini · DeepSeek         │
-│             GLM-4.7 · MiniMax M2.7 · Qwen3 80B                   │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │  SDK + Wallet Auth
-┌──────────────────────────▼──────────────────────────────────────┐
-│                   PROOF OF INSIGHT (PoI)                        │
-│   Human voting (3 votes avg ≥ 7) → Auto-anchor on Solana        │
-│   SHA-256 hash · ZK Proof (Groth16) · Trust Score               │
-└──────────────────────────┬──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                       APPLICATION LAYER                             │
+│   AI Agents · Copilots · Research Tools · Enterprise Apps           │
+│   8 Models: GPT-4o · Claude · Llama · Gemini · DeepSeek             │
+│             GLM-4.7 · MiniMax M2.7 · Qwen3 80B                      │
+└──────────────────┬──────────────────────┬───────────────────────────┘
+                   │  Chat + Memory       │  Intelligence Services
+┌──────────────────▼──────────┐  ┌────────▼──────────────────────────┐
+│     MEMORY BRAIN            │  │    AGENT OFFICE + PAY             │
+│  Force-directed graph        │  │  Live AI economy dashboard        │
+│  Neural memory visualization │  │  6 real services · SOL payments   │
+│  Chat memories + Agent cards │  │  Market signals · DeFi yields     │
+│  ZK rings · on-chain glow    │  │  Wallet intel · Research          │
+└──────────────────┬──────────┘  └────────┬──────────────────────────┘
+                   │                       │
+┌──────────────────▼───────────────────────▼──────────────────────────┐
+│                   PROOF OF INSIGHT (PoI)                            │
+│   Human voting (3 votes avg ≥ 7) → Auto-anchor on Solana           │
+│   SHA-256 hash · ZK Proof (Groth16) · Trust Score                  │
+│   Grounding Engine: Binance · CoinGecko · DeFiLlama · Helius        │
+└──────────────────────────┬──────────────────────────────────────────┘
                            │  Verified Memory Candidates
-┌──────────────────────────▼──────────────────────────────────────┐
-│                  COGNCHAIN ANCHOR PROGRAM                       │
-│              BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL       │
-│                                                                  │
-│  create_vault  │  write_memory  │  read_memory                  │
-│  PDA Vaults    │  152-byte records │  Permission grants          │
-└──────────────────────────┬──────────────────────────────────────┘
+┌──────────────────────────▼──────────────────────────────────────────┐
+│                  COGNCHAIN ANCHOR PROGRAM                           │
+│              BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL          │
+│                                                                      │
+│  create_vault  │  write_memory  │  read_memory                      │
+│  PDA Vaults    │  152-byte records │  Permission grants              │
+└──────────────────────────┬──────────────────────────────────────────┘
                            │  On-chain: hashes + scores + proofs
-┌──────────────────────────▼──────────────────────────────────────┐
-│                    HYBRID STORAGE                               │
-│   Solana: ContentHash · SummaryHash · ConfidenceBps · PolicyId  │
-│   Off-chain: Encrypted content · Vectors · Session traces       │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────▼──────────────────────────────────────────┐
+│                    HYBRID STORAGE                                   │
+│   Solana: ContentHash · SummaryHash · ConfidenceBps · PolicyId      │
+│   Off-chain: Encrypted content · Vectors · Session traces           │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -164,6 +173,92 @@ Continuando e aprofundando a partir desta base verificada:
 
 ---
 
+## 🤖 Agent Office — Live AI Economy Dashboard
+
+The Agent Office (`/office`) is a real-time dashboard where autonomous AI agents run live tasks and their outputs are stored as verifiable memories on-chain.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AGENT OFFICE                             │
+│  ▶ Play / ⏸ Pause scheduler — user-controlled              │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │  VEGA    │  │  NEXUS   │  │  NOVA    │  │  ECHO    │   │
+│  │ Market   │  │  DeFi    │  │Sentiment │  │ Research │   │
+│  │ Signal   │  │  Yield   │  │  Scan    │  │  Agent   │   │
+│  │ Llama3.3 │  │  GLM-4.7 │  │  Qwen3   │  │ MiniMax  │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+│                                                             │
+│  Live data sources:  Binance · CoinGecko · DeFiLlama        │
+│  Outputs → [AGENT_INSIGHT] memories → anchored on Solana    │
+│  Chat integration → amber banner shows agent findings       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Agent skills — each fetches live data before calling AI:**
+
+| Agent | Data Source | AI Model | Output |
+|---|---|---|---|
+| VEGA | Binance live prices | Llama 3.3 70B | Trade signals with entry/exit levels |
+| NEXUS | DeFiLlama TVL | GLM-4.7 | Top yield opportunities across protocols |
+| NOVA | CoinGecko multi-asset | Qwen3 80B | Sentiment positioning + market outlook |
+| ECHO | On-chain Helius data | MiniMax M2.7 | Wallet behavior analysis |
+| APEX | Combined feeds | GPT-4o | Deep cross-asset research |
+| ARES | Protocol metrics | Claude | Security and risk audit |
+| FLUX | Macro indicators | DeepSeek V3 | Macro thesis + narrative |
+| ZION | All sources | Llama 3.3 | Synthesis and executive brief |
+
+Agent outputs flow into the Memory Brain **Agentes tab** as holographic cards — fully separate from chat memories.
+
+---
+
+## 💎 CONGCHAIN Pay — Intelligence Services
+
+Pay with SOL to receive real AI-powered intelligence grounded in live on-chain and market data.
+
+```
+User pays SOL → Live data fetched → AI generates insight → Result saved to Memory Brain
+```
+
+| Service | Price | Data Source | Model | Output |
+|---|---|---|---|---|
+| Market Signal | 0.005 SOL | Binance live OHLCV | Llama 3.3 | Trade signal with levels |
+| DeFi Yield Scan | 0.008 SOL | DeFiLlama TVL | GLM-4.7 | Best yield opportunities |
+| Wallet Intelligence | 0.010 SOL | Helius on-chain | Qwen3 80B | Complete wallet profile |
+| AI Research Report | 0.020 SOL | All sources | GPT-4o | Deep research document |
+| Sentiment Scan | 0.005 SOL | CoinGecko 10 assets | MiniMax M2.7 | Market positioning |
+| Protocol Audit | 0.015 SOL | Protocol metrics | Claude | Security risk assessment |
+
+Every paid intelligence report is saved as a `[INTELLIGENCE_SERVICE]` memory — verifiable, on-chain, permanent.
+
+---
+
+## 🧠 Memory Brain — Neural Visualization
+
+The Memory Brain (`/brain`) is a force-directed neural graph of all AI conversation memories, with a separate holographic view for autonomous agent decisions.
+
+**Two views:**
+
+| View | What it shows |
+|---|---|
+| Memórias (graph) | Force-directed graph of all chat memories — colored by AI model, ZK rings for verified records, on-chain glow for anchored memories |
+| Agentes (cards) | Holographic cards for agent-generated memories — each card shows the agent avatar (HologramFace), service name, SOL paid, and a 160-char insight snippet |
+
+**Graph features:**
+- Click any node → see full memory content + SHA-256 hash + ZK proof status
+- Delete individual nodes
+- Command input to query memories
+- Optimized for 100+ nodes: link capping prevents O(n²) explosion
+- Mobile-friendly touch navigation
+
+**Agent card features:**
+- Click any card → full analysis modal with proof bundle
+- SOL paid badge (for paid intelligence services)
+- Model identity with holographic face avatar
+- Hash + blockchain verification status
+
+---
+
 ## ✅ What's Live
 
 | Feature | Status | Details |
@@ -171,7 +266,13 @@ Continuando e aprofundando a partir desta base verificada:
 | Anchor Program | ✅ Devnet | `create_vault`, `write_memory`, `read_memory` |
 | Multi-Provider AI Router | ✅ Live | **8 models** — GPT-4o, Claude Opus 4.7, NVIDIA Llama 3.3, Gemini 2.0 Flash, DeepSeek V3, GLM-4.7, MiniMax M2.7, Qwen3 80B |
 | Free / Pro Tier | ✅ Live | 4 free models (NVIDIA · GLM · MiniMax · Qwen) + 4 Pro models ($5/month) |
-| Memory Brain | ✅ Live | Force-directed neural graph of all memories · color by model · ZK rings · on-chain glow |
+| Memory Brain — Graph | ✅ Live | Force-directed neural graph · color by model · ZK rings · on-chain glow · delete nodes |
+| Memory Brain — Agentes | ✅ Live | Holographic card grid for autonomous agent memories · full analysis modal |
+| Agent Office | ✅ Live | Live AI economy dashboard · 8 agents · Play/Pause scheduler · SSE streaming |
+| Real Agent Skills | ✅ Live | Binance live data · DeFiLlama TVL · CoinGecko sentiment → AI analysis |
+| Agent→Chat Integration | ✅ Live | Agent insights surface as amber banner in chat interface |
+| CONGCHAIN Pay | ✅ Live | 6 intelligence services · SOL micropayments · results saved as verified memories |
+| Grounding Engine | ✅ Live | 8-layer pipeline: Binance · CoinGecko · DeFiLlama · Helius · multi-token support |
 | Admin Login | ✅ Live | Cookie-based admin session · unlocks all Pro models instantly |
 | Proof of Insight (PoI) | ✅ Live | Human voting → threshold → auto-anchor on Solana |
 | Memory Audit Trail | ✅ Live | Memory Chain · Evidence Record · ZK Proof Stack |
@@ -183,7 +284,7 @@ Continuando e aprofundando a partir desta base verificada:
 | Memory Inheritance | ✅ Live | Seed agents with verified on-chain memories |
 | Solana Sage Agent | ✅ Live | Autonomous Solana monitor with 7-layer security |
 | Solana Intent Queue | ✅ Live | Human-confirmed transactions · simulation before approval |
-| Wallet Connection | ✅ Live | Phantom · Solflare · Coinbase via standard adapter |
+| Wallet Connection | ✅ Live | Phantom · Solflare · Backpack via Wallet Standard · dark modal |
 | Helius RPC + Proxy | ✅ Live | Premium devnet RPC · API key secured server-side |
 | MCP Server | ✅ Live | 7 tools via Memory Internet Protocol |
 
@@ -303,14 +404,19 @@ console.log("Memory anchored on Solana ✅");
 
 ```
 ✅ Phase 0   Specification · Schema · Anchor account map
-✅ Phase 1   Devnet deployment · Memory Engine · 5-model AI router
+✅ Phase 1   Devnet deployment · Memory Engine · 8-model AI router
              PoI voting · ZK proofs · Agent Builder · Marketplace
              Autonomous loop · Intelligence Score · Wallet Connection
              Solana Sage · Intent Queue · Helius RPC · MCP Server
-🔜 Phase 2   SDK release · Indexer · API gateway · First integrations
+✅ Phase 2   Agent Office (live AI economy) · CONGCHAIN Pay (SOL micropayments)
+             Intelligence Services (6 real services with live market data)
+             Memory Brain Agentes tab (holographic cards)
+             Grounding engine (Binance · CoinGecko · DeFiLlama · Helius)
+             Agent→Chat integration · Wallet Standard support
+🔜 Phase 3   SDK release · Indexer · API gateway · First integrations
              Agent reputation · Policy presets · Observability
-🔜 Phase 3   Groth16 in production · Enterprise tooling · Cross-app portability
-🔜 Phase 4   TEE + FHE research · Cognitive standard
+🔜 Phase 4   Groth16 in production · Enterprise tooling · Cross-app portability
+🔜 Phase 5   TEE + FHE research · Cognitive standard
 ```
 
 ---
@@ -326,13 +432,25 @@ cognchain-program/
 │   └── cognchain.ts            Integration tests
 ├── client/
 │   └── client.ts               TypeScript SDK examples
+├── src/
+│   ├── app/
+│   │   ├── brain/              Memory Brain — neural graph + agent cards
+│   │   ├── office/             Agent Office — live AI economy dashboard
+│   │   ├── pay/                CONGCHAIN Pay — intelligence services
+│   │   ├── chat/               Multi-model AI chat
+│   │   └── api/
+│   │       ├── memory/         Memory CRUD + graph + agent cards
+│   │       ├── office/         SSE stream + agent snapshots
+│   │       └── pay/            Intelligence services + SOL payment
+│   ├── lib/
+│   │   ├── grounding/          8-layer data pipeline (Binance, CoinGecko, etc.)
+│   │   └── db.ts               Prisma database client
+│   └── components/
+│       └── providers/          Wallet provider (Wallet Standard)
 ├── docs/
-│   ├── architecture.md         System design
-│   ├── zk-spec.md              ZK circuit specification
-│   └── security.md             Security model
-├── scripts/
-│   ├── create-vault.ts         CLI: create memory vault
-│   └── write-memory.ts         CLI: anchor a memory record
+│   ├── architecture.md
+│   ├── zk-spec.md
+│   └── security.md
 ├── Anchor.toml
 ├── Cargo.toml
 └── README.md
@@ -356,7 +474,7 @@ Open an issue, fork the repo, or reach out directly.
 
 **Eden Lucas Cavalcanti de Oliveira** — Solo founder and full-stack builder.
 
-Shipped the entire CognChain stack from zero: Anchor program on Solana devnet, multi-provider AI router across 5 models, ZK proof pipeline, autonomous agent loop with on-chain memory synthesis, and wallet-native memory vaults with 7-layer transaction security. Previously built RadarPolítico BR, Lumina AI and Moreno Smart City. Building in public, full-time, since Q1 2026.
+Shipped the entire CognChain stack from zero: Anchor program on Solana devnet, multi-provider AI router across 8 models, ZK proof pipeline, autonomous agent loop with on-chain memory synthesis, wallet-native memory vaults with 7-layer transaction security, Agent Office with live market data skills, CONGCHAIN Pay intelligence services with SOL micropayments, and Memory Brain with holographic agent memory cards. Previously built RadarPolítico BR, Lumina AI and Moreno Smart City. Building in public, full-time, since Q1 2026.
 
 [![GitHub](https://img.shields.io/badge/GitHub-edencrypto--ia-181717?style=flat-square&logo=github)](https://github.com/edencrypto-ia)
 [![X / Twitter](https://img.shields.io/badge/X-PenguPudgyPump-000000?style=flat-square&logo=x)](https://x.com/PenguPudgyPump)
@@ -424,6 +542,55 @@ Continuando e aprofundando a partir desta base verificada:
 
 ---
 
+## 🤖 Agent Office — Dashboard da Economia de IA
+
+O Agent Office (`/office`) é um painel em tempo real onde agentes de IA autônomos executam tarefas reais e seus outputs são armazenados como memórias verificáveis na blockchain.
+
+**Habilidades reais dos agentes — cada um busca dados ao vivo antes de chamar a IA:**
+
+| Agente | Fonte de dados | Modelo de IA | Output |
+|---|---|---|---|
+| VEGA | Binance preços ao vivo | Llama 3.3 70B | Sinais de trade com níveis de entrada/saída |
+| NEXUS | DeFiLlama TVL | GLM-4.7 | Melhores oportunidades de yield |
+| NOVA | CoinGecko multi-ativo | Qwen3 80B | Posicionamento de sentimento + outlook |
+| ECHO | Dados on-chain Helius | MiniMax M2.7 | Análise de comportamento de carteiras |
+| APEX | Feeds combinados | GPT-4o | Pesquisa profunda cross-asset |
+| ARES | Métricas de protocolo | Claude | Auditoria de segurança e risco |
+| FLUX | Indicadores macro | DeepSeek V3 | Tese macro + narrativa |
+| ZION | Todas as fontes | Llama 3.3 | Síntese e briefing executivo |
+
+Os outputs dos agentes vão para a aba **Agentes** no Memory Brain como cards holográficos — totalmente separados das memórias do chat.
+
+---
+
+## 💎 CONGCHAIN Pay — Serviços de Inteligência
+
+Pague com SOL para receber inteligência real alimentada por IA, fundamentada em dados ao vivo de mercado e on-chain.
+
+| Serviço | Preço | Fonte | Modelo | Output |
+|---|---|---|---|---|
+| Sinal de Mercado | 0.005 SOL | Binance OHLCV ao vivo | Llama 3.3 | Sinal de trade com níveis |
+| Scan DeFi Yield | 0.008 SOL | DeFiLlama TVL | GLM-4.7 | Melhores oportunidades de yield |
+| Inteligência de Carteira | 0.010 SOL | Helius on-chain | Qwen3 80B | Perfil completo da carteira |
+| Relatório de Pesquisa IA | 0.020 SOL | Todas as fontes | GPT-4o | Documento de pesquisa profunda |
+| Scan de Sentimento | 0.005 SOL | CoinGecko 10 ativos | MiniMax M2.7 | Posicionamento de mercado |
+| Auditoria de Protocolo | 0.015 SOL | Métricas do protocolo | Claude | Avaliação de risco de segurança |
+
+Cada relatório de inteligência pago é salvo como memória `[INTELLIGENCE_SERVICE]` — verificável, on-chain, permanente.
+
+---
+
+## 🧠 Memory Brain — Visualização Neural
+
+O Memory Brain (`/brain`) tem duas visões:
+
+| Visão | O que mostra |
+|---|---|
+| Memórias (grafo) | Grafo neural das memórias do chat — colorido por modelo de IA, anéis ZK para registros verificados, brilho on-chain para memórias ancoradas |
+| Agentes (cards) | Cards holográficos das memórias geradas por agentes autônomos — cada card mostra o avatar do agente, nome do serviço, SOL pago e trecho do insight |
+
+---
+
 ## ✅ O que está no ar
 
 | Feature | Status | Detalhes |
@@ -431,7 +598,13 @@ Continuando e aprofundando a partir desta base verificada:
 | Programa Anchor | ✅ Devnet | `create_vault`, `write_memory`, `read_memory` |
 | AI Router Multi-Provedor | ✅ Ativo | **8 modelos** — GPT-4o, Claude Opus 4.7, NVIDIA Llama 3.3, Gemini 2.0 Flash, DeepSeek V3, GLM-4.7, MiniMax M2.7, Qwen3 80B |
 | Tier Free / Pro | ✅ Ativo | 4 modelos gratuitos (NVIDIA · GLM · MiniMax · Qwen) + 4 modelos Pro ($5/mês) |
-| Memory Brain | ✅ Ativo | Grafo neural das memórias · cores por modelo · anel ZK · brilho on-chain |
+| Memory Brain — Grafo | ✅ Ativo | Grafo neural force-directed · cores por modelo · anel ZK · brilho on-chain · deletar nós |
+| Memory Brain — Agentes | ✅ Ativo | Grid de cards holográficos para memórias de agentes autônomos · modal de análise completa |
+| Agent Office | ✅ Ativo | Dashboard da economia de IA ao vivo · 8 agentes · scheduler Play/Pause · streaming SSE |
+| Habilidades Reais dos Agentes | ✅ Ativo | Dados ao vivo do Binance · TVL DeFiLlama · sentimento CoinGecko → análise de IA |
+| Integração Agente→Chat | ✅ Ativo | Insights dos agentes aparecem como banner âmbar na interface do chat |
+| CONGCHAIN Pay | ✅ Ativo | 6 serviços de inteligência · micropagamentos em SOL · resultados salvos como memórias verificadas |
+| Motor de Grounding | ✅ Ativo | Pipeline de 8 camadas: Binance · CoinGecko · DeFiLlama · Helius · suporte multi-token |
 | Login Admin | ✅ Ativo | Sessão admin por cookie · desbloqueia todos os modelos Pro instantaneamente |
 | Proof of Insight (PoI) | ✅ Ativo | Votação humana → threshold → âncora automática na Solana |
 | Memory Audit Trail | ✅ Ativo | Memory Chain · Evidence Record · Proof Stack ZK |
@@ -443,7 +616,7 @@ Continuando e aprofundando a partir desta base verificada:
 | Herança de Memória | ✅ Ativo | Inicialize agentes com memórias verificadas on-chain |
 | Solana Sage | ✅ Ativo | Agente autônomo de monitoramento Solana com 7 camadas de segurança |
 | Fila de Intents Solana | ✅ Ativo | Transações com confirmação humana obrigatória |
-| Conexão de Carteira | ✅ Ativo | Phantom · Solflare · Coinbase via adapter padrão |
+| Conexão de Carteira | ✅ Ativo | Phantom · Solflare · Backpack via Wallet Standard · modal dark |
 | Helius RPC + Proxy | ✅ Ativo | RPC premium devnet · chave API protegida no servidor |
 | Servidor MCP | ✅ Ativo | 7 ferramentas via Memory Internet Protocol |
 
@@ -477,12 +650,18 @@ Camada 7 — Expiração + rate limit        Intents expiram em 10 min · máx 5
 
 ```
 ✅ Fase 0   Especificação · Schema · Mapa de contas Anchor
-✅ Fase 1   Deploy no devnet · AI Router 5 modelos · PoI
+✅ Fase 1   Deploy no devnet · AI Router 8 modelos · PoI
              Provas ZK · Agent Builder · Marketplace · Loop Autônomo
              Intelligence Score · Wallet Connect · Solana Sage · MCP Server
-🔜 Fase 2   SDK · Indexer · API gateway · Primeiras integrações
-🔜 Fase 3   Groth16 em produção · Ferramentas enterprise
-🔜 Fase 4   TEE + FHE · Padrão cognitivo
+✅ Fase 2   Agent Office (economia de IA ao vivo) · CONGCHAIN Pay (micropagamentos SOL)
+             6 serviços de inteligência com dados de mercado ao vivo
+             Memory Brain — aba Agentes com cards holográficos
+             Motor de grounding (Binance · CoinGecko · DeFiLlama · Helius)
+             Integração Agente→Chat · Suporte Wallet Standard
+🔜 Fase 3   SDK · Indexer · API gateway · Primeiras integrações
+             Reputação de agentes · Presets de política · Observabilidade
+🔜 Fase 4   Groth16 em produção · Ferramentas enterprise · Portabilidade cross-app
+🔜 Fase 5   TEE + FHE · Padrão cognitivo
 ```
 
 ---
@@ -491,7 +670,7 @@ Camada 7 — Expiração + rate limit        Intents expiram em 10 min · máx 5
 
 **Eden Lucas Cavalcanti de Oliveira** — Fundador solo e desenvolvedor full-stack.
 
-Construiu toda a stack do CognChain do zero: programa Anchor na devnet da Solana, AI router multi-provedor com 5 modelos, pipeline de ZK proof, loop autônomo de agentes com síntese de memória on-chain e vaults de memória nativos de carteira com segurança em 7 camadas. Anteriormente construiu RadarPolítico BR, Lumina AI e Moreno Smart City. Construindo em público, tempo integral, desde o 1º trimestre de 2026.
+Construiu toda a stack do CognChain do zero: programa Anchor na devnet da Solana, AI router multi-provedor com 8 modelos, pipeline de ZK proof, loop autônomo de agentes com síntese de memória on-chain, vaults de memória nativos de carteira com segurança em 7 camadas, Agent Office com habilidades de dados de mercado ao vivo, serviços de inteligência CONGCHAIN Pay com micropagamentos em SOL, e Memory Brain com cards holográficos de memória de agentes. Anteriormente construiu RadarPolítico BR, Lumina AI e Moreno Smart City. Construindo em público, tempo integral, desde o 1º trimestre de 2026.
 
 [![GitHub](https://img.shields.io/badge/GitHub-edencrypto--ia-181717?style=flat-square&logo=github)](https://github.com/edencrypto-ia)
 [![X / Twitter](https://img.shields.io/badge/X-PenguPudgyPump-000000?style=flat-square&logo=x)](https://x.com/PenguPudgyPump)
@@ -524,6 +703,38 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 
 ---
 
+## 🤖 Agent Office — 实时 AI 经济仪表板
+
+Agent Office（`/office`）是一个实时仪表板，自主 AI 代理在此执行真实任务，其输出作为可验证记忆存储在链上。
+
+**代理技能——每个代理在调用 AI 之前都会获取实时数据：**
+
+| 代理 | 数据来源 | AI 模型 | 输出 |
+|---|---|---|---|
+| VEGA | Binance 实时价格 | Llama 3.3 70B | 带入/出场位的交易信号 |
+| NEXUS | DeFiLlama TVL | GLM-4.7 | 最佳收益机会 |
+| NOVA | CoinGecko 多资产 | Qwen3 80B | 情绪定位 + 市场展望 |
+| ECHO | Helius 链上数据 | MiniMax M2.7 | 钱包行为分析 |
+
+---
+
+## 💎 CONGCHAIN Pay — 智能服务
+
+用 SOL 支付，获取由 AI 驱动的实时市场和链上数据支持的真实情报。
+
+| 服务 | 价格 | 数据来源 | 模型 | 输出 |
+|---|---|---|---|---|
+| 市场信号 | 0.005 SOL | Binance 实时 OHLCV | Llama 3.3 | 带价位的交易信号 |
+| DeFi 收益扫描 | 0.008 SOL | DeFiLlama TVL | GLM-4.7 | 最佳收益机会 |
+| 钱包情报 | 0.010 SOL | Helius 链上 | Qwen3 80B | 完整钱包画像 |
+| AI 研究报告 | 0.020 SOL | 所有来源 | GPT-4o | 深度研究文档 |
+| 情绪扫描 | 0.005 SOL | CoinGecko 10 资产 | MiniMax M2.7 | 市场定位 |
+| 协议审计 | 0.015 SOL | 协议指标 | Claude | 安全风险评估 |
+
+每份付费情报报告都以 `[INTELLIGENCE_SERVICE]` 记忆形式保存——可验证、链上、永久。
+
+---
+
 ## ✅ 已上线功能
 
 | 功能 | 状态 | 详情 |
@@ -531,7 +742,13 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 | Anchor 程序 | ✅ 开发网 | `create_vault`、`write_memory`、`read_memory` |
 | 多供应商 AI 路由器 | ✅ 上线 | **8 个模型** — GPT-4o、Claude Opus 4.7、NVIDIA Llama 3.3、Gemini 2.0 Flash、DeepSeek V3、GLM-4.7、MiniMax M2.7、Qwen3 80B |
 | 免费/专业版分层 | ✅ 上线 | 4 个免费模型（NVIDIA · GLM · MiniMax · Qwen）+ 4 个专业版模型（$5/月）|
-| Memory Brain | ✅ 上线 | 记忆神经图谱 · 按模型着色 · ZK 环 · 链上光晕 |
+| Memory Brain — 图谱 | ✅ 上线 | 力导向神经图谱 · 按模型着色 · ZK 环 · 链上光晕 · 删除节点 |
+| Memory Brain — 代理卡片 | ✅ 上线 | 自主代理记忆的全息卡片网格 · 完整分析弹窗 |
+| Agent Office | ✅ 上线 | 实时 AI 经济仪表板 · 8 个代理 · 播放/暂停调度器 · SSE 流式传输 |
+| 真实代理技能 | ✅ 上线 | Binance 实时数据 · DeFiLlama TVL · CoinGecko 情绪 → AI 分析 |
+| 代理→聊天集成 | ✅ 上线 | 代理洞察以琥珀色横幅显示在聊天界面 |
+| CONGCHAIN Pay | ✅ 上线 | 6 项智能服务 · SOL 微支付 · 结果保存为已验证记忆 |
+| 接地引擎 | ✅ 上线 | 8 层管道：Binance · CoinGecko · DeFiLlama · Helius · 多代币支持 |
 | 管理员登录 | ✅ 上线 | Cookie 会话 · 即时解锁所有专业版模型 |
 | 洞察证明（PoI）| ✅ 上线 | 人工投票 → 阈值 → 自动锚定到 Solana |
 | 记忆审计追踪 | ✅ 上线 | 记忆链 · 证据记录 · ZK 证明堆栈 |
@@ -543,7 +760,7 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 | 记忆继承 | ✅ 上线 | 用已验证的链上记忆初始化新代理 |
 | Solana 智者代理 | ✅ 上线 | 具有 7 层安全性的自主 Solana 监控代理 |
 | Solana 意图队列 | ✅ 上线 | 人工确认的交易 · 批准前先模拟 |
-| 钱包连接 | ✅ 上线 | Phantom · Solflare · Coinbase（标准适配器）|
+| 钱包连接 | ✅ 上线 | Phantom · Solflare · Backpack（Wallet Standard）· 深色模态框 |
 | Helius RPC + 代理 | ✅ 上线 | 高级开发网 RPC · API 密钥在服务器端保护 |
 | MCP 服务器 | ✅ 上线 | 通过记忆互联网协议提供 7 个工具 |
 
@@ -577,12 +794,16 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 
 ```
 ✅ 阶段 0   规范 · 模式 · Anchor 账户映射
-✅ 阶段 1   开发网部署 · 5 模型 AI 路由器 · PoI 投票
+✅ 阶段 1   开发网部署 · 8 模型 AI 路由器 · PoI 投票
              ZK 证明 · 代理构建器 · 市场 · 自主循环
              智能分数 · 钱包连接 · Solana 智者 · MCP 服务器
-🔜 阶段 2   SDK 发布 · 索引器 · API 网关 · 首次集成
-🔜 阶段 3   Groth16 投入生产 · 企业工具
-🔜 阶段 4   TEE + FHE 研究 · 认知标准
+✅ 阶段 2   Agent Office（实时 AI 经济）· CONGCHAIN Pay（SOL 微支付）
+             6 项实时市场数据智能服务
+             Memory Brain 代理选项卡（全息卡片）
+             接地引擎（Binance · CoinGecko · DeFiLlama · Helius）
+🔜 阶段 3   SDK 发布 · 索引器 · API 网关 · 首次集成
+🔜 阶段 4   Groth16 投入生产 · 企业工具 · 跨应用可移植性
+🔜 阶段 5   TEE + FHE 研究 · 认知标准
 ```
 
 ---
@@ -591,7 +812,7 @@ BgrtrSJ53Uhp69sS8JfD414M1kujdR5ruhHc9wRbhiEL
 
 **Eden Lucas Cavalcanti de Oliveira** — 独立创始人与全栈构建者。
 
-从零开始构建了整个 CognChain 技术栈：Solana 开发网上的 Anchor 程序、跨 5 个模型的多供应商 AI 路由器、ZK 证明管道、具有链上记忆合成的自主代理循环，以及具有 7 层交易安全性的原生钱包记忆金库。此前还构建了 RadarPolítico BR、Lumina AI 和 Moreno Smart City。自 2026 年第一季度起全职公开构建。
+从零开始构建了整个 CognChain 技术栈：Solana 开发网上的 Anchor 程序、跨 8 个模型的多供应商 AI 路由器、ZK 证明管道、具有链上记忆合成的自主代理循环、具有 7 层交易安全性的原生钱包记忆金库、带实时市场数据技能的 Agent Office、SOL 微支付的 CONGCHAIN Pay 智能服务，以及带全息代理记忆卡片的 Memory Brain。此前还构建了 RadarPolítico BR、Lumina AI 和 Moreno Smart City。自 2026 年第一季度起全职公开构建。
 
 [![GitHub](https://img.shields.io/badge/GitHub-edencrypto--ia-181717?style=flat-square&logo=github)](https://github.com/edencrypto-ia)
 [![X / Twitter](https://img.shields.io/badge/X-PenguPudgyPump-000000?style=flat-square&logo=x)](https://x.com/PenguPudgyPump)
