@@ -19,6 +19,18 @@ export async function GET() {
     /^(assistant:\s*)?(olá|ola)[\s!].*sou o (congchain|cognchain)/i,
     /^(assistant:\s*)?novo inicio/i,
     /^assistant:\s*novo/i,
+    // Agent-generated content — stays in Office, not in Brain
+    /^\[.*SYNTHESIS\]/i,
+    /^\[CONGCHAIN PAY/i,
+    /^\[Autonomous Decision/i,
+    /^\[VEGA\s/i,
+    /^\[NEXUS\s/i,
+    /^\[NOVA\s/i,
+    /^\[ECHO\s/i,
+    /^\[APEX\s/i,
+    /^\[ARES\s/i,
+    /^\[FLUX\s/i,
+    /^\[ZION\s/i,
   ];
 
   const nodes = memories

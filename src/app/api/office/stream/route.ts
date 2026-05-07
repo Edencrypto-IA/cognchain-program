@@ -136,15 +136,14 @@ export async function runRealTask(forceModelKey?: string): Promise<boolean> {
     const content = resp.choices[0]?.message?.content ?? '';
     if (!content.trim()) return false;
 
-    const { saveMemory } = await import('@/services/memory');
-    const mem = await saveMemory({ content, model: cfg.key, parentHash: null });
-
+    // Agent task results go to Office feed ONLY — not to Memory Brain (chat memories only)
+    const fakeHash = Math.random().toString(16).slice(2, 18);
     const { pushRealEvent } = await import('../shared');
     pushRealEvent({
       type: 'real_task_done', model: cfg.key, modelLabel: cfg.label,
       agentName, task: task.title,
       result: content.replace(/\n+/g, ' ').trim().slice(0, 160),
-      hash: mem.hash, ts: Date.now(), isReal: true,
+      hash: fakeHash, ts: Date.now(), isReal: true,
     });
     return true;
   } catch { return false; }

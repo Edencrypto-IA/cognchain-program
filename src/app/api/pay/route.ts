@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { url, amount = 0.001, model = 'nvidia', saveResult = true, agentName = 'PayAgent' } = body as {
+    const { url, amount = 0.001, model = 'nvidia', saveResult = false, agentName = 'PayAgent' } = body as {
       url?: string; amount?: number; model?: string; saveResult?: boolean; agentName?: string;
     };
 
