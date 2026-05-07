@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Zap, Shield, Brain, Copy, Check, ExternalLink, Loader2, ChevronRight, ArrowRight, RefreshCw } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,267 +12,598 @@ interface Service {
 }
 
 interface PurchaseResult {
-  success: boolean;
-  analysis: string;
+  success: boolean; analysis: string;
   service: { id: string; name: string };
   payment: { txHash: string; simulated: boolean; amountSol: number; explorerUrl?: string };
-  memoryHash: string;
-  proof: string;
-  duration: number;
-  steps: string[];
+  memoryHash: string; proof: string; duration: number; steps: string[];
 }
 
 interface Stats { totalPurchases: number; totalSolCollected: number; }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Design tokens (CSS vars) ─────────────────────────────────────────────────
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Trade: '#F59E0B', DeFi: '#14F195', 'On-Chain': '#9945FF',
-  Pesquisa: '#4285F4', Sentimento: '#00D1FF', Segurança: '#FF6B35',
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
+  :root {
+    --bg:#050608; --bg-elev:#0b0d12; --bg-card:#0f1218;
+    --line:rgba(255,255,255,0.06); --line2:rgba(255,255,255,0.10); --line3:rgba(255,255,255,0.18);
+    --t:#f5f6fa; --t2:#a8acb8; --t3:#6b6f7c; --t4:#3f434e;
+    --pu:#b794ff; --or:#ff9e3d; --gr:#3ddb88; --cy:#5ce3ff; --go:#f5c952;
+  }
+  .mono { font-family:'JetBrains Mono',ui-monospace,monospace !important; }
+  .serif { font-family:'Instrument Serif',Georgia,serif !important; font-style:italic; font-weight:400; }
+  @keyframes blink  { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes spin   { to{transform:rotate(360deg)} }
+  @keyframes marquee{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+  @keyframes mFade  { from{opacity:0} to{opacity:1} }
+  @keyframes mSlide { from{opacity:0;transform:translateY(18px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+  @keyframes glow   { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+`;
+
+// ─── Category colours ─────────────────────────────────────────────────────────
+
+const CAT_HEX: Record<string, string> = {
+  Trade:'#ff9e3d', DeFi:'#3ddb88', 'On-Chain':'#b794ff',
+  Pesquisa:'#4285F4', Sentimento:'#5ce3ff', Segurança:'#FF6B35',
 };
 
-const MODEL_LABELS: Record<string, string> = {
-  nvidia: 'Llama 3.3', glm: 'GLM-4.7', minimax: 'MiniMax',
-  qwen: 'Qwen3', gpt: 'GPT-4o', claude: 'Claude',
+const MODEL_LABEL: Record<string, string> = {
+  nvidia:'Llama 3.3', glm:'GLM-4.7', minimax:'MiniMax',
+  qwen:'Qwen3', gpt:'GPT-4o', claude:'Claude',
 };
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
+// ─── Small components ─────────────────────────────────────────────────────────
 
+function Dot({ c }: { c: string }) {
+  return <span style={{ width:10,height:10,borderRadius:'50%',background:c,display:'inline-block' }} />;
+}
+function Spinner() {
+  return <span style={{ width:12,height:12,border:'2px solid rgba(183,148,255,0.3)',borderTopColor:'#b794ff',borderRadius:'50%',display:'inline-block',animation:'spin 0.7s linear infinite' }} />;
+}
+function Logo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <defs><linearGradient id="ccLg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#7c5cff"/><stop offset="100%" stopColor="#3ddb88"/></linearGradient></defs>
+      <circle cx="12" cy="12" r="10" stroke="url(#ccLg)" strokeWidth="2"/>
+      <circle cx="12" cy="12" r="3.5" fill="url(#ccLg)"/>
+    </svg>
+  );
+}
 function CopyBtn({ text }: { text: string }) {
   const [ok, setOk] = useState(false);
   return (
-    <button onClick={() => { navigator.clipboard?.writeText(text).catch(() => {}); setOk(true); setTimeout(() => setOk(false), 1500); }}
-      className="p-1 rounded hover:bg-white/10 transition-colors text-white/25 hover:text-white/60">
-      {ok ? <Check className="w-3.5 h-3.5 text-[#14F195]" /> : <Copy className="w-3.5 h-3.5" />}
+    <button onClick={() => { navigator.clipboard?.writeText(text).catch(()=>{}); setOk(true); setTimeout(()=>setOk(false),1400); }}
+      style={{ background:'transparent',border:'none',color:ok?'var(--gr)':'var(--t3)',cursor:'pointer',fontSize:15,padding:0,display:'flex',alignItems:'center',justifyContent:'center',width:22,height:22,marginLeft:4 }}>
+      {ok ? '✓' : '⧉'}
     </button>
+  );
+}
+
+// ─── TopBar ───────────────────────────────────────────────────────────────────
+
+function TopBar({ stats }: { stats: Stats }) {
+  return (
+    <div style={{ borderBottom:'1px solid var(--line)',background:'rgba(5,6,8,0.8)',backdropFilter:'blur(20px)',position:'sticky',top:0,zIndex:50 }}>
+      <div style={{ maxWidth:1240,margin:'0 auto',padding:'14px 28px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:24 }}>
+        <div style={{ display:'flex',alignItems:'center',gap:24 }}>
+          <a href="/" className="mono" style={{ fontSize:12,color:'var(--t3)',textDecoration:'none',display:'flex',alignItems:'center',gap:6 }}>
+            <span>←</span><span>Chat</span>
+          </a>
+          <div style={{ width:1,height:16,background:'var(--line2)' }} />
+          <div style={{ display:'flex',alignItems:'center',gap:10 }}>
+            <Logo />
+            <span style={{ fontSize:14,fontWeight:600,letterSpacing:'-0.01em' }}>CONGCHAIN</span>
+            <span className="mono" style={{ fontSize:9.5,color:'var(--t3)',padding:'3px 7px',border:'1px solid var(--line2)',borderRadius:4,letterSpacing:'0.12em' }}>INTELLIGENCE PAY</span>
+          </div>
+        </div>
+        <div className="mono" style={{ display:'flex',alignItems:'center',gap:28,fontSize:11,color:'var(--t3)' }}>
+          <span><span style={{ color:'var(--pu)',fontWeight:600 }}>{stats.totalPurchases}</span> análises</span>
+          <span><span style={{ color:'var(--or)',fontWeight:600 }}>{stats.totalSolCollected.toFixed(3)}</span> SOL coletados</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+
+function Hero() {
+  return (
+    <section style={{ maxWidth:980,margin:'0 auto',padding:'100px 28px 40px',textAlign:'center',position:'relative' }}>
+      <div className="mono" style={{ fontSize:11,color:'var(--t3)',letterSpacing:'0.25em',marginBottom:28,display:'flex',alignItems:'center',justifyContent:'center',gap:10 }}>
+        <span style={{ width:6,height:6,borderRadius:'50%',background:'var(--pu)',display:'inline-block',animation:'glow 2s ease-in-out infinite' }} />
+        INTELIGÊNCIA VERIFICÁVEL COM SOL
+      </div>
+
+      <h1 style={{ fontSize:'clamp(52px,8.5vw,108px)',lineHeight:0.92,fontWeight:600,letterSpacing:'-0.045em',margin:0 }}>
+        Compre análises de IA.<br />
+        <span style={{ background:'linear-gradient(95deg,#b794ff 0%,#7c5cff 35%,#5ce3ff 70%,#3ddb88 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text' }}>
+          Pague em <span className="serif">SOL.</span>
+        </span>
+      </h1>
+
+      <p style={{ fontSize:18,color:'var(--t2)',lineHeight:1.5,margin:'32px auto 0',maxWidth:540 }}>
+        Sem conta. Sem assinatura. Sem cartão de crédito.<br />
+        <span style={{ color:'var(--t)' }}>Dados reais + IA + prova na blockchain.</span>
+      </p>
+
+      {/* Pay.sh comparison strip */}
+      <div style={{ display:'flex',justifyContent:'center',alignItems:'stretch',gap:0,margin:'44px auto 0',maxWidth:460,border:'1px solid var(--line)',borderRadius:12,overflow:'hidden' }}>
+        <div style={{ flex:1,padding:'16px 20px',textAlign:'center' }}>
+          <div className="mono" style={{ fontSize:9.5,color:'var(--t3)',letterSpacing:'0.18em',marginBottom:6 }}>PAY.SH</div>
+          <div style={{ fontSize:12.5,color:'var(--t2)' }}>paga · recebe dados</div>
+        </div>
+        <div style={{ display:'flex',alignItems:'center',color:'var(--t4)',fontSize:18,padding:'0 6px',borderLeft:'1px solid var(--line)',borderRight:'1px solid var(--line)' }}>›</div>
+        <div style={{ flex:1,padding:'16px 20px',textAlign:'center',background:'linear-gradient(180deg,rgba(124,92,255,0.06),transparent)' }}>
+          <div className="mono" style={{ fontSize:9.5,color:'var(--pu)',letterSpacing:'0.18em',marginBottom:6,fontWeight:700 }}>CONGCHAIN PAY</div>
+          <div style={{ fontSize:12.5,color:'var(--t)' }}>
+            paga · recebe · <span style={{ color:'var(--gr)' }}>salva</span> · <span style={{ color:'var(--pu)' }}>verifica</span>
+          </div>
+        </div>
+      </div>
+
+      {/* CLI chip */}
+      <div style={{ display:'inline-flex',alignItems:'center',gap:14,padding:'12px 18px',marginTop:32,background:'var(--bg-elev)',border:'1px solid var(--line2)',borderRadius:10 }}>
+        <span className="mono" style={{ color:'var(--gr)',fontSize:13,flexShrink:0 }}>$</span>
+        <span className="mono" style={{ fontSize:13,color:'var(--t)' }}>
+          npx congchain pay <span style={{ color:'var(--pu)' }}>market-signal</span>
+        </span>
+        <CopyBtn text="npx congchain pay market-signal" />
+      </div>
+    </section>
+  );
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+function StatsGrid({ stats }: { stats: Stats }) {
+  return (
+    <section style={{ maxWidth:1080,margin:'60px auto 0',padding:'0 28px',display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16 }}>
+      {[
+        { n: stats.totalPurchases,                        l:'ANÁLISES VENDIDAS',   c:'var(--pu)' },
+        { n: `${stats.totalSolCollected.toFixed(3)} SOL`, l:'SOL COLETADOS',       c:'var(--or)' },
+        { n: '5 fontes',                                  l:'ROUTER DE PREÇOS',    c:'var(--gr)' },
+      ].map(({ n, l, c }) => (
+        <div key={l} style={{ background:'linear-gradient(180deg,var(--bg-elev),var(--bg-card))',border:'1px solid var(--line)',borderRadius:14,padding:'32px 28px',textAlign:'center',position:'relative',overflow:'hidden' }}>
+          <div style={{ position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:'60%',height:1,background:`linear-gradient(90deg,transparent,${c},transparent)`,opacity:0.5 }} />
+          <div className="mono" style={{ fontSize:34,fontWeight:700,color:c,letterSpacing:'-0.02em',lineHeight:1,marginBottom:12 }}>{n}</div>
+          <div className="mono" style={{ fontSize:10,color:'var(--t3)',letterSpacing:'0.2em' }}>{l}</div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// ─── Live Terminal ────────────────────────────────────────────────────────────
+
+const SCRIPTS = [
+  {
+    label: 'market-signal', color: '#ff9e3d', price: '0.005 SOL',
+    lines: [
+      { t:0,    k:'cmd',  v:'$ congchain pay market-signal --tokens SOL,BONK,PENGU' },
+      { t:500,  k:'info', v:'⚡ Pagamento: 0.005 SOL → CONGCHAIN vault' },
+      { t:1100, k:'ok',   v:'  TX: 3xKmB7pQ9r... · confirmado em 89ms' },
+      { t:1700, k:'info', v:'[1/4] Binance + Bybit + OKX + CoinGecko consultados...' },
+      { t:2400, k:'ok',   v:'  SOL: $148.23 (+4.2%) · 3/5 fontes · mediana' },
+      { t:2900, k:'info', v:'[2/4] NVIDIA Llama 3.3 70B processando...' },
+      { t:3600, k:'info', v:'[3/4] Gerando sinal de trade...' },
+      { t:4300, k:'',     v:'' },
+      { t:4500, k:'res',  v:'▶ SINAL: COMPRA | Confiança: 87%' },
+      { t:5000, k:'dim',  v:'  Entrada: $145–149 · Stop: $139.50 · Target: $158' },
+      { t:5500, k:'info', v:'[4/4] Salvando memória verificável na Solana...' },
+      { t:6100, k:'ok',   v:'◆ Hash: a3f9b2c1d7e8... · SHA-256 · on-chain ✓' },
+    ],
+  },
+  {
+    label: 'defi-yield', color: '#3ddb88', price: '0.008 SOL',
+    lines: [
+      { t:0,    k:'cmd',  v:'$ congchain pay defi-yield --chain solana' },
+      { t:500,  k:'info', v:'⚡ Pagamento: 0.008 SOL → confirmado · 71ms' },
+      { t:1100, k:'info', v:'[1/3] DeFiLlama yields.llama.fi/pools...' },
+      { t:1800, k:'ok',   v:'  23 protocolos · TVL $8.41B · 12 pools Solana' },
+      { t:2400, k:'info', v:'[2/3] GLM-4.7 Flash analisando...' },
+      { t:3200, k:'info', v:'[3/3] Ranking risco/retorno...' },
+      { t:3800, k:'',     v:'' },
+      { t:4000, k:'res',  v:'▶ TOP YIELDS SOLANA' },
+      { t:4500, k:'dim',  v:'  Kamino USDC/SOL: 34.2% APY · TVL $89M' },
+      { t:5000, k:'dim',  v:'  Meteora JitoSOL: 28.7% APY · IL mínimo' },
+      { t:5500, k:'dim',  v:'  Raydium USDC/USDT: 18.4% · stablecoin' },
+      { t:6000, k:'ok',   v:'◆ Memória ancorada · Hash: c8d2e1f3... ✓' },
+    ],
+  },
+];
+
+function LiveTerminal() {
+  const [idx, setIdx] = useState(0);
+  const [lines, setLines] = useState(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearAll = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+
+  const play = useCallback((i: number) => {
+    clearAll(); setLines(0);
+    const sc = SCRIPTS[i];
+    sc.lines.forEach((ln, li) => {
+      const t = setTimeout(() => setLines(l => l + 1), ln.t);
+      timers.current.push(t);
+    });
+    const last = sc.lines[sc.lines.length - 1].t + 2500;
+    const adv = setTimeout(() => { const nx = (i+1) % SCRIPTS.length; setIdx(nx); play(nx); }, last);
+    timers.current.push(adv);
+  }, []);
+
+  useEffect(() => { play(0); return clearAll; }, [play]);
+
+  const sc = SCRIPTS[idx];
+  const kColor = (k: string) => k==='ok'?'var(--gr)':k==='res'?'var(--pu)':k==='cmd'?'var(--t)':k==='dim'?'var(--t2)':'var(--t3)';
+
+  return (
+    <section style={{ maxWidth:1080,margin:'60px auto 0',padding:'0 28px' }}>
+      <div style={{ background:'var(--bg-elev)',border:'1px solid var(--line2)',borderRadius:14,overflow:'hidden',boxShadow:'0 24px 60px -20px rgba(0,0,0,0.6),0 0 0 1px rgba(255,255,255,0.02) inset' }}>
+        {/* Title bar */}
+        <div style={{ padding:'12px 16px',borderBottom:'1px solid var(--line)',display:'flex',alignItems:'center',gap:10,background:'rgba(0,0,0,0.2)' }}>
+          <div style={{ display:'flex',gap:6 }}><Dot c="#ff5f56"/><Dot c="#ffbd2e"/><Dot c="#27c93f"/></div>
+          <span className="mono" style={{ fontSize:11.5,color:'var(--t3)',marginLeft:8 }}>congchain pay — terminal</span>
+          <div style={{ flex:1 }} />
+          <span className="mono" style={{ fontSize:9.5,padding:'2px 8px',borderRadius:4,border:'1px solid var(--line2)',color:sc.color }}>
+            {sc.label} · {sc.price}
+          </span>
+          <button onClick={() => { setIdx(0); play(0); }}
+            style={{ background:'transparent',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:14,padding:'0 6px' }}>↺</button>
+        </div>
+
+        {/* Lines */}
+        <div className="mono" style={{ padding:'20px 24px',minHeight:220,fontSize:13,lineHeight:1.75 }}>
+          {sc.lines.slice(0, lines).map((ln, i) => (
+            <div key={`${idx}-${i}`} style={{ color: kColor(ln.k), animation:'fadeUp 0.15s ease-out' }}>
+              {ln.v || <span>&nbsp;</span>}
+            </div>
+          ))}
+          {lines < sc.lines.length && (
+            <span style={{ display:'inline-block',width:7,height:14,background:'var(--gr)',verticalAlign:'middle',animation:'blink 1s infinite' }} />
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
 // ─── Service Card ─────────────────────────────────────────────────────────────
 
-function ServiceCard({ service, onSelect }: { service: Service; onSelect: (s: Service) => void }) {
+const TONE: Record<string, { bg:string; border:string; glow:string }> = {
+  '#ff9e3d': { bg:'rgba(255,158,61,0.04)',  border:'rgba(255,158,61,0.22)',  glow:'rgba(255,158,61,0.14)' },
+  '#3ddb88': { bg:'rgba(61,219,136,0.04)',  border:'rgba(61,219,136,0.22)',  glow:'rgba(61,219,136,0.14)' },
+  '#b794ff': { bg:'rgba(183,148,255,0.04)', border:'rgba(183,148,255,0.22)', glow:'rgba(183,148,255,0.14)' },
+  '#4285F4': { bg:'rgba(66,133,244,0.04)',  border:'rgba(66,133,244,0.22)',  glow:'rgba(66,133,244,0.14)' },
+  '#5ce3ff': { bg:'rgba(92,227,255,0.04)',  border:'rgba(92,227,255,0.22)',  glow:'rgba(92,227,255,0.14)' },
+  '#FF6B35': { bg:'rgba(255,107,53,0.04)',  border:'rgba(255,107,53,0.22)',  glow:'rgba(255,107,53,0.14)' },
+};
+
+function ServiceCard({ svc, onSelect }: { svc: Service; onSelect: () => void }) {
   const [hover, setHover] = useState(false);
-  const color = CATEGORY_COLORS[service.category] ?? '#9945FF';
+  const hex = CAT_HEX[svc.category] ?? '#b794ff';
+  const tone = TONE[hex] ?? TONE['#b794ff'];
 
   return (
-    <article
-      onClick={() => onSelect(service)}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        background: hover ? `rgba(${color === '#F59E0B' ? '245,158,11' : color === '#14F195' ? '20,241,149' : color === '#9945FF' ? '153,69,255' : '66,133,244'},0.04)` : '#0f1218',
-        border: `1px solid ${hover ? color + '30' : 'rgba(255,255,255,0.06)'}`,
-        boxShadow: hover ? `0 12px 30px -8px ${color}15` : 'none',
-        transform: hover ? 'translateY(-2px)' : 'translateY(0)',
-      }}
-      className="rounded-2xl p-5 cursor-pointer transition-all duration-200">
+    <article onClick={onSelect} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ background:hover?tone.bg:'var(--bg-card)',border:'1px solid '+(hover?tone.border:'var(--line)'),borderRadius:12,padding:20,cursor:'pointer',transition:'all 0.2s',transform:hover?'translateY(-2px)':'none',boxShadow:hover?`0 16px 40px -10px ${tone.glow}`:'none' }}>
 
-      {/* Top */}
-      <div className="flex items-start justify-between mb-4">
+      {/* Header */}
+      <div style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14 }}>
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-0.5 rounded-full"
-              style={{ background: `${color}15`, color, border: `1px solid ${color}25` }}>
-              {service.category}
+          <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:6 }}>
+            <span className="mono" style={{ fontSize:9,fontWeight:700,letterSpacing:'0.2em',padding:'2px 7px',borderRadius:5,background:`${hex}18`,color:hex,border:`1px solid ${hex}28` }}>
+              {svc.category.toUpperCase()}
             </span>
-            <span className="text-[10px] text-white/25">{MODEL_LABELS[service.model] ?? service.model}</span>
+            <span className="mono" style={{ fontSize:9.5,color:'var(--t3)' }}>{MODEL_LABEL[svc.model] ?? svc.model}</span>
           </div>
-          <h3 className="text-[14px] font-bold text-white/85 leading-tight">{service.name}</h3>
+          <h3 style={{ fontSize:15,fontWeight:600,margin:0,color:'var(--t)',letterSpacing:'-0.01em' }}>{svc.name}</h3>
         </div>
-        <div className="text-right flex-shrink-0 ml-3">
-          <div className="text-[18px] font-black font-mono" style={{ color }}>{service.priceSol} SOL</div>
-          <div className="text-[10px] text-white/25">{service.priceUsd}</div>
+        <div style={{ textAlign:'right',flexShrink:0,marginLeft:12 }}>
+          <div className="mono" style={{ fontSize:18,fontWeight:700,color:hex,lineHeight:1 }}>{svc.priceSol} SOL</div>
+          <div className="mono" style={{ fontSize:10,color:'var(--t3)',marginTop:3 }}>{svc.priceUsd}</div>
         </div>
       </div>
 
       {/* Description */}
-      <p className="text-[12px] text-white/45 leading-relaxed mb-4 line-clamp-2">{service.description}</p>
+      <p style={{ fontSize:12.5,color:'var(--t2)',lineHeight:1.55,margin:'0 0 14px',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>
+        {svc.description}
+      </p>
 
-      {/* Example preview */}
-      <div className="rounded-xl p-3 border border-white/[0.04] bg-white/[0.015]">
-        <div className="text-[9px] font-semibold uppercase tracking-widest text-white/20 mb-1.5">Exemplo de resultado</div>
-        <p className="text-[11px] text-white/50 leading-relaxed line-clamp-2 italic">{service.example}</p>
+      {/* Example */}
+      <div style={{ padding:'10px 12px',borderRadius:8,background:'rgba(255,255,255,0.02)',border:'1px solid var(--line)' }}>
+        <div className="mono" style={{ fontSize:9,color:'var(--t4)',letterSpacing:'0.2em',marginBottom:5 }}>EXEMPLO</div>
+        <p className="mono" style={{ fontSize:11,color:'var(--t3)',lineHeight:1.5,margin:0,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',fontStyle:'italic' }}>
+          {svc.example}
+        </p>
       </div>
 
       {/* CTA */}
-      <div className="flex items-center gap-1 mt-3" style={{ color }}>
-        <span className="text-[11px] font-semibold">Comprar análise</span>
-        <ChevronRight className="w-3.5 h-3.5" />
+      <div style={{ display:'flex',alignItems:'center',gap:6,marginTop:14,color:hex }}>
+        <span style={{ fontSize:10 }}>▶</span>
+        <span className="mono" style={{ fontSize:11 }}>Comprar análise</span>
       </div>
     </article>
   );
 }
 
+// ─── Services Grid ────────────────────────────────────────────────────────────
+
+function ServicesSection({ services, onSelect }: { services: Service[]; onSelect: (s: Service) => void }) {
+  const [filter, setFilter] = useState('Todos');
+  const cats = [...new Set(services.map(s => s.category))];
+  const visible = filter === 'Todos' ? services : services.filter(s => s.category === filter);
+
+  return (
+    <section style={{ maxWidth:1240,margin:'100px auto 0',padding:'0 28px' }}>
+      <div style={{ display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:32,flexWrap:'wrap',gap:12 }}>
+        <h2 className="mono" style={{ fontSize:12,color:'var(--t3)',letterSpacing:'0.22em',fontWeight:500,margin:0 }}>
+          SERVIÇOS DE INTELIGÊNCIA · PAGUE EM SOL
+        </h2>
+        <span className="mono" style={{ fontSize:11,color:'var(--t4)' }}>{services.length} serviços · dados ao vivo</span>
+      </div>
+
+      {/* Filter pills */}
+      <div style={{ display:'flex',flexWrap:'wrap',gap:8,marginBottom:28 }}>
+        {['Todos', ...cats].map(f => {
+          const active = filter === f;
+          const hex = f === 'Todos' ? '#b794ff' : (CAT_HEX[f] ?? '#b794ff');
+          return (
+            <button key={f} onClick={() => setFilter(f)} className="mono"
+              style={{ background:active?`${hex}18`:'transparent',border:`1px solid ${active?hex+'40':'var(--line2)'}`,color:active?hex:'var(--t3)',padding:'5px 14px',borderRadius:100,fontSize:10.5,fontWeight:active?700:500,cursor:'pointer',letterSpacing:'0.12em',transition:'all 0.15s',boxShadow:active?`0 0 16px ${hex}18`:'none' }}>
+              {f.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Grid */}
+      <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14 }}>
+        {visible.map(s => <ServiceCard key={s.id} svc={s} onSelect={() => onSelect(s)} />)}
+      </div>
+    </section>
+  );
+}
+
+// ─── Brand Marquee ────────────────────────────────────────────────────────────
+
+const MARQUEE_ITEMS = [
+  { name:'Binance',    color:'#f5c952' },
+  { name:'Bybit',      color:'#ff9e3d' },
+  { name:'OKX',        color:'#f5f6fa' },
+  { name:'CoinGecko',  color:'#8dc63f' },
+  { name:'Crypto.com', color:'#4285F4' },
+  { name:'DeFiLlama',  color:'#5ce3ff' },
+  { name:'Helius',     color:'#9945FF' },
+  { name:'Llama 3.3',  color:'#76b900' },
+  { name:'GLM-4.7',    color:'#5ce3ff' },
+  { name:'MiniMax',    color:'#ff6b9d' },
+  { name:'Qwen3 80B',  color:'#a855f7' },
+  { name:'GPT-4o',     color:'#10a37f' },
+  { name:'Claude',     color:'#D97757' },
+];
+
+function BrandMarquee() {
+  const items = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+  return (
+    <section style={{ margin:'80px 0 0',padding:'28px 0',borderTop:'1px solid var(--line)',borderBottom:'1px solid var(--line)',background:'linear-gradient(180deg,transparent,rgba(124,92,255,0.03),transparent)',overflow:'hidden',position:'relative' }}>
+      <div className="mono" style={{ position:'absolute',top:8,left:'50%',transform:'translateX(-50%)',fontSize:9.5,color:'var(--t4)',letterSpacing:'0.25em',background:'var(--bg)',padding:'0 12px',whiteSpace:'nowrap' }}>
+        5 EXCHANGES · 8 MODELOS DE IA · 1 PAGAMENTO SOL
+      </div>
+      <div style={{ display:'flex',gap:40,animation:'marquee 45s linear infinite',width:'fit-content',marginTop:16 }}>
+        {items.map((it, i) => (
+          <div key={i} style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 20px',background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:100,flexShrink:0 }}>
+            <span style={{ width:7,height:7,borderRadius:'50%',background:it.color,display:'inline-block',boxShadow:`0 0 8px ${it.color}60` }} />
+            <span style={{ fontSize:13,fontWeight:500,color:'var(--t)',whiteSpace:'nowrap' }}>{it.name}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ position:'absolute',top:0,left:0,bottom:0,width:120,background:'linear-gradient(90deg,var(--bg),transparent)',pointerEvents:'none' }} />
+      <div style={{ position:'absolute',top:0,right:0,bottom:0,width:120,background:'linear-gradient(270deg,var(--bg),transparent)',pointerEvents:'none' }} />
+    </section>
+  );
+}
+
+// ─── Comparison Table ─────────────────────────────────────────────────────────
+
+function ComparisonTable() {
+  const rows = [
+    { k:'Paga por serviço em SOL',                  ps:true,  cc:true  },
+    { k:'Sem conta / sem cadastro',                 ps:true,  cc:true  },
+    { k:'Dados de mercado em tempo real',           ps:false, cc:true  },
+    { k:'Router 5 exchanges (mediana de preço)',    ps:false, cc:true  },
+    { k:'Análise com IA integrada',                 ps:false, cc:true  },
+    { k:'Hash SHA-256 verificável',                 ps:false, cc:true  },
+    { k:'Resultado ancorado na Solana blockchain',  ps:false, cc:true  },
+    { k:'Memória salva entre sessões de IA',        ps:false, cc:true  },
+    { k:'Visível no Agent Office ao vivo',          ps:false, cc:true  },
+    { k:'Suporte a 8 modelos de IA',               ps:false, cc:true  },
+  ];
+  return (
+    <section style={{ maxWidth:860,margin:'80px auto 0',padding:'0 28px' }}>
+      <h2 className="mono" style={{ fontSize:11,color:'var(--t3)',letterSpacing:'0.25em',textAlign:'center',marginBottom:24 }}>
+        CONGCHAIN PAY VS PAY.SH — COMPARAÇÃO
+      </h2>
+      <div style={{ background:'var(--bg-elev)',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden' }}>
+        <div style={{ display:'grid',gridTemplateColumns:'1fr 130px 130px',padding:'14px 24px',borderBottom:'1px solid var(--line)',background:'rgba(0,0,0,0.2)' }}>
+          <div className="mono" style={{ fontSize:11,color:'var(--t3)' }}>Funcionalidade</div>
+          <div className="mono" style={{ fontSize:11,color:'var(--t3)',textAlign:'center' }}>Pay.sh</div>
+          <div className="mono" style={{ fontSize:11,color:'var(--pu)',textAlign:'center',fontWeight:700 }}>CONGCHAIN</div>
+        </div>
+        {rows.map((r, i) => (
+          <div key={i} style={{ display:'grid',gridTemplateColumns:'1fr 130px 130px',padding:'13px 24px',borderBottom:i<rows.length-1?'1px solid var(--line)':'none',transition:'background 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.background='rgba(255,255,255,0.015)')}
+            onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
+            <div style={{ fontSize:13.5,color:'var(--t)' }}>{r.k}</div>
+            <div style={{ textAlign:'center' }}>
+              {r.ps ? <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7L6 11L12 3" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>
+                    : <span style={{ color:'var(--t4)',fontSize:14 }}>—</span>}
+            </div>
+            <div style={{ textAlign:'center' }}>
+              {r.cc ? <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7L6 11L12 3" stroke="var(--gr)" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>
+                    : <span style={{ color:'var(--t4)',fontSize:14 }}>—</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ─── Pillars ──────────────────────────────────────────────────────────────────
+
+function Pillars() {
+  return (
+    <section style={{ maxWidth:1080,margin:'80px auto 0',padding:'0 28px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:16 }}>
+      {[
+        { title:'Paga',   color:'var(--or)', desc:'Micropagamento SOL instantâneo. Sem conta, sem assinatura, sem cartão.',
+          icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14H11L10 22L19 10H12L13 2Z" stroke="var(--or)" strokeWidth="1.8" strokeLinejoin="round"/></svg> },
+        { title:'Analisa', color:'var(--pu)', desc:'5 exchanges consultadas em paralelo. Mediana de preço. IA especializada com dados reais.',
+          icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="var(--pu)" strokeWidth="1.8"/><path d="M8 12h8M12 8v8" stroke="var(--pu)" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+        { title:'Prova',  color:'var(--gr)', desc:'Resultado salvo com SHA-256 ancorado na Solana. Qualquer IA pode verificar a origem.',
+          icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3L4 6V12C4 16.5 7.5 20 12 21C16.5 20 20 16.5 20 12V6L12 3Z" stroke="var(--gr)" strokeWidth="1.8" strokeLinejoin="round"/></svg> },
+      ].map(it => (
+        <div key={it.title} style={{ background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:14,padding:'32px 28px',textAlign:'center',transition:'all 0.2s' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor='var(--line2)'; e.currentTarget.style.transform='translateY(-2px)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor='var(--line)'; e.currentTarget.style.transform='translateY(0)'; }}>
+          <div style={{ width:44,height:44,borderRadius:11,background:'var(--bg-elev)',border:'1px solid var(--line2)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px' }}>{it.icon}</div>
+          <h3 style={{ fontSize:18,fontWeight:600,margin:'0 0 8px',color:it.color,letterSpacing:'-0.01em' }}>{it.title}</h3>
+          <p style={{ fontSize:13,color:'var(--t2)',margin:0,lineHeight:1.55 }}>{it.desc}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 // ─── Purchase Modal ───────────────────────────────────────────────────────────
 
-function PurchaseModal({ service, onClose }: { service: Service | null; onClose: () => void }) {
+function PurchaseModal({ svc, onClose }: { svc: Service | null; onClose: () => void }) {
   const [inputs, setInputs] = useState<Record<string, string>>({});
-  const [step, setStep] = useState<'form' | 'running' | 'done'>('form');
+  const [step, setStep] = useState<'form'|'running'|'done'>('form');
   const [result, setResult] = useState<PurchaseResult | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState('');
   const logsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!service) return;
-    setInputs({});
-    setStep('form');
-    setResult(null);
-    setLogs([]);
-    setError('');
+    if (!svc) return;
+    setInputs({}); setStep('form'); setResult(null); setLogs([]); setError('');
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
-  }, [service, onClose]);
+  }, [svc, onClose]);
 
-  useEffect(() => {
-    if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
-  }, [logs]);
+  useEffect(() => { if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight; }, [logs]);
 
-  if (!service) return null;
-  const color = CATEGORY_COLORS[service.category] ?? '#9945FF';
+  if (!svc) return null;
+  const hex = CAT_HEX[svc.category] ?? '#b794ff';
 
   const handlePurchase = async () => {
-    setStep('running');
-    setLogs([]);
-    setError('');
+    setStep('running'); setLogs([]); setError('');
     try {
       const res = await fetch('/api/pay/intelligence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serviceId: service.id, inputs }),
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ serviceId: svc.id, inputs }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Erro'); setStep('form'); return; }
-      // Animate steps
       data.steps?.forEach((s: string, i: number) => setTimeout(() => setLogs(l => [...l, s]), i * 600));
       setTimeout(() => { setResult(data); setStep('done'); }, (data.steps?.length ?? 3) * 600 + 400);
     } catch (e) { setError(String(e)); setStep('form'); }
   };
 
   return (
-    <div onClick={onClose}
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)' }}>
-      <div onClick={e => e.stopPropagation()}
-        className="w-full max-w-lg rounded-2xl overflow-hidden"
-        style={{ background: '#0b0d12', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 40px 100px rgba(0,0,0,0.8)' }}>
+    <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.78)',backdropFilter:'blur(16px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24,animation:'mFade 0.2s ease' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:'var(--bg-elev)',border:'1px solid var(--line2)',borderRadius:16,width:'100%',maxWidth:520,animation:'mSlide 0.25s ease',boxShadow:'0 40px 100px -20px rgba(0,0,0,0.85)' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-          <div>
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-0.5 rounded-full mr-2"
-              style={{ background: `${color}15`, color, border: `1px solid ${color}25` }}>{service.category}</span>
-            <span className="text-[13px] font-bold text-white/85">{service.name}</span>
+        <div style={{ padding:'18px 24px',borderBottom:'1px solid var(--line)',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+          <div style={{ display:'flex',alignItems:'center',gap:10 }}>
+            <span className="mono" style={{ fontSize:9,fontWeight:700,letterSpacing:'0.2em',padding:'3px 8px',borderRadius:5,background:`${hex}18`,color:hex,border:`1px solid ${hex}28` }}>{svc.category.toUpperCase()}</span>
+            <span style={{ fontSize:14,fontWeight:600,color:'var(--t)' }}>{svc.name}</span>
           </div>
-          <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors text-xl">×</button>
+          <button onClick={onClose} style={{ background:'transparent',border:'none',color:'var(--t3)',fontSize:22,cursor:'pointer',width:28,height:28,padding:0,lineHeight:1 }}>×</button>
         </div>
 
-        <div className="p-6">
-          {/* Form */}
+        <div style={{ padding:24 }}>
           {step === 'form' && (
             <>
-              <p className="text-[13px] text-white/50 leading-relaxed mb-5">{service.description}</p>
+              <p style={{ fontSize:13,color:'var(--t2)',lineHeight:1.55,marginBottom:20 }}>{svc.description}</p>
 
-              {service.inputs.length > 0 && (
-                <div className="space-y-3 mb-5">
-                  {service.inputs.map(inp => (
-                    <div key={inp.key}>
-                      <label className="block text-[10px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
-                        {inp.label}{inp.required && ' *'}
-                      </label>
-                      <input value={inputs[inp.key] ?? ''} onChange={e => setInputs(p => ({ ...p, [inp.key]: e.target.value }))}
+              {svc.inputs.length > 0 && (
+                <div style={{ marginBottom:20 }}>
+                  {svc.inputs.map(inp => (
+                    <div key={inp.key} style={{ marginBottom:12 }}>
+                      <label className="mono" style={{ display:'block',fontSize:9.5,color:'var(--t3)',letterSpacing:'0.18em',marginBottom:7 }}>{inp.label.toUpperCase()}{inp.required?' *':''}</label>
+                      <input value={inputs[inp.key]??''} onChange={e => setInputs(p=>({...p,[inp.key]:e.target.value}))}
                         placeholder={inp.placeholder}
-                        className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-2.5 text-[13px] text-white/80 placeholder-white/20 outline-none focus:border-white/[0.15] transition-colors" />
+                        style={{ width:'100%',background:'var(--bg-card)',border:'1px solid var(--line2)',color:'var(--t)',padding:'11px 14px',borderRadius:9,fontSize:13,outline:'none',transition:'border 0.15s',boxSizing:'border-box' }}
+                        onFocus={e => (e.target.style.borderColor='var(--line3)')}
+                        onBlur={e => (e.target.style.borderColor='var(--line2)')} />
                     </div>
                   ))}
                 </div>
               )}
 
               {/* Price box */}
-              <div className="rounded-xl p-4 mb-5 border" style={{ background: `${color}08`, borderColor: `${color}20` }}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-white/50">Você paga</span>
-                  <div className="text-right">
-                    <div className="text-[22px] font-black font-mono" style={{ color }}>{service.priceSol} SOL</div>
-                    <div className="text-[10px] text-white/30">{service.priceUsd} · sem assinatura</div>
+              <div style={{ padding:'14px 18px',marginBottom:20,borderRadius:10,background:`${hex}08`,border:`1px solid ${hex}22` }}>
+                <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+                  <span style={{ fontSize:12.5,color:'var(--t2)' }}>Você paga</span>
+                  <div style={{ textAlign:'right' }}>
+                    <div className="mono" style={{ fontSize:22,fontWeight:700,color:hex,lineHeight:1 }}>{svc.priceSol} SOL</div>
+                    <div className="mono" style={{ fontSize:10,color:'var(--t3)',marginTop:3 }}>{svc.priceUsd} · sem assinatura</div>
                   </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-white/[0.06] text-[11px] text-white/35 flex items-center gap-1.5">
-                  <Shield className="w-3 h-3" />
+                <div className="mono" style={{ marginTop:10,paddingTop:10,borderTop:'1px solid var(--line)',fontSize:11,color:'var(--t3)',display:'flex',alignItems:'center',gap:6 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 3L4 6V12C4 16.5 7.5 20 12 21C16.5 20 20 16.5 20 12V6L12 3Z" stroke="var(--gr)" strokeWidth="1.8"/></svg>
                   Resultado salvo como memória verificável na Solana
                 </div>
               </div>
 
-              {error && <p className="text-[11px] text-red-400/70 mb-3">{error}</p>}
+              {error && <p className="mono" style={{ fontSize:11,color:'#ff6b6b',marginBottom:12 }}>{error}</p>}
 
               <button onClick={handlePurchase}
-                className="w-full py-3.5 rounded-xl font-bold text-[14px] transition-all flex items-center justify-center gap-2"
-                style={{ background: `linear-gradient(135deg, ${color}80, ${color}40)`, border: `1px solid ${color}40`, color }}>
-                <Zap className="w-4 h-4" />
-                Comprar por {service.priceSol} SOL
+                style={{ width:'100%',background:`linear-gradient(180deg,${hex}cc,${hex}88)`,border:`1px solid ${hex}60`,color:'#000',padding:'13px',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8 }}>
+                ⚡ Comprar por {svc.priceSol} SOL
               </button>
             </>
           )}
 
-          {/* Running */}
           {step === 'running' && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 mb-4">
-                <Loader2 className="w-5 h-5 animate-spin" style={{ color }} />
-                <span className="text-[13px] text-white/60">Processando inteligência...</span>
+            <div>
+              <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:16 }}>
+                <Spinner />
+                <span style={{ fontSize:13,color:'var(--t2)' }}>Consultando exchanges e processando com IA...</span>
               </div>
-              <div ref={logsRef} className="space-y-1.5 max-h-40 overflow-y-auto">
+              <div ref={logsRef} className="mono" style={{ fontSize:11.5,lineHeight:1.8,maxHeight:160,overflowY:'auto' }}>
                 {logs.map((l, i) => (
-                  <div key={i} className="flex items-start gap-2 text-[12px]">
-                    <span style={{ color }} className="flex-shrink-0 mt-0.5">→</span>
-                    <span className="text-white/55">{l}</span>
-                  </div>
+                  <div key={i} style={{ color:i===0?'var(--pu)':i===logs.length-1?'var(--gr)':'var(--t3)',animation:'fadeUp 0.2s ease' }}>→ {l}</div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Done */}
           {step === 'done' && result && (
-            <div className="space-y-4">
-              {/* Analysis */}
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-white/25 mb-2">Análise</div>
-                <div className="rounded-xl p-4 bg-white/[0.03] border border-white/[0.06] text-[13px] text-white/75 leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto">
-                  {result.analysis}
-                </div>
+            <div>
+              <div style={{ padding:'14px 16px',background:'var(--bg-card)',border:'1px solid var(--line)',borderRadius:10,maxHeight:220,overflowY:'auto',fontSize:13,color:'var(--t2)',lineHeight:1.65,whiteSpace:'pre-wrap',marginBottom:16 }}>
+                {result.analysis}
               </div>
-
-              {/* Proofs */}
-              <div className="space-y-2.5 pt-3 border-t border-white/[0.05]">
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] uppercase tracking-widest text-white/20 w-14">TX</span>
-                  <span className="font-mono text-[11px] text-white/45">{result.payment.txHash.slice(0, 20)}…</span>
-                  <CopyBtn text={result.payment.txHash} />
-                  {result.payment.explorerUrl && (
-                    <a href={result.payment.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-white/20 hover:text-[#14F195]/60 transition-colors">
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-                  {result.payment.simulated && <span className="text-[9px] text-white/15 bg-white/[0.04] px-2 py-0.5 rounded-full">simulado</span>}
+              <div className="mono" style={{ fontSize:10.5,lineHeight:2,borderTop:'1px solid var(--line)',paddingTop:12 }}>
+                <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+                  <span style={{ color:'var(--t4)',width:14 }}>TX</span>
+                  <span style={{ color:'var(--t3)' }}>{result.payment.txHash.slice(0,22)}…</span>
+                  {result.payment.simulated && <span style={{ fontSize:9,color:'var(--t4)',background:'var(--bg-elev)',padding:'1px 6px',borderRadius:4 }}>simulado</span>}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] uppercase tracking-widest text-white/20 w-14">Hash</span>
-                  <span className="font-mono text-[11px] text-white/45">{result.memoryHash.slice(0, 20)}…</span>
-                  <CopyBtn text={result.memoryHash} />
+                <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+                  <span style={{ color:'var(--t4)',width:14 }}>◆</span>
+                  <span style={{ color:'var(--gr)' }}>{result.memoryHash.slice(0,22)}… · on-chain ✓</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] uppercase tracking-widest text-[#14F195]/40 w-14">Proof</span>
-                  <span className="font-mono text-[10px] text-[#14F195]/50 truncate">{result.proof}</span>
-                  <CopyBtn text={result.proof} />
+                <div style={{ display:'flex',alignItems:'center',gap:8,justifyContent:'space-between' }}>
+                  <span style={{ color:'var(--gr)' }}>✓ {result.duration}ms · {result.payment.amountSol} SOL</span>
+                  <button onClick={onClose} style={{ background:'var(--bg-card)',border:'1px solid var(--line2)',color:'var(--t2)',padding:'6px 14px',borderRadius:7,fontSize:12,cursor:'pointer' }}>Fechar</button>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-[#14F195]/60 flex items-center gap-1"><Check className="w-3.5 h-3.5" />{result.duration}ms · {result.payment.amountSol} SOL</span>
-                <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors">Fechar</button>
               </div>
             </div>
           )}
@@ -283,210 +613,23 @@ function PurchaseModal({ service, onClose }: { service: Service | null; onClose:
   );
 }
 
-// ─── Live Terminal ────────────────────────────────────────────────────────────
+// ─── Footer ───────────────────────────────────────────────────────────────────
 
-const DEMO_SCRIPTS = [
-  {
-    service: 'Sinal de Mercado — SOL/USDT',
-    price: '0.005 SOL',
-    color: '#F59E0B',
-    lines: [
-      { text: '$ congchain pay market-signal --asset SOL', delay: 0,    color: 'text-white/55' },
-      { text: '⚡ Pagamento: 0.005 SOL → CONGCHAIN vault', delay: 600,  color: 'text-[#F59E0B]/70' },
-      { text: '   TX: 3xKmB7pQ9r...  ✓ 89ms',              delay: 1200, color: 'text-[#14F195]/60' },
-      { text: '[1/4] Conectando ao Binance...',             delay: 1900, color: 'text-white/35' },
-      { text: '   SOL/USDT: $148.23 | Vol 24h: $4.2B  ✓', delay: 2500, color: 'text-[#14F195]/60' },
-      { text: '[2/4] Order book + OHLCV capturado',        delay: 3100, color: 'text-white/35' },
-      { text: '[3/4] NVIDIA Llama 3.3 70B processando...', delay: 3700, color: 'text-white/35' },
-      { text: '[4/4] Gerando análise de trade...',         delay: 4400, color: 'text-white/35' },
-      { text: '',                                          delay: 5000, color: '' },
-      { text: '▶ SINAL: COMPRA | Confiança: 87%',         delay: 5100, color: 'text-[#F59E0B] font-bold' },
-      { text: '  Entrada: $145–149 | Stop: $139.50',      delay: 5700, color: 'text-white/60' },
-      { text: '  Target 1: $158.00 (+6.6%)',              delay: 6200, color: 'text-[#14F195]/70' },
-      { text: '  Target 2: $172.00 (+16.0%)',             delay: 6700, color: 'text-[#14F195]/70' },
-      { text: '',                                          delay: 7200, color: '' },
-      { text: '◆ Hash: a3f9b2c1d7e8...  | SHA-256',       delay: 7400, color: 'text-[#9945FF]/70' },
-      { text: '◆ Ancorado na Solana · Verificável ✓',     delay: 7900, color: 'text-[#9945FF]/70' },
-    ],
-  },
-  {
-    service: 'Scan DeFi Yields — Solana',
-    price: '0.008 SOL',
-    color: '#14F195',
-    lines: [
-      { text: '$ congchain pay defi-yield --chain solana',  delay: 0,    color: 'text-white/55' },
-      { text: '⚡ Pagamento: 0.008 SOL → CONGCHAIN vault',  delay: 600,  color: 'text-[#14F195]/70' },
-      { text: '   TX: 9pNr4vWx2k...  ✓ 71ms',              delay: 1200, color: 'text-[#14F195]/60' },
-      { text: '[1/3] DeFiLlama API — buscando TVL...',      delay: 1900, color: 'text-white/35' },
-      { text: '   23 protocolos · TVL total: $8.41B  ✓',   delay: 2600, color: 'text-[#14F195]/60' },
-      { text: '[2/3] GLM-4.7 Flash analisando yields...',  delay: 3300, color: 'text-white/35' },
-      { text: '[3/3] Ranking + filtro de risco...',         delay: 4100, color: 'text-white/35' },
-      { text: '',                                           delay: 4800, color: '' },
-      { text: '▶ TOP YIELDS IDENTIFICADOS',                delay: 5000, color: 'text-[#14F195] font-bold' },
-      { text: '  #1 Kamino USDC/SOL: 34.2% APY',          delay: 5500, color: 'text-white/60' },
-      { text: '  #2 Meteora SOL/JitoSOL: 28.7% APY',      delay: 6000, color: 'text-white/60' },
-      { text: '  #3 Raydium USDC/USDT: 18.4% APY',        delay: 6500, color: 'text-white/60' },
-      { text: '  Yield ponderado recomendado: 27.4% APY', delay: 7100, color: 'text-[#14F195]/70' },
-      { text: '',                                           delay: 7600, color: '' },
-      { text: '◆ Hash: c8d2e1f3a0b9...  | Solana ✓',      delay: 7800, color: 'text-[#9945FF]/70' },
-    ],
-  },
-];
-
-function LiveTerminal() {
-  const [scriptIdx, setScriptIdx] = useState(0);
-  const [visibleLines, setVisibleLines] = useState(0);
-  const [playing, setPlaying] = useState(true);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const script = DEMO_SCRIPTS[scriptIdx];
-
-  const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
-
-  const play = useCallback((idx: number) => {
-    clearTimers();
-    setVisibleLines(0);
-    const s = DEMO_SCRIPTS[idx];
-    s.lines.forEach((_, i) => {
-      const t = setTimeout(() => setVisibleLines(i + 1), s.lines[i].delay);
-      timersRef.current.push(t);
-    });
-    // Auto advance to next script after last line + 2s pause
-    const last = s.lines[s.lines.length - 1].delay + 2400;
-    const advance = setTimeout(() => {
-      const next = (idx + 1) % DEMO_SCRIPTS.length;
-      setScriptIdx(next);
-      play(next);
-    }, last);
-    timersRef.current.push(advance);
-  }, []);
-
-  useEffect(() => {
-    if (playing) play(scriptIdx);
-    else clearTimers();
-    return clearTimers;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing]);
-
-  const restart = () => { setScriptIdx(0); setPlaying(true); play(0); };
-
+function Footer() {
   return (
-    <div className="max-w-3xl mx-auto px-5 sm:px-8 mb-16">
-      <div className="rounded-2xl border border-white/[0.06] bg-[#050507] overflow-hidden">
-        {/* Title bar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.04] bg-white/[0.015]">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-[#FF5F57]/80" />
-              <div className="w-3 h-3 rounded-full bg-[#FFBD2E]/80" />
-              <div className="w-3 h-3 rounded-full bg-[#28C840]/80" />
-            </div>
-            <span className="text-[11px] font-mono text-white/25 ml-1">congchain pay — terminal</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full border"
-              style={{ color: script.color, borderColor: `${script.color}30`, background: `${script.color}10` }}>
-              {script.service}
-            </span>
-            <button onClick={restart}
-              className="p-1 rounded hover:bg-white/10 transition-colors text-white/20 hover:text-white/50">
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Terminal content */}
-        <div className="p-5 min-h-[240px] font-mono text-[12px] leading-relaxed">
-          {script.lines.slice(0, visibleLines).map((line, i) => (
-            <div key={`${scriptIdx}-${i}`}
-              className={`${line.color} transition-all duration-150`}
-              style={{ animation: 'termFadeIn 0.15s ease-out' }}>
-              {line.text || ' '}
-            </div>
-          ))}
-          {visibleLines < script.lines.length && (
-            <span className="inline-block w-2 h-3.5 bg-white/30 animate-pulse ml-0.5" />
-          )}
-        </div>
+    <footer style={{ padding:'60px 28px 40px',marginTop:100,textAlign:'center' }}>
+      <div className="mono" style={{ display:'inline-flex',alignItems:'center',gap:10,fontSize:11,color:'var(--t4)',letterSpacing:'0.15em' }}>
+        <span>CONGCHAIN</span><span>·</span>
+        <span>Verifiable AI Memory Layer</span><span>·</span>
+        <span style={{ display:'inline-flex',alignItems:'center',gap:6 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <defs><linearGradient id="solFt" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#9945FF"/><stop offset="100%" stopColor="#14F195"/></linearGradient></defs>
+            <path d="M5 7h13l-2 2H3l2-2zm0 4h13l-2 2H3l2-2zm14 4H6l-2 2h13l2-2z" fill="url(#solFt)"/>
+          </svg>
+          Solana
+        </span>
       </div>
-    </div>
-  );
-}
-
-// ─── Comparison vs Pay.sh ─────────────────────────────────────────────────────
-
-function ComparisonTable() {
-  const rows = [
-    ['Paga por serviço em SOL',                  true,  true ],
-    ['Sem conta / sem cadastro',                 true,  true ],
-    ['Dados de mercado em tempo real',           false, true ],
-    ['Análise com IA integrada',                 false, true ],
-    ['Hash SHA-256 verificável',                 false, true ],
-    ['Resultado ancorado na Solana blockchain',  false, true ],
-    ['Memória salva entre sessões de IA',        false, true ],
-    ['Visível no Agent Office ao vivo',          false, true ],
-    ['Suporte a 8 modelos de IA',                false, true ],
-  ];
-
-  return (
-    <div className="max-w-3xl mx-auto px-5 sm:px-8 mb-16">
-      <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/20 mb-5 text-center">
-        CONGCHAIN Pay vs Pay.sh — Comparação de funcionalidades
-      </div>
-      <div className="rounded-2xl border border-white/[0.05] overflow-hidden">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="border-b border-white/[0.05] bg-white/[0.01]">
-              <th className="px-5 py-3 text-left text-white/25 font-medium">Funcionalidade</th>
-              <th className="px-5 py-3 text-center text-white/25 font-medium text-[11px]">Pay.sh</th>
-              <th className="px-5 py-3 text-center font-bold text-[11px]" style={{ color: '#9945FF' }}>CONGCHAIN</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([feature, paysh, cong]) => (
-              <tr key={String(feature)} className="border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors">
-                <td className="px-5 py-2.5 text-white/45">{String(feature)}</td>
-                <td className="px-5 py-2.5 text-center">
-                  {paysh ? <span className="text-white/35">✓</span> : <span className="text-white/10">—</span>}
-                </td>
-                <td className="px-5 py-2.5 text-center">
-                  {cong ? <span className="text-[#14F195] font-bold">✓</span> : <span className="text-white/10">—</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ─── How it works ─────────────────────────────────────────────────────────────
-
-function HowItWorks() {
-  const steps = [
-    { n: '01', title: 'Escolha a análise', desc: 'Selecione o serviço de inteligência que precisa. Sem conta, sem cadastro.' },
-    { n: '02', title: 'Pague em SOL', desc: 'Micropagamento instantâneo. Menos de $2 pela maioria das análises.' },
-    { n: '03', title: 'Receba a inteligência', desc: 'CONGCHAIN coleta dados reais e gera análise com o melhor modelo de IA.' },
-    { n: '04', title: 'Prova na Solana', desc: 'Resultado salvo com hash SHA-256, ancorado on-chain. Verificável por qualquer IA.' },
-  ];
-  return (
-    <section className="max-w-4xl mx-auto px-5 sm:px-8 mb-20">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.3em] text-white/20 mb-8 text-center">Como funciona</div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {steps.map((s, i) => (
-          <div key={i} className="text-center">
-            <div className="text-[28px] font-black font-mono text-white/[0.06] mb-2">{s.n}</div>
-            <h3 className="text-[12px] font-bold text-white/70 mb-1.5">{s.title}</h3>
-            <p className="text-[11px] text-white/35 leading-relaxed">{s.desc}</p>
-            {i < steps.length - 1 && (
-              <div className="hidden md:flex justify-end mt-4 pr-2">
-                <ArrowRight className="w-3.5 h-3.5 text-white/15" />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
+    </footer>
   );
 }
 
@@ -496,154 +639,34 @@ export default function PayPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [stats, setStats] = useState<Stats>({ totalPurchases: 0, totalSolCollected: 0 });
   const [selected, setSelected] = useState<Service | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('Todos');
 
   useEffect(() => {
     fetch('/api/pay/intelligence').then(r => r.json()).then(d => {
       setServices(d.services ?? []);
       setStats(d.stats ?? { totalPurchases: 0, totalSolCollected: 0 });
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => {});
   }, []);
-
-  const categories = [...new Set(services.map(s => s.category))];
-  const filters = ['Todos', ...categories];
-  const visibleServices = activeFilter === 'Todos' ? services : services.filter(s => s.category === activeFilter);
 
   return (
     <>
-      <style>{`
-        @keyframes fade-up { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        .fade-up { animation: fade-up 0.4s ease-out forwards; }
-        @keyframes termFadeIn { from{opacity:0;transform:translateX(-4px)} to{opacity:1;transform:translateX(0)} }
-      `}</style>
-
-      <div className="min-h-screen bg-[#050608] text-white" style={{ fontFamily: '"Geist", system-ui, sans-serif' }}>
-
-        {/* Nav */}
-        <nav className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04] bg-[#050608]/90 backdrop-blur-xl sticky top-0 z-20">
-          <div className="flex items-center gap-4">
-            <a href="/" className="flex items-center gap-1.5 text-white/30 hover:text-white/60 transition-colors text-xs">
-              <ArrowLeft className="w-3.5 h-3.5" />Chat
-            </a>
-            <div className="w-px h-4 bg-white/[0.06]" />
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#9945FF] to-[#14F195] flex items-center justify-center">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L10.5 3.5V8.5L6 11L1.5 8.5V3.5L6 1Z" fill="white" fillOpacity="0.95"/></svg>
-              </div>
-              <span className="text-[11px] font-black tracking-[0.12em] bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-transparent">CONGCHAIN</span>
-              <span className="text-[9px] text-white/20 border-l border-white/[0.06] pl-3 tracking-wider uppercase">Intelligence Pay</span>
-            </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-5 text-[10px] font-mono text-white/20">
-            <span>{stats.totalPurchases} análises vendidas</span>
-            <span>{stats.totalSolCollected.toFixed(3)} SOL coletados</span>
-          </div>
-        </nav>
-
-        {/* Hero */}
-        <div className="max-w-4xl mx-auto px-5 sm:px-8 pt-20 pb-14 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#9945FF]/20 bg-[#9945FF]/8 mb-6">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#9945FF] animate-pulse" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9945FF]/70">Inteligência Verificável com SOL</span>
-          </div>
-
-          <h1 className="text-[44px] sm:text-[60px] font-black leading-[1.05] tracking-tight mb-5">
-            <span className="text-white/90">Compre análises de IA.</span><br />
-            <span className="bg-gradient-to-r from-[#9945FF] via-[#a855f7] to-[#14F195] bg-clip-text text-transparent">Pague em SOL.</span>
-          </h1>
-
-          <p className="text-[16px] text-white/40 max-w-xl mx-auto mb-4 leading-relaxed">
-            Sem conta. Sem assinatura. Sem cartão de crédito.<br />
-            <span className="text-white/55">Dados reais + IA + prova na blockchain.</span>
-          </p>
-
-          <div className="flex items-center justify-center gap-6 text-[12px] text-white/30">
-            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-[#F59E0B]" />A partir de 0.005 SOL</span>
-            <span className="flex items-center gap-1.5"><Brain className="w-3.5 h-3.5 text-[#9945FF]" />Resultado salvo como memória</span>
-            <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-[#14F195]" />Prova on-chain Solana</span>
-          </div>
-        </div>
-
-        {/* Live Terminal Demo */}
+      <style>{CSS}</style>
+      <div style={{
+        background:'radial-gradient(1200px 700px at 50% -200px,rgba(124,92,255,0.10),transparent 60%),radial-gradient(900px 500px at 90% 30%,rgba(255,158,61,0.04),transparent 60%),radial-gradient(700px 400px at 10% 60%,rgba(61,219,136,0.04),transparent 60%),#050608',
+        minHeight:'100vh', color:'var(--t)',
+        fontFamily:'"Geist",system-ui,-apple-system,sans-serif',
+        WebkitFontSmoothing:'antialiased',
+      }}>
+        <TopBar stats={stats} />
+        <Hero />
+        <StatsGrid stats={stats} />
         <LiveTerminal />
-
-        {/* Services */}
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 mb-20">
-          {/* Category filter pills */}
-          {!loading && (
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
-              {filters.map(f => {
-                const isActive = activeFilter === f;
-                const color = f === 'Todos' ? '#9945FF' : (CATEGORY_COLORS[f] ?? '#9945FF');
-                return (
-                  <button key={f} onClick={() => setActiveFilter(f)}
-                    style={{
-                      background: isActive ? `${color}18` : 'transparent',
-                      border: `1px solid ${isActive ? color + '40' : 'rgba(255,255,255,0.07)'}`,
-                      color: isActive ? color : 'rgba(255,255,255,0.35)',
-                      boxShadow: isActive ? `0 0 14px ${color}18` : 'none',
-                    }}
-                    className="px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] transition-all duration-150 hover:border-white/20">
-                    {f}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 animate-spin text-white/20" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {visibleServices.map(s => (
-                <ServiceCard key={s.id} service={s} onSelect={setSelected} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <HowItWorks />
-
-        {/* Comparison */}
+        <ServicesSection services={services} onSelect={setSelected} />
+        <BrandMarquee />
         <ComparisonTable />
-
-        {/* Why SOL */}
-        <div className="max-w-3xl mx-auto px-5 sm:px-8 mb-20">
-          <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] p-8">
-            <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/20 mb-6 text-center">Por que pagar em SOL?</div>
-            <div className="grid sm:grid-cols-3 gap-6">
-              {[
-                { title: 'Sem conta', desc: 'Nenhum cadastro, nenhum billing, nenhum e-mail. Só carteira + SOL.', color: '#9945FF' },
-                { title: 'Micropagamento', desc: 'Pague por análise, não por mês. 0.005 SOL por chamada ao invés de $20/mês.', color: '#F59E0B' },
-                { title: 'Prova verificável', desc: 'Cada análise tem hash SHA-256 ancorado na Solana. Nenhuma outra plataforma faz isso.', color: '#14F195' },
-              ].map(({ title, desc, color }) => (
-                <div key={title} className="text-center">
-                  <div className="text-[13px] font-bold mb-1.5" style={{ color }}>{title}</div>
-                  <p className="text-[11px] text-white/35 leading-relaxed">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-white/[0.04] py-8 text-center">
-          <div className="flex items-center justify-center gap-3 text-[10px] text-white/20 font-mono">
-            <span>CONGCHAIN</span><span>·</span>
-            <span>Verifiable AI Memory Layer</span><span>·</span>
-            <span className="flex items-center gap-1.5">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="slFt" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#9945FF"/><stop offset="100%" stopColor="#14F195"/></linearGradient></defs><path d="M5 7h13l-2 2H3l2-2zm0 4h13l-2 2H3l2-2zm14 4H6l-2 2h13l2-2z" fill="url(#slFt)"/></svg>
-              Solana
-            </span>
-          </div>
-        </div>
+        <Pillars />
+        <Footer />
+        <PurchaseModal svc={selected} onClose={() => setSelected(null)} />
       </div>
-
-      <PurchaseModal service={selected} onClose={() => setSelected(null)} />
     </>
   );
 }
