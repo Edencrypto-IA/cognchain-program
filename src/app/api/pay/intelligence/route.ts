@@ -100,22 +100,87 @@ export const SERVICES: IntelligenceService[] = [
 
 // ─── Data fetchers ────────────────────────────────────────────────────────────
 
-async function safeFetch(url: string, ms = 5000, opts?: RequestInit): Promise<unknown> {
+async function safeFetch(url: string, ms = 6000, opts?: RequestInit): Promise<unknown> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    const r = await fetch(url, { ...opts, signal: ctrl.signal });
+    const r = await fetch(url, { ...opts, signal: ctrl.signal, cache: 'no-store' });
     clearTimeout(t);
     if (!r.ok) return null;
     return r.json();
   } catch { clearTimeout(t); return null; }
 }
 
-async function getLiveMarketData(tokens = ['SOL', 'BONK', 'PENGU']) {
-  const results = await Promise.allSettled(tokens.map(t =>
-    safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${t}USDT`)
-  ));
-  return results.map((r, i) => ({ token: tokens[i], data: r.status === 'fulfilled' ? r.value : null }));
+// CoinGecko ID map for common tokens
+const CG_IDS: Record<string, string> = {
+  SOL: 'solana', BTC: 'bitcoin', ETH: 'ethereum',
+  BONK: 'bonk', PENGU: 'penguin', JTO: 'jito-governance',
+  JUP: 'jupiter-exchange-solana', RAY: 'raydium', PYTH: 'pyth-network',
+  WIF: 'dogwifcoin', POPCAT: 'popcat', W: 'wormhole',
+};
+
+interface TokenPrice {
+  token: string;
+  price: number;
+  change24h: number;
+  volume24h: number;
+  high24h: number;
+  low24h: number;
+  source: string;
+}
+
+async function getLiveMarketData(tokens = ['SOL', 'BONK', 'PENGU']): Promise<TokenPrice[]> {
+  const results: TokenPrice[] = [];
+
+  // 1. Try CoinGecko (most reliable from server environments)
+  const cgIds = tokens.map(t => CG_IDS[t] ?? t.toLowerCase()).join(',');
+  const cgData = await safeFetch(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${cgIds}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_24h_high=true&include_24h_low=true`
+  ) as Record<string, Record<string, number>> | null;
+
+  if (cgData) {
+    for (const token of tokens) {
+      const id = CG_IDS[token] ?? token.toLowerCase();
+      const d = cgData[id];
+      if (d?.usd) {
+        results.push({
+          token,
+          price: d.usd,
+          change24h: d.usd_24h_change ?? 0,
+          volume24h: d.usd_24h_vol ?? 0,
+          high24h: d.usd_24h_high ?? d.usd * 1.02,
+          low24h: d.usd_24h_low ?? d.usd * 0.98,
+          source: 'CoinGecko',
+        });
+      }
+    }
+  }
+
+  // 2. For any token that CoinGecko didn't return, try Binance
+  const missing = tokens.filter(t => !results.find(r => r.token === t));
+  if (missing.length > 0) {
+    const binanceResults = await Promise.allSettled(
+      missing.map(t => safeFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${t}USDT`))
+    );
+    binanceResults.forEach((r, i) => {
+      if (r.status === 'fulfilled' && r.value) {
+        const d = r.value as Record<string, string>;
+        if (d.lastPrice) {
+          results.push({
+            token: missing[i],
+            price: parseFloat(d.lastPrice),
+            change24h: parseFloat(d.priceChangePercent ?? '0'),
+            volume24h: parseFloat(d.quoteVolume ?? '0'),
+            high24h: parseFloat(d.highPrice ?? d.lastPrice),
+            low24h: parseFloat(d.lowPrice ?? d.lastPrice),
+            source: 'Binance',
+          });
+        }
+      }
+    });
+  }
+
+  return results;
 }
 
 async function getDefiLlamaData() {
@@ -133,18 +198,21 @@ async function getCoinGeckoSentiment() {
 }
 
 function fmtB(n: number) { return n >= 1e9 ? `$${(n / 1e9).toFixed(2)}B` : `$${(n / 1e6).toFixed(1)}M`; }
-function fmt(n: number, d = 2) { return n.toFixed(d); }
 
 // ─── Prompt builders ──────────────────────────────────────────────────────────
 
 function buildPrompt(serviceId: string, inputs: Record<string, string>, marketData: unknown): string {
   switch (serviceId) {
     case 'market-signal': {
-      const markets = marketData as { token: string; data: Record<string, string> | null }[];
-      const lines = markets
-        .filter(m => m.data)
-        .map(m => `${m.token}: $${parseFloat(m.data!.lastPrice).toFixed(m.token === 'BONK' ? 8 : 2)} | Vol: ${fmtB(parseFloat(m.data!.quoteVolume))} | Var: ${fmt(parseFloat(m.data!.priceChangePercent))}% | Max: $${parseFloat(m.data!.highPrice).toFixed(m.token === 'BONK' ? 8 : 2)} | Min: $${parseFloat(m.data!.lowPrice).toFixed(m.token === 'BONK' ? 8 : 2)}`);
-      return `Dados ao vivo (Binance):\n${lines.join('\n')}\n\nCom base nesses números reais, forneça:\n1. Sinal de trade: COMPRA / VENDA / NEUTRO com justificativa objetiva\n2. Nível de suporte e resistência mais próximos para SOL\n3. Anomalia de volume ou preço relevante\n4. Posicionamento recomendado para as próximas 24h\nSeja direto, use os dados, não invente números.`;
+      const markets = marketData as TokenPrice[];
+      if (!markets || markets.length === 0) {
+        return 'ERRO: Não foi possível obter dados ao vivo de preços. Informe o usuário que os dados de mercado estão indisponíveis no momento e sugira tentar novamente em alguns minutos.';
+      }
+      const decimals = (t: string) => ['BONK', 'PENGU', 'WIF', 'POPCAT'].includes(t) ? 6 : 2;
+      const lines = markets.map(m =>
+        `${m.token}: $${m.price.toFixed(decimals(m.token))} | Var 24h: ${m.change24h >= 0 ? '+' : ''}${m.change24h.toFixed(2)}% | Vol: ${fmtB(m.volume24h)} | Máx: $${m.high24h.toFixed(decimals(m.token))} | Mín: $${m.low24h.toFixed(decimals(m.token))} | Fonte: ${m.source}`
+      );
+      return `DADOS AO VIVO — ${new Date().toUTCString()}:\n${lines.join('\n')}\n\nEsses são preços REAIS coletados agora. Use exatamente esses valores na sua análise.\n\nForneça:\n1. Sinal de trade: COMPRA / VENDA / NEUTRO para SOL com justificativa objetiva baseada nesses números\n2. Suporte e resistência para SOL (calcule % abaixo/acima do preço atual acima)\n3. Anomalia de volume ou preço relevante\n4. Posicionamento recomendado para as próximas 24h\nSeja direto. JAMAIS invente preços — use apenas os valores listados acima.`;
     }
     case 'defi-yield': {
       const protos = marketData as { name: unknown; tvl: unknown; c1d?: unknown; c7d?: unknown }[];
