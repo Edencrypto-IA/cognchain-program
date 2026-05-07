@@ -112,14 +112,52 @@ async function localFetch<T>(url: string, ms = 6000): Promise<T | null> {
   } catch { clearTimeout(t); return null; }
 }
 
-async function getDefiLlamaData() {
-  const raw = await localFetch<unknown[]>('https://api.llama.fi/protocols');
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((p: unknown) => { const x = p as Record<string, unknown>; return (x.chains as string[] | undefined)?.includes('Solana') && (x.tvl as number) > 1_000_000; })
-    .sort((a: unknown, b: unknown) => ((b as Record<string, number>).tvl) - ((a as Record<string, number>).tvl))
-    .slice(0, 10)
-    .map((p: unknown) => { const x = p as Record<string, unknown>; return { name: x.name, tvl: x.tvl, c1d: x.change_1d, c7d: x.change_7d }; });
+interface DefiPool {
+  project: string; symbol: string; apy: number; apyBase: number; apyReward: number;
+  tvlUsd: number; il7d: number | null; stablecoin: boolean; apyPct7D: number | null;
+}
+interface DefiProto { name: string; tvl: number; c1d: number; c7d: number; }
+interface DefiData { pools: DefiPool[]; protocols: DefiProto[]; }
+
+async function getDefiLlamaData(): Promise<DefiData> {
+  // Fetch both endpoints in parallel
+  type PoolsResp = { status: string; data: Record<string, unknown>[] };
+  type ProtoResp = Record<string, unknown>[];
+
+  const [poolsRaw, protosRaw] = await Promise.all([
+    localFetch<PoolsResp>('https://yields.llama.fi/pools'),
+    localFetch<ProtoResp>('https://api.llama.fi/protocols'),
+  ]);
+
+  // Top yield pools on Solana (min $1M TVL, max APY 300% to filter outliers)
+  const pools: DefiPool[] = Array.isArray(poolsRaw?.data)
+    ? (poolsRaw!.data as Record<string, unknown>[])
+        .filter(p => p.chain === 'Solana' && Number(p.tvlUsd) > 1_000_000 && Number(p.apy) < 300 && !p.outlier)
+        .sort((a, b) => Number(b.apy) - Number(a.apy))
+        .slice(0, 12)
+        .map(p => ({
+          project: String(p.project ?? ''),
+          symbol: String(p.symbol ?? ''),
+          apy: Number(p.apy ?? 0),
+          apyBase: Number(p.apyBase ?? 0),
+          apyReward: Number(p.apyReward ?? 0),
+          tvlUsd: Number(p.tvlUsd ?? 0),
+          il7d: p.il7d != null ? Number(p.il7d) : null,
+          stablecoin: Boolean(p.stablecoin),
+          apyPct7D: p.apyPct7D != null ? Number(p.apyPct7D) : null,
+        }))
+    : [];
+
+  // Top protocols on Solana by TVL
+  const protocols: DefiProto[] = Array.isArray(protosRaw)
+    ? (protosRaw as Record<string, unknown>[])
+        .filter(p => (p.chains as string[] | undefined)?.includes('Solana') && Number(p.tvl) > 1_000_000)
+        .sort((a, b) => Number(b.tvl) - Number(a.tvl))
+        .slice(0, 8)
+        .map(p => ({ name: String(p.name), tvl: Number(p.tvl), c1d: Number(p.change_1d ?? 0), c7d: Number(p.change_7d ?? 0) }))
+    : [];
+
+  return { pools, protocols };
 }
 
 function fmtB(n: number) { return n >= 1e9 ? `$${(n / 1e9).toFixed(2)}B` : `$${(n / 1e6).toFixed(1)}M`; }
@@ -140,9 +178,40 @@ function buildPrompt(serviceId: string, inputs: Record<string, string>, marketDa
       return `DADOS AO VIVO — ${new Date().toUTCString()}:\n${lines.join('\n')}\n\nEsses são preços REAIS coletados agora. Use exatamente esses valores na sua análise.\n\nForneça:\n1. Sinal de trade: COMPRA / VENDA / NEUTRO para SOL com justificativa objetiva baseada nesses números\n2. Suporte e resistência para SOL (calcule % abaixo/acima do preço atual acima)\n3. Anomalia de volume ou preço relevante\n4. Posicionamento recomendado para as próximas 24h\nSeja direto. JAMAIS invente preços — use apenas os valores listados acima.`;
     }
     case 'defi-yield': {
-      const protos = marketData as { name: unknown; tvl: unknown; c1d?: unknown; c7d?: unknown }[];
-      const list = protos.map(p => `${p.name}: TVL ${fmtB(Number(p.tvl))} | 1d: ${(Number(p.c1d) || 0).toFixed(1)}% | 7d: ${(Number(p.c7d) || 0).toFixed(1)}%`).join('\n');
-      return `Protocolos DeFi Solana (DeFiLlama, dados ao vivo):\n${list}\n\nAnalise e responda:\n1. Qual protocolo oferece melhor oportunidade de yield agora? Por quê?\n2. Qual tem o melhor equilíbrio risco/retorno considerando os TVLs?\n3. Algum protocolo com TVL caindo forte — alerta de risco?\n4. Recomendação final para quem quer maximizar yield esta semana.`;
+      const d = marketData as DefiData;
+      if (!d || (d.pools.length === 0 && d.protocols.length === 0)) {
+        return 'ERRO: DeFiLlama indisponível. Informe o usuário e sugira tentar novamente.';
+      }
+
+      const poolLines = d.pools.map(p =>
+        `${p.project} [${p.symbol}]: APY ${p.apy.toFixed(1)}%` +
+        (p.apyBase ? ` (base ${p.apyBase.toFixed(1)}% + rewards ${p.apyReward.toFixed(1)}%)` : '') +
+        ` | TVL ${fmtB(p.tvlUsd)}` +
+        (p.il7d != null ? ` | IL7d: ${p.il7d.toFixed(2)}%` : '') +
+        (p.stablecoin ? ' | STABLECOIN' : '') +
+        (p.apyPct7D != null ? ` | APY 7d: ${p.apyPct7D >= 0 ? '+' : ''}${p.apyPct7D.toFixed(1)}%` : '')
+      ).join('\n');
+
+      const protoLines = d.protocols.map(p =>
+        `${p.name}: TVL ${fmtB(p.tvl)} | 1d: ${p.c1d >= 0 ? '+' : ''}${p.c1d.toFixed(1)}% | 7d: ${p.c7d >= 0 ? '+' : ''}${p.c7d.toFixed(1)}%`
+      ).join('\n');
+
+      return `DADOS AO VIVO — DeFiLlama · ${new Date().toUTCString()}
+
+TOP POOLS POR APY (Solana, mín $1M TVL):
+${poolLines}
+
+TOP PROTOCOLOS POR TVL (Solana):
+${protoLines}
+
+Esses são dados REAIS coletados agora de DeFiLlama. Use os valores exatos acima.
+
+Analise e responda com precisão:
+1. Top 3 melhores pools agora considerando APY + TVL + risco (IL, rewards inflacionários)
+2. Melhor opção para perfil conservador (stablecoin ou baixo IL)
+3. Algum protocolo com TVL caindo forte esta semana — alerta de saída?
+4. Estratégia de alocação recomendada para maximizar yield com risco controlado.
+JAMAIS invente APY ou TVL — use apenas os números acima.`;
     }
     case 'wallet-intel': {
       const addr = inputs.address || '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs';
@@ -270,8 +339,9 @@ export async function POST(req: NextRequest) {
       const srcSummary = prices.map(p => `${p.token}($${p.price.toFixed(2)}, ${p.confidence} fontes)`).join(' · ');
       steps.push(srcSummary || 'Dados coletados');
     } else if (serviceId === 'defi-yield') {
-      marketData = await getDefiLlamaData();
-      steps.push('DeFiLlama: protocolos carregados');
+      const defi = await getDefiLlamaData();
+      marketData = defi;
+      steps.push(`DeFiLlama: ${defi.pools.length} pools · ${defi.protocols.length} protocolos carregados`);
     } else if (serviceId === 'sentiment-scan') {
       const prices = await getMultiSourcePrices(['SOL', 'BTC', 'ETH']);
       marketData = prices;
