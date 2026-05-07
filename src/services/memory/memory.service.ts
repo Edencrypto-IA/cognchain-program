@@ -49,6 +49,7 @@ export async function saveMemory(input: MemoryCreateInput): Promise<MemoryEntry>
       model: input.model,
       timestamp,
       parentHash: input.parentHash || null,
+      clientId: input.clientId ?? null,
       verified: false,
     },
     update: {}, // Don't overwrite existing data

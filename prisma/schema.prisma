@@ -42,10 +42,13 @@ model Memory {
   zkHashAlgo String?
   zkGeneratedAt Int?
   poiTxHash  String?       // Solana TX quando PoI é atingido
+  clientId   String?       // null = global (agent/pay), set = per-user chat session
   createdAt  DateTime      @default(now())
   children   Memory[]      @relation("MemoryTree")
   parent     Memory?       @relation("MemoryTree", fields: [parentHash], references: [hash])
   votes      InsightVote[]
+
+  @@index([clientId])
 }
 
 // Proof of Insight — votos humanos que validam memórias AI

@@ -1,19 +1,38 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getClientId, buildClientIdCookie, generateClientId } from '@/lib/client-id';
+
+const MEMORY_LIMIT = 60;
 
 function modelKey(model: string) {
   const keys = ['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'glm', 'minimax', 'qwen'];
   return keys.find(k => model.toLowerCase().includes(k)) ?? 'other';
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const cookieHeader = request.headers.get('cookie');
+  let clientId = getClientId(cookieHeader);
+  let newCookie: string | null = null;
+  if (!clientId) { clientId = generateClientId(); newCookie = buildClientIdCookie(clientId); }
+
+  // Fetch chat memories scoped to this client (most recent 60) + any legacy null-clientId records
   const memories = await db.memory.findMany({
+    where: {
+      OR: [
+        { clientId },
+        { clientId: null },  // backward compat for data before isolation
+      ],
+    },
     select: {
       hash: true, content: true, model: true, timestamp: true,
       parentHash: true, score: true, verified: true, zkVerified: true, poiTxHash: true,
     },
-    orderBy: { timestamp: 'asc' },
+    orderBy: { timestamp: 'desc' },
+    take: MEMORY_LIMIT,
   });
+
+  // Reverse to chronological order for graph link building (was fetched desc for LIMIT)
+  memories.reverse();
 
   const WELCOME_PATTERNS = [
     /^(assistant:\s*)?(olá|ola)[\s!].*sou o (congchain|cognchain)/i,
@@ -124,5 +143,7 @@ export async function GET() {
     if (degree === 0) addLink(filteredMems[i].hash, filteredMems[i + 1].hash, 'temporal', 0.2);
   }
 
-  return NextResponse.json({ nodes, links });
+  const resp = NextResponse.json({ nodes, links });
+  if (newCookie) resp.headers.set('Set-Cookie', newCookie);
+  return resp;
 }

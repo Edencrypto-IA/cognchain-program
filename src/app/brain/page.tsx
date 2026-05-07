@@ -122,8 +122,9 @@ function AgentMemoryCard({ card, onClick }: { card: AgentCard; onClick: () => vo
 }
 
 // ─── Agent Detail Modal ────────────────────────────────────────────────────────
-function AgentDetailModal({ card, onClose }: { card: AgentCard; onClose: () => void }) {
+function AgentDetailModal({ card, onClose, onDeleted }: { card: AgentCard; onClose: () => void; onDeleted: (hash: string) => void }) {
   const [copied, setCopied] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const mk = Object.keys({ gpt:1,claude:1,nvidia:1,gemini:1,deepseek:1,glm:1,minimax:1,qwen:1 })
     .find(k => card.model.toLowerCase().includes(k)) ?? 'nvidia';
   const color = ({ gpt:'#10A37F',claude:'#9945FF',nvidia:'#76B900',gemini:'#4285F4',deepseek:'#FF6B35',glm:'#00D1FF',minimax:'#FF6B9D',qwen:'#A855F7' } as Record<string,string>)[mk] ?? '#888';
@@ -156,7 +157,19 @@ function AgentDetailModal({ card, onClose }: { card: AgentCard; onClose: () => v
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors text-xl">×</button>
+          <div className="flex items-center gap-2">
+            <button onClick={async () => {
+              if (!confirm('Apagar esta memória?')) return;
+              setDeleting(true);
+              await fetch(`/api/memory/${card.hash}`, { method: 'DELETE' });
+              onDeleted(card.hash);
+              onClose();
+            }} disabled={deleting}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-red-400/60 hover:text-red-400 hover:bg-red-400/10 border border-red-400/10 hover:border-red-400/25 transition-all disabled:opacity-40">
+              <Trash2 className="w-3 h-3" />{deleting ? 'Apagando…' : 'Apagar'}
+            </button>
+            <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors text-xl">×</button>
+          </div>
         </div>
 
         <div className="p-5 space-y-4">
@@ -978,7 +991,13 @@ export default function BrainPage() {
       </div>}
 
       {/* Agent detail modal */}
-      {selectedCard && <AgentDetailModal card={selectedCard} onClose={() => setSelectedCard(null)} />}
+      {selectedCard && (
+        <AgentDetailModal
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+          onDeleted={(hash) => setAgentCards(prev => prev.filter(c => c.hash !== hash))}
+        />
+      )}
 
       {/* Detail panel — full-screen on mobile, sidebar on desktop */}
       {selected && (

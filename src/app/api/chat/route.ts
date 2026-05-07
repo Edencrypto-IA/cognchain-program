@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { routeChat } from '@/services/ai';
 import { saveMemory, chunkContent } from '@/services/memory';
+import { getClientId, buildClientIdCookie, generateClientId } from '@/lib/client-id';
 import { checkRateLimit, validateModel, Limits, safeErrorMessage, MODEL_TIER } from '@/lib/security';
 import { needsGrounding, groundQuery } from '@/lib/grounding';
 import { getCachedResponse, cacheResponse, seedFAQCache } from '@/services/cache/response-cache';
@@ -144,6 +145,12 @@ export async function POST(request: NextRequest) {
       await cacheResponse(lastUserMessage.content, response, selectedModel).catch(() => {});
     }
 
+    // Resolve or create clientId for memory isolation
+    const cookieHeader = request.headers.get('cookie');
+    let clientId = getClientId(cookieHeader);
+    let newCookieHeader: string | null = null;
+    if (!clientId) { clientId = generateClientId(); newCookieHeader = buildClientIdCookie(clientId); }
+
     let memoryHash: string | null = null;
     let chunkCount = 0;
     if (saveResponse) {
@@ -151,6 +158,7 @@ export async function POST(request: NextRequest) {
       const memory = await saveMemory({
         content: fullContent.substring(0, Limits.MAX_CONTENT_LENGTH),
         model: selectedModel,
+        clientId,
       });
       memoryHash = memory.hash;
 
@@ -158,13 +166,16 @@ export async function POST(request: NextRequest) {
       chunkCount = chunks.length;
     }
 
-    return NextResponse.json({
+    const jsonResp = NextResponse.json({
       response,
       model: selectedModel,
       memoryHash,
+      clientId,
       chunkCount: chunkCount || undefined,
       structuredResponse: structuredResponse ?? undefined,
     });
+    if (newCookieHeader) jsonResp.headers.set('Set-Cookie', newCookieHeader);
+    return jsonResp;
   } catch (error: unknown) {
     const status = error instanceof Error && error.name === 'ValidationError' ? 400 : 500;
     return NextResponse.json({ error: safeErrorMessage(error) }, { status });

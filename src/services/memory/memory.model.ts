@@ -19,6 +19,7 @@ export interface MemoryCreateInput {
   content: string;
   model: string;
   parentHash?: string | null;
+  clientId?: string | null;
 }
 
 export interface MemoryScoreInput {
