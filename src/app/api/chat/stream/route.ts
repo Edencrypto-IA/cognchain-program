@@ -39,12 +39,15 @@ function enc(text: string) {
 function encDone(extra?: object) {
   return new TextEncoder().encode(`data: ${JSON.stringify({ done: true, ...extra })}\n\n`);
 }
+function encError(message: string) {
+  return new TextEncoder().encode(`data: ${JSON.stringify({ error: message, done: true })}\n\n`);
+}
 
-async function streamOpenAI(messages: { role: string; content: string }[], model: string, controller: ReadableStreamDefaultController) {
+async function streamOpenAI(messages: { role: string; content: string }[], model: string, system: string, controller: ReadableStreamDefaultController) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const stream = await client.chat.completions.create({
     model,
-    messages: [{ role: 'system', content: SYSTEM }, ...messages] as never,
+    messages: [{ role: 'system', content: system }, ...messages] as never,
     stream: true,
     max_tokens: 1500,
   });
@@ -56,12 +59,12 @@ async function streamOpenAI(messages: { role: string; content: string }[], model
   return full;
 }
 
-async function streamAnthropic(messages: { role: string; content: string }[], controller: ReadableStreamDefaultController) {
+async function streamAnthropic(messages: { role: string; content: string }[], system: string, controller: ReadableStreamDefaultController) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const stream = await client.messages.create({
     model: 'claude-opus-4-7',
     max_tokens: 1500,
-    system: SYSTEM,
+    system,
     messages: messages as never,
     stream: true,
   });
@@ -75,11 +78,11 @@ async function streamAnthropic(messages: { role: string; content: string }[], co
   return full;
 }
 
-async function streamOpenAICompat(messages: { role: string; content: string }[], model: string, baseURL: string, apiKey: string, controller: ReadableStreamDefaultController) {
+async function streamOpenAICompat(messages: { role: string; content: string }[], model: string, baseURL: string, apiKey: string, system: string, controller: ReadableStreamDefaultController) {
   const client = new OpenAI({ apiKey, baseURL });
   const stream = await client.chat.completions.create({
     model,
-    messages: [{ role: 'system', content: SYSTEM }, ...messages] as never,
+    messages: [{ role: 'system', content: system }, ...messages] as never,
     stream: true,
     max_tokens: 1500,
   });
@@ -135,6 +138,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         let full = '';
+        console.log(`[chat:stream] start model=${selectedModel}`);
 
         // Grounding with live status events
         let groundingPrefix = '';
@@ -165,11 +169,11 @@ export async function POST(req: NextRequest) {
           : messages;
         const validMsgs = augmented.map((m: { role: string; content: string }) => ({ role: m.role, content: String(m.content).slice(0, Limits.MAX_PROMPT_LENGTH) }));
         if (selectedModel === 'gpt') {
-          full = await streamOpenAI(validMsgs, 'gpt-4o', controller);
+          full = await streamOpenAI(validMsgs, 'gpt-4o', SYSTEM, controller);
         } else if (selectedModel === 'claude') {
-          full = await streamAnthropic(validMsgs, controller);
+          full = await streamAnthropic(validMsgs, SYSTEM, controller);
         } else if (selectedModel === 'deepseek') {
-          full = await streamOpenAICompat(validMsgs, 'deepseek-chat', 'https://api.deepseek.com', process.env.DEEPSEEK_API_KEY ?? '', controller);
+          full = await streamOpenAICompat(validMsgs, 'deepseek-chat', 'https://api.deepseek.com', process.env.DEEPSEEK_API_KEY ?? '', SYSTEM, controller);
         } else if (selectedModel === 'gemini') {
           // Gemini via OpenAI-compatible endpoint
           const { GoogleGenerativeAI } = await import('@google/generative-ai');
@@ -191,13 +195,17 @@ export async function POST(req: NextRequest) {
             qwen:    { url: 'https://integrate.api.nvidia.com/v1', name: 'qwen/qwen3-next-80b-a3b-instruct', key: process.env.NVIDIA_QWEN_KEY ?? '' },
           };
           const cfg = modelMap[selectedModel] ?? modelMap.nvidia;
-          full = await streamOpenAICompat(validMsgs, cfg.name, cfg.url, cfg.key, controller);
+          full = await streamOpenAICompat(validMsgs, cfg.name, cfg.url, cfg.key, SYSTEM, controller);
         }
 
+        console.log(`[chat:stream] done model=${selectedModel} chars=${full.length}`);
         controller.enqueue(encDone({ model: selectedModel, structuredResponse }));
       } catch (err) {
-        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[chat:stream] error model=${selectedModel}`, message);
+        controller.enqueue(encError(message));
       } finally {
+        console.log(`[chat:stream] close model=${selectedModel}`);
         controller.close();
       }
     },
@@ -207,6 +215,7 @@ export async function POST(req: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
+      'X-Accel-Buffering': 'no',
       'Connection': 'keep-alive',
     },
   });

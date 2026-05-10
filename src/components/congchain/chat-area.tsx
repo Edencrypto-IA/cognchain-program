@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useToast } from '@/hooks/use-toast';
 import {
   Send, ArrowDown,
@@ -16,6 +17,7 @@ import type { StructuredResponse } from '@/lib/grounding/types';
 import dynamic from 'next/dynamic';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
+type ChatPhase = 'idle' | 'connecting' | 'thinking' | 'streaming' | 'completed' | 'error';
 
 // ============================================================
 // DESIGN LOCK: Original UI preserved. Only additive features.
@@ -45,6 +47,54 @@ interface Message {
 // ============================================================
 // Chat Message — with performance badge + score
 // ============================================================
+function ThinkingPanel({ phase, status, thoughts, showReasoning, onToggle }: {
+  phase: ChatPhase;
+  status: string;
+  thoughts: string[];
+  showReasoning: boolean;
+  onToggle: () => void;
+}) {
+  if (!['connecting', 'thinking'].includes(phase)) return null;
+
+  return (
+    <div className="flex gap-4 px-4 md:px-6 lg:px-8">
+      <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-visible">
+        <Orb mode="thinking" size="sm" interactive={false} />
+      </div>
+      <div className="flex-1 max-w-[85%] md:max-w-[70%]">
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="text-xs font-semibold text-white/60">CONGCHAIN</span>
+          <button
+            onClick={onToggle}
+            className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-white/35 hover:text-white/60 hover:border-[#9945FF]/30 transition-colors"
+          >
+            {showReasoning ? 'Hide reasoning' : 'Show reasoning'}
+          </button>
+        </div>
+        <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl px-4 py-3 shadow-lg shadow-black/10">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#9945FF] animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <span className="text-[12px] text-white/45 transition-all duration-300">{status || 'Thinking...'}</span>
+          </div>
+          {showReasoning && thoughts.length > 0 && (
+            <div className="mt-3 space-y-2 border-t border-white/[0.06] pt-3">
+              {thoughts.slice(-4).map((thought, index) => (
+                <div key={`${thought}-${index}`} className="rounded-xl bg-[#9945FF]/[0.07] border border-[#9945FF]/10 px-3 py-2 text-[12px] leading-relaxed text-white/50 animate-in fade-in duration-300">
+                  {thought}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, onCompare, onScore, onCopyHash, onAudit }: {
   message: Message;
   isLatest?: boolean;
@@ -144,14 +194,14 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
                       components={{
                         code({ className, children, ...props }) {
                           const isBlock = className?.includes('language-');
-                          const [copied, setCopied] = useState(false);
+                          const copied = false;
                           const code = String(children).replace(/\n$/, '');
                           if (!isBlock) return <code className="font-mono text-[#14F195] bg-[#14F195]/10 px-1.5 py-0.5 rounded text-[13px]" {...props}>{children}</code>;
                           return (
                             <div className="relative group">
                               <div className="flex items-center justify-between px-4 py-1.5 bg-white/[0.04] border-b border-white/[0.06] rounded-t-xl">
                                 <span className="text-[10px] text-white/30 font-mono">{className?.replace('language-', '') ?? 'code'}</span>
-                                <button onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+                                <button onClick={() => { navigator.clipboard.writeText(code).catch(() => {}); }}
                                   className="text-[10px] text-white/40 hover:text-[#14F195] transition-colors">
                                   {copied ? '✅ Copiado' : '📋 Copiar'}
                                 </button>
@@ -1275,11 +1325,8 @@ function EvolutionTimeline({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 // ============================================================
 // ── Upgrade Modal ─────────────────────────────────────────────
 function UpgradeModal({ model, onClose }: { model: string; onClose: () => void }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-  if (!mounted) return null;
+  if (typeof document === 'undefined') return null;
 
-  const { createPortal } = require('react-dom');
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
@@ -1442,12 +1489,19 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [isWalletConnecting, setIsWalletConnecting] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [thinkingStatus, setThinkingStatus] = useState('Analisando...');
+  const [chatPhase, setChatPhase] = useState<ChatPhase>('idle');
+  const [reasoningChunks, setReasoningChunks] = useState<string[]>([]);
+  const [showReasoning, setShowReasoning] = useState(false);
   const [showSolanaOverlay, setShowSolanaOverlay] = useState(false);
   const [solanaTxHash, setSolanaTxHash] = useState<string | null>(null);
   const [auditHash, setAuditHash] = useState<string | null>(null);
   const [auditModel, setAuditModel] = useState<string | undefined>(undefined);
   const [streamedContent, setStreamedContent] = useState('');
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const streamWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamFrameRef = useRef<number | null>(null);
+  const pendingStreamContentRef = useRef('');
   const sessionIdRef = useRef(activeConvId ?? `sess_${Date.now()}`);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -1467,14 +1521,26 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
   // Cleanup streaming interval on unmount
   useEffect(() => {
-    return () => { if (streamIntervalRef.current) clearInterval(streamIntervalRef.current); };
+    return () => {
+      if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+      if (streamWatchdogRef.current) clearTimeout(streamWatchdogRef.current);
+      if (streamFrameRef.current) cancelAnimationFrame(streamFrameRef.current);
+      streamAbortRef.current?.abort();
+    };
   }, []);
 
   // Nova conversa — limpa mensagens e estado
   const handleNewChat = useCallback(() => {
     if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+    if (streamWatchdogRef.current) clearTimeout(streamWatchdogRef.current);
+    if (streamFrameRef.current) cancelAnimationFrame(streamFrameRef.current);
+    streamAbortRef.current?.abort();
     setStreamingId(null);
     setStreamedContent('');
+    pendingStreamContentRef.current = '';
+    streamFrameRef.current = null;
+    setChatPhase('idle');
+    setReasoningChunks([]);
     setIsTyping(false);
     setContextActive(false);
     setOrbMode('idle');
@@ -1539,6 +1605,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setOrbMode('thinking');
+    setChatPhase('connecting');
+    setThinkingStatus('Conectando ao stream...');
+    setReasoningChunks([]);
 
     // Register session in history — must be outside setMessages updater (React rule)
     if (onSessionUpdate) {
@@ -1556,7 +1625,17 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90000);
+      streamAbortRef.current?.abort();
+      streamAbortRef.current = controller;
+      const resetWatchdog = () => {
+        if (streamWatchdogRef.current) clearTimeout(streamWatchdogRef.current);
+        streamWatchdogRef.current = setTimeout(() => {
+          console.warn('[chat-stream] watchdog timeout');
+          controller.abort();
+        }, 90000);
+      };
+      resetWatchdog();
+      console.log('[chat-stream] request:start', { model: selectedModel });
       const res = await fetch('/api/chat/stream', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1565,11 +1644,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         }),
         signal: controller.signal,
       });
-      clearTimeout(timeout);
 
       if (!res.ok || !res.body) throw new Error('Stream failed');
 
-      setOrbMode('typing');
       const msgId = (Date.now() + 1).toString();
       const assistantMsg: Message = {
         id: msgId, role: 'assistant', content: '',
@@ -1582,63 +1659,149 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setMessages(prev => [...prev, assistantMsg]);
       setStreamingId(msgId);
       setStreamedContent('');
+      setChatPhase('thinking');
 
       // Real token streaming
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let accumulated = '';
+      let sseBuffer = '';
       let fullContent = '';
+      let finalized = false;
+      let finalStructuredResponse: StructuredResponse | undefined;
+      pendingStreamContentRef.current = '';
+
+      const flushStreamContent = () => {
+        streamFrameRef.current = null;
+        setStreamedContent(pendingStreamContentRef.current);
+      };
+
+      const scheduleStreamContent = (content: string) => {
+        pendingStreamContentRef.current = content;
+        if (streamFrameRef.current !== null) return;
+        streamFrameRef.current = requestAnimationFrame(flushStreamContent);
+      };
+
+      const finalizeStream = (reason: 'done' | 'closed' | 'error', errorMessage?: string) => {
+        if (finalized) return;
+        finalized = true;
+        if (streamWatchdogRef.current) clearTimeout(streamWatchdogRef.current);
+        if (streamFrameRef.current) cancelAnimationFrame(streamFrameRef.current);
+        streamWatchdogRef.current = null;
+        streamFrameRef.current = null;
+        streamAbortRef.current = null;
+        reader.releaseLock();
+        setStreamingId(null);
+        setStreamedContent('');
+        pendingStreamContentRef.current = '';
+        setThinkingStatus('Analisando...');
+        setChatPhase(reason === 'error' ? 'error' : 'completed');
+        const responseTime = Date.now() - startTime;
+        const content = fullContent || errorMessage || 'A resposta terminou sem conteudo. Tente novamente ou troque de modelo.';
+        setMessages(prev => {
+          const updated = prev.map(m => m.id === msgId ? {
+            ...m, content,
+            orbMode: reason === 'error' ? 'error' as OrbMode : 'success' as OrbMode,
+            responseTime,
+            tokensUsed: Math.ceil(content.length / 3.5),
+            structuredResponse: finalStructuredResponse,
+          } : m);
+          if (onSessionUpdate) {
+            const firstUser = updated.find(m => m.role === 'user');
+            const title = firstUser
+              ? firstUser.content.slice(0, 55) + (firstUser.content.length > 55 ? '...' : '')
+              : 'Conversa';
+            onSessionUpdate({
+              id: sessionIdRef.current, title,
+              lastMessage: content.slice(0, 45) + (content.length > 45 ? '...' : ''),
+              timestamp: 'Agora',
+            });
+          }
+          return updated;
+        });
+        setOrbMode(reason === 'error' ? 'error' : 'idle');
+        if (reason === 'error') setTimeout(() => setOrbMode('idle'), 1500);
+        setIsTyping(false);
+        console.log('[chat-stream] finalize', { reason, chars: content.length });
+      };
+
+      const handleEvent = (evt: { status?: string; token?: string; done?: boolean; error?: string; structuredResponse?: StructuredResponse }) => {
+        if (evt.status) {
+          setChatPhase('thinking');
+          setThinkingStatus(evt.status);
+          setReasoningChunks(prev => {
+            if (prev[prev.length - 1] === evt.status) return prev;
+            return [...prev, evt.status!].slice(-8);
+          });
+          console.log('[chat-stream] status', evt.status);
+        }
+        if (evt.token) {
+          setChatPhase('streaming');
+          setOrbMode('typing');
+          fullContent += evt.token;
+          scheduleStreamContent(fullContent);
+        }
+        if (evt.structuredResponse) {
+          finalStructuredResponse = evt.structuredResponse;
+        }
+        if (evt.error) {
+          console.error('[chat-stream] event:error', evt.error);
+          finalizeStream('error', `Stream error: ${evt.error}`);
+          return;
+        }
+        if (evt.done) {
+          finalizeStream('done');
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        const lines = accumulated.split('\n');
-        accumulated = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
+        if (done) {
+          const tail = decoder.decode();
+          if (tail) sseBuffer += tail;
+          break;
+        }
+        resetWatchdog();
+        sseBuffer += decoder.decode(value, { stream: true });
+        const events = sseBuffer.split('\n\n');
+        sseBuffer = events.pop() ?? '';
+        for (const rawEvent of events) {
+          const data = rawEvent
+            .split('\n')
+            .filter(line => line.startsWith('data:'))
+            .map(line => line.replace(/^data:\s?/, ''))
+            .join('\n');
+          if (!data) continue;
           try {
-            const evt = JSON.parse(line.slice(6));
-            if (evt.status) {
-              setThinkingStatus(evt.status);
-            }
-            if (evt.token) {
-              fullContent += evt.token;
-              setStreamedContent(fullContent);
-            }
-            if (evt.done) {
-              setThinkingStatus('Analisando...');
-              clearTimeout(timeout);
-              setStreamingId(null);
-              const responseTime = Date.now() - startTime;
-              setMessages(prev => {
-                const updated = prev.map(m => m.id === msgId ? {
-                  ...m, content: fullContent,
-                  responseTime, tokensUsed: Math.ceil(fullContent.length / 3.5),
-                  structuredResponse: evt.structuredResponse ?? undefined,
-                } : m);
-                if (onSessionUpdate) {
-                  const firstUser = updated.find(m => m.role === 'user');
-                  const title = firstUser
-                    ? firstUser.content.slice(0, 55) + (firstUser.content.length > 55 ? '...' : '')
-                    : 'Conversa';
-                  onSessionUpdate({
-                    id: sessionIdRef.current, title,
-                    lastMessage: fullContent.slice(0, 45) + (fullContent.length > 45 ? '...' : ''),
-                    timestamp: 'Agora',
-                  });
-                }
-                return updated;
-              });
-              setOrbMode('idle');
-              setIsTyping(false);
-            }
-          } catch { /* malformed SSE line */ }
+            handleEvent(JSON.parse(data));
+            if (finalized) break;
+          } catch (parseError) {
+            console.warn('[chat-stream] malformed event', parseError);
+          }
+        }
+        if (finalized) break;
+      }
+      if (!finalized && sseBuffer.trim()) {
+        const data = sseBuffer
+          .split('\n')
+          .filter(line => line.startsWith('data:'))
+          .map(line => line.replace(/^data:\s?/, ''))
+          .join('\n');
+        if (data) {
+          try { handleEvent(JSON.parse(data)); } catch { /* ignore trailing partial */ }
         }
       }
+      if (!finalized) finalizeStream(fullContent ? 'closed' : 'error', 'The stream closed before the final chunk arrived.');
     } catch (err: unknown) {
       if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+      if (streamWatchdogRef.current) clearTimeout(streamWatchdogRef.current);
+      if (streamFrameRef.current) cancelAnimationFrame(streamFrameRef.current);
+      streamWatchdogRef.current = null;
+      streamFrameRef.current = null;
+      streamAbortRef.current = null;
       setStreamingId(null);
+      setStreamedContent('');
+      pendingStreamContentRef.current = '';
+      setChatPhase('error');
       setOrbMode('error');
       const isTimeout = err instanceof Error && err.name === 'AbortError';
       const errorMsg = isTimeout
@@ -1653,8 +1816,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setMessages(prev => [...prev, errMsg]);
       setOrbMode('idle');
       setIsTyping(false);
+      console.error('[chat-stream] request:error', err);
     }
-  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, toast]);
+  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages]);
 
   // Save memory API — #6 microcopy
   const handleSave = useCallback(async (msg: Message) => {
@@ -2232,14 +2396,25 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
             </div>
           ) : (
             <div className="py-6 space-y-6">
-              {messages.map((msg, idx) => (
-                <ChatMessage key={msg.id} message={msg}
-                  isLatest={idx === messages.length - 1 && msg.role === 'assistant'}
-                  isStreaming={streamingId === msg.id}
-                  streamedContent={streamingId === msg.id ? streamedContent : undefined}
-                  onSave={handleSave} onCompare={handleCompare} onScore={handleScoreOpen} onCopyHash={handleCopyHash} onAudit={handleAudit} />
-              ))}
-              {isTyping && !streamingId && (
+              {messages.map((msg, idx) => {
+                const isStreamingMessage = streamingId === msg.id;
+                if (isStreamingMessage && !streamedContent) return null;
+                return (
+                  <ChatMessage key={msg.id} message={msg}
+                    isLatest={idx === messages.length - 1 && msg.role === 'assistant'}
+                    isStreaming={isStreamingMessage}
+                    streamedContent={isStreamingMessage ? streamedContent : undefined}
+                    onSave={handleSave} onCompare={handleCompare} onScore={handleScoreOpen} onCopyHash={handleCopyHash} onAudit={handleAudit} />
+                );
+              })}
+              <ThinkingPanel
+                phase={chatPhase}
+                status={thinkingStatus}
+                thoughts={reasoningChunks}
+                showReasoning={showReasoning}
+                onToggle={() => setShowReasoning(v => !v)}
+              />
+              {isTyping && !streamingId && chatPhase === 'idle' && (
                 <div className="flex gap-4 px-4 md:px-6 lg:px-8">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-visible">
                     <Orb mode={orbMode} size="sm" interactive={false} />
