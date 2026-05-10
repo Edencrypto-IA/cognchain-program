@@ -2224,17 +2224,6 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         timestamp: ts(), orbMode: 'idle', model: 'gpt',
       }]);
       setSelectedModel('gpt');
-      setMessages(prev => [...prev, {
-        id: uid(),
-        role: 'assistant',
-        content: passportText(gptPassport, 'Claude'),
-        timestamp: ts(),
-        orbMode: 'success',
-        model: 'gpt',
-        memoryHash: hash1,
-        verified: true,
-        txHash: anchoredTxHash ?? undefined,
-      }]);
       setPreviousModel('gpt');
       setContextActive(false);
 
@@ -2308,6 +2297,17 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setPreviousModel('gpt');
       setSelectedModel('claude');
       setContextActive(true);
+      setMessages(prev => [...prev, {
+        id: uid(),
+        role: 'assistant',
+        content: passportText(gptPassport, 'Claude'),
+        timestamp: ts(),
+        orbMode: 'success',
+        model: 'gpt',
+        memoryHash: hash1,
+        verified: true,
+        txHash: anchoredTxHash ?? undefined,
+      }]);
       await delay(1200);
 
       // ── STEP 5: Claude continua com contexto ──────────────────
