@@ -30,6 +30,12 @@ type DemoStage = {
   txHash?: string;
   trustScore?: number;
 };
+type DemoMemoryPassport = {
+  hash: string;
+  model: string;
+  createdAt: string;
+  title: string;
+};
 
 // ============================================================
 // DESIGN LOCK: Original UI preserved. Only additive features.
@@ -162,8 +168,15 @@ function DemoCommandCenter({ stage, total }: { stage: DemoStage; total: number }
   );
 }
 
-function DemoFinaleOverlay({ stage, onClose }: { stage: DemoStage; onClose: () => void }) {
+function DemoFinaleOverlay({ stage, summary, onCopy, copied, onClose }: {
+  stage: DemoStage;
+  summary: string;
+  onCopy: () => void;
+  copied: boolean;
+  onClose: () => void;
+}) {
   if (!stage.visible || stage.phase !== 'finale') return null;
+  void summary;
 
   return (
     <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
@@ -202,6 +215,13 @@ function DemoFinaleOverlay({ stage, onClose }: { stage: DemoStage; onClose: () =
               The demo is not a chatbot trick. It is a live proof that AI memory can survive model switching, be verified on Solana, and become reusable infrastructure for agents.
             </p>
           </div>
+
+          <button
+            onClick={onCopy}
+            className="mt-4 w-full rounded-2xl border border-[#9945FF]/25 bg-[#9945FF]/10 px-4 py-3 text-sm font-semibold text-[#C084FC] transition-colors hover:border-[#14F195]/30 hover:bg-[#14F195]/10 hover:text-[#14F195]"
+          >
+            {copied ? 'Judge summary copied' : 'Copy judge summary'}
+          </button>
         </div>
       </div>
     </div>
@@ -2076,10 +2096,50 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     subtitle: '',
     phase: 'boot',
   });
+  const [demoJudgeSummary, setDemoJudgeSummary] = useState('');
+  const [demoSummaryCopied, setDemoSummaryCopied] = useState(false);
   const DEMO_TOTAL = 10;
+
+  const copyDemoJudgeSummary = useCallback(() => {
+    if (!demoJudgeSummary) return;
+    navigator.clipboard.writeText(demoJudgeSummary).then(() => {
+      setDemoSummaryCopied(true);
+      setTimeout(() => setDemoSummaryCopied(false), 1600);
+    }).catch(() => {});
+  }, [demoJudgeSummary]);
 
   const runAutoDemo = useCallback(async () => {
     setIsDemoRunning(true);
+    if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+    if (streamWatchdogRef.current) clearTimeout(streamWatchdogRef.current);
+    if (streamFrameRef.current) cancelAnimationFrame(streamFrameRef.current);
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    streamWatchdogRef.current = null;
+    streamFrameRef.current = null;
+    pendingStreamContentRef.current = '';
+    setStreamingId(null);
+    setStreamedContent('');
+    setIsTyping(false);
+    setChatPhase('idle');
+    setReasoningChunks([]);
+    setThinkingStatus('Analisando...');
+    setShowPanel(false);
+    setShowScoreModal(false);
+    setShowCompare(false);
+    setCompareResults([]);
+    setComparePrompt('');
+    setCompareLoading(false);
+    setShowTimeline(false);
+    setShowSwitchModal(false);
+    setSelectedMessage(null);
+    setAuditHash(null);
+    setHashError('');
+    setHashLoading(false);
+    setShowLangMenu(false);
+    setIsTranslating(false);
+    setDemoJudgeSummary('');
+    setDemoSummaryCopied(false);
     setDemoStage({
       visible: true,
       step: 0,
@@ -2103,11 +2163,19 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
     const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const stamp = () => new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
     const uid = () => (Date.now() + Math.random()).toString(36);
     const present = (stage: Partial<DemoStage>) => {
       setDemoStage(prev => ({ ...prev, visible: true, ...stage }));
     };
     let anchoredTxHash: string | null = null;
+
+    const passportText = (passport: DemoMemoryPassport, nextModel: string) => (
+      `### Memory passport received\n\n` +
+      `**${nextModel} is continuing from verified memory created by ${passport.model}.**\n\n` +
+      `| Field | Value |\n| --- | --- |\n| Source AI | ${passport.model} |\n| Memory title | ${passport.title} |\n| Memory hash | \`${passport.hash}\` |\n| Built at | ${passport.createdAt} |\n| Next AI | ${nextModel} |\n\n` +
+      `The next answer must build on this hash, not restart from an empty prompt.`
+    );
 
     const callChat = async (content: string, model: string, ctx?: string) => {
       try {
@@ -2156,6 +2224,17 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         timestamp: ts(), orbMode: 'idle', model: 'gpt',
       }]);
       setSelectedModel('gpt');
+      setMessages(prev => [...prev, {
+        id: uid(),
+        role: 'assistant',
+        content: passportText(gptPassport, 'Claude'),
+        timestamp: ts(),
+        orbMode: 'success',
+        model: 'gpt',
+        memoryHash: hash1,
+        verified: true,
+        txHash: anchoredTxHash ?? undefined,
+      }]);
       setPreviousModel('gpt');
       setContextActive(false);
 
@@ -2174,9 +2253,10 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       const d1 = await Promise.race([d1Promise, Promise.resolve(null)]);
       const gptContent = d1?.response || FALLBACKS.gpt1;
       const gptId = uid();
+      const gptCreatedAt = stamp();
       const gptMsg: Message = {
         id: gptId, role: 'assistant', content: gptContent,
-        timestamp: ts(), orbMode: 'success', model: 'gpt',
+        timestamp: gptCreatedAt, orbMode: 'success', model: 'gpt',
         responseTime: 2100, tokensUsed: 198,
       };
       setMessages(prev => [...prev, gptMsg]);
@@ -2188,6 +2268,12 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       present({ step: 2, title: 'Seal the memory fingerprint', subtitle: 'The answer becomes a content-addressed memory object with a stable hash.', phase: 'proof', trustScore: 28 });
       toast({ title: '▶ Demo 2/10', description: 'Salvando memória com hash SHA-256...' });
       const hash1 = d1?.memoryHash || await saveMemory(gptContent, 'gpt');
+      const gptPassport: DemoMemoryPassport = {
+        hash: hash1,
+        model: 'GPT-4o',
+        createdAt: gptCreatedAt,
+        title: 'Verifiable AI memory for Solana agents',
+      };
       setMessages(prev => prev.map(m => m.id === gptId ? { ...m, memoryHash: hash1 } : m));
       present({ hash: hash1, trustScore: 35 });
       toast({ title: '✓ Memory saved', description: `SHA-256: ${hash1.slice(0, 16)}...` });
@@ -2240,9 +2326,10 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       const d2 = await Promise.race([d2Promise, Promise.resolve(null)]);
       const claudeContent = d2?.response || FALLBACKS.claude1;
       const claudeId = uid();
+      const claudeCreatedAt = stamp();
       setMessages(prev => [...prev, {
         id: claudeId, role: 'assistant', content: claudeContent,
-        timestamp: ts(), orbMode: 'success', model: 'claude',
+        timestamp: claudeCreatedAt, orbMode: 'success', model: 'claude',
         responseTime: 3200, tokensUsed: 276,
         contextInjected: true, previousModel: 'gpt',
         contextSummary: 'GPT memory sobre Proof of Work injetado',
@@ -2255,6 +2342,12 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       present({ step: 6, title: 'Extend the memory chain', subtitle: 'Claude creates a child memory linked to the first verified insight.', phase: 'proof', primaryModel: 'Claude', trustScore: 82 });
       toast({ title: '▶ Demo 6/10', description: 'Salvando insight do Claude...' });
       const hash2 = d2?.memoryHash || await saveMemory(claudeContent, 'claude');
+      const claudePassport: DemoMemoryPassport = {
+        hash: hash2,
+        model: 'Claude',
+        createdAt: claudeCreatedAt,
+        title: 'Cross-model continuation of verified memory',
+      };
       setMessages(prev => prev.map(m => m.id === claudeId ? { ...m, memoryHash: hash2 } : m));
       toast({ title: '✓ Claude memory saved', description: `SHA-256: ${hash2.slice(0, 16)}...` });
       await delay(1000);
@@ -2263,6 +2356,16 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setDemoStep(7);
       present({ step: 7, title: 'Second model handoff', subtitle: 'Gemini receives a two-step memory trail and continues the same intelligence.', phase: 'handoff', primaryModel: 'Claude', secondaryModel: 'Gemini', trustScore: 86 });
       toast({ title: '▶ Demo 7/10', description: 'Gemini herda memórias do GPT + Claude...' });
+      setMessages(prev => [...prev, {
+        id: uid(),
+        role: 'assistant',
+        content: `${passportText(gptPassport, 'Gemini')}\n\n---\n\n${passportText(claudePassport, 'Gemini')}`,
+        timestamp: ts(),
+        orbMode: 'success',
+        model: 'claude',
+        memoryHash: hash2,
+        verified: true,
+      }]);
       setPreviousModel('claude');
       setSelectedModel('gemini');
       await delay(1200);
@@ -2315,10 +2418,12 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       // ── STEP 10: Conclusão ────────────────────────────────────
       setDemoStep(10);
       present({ step: 10, title: 'Verifiable AI continuity is live', subtitle: 'The memory survived model switching and produced a portable proof trail.', phase: 'finale', primaryModel: 'CONGCHAIN', secondaryModel: 'Solana', trustScore: 100 });
+      const judgeSummary = `CONGCHAIN turns AI output into verifiable memory infrastructure.\n\nDemo trail:\n- GPT-4o memory: ${gptPassport.hash}\n- GPT-4o built at: ${gptPassport.createdAt}\n- Claude memory: ${claudePassport.hash}\n- Claude built at: ${claudePassport.createdAt}\n- Solana anchor: ${anchoredTxHash ?? 'devnet proof path ready'}\n- ZK proof: generated for memory integrity\n\nOne insight moved across GPT-4o -> Claude -> Gemini while preserving a cryptographic trail. AI memory becomes portable, inspectable, and reusable by agents across models.`;
+      setDemoJudgeSummary(judgeSummary);
       setMessages(prev => [...prev, {
         id: uid(),
         role: 'assistant',
-        content: `### Judge summary\n\n**CONGCHAIN turns AI output into verifiable memory infrastructure.**\n\nIn this demo, one insight moved across **GPT-4o -> Claude -> Gemini** while preserving a cryptographic trail:\n\n- **Memory hash:** \`${hash1.slice(0, 18)}...\`\n- **Child memory:** \`${hash2.slice(0, 18)}...\`\n- **Solana anchor:** ${anchoredTxHash ? `\`${anchoredTxHash.slice(0, 18)}...\`` : 'devnet proof path ready'}\n- **Privacy layer:** ZK proof generated for memory integrity\n\nThis is the wow: AI memory becomes portable, inspectable, and reusable by agents across models.`,
+        content: `### Judge summary\n\n**CONGCHAIN turns AI output into verifiable memory infrastructure.**\n\nIn this demo, one insight moved across **GPT-4o -> Claude -> Gemini** while preserving a cryptographic trail:\n\n- **GPT-4o memory:** \`${gptPassport.hash}\`\n- **GPT-4o built at:** ${gptPassport.createdAt}\n- **Claude memory:** \`${claudePassport.hash}\`\n- **Claude built at:** ${claudePassport.createdAt}\n- **Solana anchor:** ${anchoredTxHash ? `\`${anchoredTxHash.slice(0, 18)}...\`` : 'devnet proof path ready'}\n- **Privacy layer:** ZK proof generated for memory integrity\n\nThis is the wow: AI memory becomes portable, inspectable, and reusable by agents across models.`,
         timestamp: ts(),
         orbMode: 'success',
         model: 'gemini',
@@ -2669,7 +2774,13 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       {showSolanaOverlay && (
         <SolanaOverlay txHash={solanaTxHash} onDone={() => setShowSolanaOverlay(false)} />
       )}
-      <DemoFinaleOverlay stage={demoStage} onClose={() => setDemoStage(prev => ({ ...prev, visible: false }))} />
+      <DemoFinaleOverlay
+        stage={demoStage}
+        summary={demoJudgeSummary}
+        onCopy={copyDemoJudgeSummary}
+        copied={demoSummaryCopied}
+        onClose={() => setDemoStage(prev => ({ ...prev, visible: false }))}
+      />
       {auditHash && (
         <MemoryAuditTrail hash={auditHash} model={auditModel} onClose={() => setAuditHash(null)} />
       )}
