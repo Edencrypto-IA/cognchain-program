@@ -786,6 +786,7 @@ function MemoryAuditTrail({ hash, model, onClose }: { hash: string; model?: stri
 function SolanaOverlay({ txHash, onDone }: { txHash: string | null; onDone: () => void }) {
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const onDoneRef = useRef(onDone);
 
   const steps = [
     'Generating SHA-256 hash...',
@@ -796,7 +797,11 @@ function SolanaOverlay({ txHash, onDone }: { txHash: string | null; onDone: () =
   ];
 
   useEffect(() => {
-    const timings =   [0, 400, 900, 1500, 2200];
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
+  useEffect(() => {
+    const timings =   [0, 250, 550, 900, 1300];
     const progresses = [15, 35,  60,   85,  100];
     const timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -804,9 +809,9 @@ function SolanaOverlay({ txHash, onDone }: { txHash: string | null; onDone: () =
       timers.push(setTimeout(() => { setStep(i); setProgress(progresses[i]); }, t));
     });
 
-    timers.push(setTimeout(onDone, 3000));
+    timers.push(setTimeout(() => onDoneRef.current(), 1800));
     return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -2286,7 +2291,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           setMessages(prev => prev.map(m => m.id === gptId ? { ...m, verified: true, txHash: d.txHash } : m));
         }
       }).catch(() => {});
-      await delay(3000); // overlay duration — demo pauses here
+      await delay(1800); // overlay duration — demo pauses here
       setOrbMode('idle');
       await delay(300);
 
