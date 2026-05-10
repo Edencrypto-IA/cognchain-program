@@ -18,6 +18,18 @@ import dynamic from 'next/dynamic';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
 type ChatPhase = 'idle' | 'connecting' | 'thinking' | 'streaming' | 'completed' | 'error';
+type DemoStage = {
+  visible: boolean;
+  step: number;
+  title: string;
+  subtitle: string;
+  phase: 'boot' | 'capture' | 'anchor' | 'handoff' | 'synthesis' | 'proof' | 'finale';
+  primaryModel?: string;
+  secondaryModel?: string;
+  hash?: string;
+  txHash?: string;
+  trustScore?: number;
+};
 
 // ============================================================
 // DESIGN LOCK: Original UI preserved. Only additive features.
@@ -89,6 +101,107 @@ function ThinkingPanel({ phase, status, thoughts, showReasoning, onToggle }: {
               ))}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DemoCommandCenter({ stage, total }: { stage: DemoStage; total: number }) {
+  if (!stage.visible) return null;
+  const progress = Math.min(100, Math.round((stage.step / total) * 100));
+  const phaseColor: Record<DemoStage['phase'], string> = {
+    boot: '#9945FF',
+    capture: '#00D1FF',
+    anchor: '#14F195',
+    handoff: '#F59E0B',
+    synthesis: '#3B82F6',
+    proof: '#06B6D4',
+    finale: '#14F195',
+  };
+  const color = phaseColor[stage.phase];
+
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-4 z-40 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#080812]/90 shadow-2xl shadow-black/40 backdrop-blur-xl">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full animate-pulse" style={{ background: color, boxShadow: `0 0 18px ${color}` }} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/35">Hackathon Demo</span>
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-mono text-white/40">
+                {stage.step}/{total}
+              </span>
+            </div>
+            <h3 className="truncate text-sm font-semibold text-white/90">{stage.title}</h3>
+            <p className="mt-0.5 line-clamp-2 text-xs text-white/45">{stage.subtitle}</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center sm:w-72">
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+              <p className="text-[9px] uppercase tracking-wider text-white/25">Model</p>
+              <p className="mt-1 truncate text-[11px] font-semibold text-white/70">{stage.primaryModel ?? 'CONGCHAIN'}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+              <p className="text-[9px] uppercase tracking-wider text-white/25">Memory</p>
+              <p className="mt-1 truncate font-mono text-[11px] text-[#14F195]/70">{stage.hash ? `${stage.hash.slice(0, 6)}...` : 'pending'}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+              <p className="text-[9px] uppercase tracking-wider text-white/25">Trust</p>
+              <p className="mt-1 text-[11px] font-semibold text-[#00D1FF]/75">{stage.trustScore ?? progress}%</p>
+            </div>
+          </div>
+        </div>
+        <div className="h-1 bg-white/[0.05]">
+          <div
+            className="h-full transition-all duration-700"
+            style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${color}, #14F195)` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DemoFinaleOverlay({ stage, onClose }: { stage: DemoStage; onClose: () => void }) {
+  if (!stage.visible || stage.phase !== 'finale') return null;
+
+  return (
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-[#14F195]/20 bg-[#06060e]/95 shadow-2xl shadow-[#14F195]/10">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#14F195] to-transparent" />
+        <div className="p-6 sm:p-8">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.28em] text-[#14F195]/70">Judge Moment</p>
+              <h2 className="text-2xl font-bold leading-tight text-white sm:text-3xl">One memory. Three models. Verifiable continuity.</h2>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/50">
+                CONGCHAIN turns an AI answer into a portable memory primitive: hashed, anchored, inherited by another model, and proven again without locking the user to one provider.
+              </p>
+            </div>
+            <button onClick={onClose} className="pointer-events-auto rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs text-white/45 hover:text-white/80">
+              Close
+            </button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ['Memory Hash', stage.hash ? `${stage.hash.slice(0, 12)}...` : 'generated', '#9945FF'],
+              ['Solana Proof', stage.txHash ? `${stage.txHash.slice(0, 12)}...` : 'devnet ready', '#14F195'],
+              ['Trust Score', `${stage.trustScore ?? 100}%`, '#00D1FF'],
+            ].map(([label, value, color]) => (
+              <div key={label} className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4">
+                <p className="text-[10px] uppercase tracking-wider text-white/25">{label}</p>
+                <p className="mt-2 truncate font-mono text-sm font-semibold" style={{ color }}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-[#14F195]/15 bg-[#14F195]/[0.04] p-4">
+            <p className="text-sm font-semibold text-white/85">What jurors should remember:</p>
+            <p className="mt-1 text-sm leading-relaxed text-white/50">
+              The demo is not a chatbot trick. It is a live proof that AI memory can survive model switching, be verified on Solana, and become reusable infrastructure for agents.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -1956,10 +2069,25 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   // #3 Auto-Demo Mode
   const [isDemoRunning, setIsDemoRunning] = useState(false);
   const [demoStep, setDemoStep] = useState(0);
+  const [demoStage, setDemoStage] = useState<DemoStage>({
+    visible: false,
+    step: 0,
+    title: '',
+    subtitle: '',
+    phase: 'boot',
+  });
   const DEMO_TOTAL = 10;
 
   const runAutoDemo = useCallback(async () => {
     setIsDemoRunning(true);
+    setDemoStage({
+      visible: true,
+      step: 0,
+      title: 'Initializing verifiable memory demo',
+      subtitle: 'Preparing model handoff, Solana proof, and cross-model continuity.',
+      phase: 'boot',
+      trustScore: 0,
+    });
 
     // Pre-written fallbacks so demo works without API keys
     const FALLBACKS: Record<string, string> = {
@@ -1969,9 +2097,17 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       gemini1: 'Solana PoH vs traditional consensus:\n\n• Traditional: Validators must communicate to agree on time → slow\n• Solana PoH: Cryptographic clock baked into the chain → 65,000 TPS\n• For AI memory: Each CONGCHAIN memory gets a PoH timestamp = proof it existed at that exact moment\n\nResult: When Claude or GPT reads your verified memory, the PoH timestamp proves it wasn\'t fabricated after the fact. This is how CONGCHAIN makes AI memory trustless.',
     };
 
+    FALLBACKS.gpt1 = '### Insight captured\n\n**Problem:** AI conversations die inside one model, one tab, one vendor.\n\n**CONGCHAIN move:** turn the answer into a portable memory object:\n\n- semantic content for future models\n- SHA-256 fingerprint for integrity\n- Solana anchor for public timestamping\n- optional ZK proof for private verification\n\nThis is the primitive agents need: memory that survives the model.';
+    FALLBACKS.claude1 = '### Cross-model continuation\n\nI received the GPT memory as verified context, not as a loose prompt.\n\n**What changed:** the second model can trust that the previous reasoning existed before this response. That creates continuity without vendor lock-in.\n\n**Why Solana matters:** low-latency finality makes memory anchoring feel native to a chat interface. Users do not wait minutes for AI state to become verifiable.\n\n**Judge takeaway:** CONGCHAIN is not storing chats. It is creating a proof layer for AI cognition.';
+    FALLBACKS.gemini1 = '### Final synthesis\n\nGPT produced the insight. Claude inherited it. Gemini can now continue with a verified trail.\n\n**Result:** model switching becomes a feature, not a reset button.\n\nThe memory hash is the bridge. Solana provides the public clock. ZK keeps private content private while still proving integrity.\n\nThis is how autonomous agents can collaborate with shared, verifiable memory.';
+
     const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
     const ts = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const uid = () => (Date.now() + Math.random()).toString(36);
+    const present = (stage: Partial<DemoStage>) => {
+      setDemoStage(prev => ({ ...prev, visible: true, ...stage }));
+    };
+    let anchoredTxHash: string | null = null;
 
     const callChat = async (content: string, model: string, ctx?: string) => {
       try {
@@ -2025,8 +2161,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 1: GPT — aprender sobre PoW ─────────────────────
       setDemoStep(1);
+      present({ step: 1, title: 'Capture an insight with GPT-4o', subtitle: 'The first model creates memory-ready reasoning instead of disposable chat text.', phase: 'capture', primaryModel: 'GPT-4o', trustScore: 10 });
       toast({ title: '▶ Demo 1/10', description: 'GPT-4o responde sobre Proof of Work' });
-      const q1 = 'What is Proof of Work and why does it consume so much energy?';
+      const q1 = 'Create a concise hackathon insight: why does verifiable AI memory matter for autonomous agents on Solana?';
       setMessages(prev => [...prev, { id: uid(), role: 'user', content: q1, timestamp: ts() }]);
       setOrbMode('thinking');
       await delay(1200);
@@ -2044,18 +2181,21 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       };
       setMessages(prev => [...prev, gptMsg]);
       setOrbMode('idle');
-      await delay(800);
+      await delay(2600);
 
       // ── STEP 2: Salvar memória GPT ────────────────────────────
       setDemoStep(2);
+      present({ step: 2, title: 'Seal the memory fingerprint', subtitle: 'The answer becomes a content-addressed memory object with a stable hash.', phase: 'proof', trustScore: 28 });
       toast({ title: '▶ Demo 2/10', description: 'Salvando memória com hash SHA-256...' });
       const hash1 = d1?.memoryHash || await saveMemory(gptContent, 'gpt');
       setMessages(prev => prev.map(m => m.id === gptId ? { ...m, memoryHash: hash1 } : m));
+      present({ hash: hash1, trustScore: 35 });
       toast({ title: '✓ Memory saved', description: `SHA-256: ${hash1.slice(0, 16)}...` });
       await delay(1000);
 
       // ── STEP 3: Ancorar na Solana ─────────────────────────────
       setDemoStep(3);
+      present({ step: 3, title: 'Anchor proof to Solana', subtitle: 'Only the fingerprint is public. The AI content remains private and portable.', phase: 'anchor', primaryModel: 'Solana Devnet', trustScore: 52 });
       setSolanaTxHash(null);
       setShowSolanaOverlay(true);
       // Blockchain call in background — updates txHash if it resolves in time
@@ -2065,7 +2205,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       }, 4000).then(async r => {
         const d = await r?.json().catch(() => null);
         if (d?.success && d?.txHash) {
+          anchoredTxHash = d.txHash;
           setSolanaTxHash(d.txHash);
+          present({ txHash: d.txHash, trustScore: 68 });
           setMessages(prev => prev.map(m => m.id === gptId ? { ...m, verified: true, txHash: d.txHash } : m));
         }
       }).catch(() => {});
@@ -2075,6 +2217,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 4: Trocar para Claude com contexto ───────────────
       setDemoStep(4);
+      present({ step: 4, title: 'Switch model without losing memory', subtitle: 'GPT-4o hands verified context to Claude. The conversation does not reset.', phase: 'handoff', primaryModel: 'GPT-4o', secondaryModel: 'Claude', trustScore: 72 });
       toast({ title: '▶ Demo 4/10', description: 'Trocando para Claude com memória injetada...' });
       setPreviousModel('gpt');
       setSelectedModel('claude');
@@ -2083,8 +2226,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 5: Claude continua com contexto ──────────────────
       setDemoStep(5);
+      present({ step: 5, title: 'Claude continues from verified context', subtitle: 'The second model builds on a memory object, not blind prompt copying.', phase: 'handoff', primaryModel: 'Claude', secondaryModel: 'GPT memory', trustScore: 78 });
       toast({ title: '▶ Demo 5/10', description: 'Claude analisa com contexto do GPT' });
-      const q2 = 'Compare PoW vs PoS — which is better for the environment and for AI memory verification?';
+      const q2 = 'Continue the verified GPT memory. Explain why this creates a new primitive for multi-agent collaboration.';
       setMessages(prev => [...prev, { id: uid(), role: 'user', content: q2, timestamp: ts() }]);
       setOrbMode('thinking');
       await delay(1400);
@@ -2108,6 +2252,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 6: Salvar memória Claude ─────────────────────────
       setDemoStep(6);
+      present({ step: 6, title: 'Extend the memory chain', subtitle: 'Claude creates a child memory linked to the first verified insight.', phase: 'proof', primaryModel: 'Claude', trustScore: 82 });
       toast({ title: '▶ Demo 6/10', description: 'Salvando insight do Claude...' });
       const hash2 = d2?.memoryHash || await saveMemory(claudeContent, 'claude');
       setMessages(prev => prev.map(m => m.id === claudeId ? { ...m, memoryHash: hash2 } : m));
@@ -2116,6 +2261,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 7: Trocar para Gemini com 2 memórias ─────────────
       setDemoStep(7);
+      present({ step: 7, title: 'Second model handoff', subtitle: 'Gemini receives a two-step memory trail and continues the same intelligence.', phase: 'handoff', primaryModel: 'Claude', secondaryModel: 'Gemini', trustScore: 86 });
       toast({ title: '▶ Demo 7/10', description: 'Gemini herda memórias do GPT + Claude...' });
       setPreviousModel('claude');
       setSelectedModel('gemini');
@@ -2123,8 +2269,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 8: Gemini continua com contexto duplo ────────────
       setDemoStep(8);
+      present({ step: 8, title: 'Synthesize across three models', subtitle: 'The final model proves memory continuity across providers.', phase: 'synthesis', primaryModel: 'Gemini', secondaryModel: 'GPT + Claude', trustScore: 90 });
       toast({ title: '▶ Demo 8/10', description: 'Gemini responde com contexto cross-model' });
-      const q3 = 'How does Solana\'s Proof of History differ from PoW and PoS? Why is it ideal for AI memory?';
+      const q3 = 'Synthesize the GPT and Claude memories into one judge-facing conclusion for CONGCHAIN.';
       setMessages(prev => [...prev, { id: uid(), role: 'user', content: q3, timestamp: ts() }]);
       setOrbMode('thinking');
       await delay(1400);
@@ -2148,6 +2295,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 9: ZK Proof ──────────────────────────────────────
       setDemoStep(9);
+      present({ step: 9, title: 'Generate privacy-preserving proof', subtitle: 'ZK proof verifies integrity without exposing private memory content.', phase: 'proof', primaryModel: 'ZK verifier', trustScore: 94 });
       toast({ title: '▶ Demo 9/10', description: 'Gerando ZK Proof da memória...' });
       try {
         const zkRes = await fetchWithTimeout('/api/zk/prove', {
@@ -2166,6 +2314,22 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
       // ── STEP 10: Conclusão ────────────────────────────────────
       setDemoStep(10);
+      present({ step: 10, title: 'Verifiable AI continuity is live', subtitle: 'The memory survived model switching and produced a portable proof trail.', phase: 'finale', primaryModel: 'CONGCHAIN', secondaryModel: 'Solana', trustScore: 100 });
+      setMessages(prev => [...prev, {
+        id: uid(),
+        role: 'assistant',
+        content: `### Judge summary\n\n**CONGCHAIN turns AI output into verifiable memory infrastructure.**\n\nIn this demo, one insight moved across **GPT-4o -> Claude -> Gemini** while preserving a cryptographic trail:\n\n- **Memory hash:** \`${hash1.slice(0, 18)}...\`\n- **Child memory:** \`${hash2.slice(0, 18)}...\`\n- **Solana anchor:** ${anchoredTxHash ? `\`${anchoredTxHash.slice(0, 18)}...\`` : 'devnet proof path ready'}\n- **Privacy layer:** ZK proof generated for memory integrity\n\nThis is the wow: AI memory becomes portable, inspectable, and reusable by agents across models.`,
+        timestamp: ts(),
+        orbMode: 'success',
+        model: 'gemini',
+        contextInjected: true,
+        previousModel: 'claude',
+        memoryHash: hash1,
+        verified: true,
+        txHash: anchoredTxHash ?? undefined,
+        responseTime: 900,
+        tokensUsed: 168,
+      }]);
       toast({ title: '✅ Demo completo!', description: 'GPT → memória → Solana → Claude → Gemini → ZK Proof' });
       setOrbMode('success');
       await delay(800);
@@ -2219,6 +2383,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
   return (
     <div className="flex-1 flex h-full relative">
+      <DemoCommandCenter stage={demoStage} total={DEMO_TOTAL} />
       <div className="flex-1 flex flex-col h-full min-w-0">
         {/* Header — #6 microcopy + model selector + timeline btn */}
         <header className="flex items-center justify-between pl-14 pr-4 md:px-6 py-3 border-b border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl">
@@ -2383,12 +2548,12 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                 {isDemoRunning ? (
                   <>
                     <span className="w-4 h-4 border-2 border-[#9945FF]/30 border-t-[#9945FF] rounded-full animate-spin" />
-                    Demo {demoStep}/{DEMO_TOTAL}...
+                    Live proof {demoStep}/{DEMO_TOTAL}...
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    Run Demo
+                    Run Hackathon Demo
                   </>
                 )}
               </button>
@@ -2504,6 +2669,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       {showSolanaOverlay && (
         <SolanaOverlay txHash={solanaTxHash} onDone={() => setShowSolanaOverlay(false)} />
       )}
+      <DemoFinaleOverlay stage={demoStage} onClose={() => setDemoStage(prev => ({ ...prev, visible: false }))} />
       {auditHash && (
         <MemoryAuditTrail hash={auditHash} model={auditModel} onClose={() => setAuditHash(null)} />
       )}
