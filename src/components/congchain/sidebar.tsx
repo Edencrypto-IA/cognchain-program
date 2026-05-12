@@ -8,7 +8,6 @@ import {
   Settings,
   Trash2,
   ChevronLeft,
-  ChevronDown,
   MoreHorizontal,
   Bot,
   RefreshCw,
@@ -48,7 +47,6 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/verify').then(r => r.json()).then(d => setIsAdmin(d.admin)).catch(() => {});
@@ -149,167 +147,130 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
             </button>
           </div>
 
-          {/* CONGCHAIN PAY Link */}
-          <div className="px-3 pb-1">
+          {/* Primary Navigation */}
+          <nav className="px-3 pb-3 space-y-1">
             <a
               href="/pay"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-                bg-gradient-to-r from-[#F59E0B]/10 to-[#9945FF]/5
-                border border-[#F59E0B]/20
-                hover:from-[#F59E0B]/20 hover:to-[#9945FF]/10
-                hover:border-[#F59E0B]/40
+                bg-transparent border border-transparent
+                hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-[#F59E0B]/15 border border-[#F59E0B]/25 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-[#F59E0B]" />
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#F59E0B]/25">
+                <Zap className="w-4 h-4 text-white/55 group-hover:text-[#F59E0B]" />
               </div>
-              <span className="text-sm font-medium text-[#F59E0B]/70 group-hover:text-[#F59E0B] transition-colors">
+              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 CONGCHAIN Pay
               </span>
             </a>
-          </div>
 
-          {/* Marketplace Link */}
-          <div className="px-3 pb-1">
             <a
               href="/marketplace"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-                bg-white/[0.03] border border-white/[0.06]
-                hover:bg-white/[0.06] hover:border-[#14F195]/30
+                bg-transparent border border-transparent
+                hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-[#14F195]/10 border border-[#14F195]/20 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-[#14F195]" />
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
+                <Sparkles className="w-4 h-4 text-white/55 group-hover:text-[#14F195]" />
               </div>
-              <span className="text-sm font-medium text-white/60 group-hover:text-white/90 transition-colors">
+              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 Marketplace
               </span>
             </a>
-          </div>
 
-          {/* API Keys Link */}
-          <div className="px-3 pb-1">
-            <a
-              href="/dashboard/keys"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-                bg-white/[0.03] border border-white/[0.06]
-                hover:bg-white/[0.06] hover:border-[#9945FF]/30
-                transition-all duration-200 group"
-            >
-              <div className="w-7 h-7 rounded-lg bg-[#9945FF]/10 border border-[#9945FF]/20 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-[#9945FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-              </div>
-              <span className="text-sm font-medium text-white/60 group-hover:text-white/90 transition-colors">
-                API Keys
-              </span>
-            </a>
-          </div>
-
-          {/* Memory Brain Link */}
-          <div className="px-3 pb-1">
             <a
               href="/brain"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-                bg-white/[0.03] border border-white/[0.06]
-                hover:bg-white/[0.06] hover:border-[#9945FF]/30
+                bg-transparent border border-transparent
+                hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-[#9945FF]/10 border border-[#9945FF]/20 flex items-center justify-center">
-                <Brain className="w-4 h-4 text-[#9945FF]" />
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
+                <Brain className="w-4 h-4 text-white/55 group-hover:text-[#9945FF]" />
               </div>
-              <span className="text-sm font-medium text-white/60 group-hover:text-white/90 transition-colors">
+              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 Memory Brain
               </span>
             </a>
-          </div>
 
-          {/* Workspace Menu */}
-          <div className="px-3 pb-3">
-            <button
-              onClick={() => setWorkspaceOpen(prev => !prev)}
+            <a
+              href="/office"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-                bg-gradient-to-r from-[#9945FF]/10 to-[#14F195]/5
-                border border-white/[0.06]
-                hover:bg-white/[0.06] hover:border-[#9945FF]/30
+                bg-transparent border border-transparent
+                hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
-              aria-expanded={workspaceOpen}
             >
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#9945FF]/20 to-[#14F195]/15 border border-[#9945FF]/20 flex items-center justify-center">
-                <Hammer className="w-4 h-4 text-[#14F195]" />
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-white/55 group-hover:text-[#9945FF]">
+                  <path d="M7 1L12.5 4V10L7 13L1.5 10V4L7 1Z" fill="currentColor" fillOpacity="0.9"/>
+                </svg>
               </div>
-              <span className="text-sm font-medium text-white/65 group-hover:text-white/90 transition-colors">
-                Workspace
+              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+                Agent Office
               </span>
-              <span className="ml-auto text-[8px] font-black text-[#14F195]/55 bg-[#14F195]/10 border border-[#14F195]/15 px-1.5 py-0.5 rounded-full tracking-widest">3</span>
-              <ChevronDown className={`w-4 h-4 text-white/35 transition-transform duration-200 ${workspaceOpen ? 'rotate-180' : ''}`} />
-            </button>
+              <span className="ml-auto text-[8px] font-black text-[#14F195]/60 bg-[#14F195]/10 border border-[#14F195]/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
+            </a>
 
-            {workspaceOpen && (
-              <div className="mt-1.5 space-y-1 pl-4">
-                <a
-                  href="/office"
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl
-                    bg-white/[0.025] border border-white/[0.05]
-                    hover:bg-white/[0.055] hover:border-[#9945FF]/25
-                    transition-all duration-200 group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-[#9945FF]/10 border border-[#9945FF]/20 flex items-center justify-center">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-[#9945FF]">
-                      <path d="M7 1L12.5 4V10L7 13L1.5 10V4L7 1Z" fill="currentColor" fillOpacity="0.9"/>
-                    </svg>
-                  </div>
-                  <span className="text-xs font-medium text-white/55 group-hover:text-white/85 transition-colors">
-                    Agent Office
-                  </span>
-                  <span className="ml-auto text-[8px] font-black text-[#14F195]/50 bg-[#14F195]/10 border border-[#14F195]/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
-                </a>
-
-                <a
-                  href="/forge"
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl
-                    bg-white/[0.025] border border-white/[0.05]
-                    hover:bg-white/[0.055] hover:border-[#14F195]/25
-                    transition-all duration-200 group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-[#14F195]/10 border border-[#14F195]/20 flex items-center justify-center">
-                    <Hammer className="w-3.5 h-3.5 text-[#14F195]" />
-                  </div>
-                  <span className="text-xs font-medium text-white/55 group-hover:text-white/85 transition-colors">
-                    Forge
-                  </span>
-                  <span className="ml-auto text-[8px] font-black text-[#14F195]/45 bg-[#14F195]/5 border border-[#14F195]/10 px-1.5 py-0.5 rounded-full tracking-widest">NEW</span>
-                </a>
-
-                <a
-                  href="/agents"
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl
-                    bg-white/[0.025] border border-white/[0.05]
-                    hover:bg-white/[0.055] hover:border-[#00D1FF]/25
-                    transition-all duration-200 group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-[#00D1FF]/10 border border-[#00D1FF]/20 flex items-center justify-center">
-                    <Bot className="w-3.5 h-3.5 text-[#00D1FF]" />
-                  </div>
-                  <span className="text-xs font-medium text-white/55 group-hover:text-white/85 transition-colors">
-                    Agent Builder
-                  </span>
-                </a>
+            <a
+              href="/forge"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                bg-transparent border border-transparent
+                hover:bg-white/[0.045] hover:border-white/[0.06]
+                transition-all duration-200 group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
+                <Hammer className="w-4 h-4 text-white/55 group-hover:text-[#14F195]" />
               </div>
-            )}
-          </div>
+              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+                CongChain Forge
+              </span>
+              <span className="ml-auto text-[8px] font-black text-[#9945FF]/60 bg-[#9945FF]/10 border border-[#9945FF]/15 px-1.5 py-0.5 rounded-full tracking-widest">MVP</span>
+            </a>
+
+            <a
+              href="/dashboard/keys"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                bg-transparent border border-transparent
+                hover:bg-white/[0.045] hover:border-white/[0.06]
+                transition-all duration-200 group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white/55 group-hover:text-[#9945FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              </div>
+              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+                API Keys
+              </span>
+            </a>
+
+            <a
+              href="/agents"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                bg-transparent border border-transparent
+                hover:bg-white/[0.045] hover:border-white/[0.06]
+                transition-all duration-200 group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#00D1FF]/25">
+                <Bot className="w-4 h-4 text-white/55 group-hover:text-[#00D1FF]" />
+              </div>
+              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+                Agent Builder
+              </span>
+            </a>
+          </nav>
 
           {/* Search */}
-          <div className="px-3 pb-3">
+          <div className="px-3 pb-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/24" />
               <input
                 type="text"
                 placeholder="Buscar conversas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-lg
-                  pl-9 pr-3 py-2 text-sm text-white/80 placeholder-white/30
-                  focus:outline-none focus:border-[#9945FF]/40 focus:bg-white/[0.06]
+                className="w-full bg-white/[0.025] border border-white/[0.045] rounded-xl
+                  pl-9 pr-3 py-2 text-sm text-white/75 placeholder-white/25
+                  focus:outline-none focus:border-[#9945FF]/30 focus:bg-white/[0.045]
                   transition-all duration-200"
               />
             </div>
@@ -333,8 +294,8 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
             {grouped.map((group) => (
               <div key={group.label} className="mb-3">
                 <div className="px-2 py-1.5">
-                  <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider">
-                    {group.label}
+                  <span className="text-[10px] font-semibold text-white/24 uppercase tracking-[0.2em]">
+                    {group.label === 'Hoje' ? 'Recent chats' : group.label}
                   </span>
                 </div>
                 {group.items.map((conv) => (
