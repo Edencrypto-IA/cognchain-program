@@ -8,15 +8,16 @@ import {
   Save, Columns2, Star, Link2, Shield, X, Cpu, Hash,
   ChevronDown, ChevronUp, Zap, Check, AlertTriangle, Eye, ExternalLink,
   GitBranch, ArrowRight, Timer, Info, Languages,
-  Wallet, LogOut, Gem, Code2, Sparkles, Paperclip, ImagePlus, Mic, PenSquare,
+  Gem, Code2, Sparkles, Paperclip, ImagePlus, Mic, PenSquare,
 } from 'lucide-react';
-import { isPhantomInstalled, connectPhantom, disconnectPhantom, getSolBalance, truncateAddress } from '@/services/wallet/wallet.service';
 import Orb, { type OrbMode } from './orb';
 import { MODEL_LABELS, type AIModel } from '@/services/memory/memory.model';
 import type { StructuredResponse } from '@/lib/grounding/types';
 import dynamic from 'next/dynamic';
+import { useWallet } from '@solana/wallet-adapter-react';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
+const WalletAdapterButton = dynamic(() => import('./wallet-button'), { ssr: false });
 type ChatPhase = 'idle' | 'connecting' | 'thinking' | 'streaming' | 'completed' | 'error';
 type DemoStage = {
   visible: boolean;
@@ -1080,54 +1081,6 @@ function VerifyOnChainButton({ hash, onVerified }: { hash: string; onVerified: (
 }
 
 // ============================================================
-// Wallet Connect Button — Phantom
-// ============================================================
-function WalletButton({ walletAddress, balance, isConnecting, onConnect, onDisconnect }: {
-  walletAddress: string | null;
-  balance: number | null;
-  isConnecting: boolean;
-  onConnect: () => void;
-  onDisconnect: () => void;
-}) {
-  if (!isPhantomInstalled()) {
-    return (
-      <a href="https://phantom.app/download" target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium bg-[#9945FF]/10 text-[#9945FF]/70 hover:bg-[#9945FF]/20 border border-[#9945FF]/20 transition-all duration-200">
-        <Wallet className="w-3.5 h-3.5" />
-        Phantom
-      </a>
-    );
-  }
-
-  if (!walletAddress) {
-    return (
-      <button onClick={onConnect} disabled={isConnecting}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/20 text-[#14F195]/80 hover:from-[#9945FF]/30 hover:to-[#14F195]/30 border border-[#14F195]/20 transition-all duration-200 disabled:opacity-50">
-        {isConnecting ? (
-          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white/70 rounded-full animate-spin" />
-        ) : (
-          <Wallet className="w-3.5 h-3.5" />
-        )}
-        Wallet
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#14F195]/10 border border-[#14F195]/20">
-      <div className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />
-      <span className="text-[10px] font-mono text-[#14F195]/80">{truncateAddress(walletAddress)}</span>
-      {balance != null && (
-        <span className="text-[10px] text-white/30 font-medium">{balance.toFixed(2)} SOL</span>
-      )}
-      <button onClick={onDisconnect} className="ml-0.5 p-0.5 rounded hover:bg-white/[0.06] text-white/20 hover:text-white/50 transition-colors" title="Disconnect">
-        <LogOut className="w-3 h-3" />
-      </button>
-    </div>
-  );
-}
-
-// ============================================================
 // Mint Memory Button — ownership of verified AI memory
 // ============================================================
 function MintNFTButton({ message, walletAddress }: { message: Message; walletAddress: string | null }) {
@@ -1573,6 +1526,8 @@ interface ChatAreaProps {
 }
 
 export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeConvId }: ChatAreaProps) {
+  const { publicKey } = useWallet();
+  const walletAddress = publicKey?.toString() ?? null;
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome', role: 'assistant',
     content: 'Ola! Sou o CONGCHAIN — Verifiable AI Memory Layer.\n\nMemory that any AI can continue.\n\nEstou aqui para ajudar voce com verificacao de memoria em blockchain, integracao Solana, e muito mais. Como posso ajudar?',
@@ -1622,9 +1577,6 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [originalMessages, setOriginalMessages] = useState<Message[]>([]);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [isWalletConnecting, setIsWalletConnecting] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [thinkingStatus, setThinkingStatus] = useState('Analisando...');
   const [chatPhase, setChatPhase] = useState<ChatPhase>('idle');
@@ -2029,26 +1981,6 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   }, [selectedMessage, setOrbMode, toast]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } };
-
-  // Wallet connect / disconnect
-  const handleWalletConnect = useCallback(async () => {
-    setIsWalletConnecting(true);
-    try {
-      const result = await connectPhantom();
-      if (result) {
-        setWalletAddress(result.publicKey);
-        const bal = await getSolBalance(result.publicKey);
-        setWalletBalance(bal);
-      }
-    } catch { /* silent */ }
-    finally { setIsWalletConnecting(false); }
-  }, []);
-
-  const handleWalletDisconnect = useCallback(async () => {
-    await disconnectPhantom();
-    setWalletAddress(null);
-    setWalletBalance(null);
-  }, []);
 
   // Translation handler
   const handleTranslate = useCallback(async (lang: string) => {
@@ -2522,13 +2454,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           <div className="flex items-center gap-1.5">
             {/* Desktop-only: Wallet + Lang + Timeline */}
             <div className="hidden sm:flex items-center gap-1.5">
-              <WalletButton
-                walletAddress={walletAddress}
-                balance={walletBalance}
-                isConnecting={isWalletConnecting}
-                onConnect={handleWalletConnect}
-                onDisconnect={handleWalletDisconnect}
-              />
+              <WalletAdapterButton />
               <div className="relative">
                 <button onClick={() => setShowLangMenu(!showLangMenu)} className={`p-1.5 rounded-lg transition-colors ${showLangMenu ? 'bg-white/[0.08] text-white/70' : 'hover:bg-white/[0.06] text-white/30 hover:text-white/60'}`} title="Traduzir">
                   {isTranslating ? (
