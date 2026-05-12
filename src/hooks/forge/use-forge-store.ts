@@ -47,6 +47,7 @@ interface ForgeState {
   updateBuildStep: (id: string, status: ForgeBuildStep['status']) => void;
   setDeployStatus: (status: string) => void;
   resetRun: (prompt: string) => void;
+  resetSession: () => void;
   restoreIdle: () => void;
 }
 
@@ -132,6 +133,20 @@ export const useForgeStore = create<ForgeState>()(
         buildSteps: cloneBuildSteps(),
         memoryNodes: cloneMemoryNodes().map(node => node.id === 'm1' ? { ...node, detail: prompt, confidence: 68 } : node),
         deployStatus: 'Planning',
+        panelTab: 'preview',
+      }),
+      resetSession: () => set({
+        phase: 'idle',
+        promptHistory: [],
+        activePrompt: '',
+        streamedResponse: '',
+        agents: cloneAgents(),
+        terminal: initialTerminalLines,
+        files: cloneFiles(),
+        selectedFile: initialFiles[0]?.path ?? '',
+        buildSteps: cloneBuildSteps(),
+        memoryNodes: cloneMemoryNodes(),
+        deployStatus: 'Local sandbox',
         panelTab: 'preview',
       }),
       restoreIdle: () => set(state => ({

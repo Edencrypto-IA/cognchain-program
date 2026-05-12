@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ArrowLeft, Layers3, LockKeyhole, Sparkles } from 'lucide-react';
+import { ArrowLeft, Layers3, LockKeyhole, RotateCcw, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ForgeSidebar } from '@/components/forge/forge-sidebar';
@@ -26,6 +26,12 @@ export function ForgeWorkspace() {
   const promptHistory = useForgeStore(state => state.promptHistory);
   const setPanelTab = useForgeStore(state => state.setPanelTab);
   const setSelectedFile = useForgeStore(state => state.setSelectedFile);
+  const resetSession = useForgeStore(state => state.resetSession);
+
+  const handleReset = () => {
+    stop();
+    resetSession();
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#050505] text-white">
@@ -68,7 +74,22 @@ export function ForgeWorkspace() {
               {label as string}
             </div>
           ))}
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/42 transition-colors hover:border-[#9945FF]/30 hover:text-white/80"
+          >
+            <RotateCcw className="size-3.5 text-[#14F195]" />
+            Reset session
+          </button>
         </div>
+
+        <button
+          onClick={handleReset}
+          className="grid size-10 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-white/45 transition-colors hover:text-white/85 lg:hidden"
+          aria-label="Reset Forge session"
+        >
+          <RotateCcw className="size-4" />
+        </button>
       </header>
 
       <section className="relative z-10 hidden h-[calc(100vh-65px)] lg:block">

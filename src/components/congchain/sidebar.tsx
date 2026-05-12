@@ -17,6 +17,7 @@ import {
   LogOut,
   ShieldCheck,
   Zap,
+  Hammer,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -240,6 +241,27 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
                 Agent Office
               </span>
               <span className="ml-auto text-[8px] font-black text-[#14F195]/60 bg-[#14F195]/10 border border-[#14F195]/20 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
+            </a>
+          </div>
+
+          {/* CongChain Forge Link */}
+          <div className="px-3 pb-1">
+            <a
+              href="/forge"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                bg-gradient-to-r from-[#14F195]/10 to-[#9945FF]/10
+                border border-[#14F195]/20
+                hover:from-[#14F195]/18 hover:to-[#9945FF]/18
+                hover:border-[#14F195]/40
+                transition-all duration-200 group relative overflow-hidden"
+            >
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#14F195]/25 to-[#9945FF]/20 border border-[#14F195]/25 flex items-center justify-center">
+                <Hammer className="w-4 h-4 text-[#14F195]" />
+              </div>
+              <span className="text-sm font-medium text-[#14F195]/75 group-hover:text-[#14F195] transition-colors">
+                CongChain Forge
+              </span>
+              <span className="ml-auto text-[8px] font-black text-[#9945FF]/65 bg-[#9945FF]/10 border border-[#9945FF]/20 px-1.5 py-0.5 rounded-full tracking-widest">MVP</span>
             </a>
           </div>
 
