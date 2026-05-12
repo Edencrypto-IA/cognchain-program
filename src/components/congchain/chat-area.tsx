@@ -1092,9 +1092,9 @@ function WalletButton({ walletAddress, balance, isConnecting, onConnect, onDisco
   if (!isPhantomInstalled()) {
     return (
       <a href="https://phantom.app/download" target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[#9945FF]/10 text-[#9945FF]/70 hover:bg-[#9945FF]/20 border border-[#9945FF]/20 transition-all duration-200">
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium bg-[#9945FF]/10 text-[#9945FF]/70 hover:bg-[#9945FF]/20 border border-[#9945FF]/20 transition-all duration-200">
         <Wallet className="w-3.5 h-3.5" />
-        Install Phantom
+        Phantom
       </a>
     );
   }
@@ -1102,19 +1102,19 @@ function WalletButton({ walletAddress, balance, isConnecting, onConnect, onDisco
   if (!walletAddress) {
     return (
       <button onClick={onConnect} disabled={isConnecting}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/20 text-[#14F195]/80 hover:from-[#9945FF]/30 hover:to-[#14F195]/30 border border-[#14F195]/20 transition-all duration-200 disabled:opacity-50">
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/20 text-[#14F195]/80 hover:from-[#9945FF]/30 hover:to-[#14F195]/30 border border-[#14F195]/20 transition-all duration-200 disabled:opacity-50">
         {isConnecting ? (
           <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white/70 rounded-full animate-spin" />
         ) : (
           <Wallet className="w-3.5 h-3.5" />
         )}
-        Connect Wallet
+        Wallet
       </button>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#14F195]/10 border border-[#14F195]/20">
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#14F195]/10 border border-[#14F195]/20">
       <div className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />
       <span className="text-[10px] font-mono text-[#14F195]/80">{truncateAddress(walletAddress)}</span>
       {balance != null && (
@@ -2496,23 +2496,25 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       <DemoCommandCenter stage={demoStage} total={DEMO_TOTAL} />
       <div className="flex-1 flex flex-col h-full min-w-0">
         {/* Header — #6 microcopy + model selector + timeline btn */}
-        <header className="flex items-center justify-between pl-14 pr-4 md:px-6 py-3 border-b border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl">
+        <header className="flex items-center justify-between pl-14 pr-4 md:px-5 py-2 border-b border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             {/* #10 Mascote micro-state tooltip */}
-            <div className="relative group">
+            <div className="relative group h-10 w-10 shrink-0">
               {/* Anel pulsante quando thinking/typing */}
               {(orbMode === 'thinking' || orbMode === 'typing') && (
                 <span className="absolute inset-0 rounded-full animate-ping opacity-30"
                   style={{ background: orbMode === 'thinking' ? 'rgba(153,69,255,0.4)' : 'rgba(20,241,149,0.4)' }} />
               )}
-              <Orb mode={contextActive && orbMode === 'idle' ? 'thinking' : orbMode} size="md" interactive={false} />
+              <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 scale-[0.42]">
+                <Orb mode={contextActive && orbMode === 'idle' ? 'thinking' : orbMode} size="sm" interactive={false} />
+              </div>
               <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
                 <span className="text-[9px] bg-white/10 backdrop-blur text-white/50 px-2 py-0.5 rounded">
                   {orbMode === 'thinking' ? 'Pensando...' : orbMode === 'typing' ? 'Digitando...' : contextActive ? 'Memory synced' : 'Ready'}
                 </span>
               </div>
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-sm font-semibold text-white/90">CONGCHAIN</h1>
               <p className="text-[11px] text-white/35">Memory that any AI can continue.</p>
             </div>
