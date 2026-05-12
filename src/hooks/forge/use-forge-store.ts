@@ -1,0 +1,156 @@
+'use client';
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import {
+  forgeAgents,
+  FORGE_STORAGE_KEY,
+  initialBuildSteps,
+  initialFiles,
+  initialMemoryNodes,
+  initialTerminalLines,
+} from '@/lib/forge/demo-data';
+import type {
+  ForgeAgent,
+  ForgeAgentId,
+  ForgeBuildStep,
+  ForgeFile,
+  ForgeMemoryNode,
+  ForgePanelTab,
+  ForgePhase,
+  ForgeTerminalLine,
+} from '@/lib/forge/types';
+
+interface ForgeState {
+  phase: ForgePhase;
+  promptHistory: string[];
+  activePrompt: string;
+  streamedResponse: string;
+  agents: ForgeAgent[];
+  terminal: ForgeTerminalLine[];
+  files: ForgeFile[];
+  selectedFile: string;
+  buildSteps: ForgeBuildStep[];
+  memoryNodes: ForgeMemoryNode[];
+  deployStatus: string;
+  panelTab: ForgePanelTab;
+  setPhase: (phase: ForgePhase) => void;
+  setActivePrompt: (prompt: string) => void;
+  setPanelTab: (tab: ForgePanelTab) => void;
+  setSelectedFile: (path: string) => void;
+  appendTerminal: (line: ForgeTerminalLine) => void;
+  appendResponse: (chunk: string) => void;
+  addPromptHistory: (prompt: string) => void;
+  upsertFile: (file: ForgeFile) => void;
+  upsertMemory: (node: ForgeMemoryNode) => void;
+  updateAgent: (id: ForgeAgentId, patch: Partial<ForgeAgent>) => void;
+  updateBuildStep: (id: string, status: ForgeBuildStep['status']) => void;
+  setDeployStatus: (status: string) => void;
+  resetRun: (prompt: string) => void;
+  restoreIdle: () => void;
+}
+
+function cloneAgents() {
+  return forgeAgents.map(agent => ({ ...agent, logs: [...agent.logs] }));
+}
+
+function cloneBuildSteps() {
+  return initialBuildSteps.map(step => ({ ...step }));
+}
+
+function cloneFiles() {
+  return initialFiles.map(file => ({ ...file }));
+}
+
+function cloneMemoryNodes() {
+  return initialMemoryNodes.map(node => ({ ...node }));
+}
+
+export const useForgeStore = create<ForgeState>()(
+  persist(
+    (set) => ({
+      phase: 'idle',
+      promptHistory: [],
+      activePrompt: '',
+      streamedResponse: '',
+      agents: cloneAgents(),
+      terminal: initialTerminalLines,
+      files: cloneFiles(),
+      selectedFile: initialFiles[0]?.path ?? '',
+      buildSteps: cloneBuildSteps(),
+      memoryNodes: cloneMemoryNodes(),
+      deployStatus: 'Local sandbox',
+      panelTab: 'preview',
+      setPhase: phase => set({ phase }),
+      setActivePrompt: activePrompt => set({ activePrompt }),
+      setPanelTab: panelTab => set({ panelTab }),
+      setSelectedFile: selectedFile => set({ selectedFile, panelTab: 'code' }),
+      appendTerminal: line => set(state => ({ terminal: [...state.terminal.slice(-80), line] })),
+      appendResponse: chunk => set(state => ({ streamedResponse: `${state.streamedResponse}${chunk}` })),
+      addPromptHistory: prompt => set(state => ({
+        promptHistory: [prompt, ...state.promptHistory.filter(item => item !== prompt)].slice(0, 8),
+      })),
+      upsertFile: file => set(state => {
+        const exists = state.files.some(item => item.path === file.path);
+        return {
+          files: exists ? state.files.map(item => item.path === file.path ? file : item) : [...state.files, file],
+          selectedFile: file.path,
+          panelTab: 'code',
+        };
+      }),
+      upsertMemory: node => set(state => {
+        const exists = state.memoryNodes.some(item => item.id === node.id);
+        return {
+          memoryNodes: exists
+            ? state.memoryNodes.map(item => item.id === node.id ? node : item)
+            : [...state.memoryNodes, node],
+        };
+      }),
+      updateAgent: (id, patch) => set(state => ({
+        agents: state.agents.map(agent => {
+          if (agent.id !== id) return agent;
+          const nextLog = patch.currentTask && patch.currentTask !== agent.currentTask ? patch.currentTask : null;
+          return {
+            ...agent,
+            ...patch,
+            logs: nextLog ? [nextLog, ...agent.logs].slice(0, 5) : agent.logs,
+          };
+        }),
+      })),
+      updateBuildStep: (id, status) => set(state => ({
+        buildSteps: state.buildSteps.map(step => step.id === id ? { ...step, status } : step),
+      })),
+      setDeployStatus: deployStatus => set({ deployStatus }),
+      resetRun: prompt => set({
+        phase: 'thinking',
+        activePrompt: prompt,
+        streamedResponse: '',
+        agents: cloneAgents().map(agent => ({ ...agent, status: 'thinking', progress: Math.max(agent.progress, 16) })),
+        terminal: initialTerminalLines,
+        files: cloneFiles(),
+        selectedFile: initialFiles[0]?.path ?? '',
+        buildSteps: cloneBuildSteps(),
+        memoryNodes: cloneMemoryNodes().map(node => node.id === 'm1' ? { ...node, detail: prompt, confidence: 68 } : node),
+        deployStatus: 'Planning',
+        panelTab: 'preview',
+      }),
+      restoreIdle: () => set(state => ({
+        phase: state.phase === 'error' ? 'error' : 'idle',
+        agents: state.agents.map(agent => ({ ...agent, status: agent.progress >= 100 ? 'complete' : 'idle' })),
+      })),
+    }),
+    {
+      name: FORGE_STORAGE_KEY,
+      partialize: state => ({
+        promptHistory: state.promptHistory,
+        streamedResponse: state.streamedResponse,
+        terminal: state.terminal.slice(-40),
+        files: state.files,
+        selectedFile: state.selectedFile,
+        memoryNodes: state.memoryNodes,
+        deployStatus: state.deployStatus,
+        panelTab: state.panelTab,
+      }),
+    },
+  ),
+);
