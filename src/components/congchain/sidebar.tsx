@@ -148,65 +148,65 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
           </div>
 
           {/* Primary Navigation */}
-          <nav className="px-3 pb-3 space-y-1">
+          <nav className="px-3 pb-2 space-y-0.5">
             <a
               href="/pay"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#F59E0B]/25">
-                <Zap className="w-4 h-4 text-white/55 group-hover:text-[#F59E0B]" />
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#F59E0B]/25">
+                <Zap className="w-3.5 h-3.5 text-white/55 group-hover:text-[#F59E0B]" />
               </div>
-              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+              <span className="text-[13px] font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 CONGCHAIN Pay
               </span>
             </a>
 
             <a
               href="/marketplace"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
-                <Sparkles className="w-4 h-4 text-white/55 group-hover:text-[#14F195]" />
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
+                <Sparkles className="w-3.5 h-3.5 text-white/55 group-hover:text-[#14F195]" />
               </div>
-              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+              <span className="text-[13px] font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 Marketplace
               </span>
             </a>
 
             <a
               href="/brain"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
-                <Brain className="w-4 h-4 text-white/55 group-hover:text-[#9945FF]" />
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
+                <Brain className="w-3.5 h-3.5 text-white/55 group-hover:text-[#9945FF]" />
               </div>
-              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+              <span className="text-[13px] font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 Memory Brain
               </span>
             </a>
 
             <a
               href="/office"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-white/55 group-hover:text-[#9945FF]">
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-white/55 group-hover:text-[#9945FF]">
                   <path d="M7 1L12.5 4V10L7 13L1.5 10V4L7 1Z" fill="currentColor" fillOpacity="0.9"/>
                 </svg>
               </div>
-              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+              <span className="text-[13px] font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 Agent Office
               </span>
               <span className="ml-auto text-[8px] font-black text-[#14F195]/60 bg-[#14F195]/10 border border-[#14F195]/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
@@ -214,15 +214,15 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
 
             <a
               href="/forge"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
-                <Hammer className="w-4 h-4 text-white/55 group-hover:text-[#14F195]" />
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
+                <Hammer className="w-3.5 h-3.5 text-white/55 group-hover:text-[#14F195]" />
               </div>
-              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+              <span className="text-[13px] font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 CongChain Forge
               </span>
               <span className="ml-auto text-[8px] font-black text-[#9945FF]/60 bg-[#9945FF]/10 border border-[#9945FF]/15 px-1.5 py-0.5 rounded-full tracking-widest">MVP</span>
@@ -230,30 +230,30 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
 
             <a
               href="/dashboard/keys"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white/55 group-hover:text-[#9945FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-white/55 group-hover:text-[#9945FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
               </div>
-              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+              <span className="text-[13px] font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 API Keys
               </span>
             </a>
 
             <a
               href="/agents"
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.045] hover:border-white/[0.06]
                 transition-all duration-200 group"
             >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#00D1FF]/25">
-                <Bot className="w-4 h-4 text-white/55 group-hover:text-[#00D1FF]" />
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#00D1FF]/25">
+                <Bot className="w-3.5 h-3.5 text-white/55 group-hover:text-[#00D1FF]" />
               </div>
-              <span className="text-sm font-medium text-white/62 group-hover:text-white/90 transition-colors">
+              <span className="text-[13px] font-medium text-white/62 group-hover:text-white/90 transition-colors">
                 Agent Builder
               </span>
             </a>
@@ -277,7 +277,7 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
           </div>
 
           {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin">
+          <div className="flex-1 min-h-[150px] overflow-y-auto px-2 pb-2 scrollbar-thin">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <RefreshCw className="w-5 h-5 text-white/20 animate-spin mb-2" />
