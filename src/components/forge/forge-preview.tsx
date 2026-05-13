@@ -74,7 +74,7 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
   ];
 
   return (
-    <div className="h-full min-h-[min(430px,42vh)] overflow-hidden bg-[#050505] lg:min-h-[430px]">
+    <div className="flex h-full min-h-[min(430px,42vh)] flex-col overflow-hidden bg-[#050505] lg:min-h-[430px]">
       <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] px-2 py-2 sm:px-3">
         <div className="flex min-w-0 items-center gap-1">
           <span className="size-2 shrink-0 rounded-full bg-red-400/70 sm:size-2.5" />
@@ -110,14 +110,14 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
         </div>
       </div>
 
-      <div className="relative h-[calc(100%-40px)] overflow-hidden p-3 sm:p-5">
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
         <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#9945FF]/15 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-44 w-44 rounded-full bg-[#14F195]/10 blur-3xl" />
         <div className="absolute left-1/2 top-10 h-56 w-56 -translate-x-1/2 rounded-full bg-[#38BDF8]/10 blur-3xl" />
 
         <motion.div
           key={pulseKey}
-          className="relative h-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#09090B]/92 p-4 shadow-2xl shadow-black/40 sm:rounded-3xl sm:p-5"
+          className="relative min-h-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#09090B]/92 p-4 shadow-2xl shadow-black/40 sm:rounded-3xl sm:p-5"
           animate={{ y: active ? [0, -3, 0] : 0 }}
           transition={{ duration: 4, repeat: active ? Infinity : 0, ease: 'easeInOut' }}
         >
@@ -131,7 +131,7 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
             />
           )}
 
-          <div className="relative z-[2] flex h-full min-h-0 flex-col">
+          <div className="relative z-[2] flex min-h-[34rem] flex-col lg:min-h-[31rem]">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#14F195]/75">PrivatePay Preview</p>
@@ -175,7 +175,7 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
               </div>
             </div>
 
-            <div className="mt-4 grid min-h-0 flex-1 gap-3 lg:mt-5 lg:grid-cols-[1.05fr_0.95fr] lg:gap-4">
+            <div className="mt-4 grid flex-1 gap-3 lg:mt-5 lg:grid-cols-[1.05fr_0.95fr] lg:gap-4">
               <motion.div
                 key={`${mode}-${phase}`}
                 initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
