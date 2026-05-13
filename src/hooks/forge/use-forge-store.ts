@@ -96,7 +96,7 @@ export const useForgeStore = create<ForgeState>()(
         return {
           files: exists ? state.files.map(item => item.path === file.path ? file : item) : [...state.files, file],
           selectedFile: file.path,
-          panelTab: 'code',
+          panelTab: state.panelTab === 'preview' ? 'preview' : 'code',
         };
       }),
       upsertMemory: node => set(state => {

@@ -15,6 +15,7 @@ export function ForgeRightPanel({
   tab,
   onTabChange,
   onSelectFile,
+  onRunPrompt,
 }: {
   phase: ForgePhase;
   files: ForgeFile[];
@@ -25,6 +26,7 @@ export function ForgeRightPanel({
   tab: ForgePanelTab;
   onTabChange: (tab: ForgePanelTab) => void;
   onSelectFile: (path: string) => void;
+  onRunPrompt?: (prompt: string) => void;
 }) {
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-[#111113]/40">
@@ -51,7 +53,7 @@ export function ForgeRightPanel({
           </div>
 
           <TabsContent value="preview" className="min-h-0">
-            <ForgePreview phase={phase} />
+            <ForgePreview phase={phase} onRunPrompt={onRunPrompt} />
           </TabsContent>
           <TabsContent value="code" className="min-h-0">
             <CodeViewer files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} />

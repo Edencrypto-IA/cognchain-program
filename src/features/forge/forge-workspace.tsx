@@ -102,6 +102,7 @@ export function ForgeWorkspace() {
                   tab={panelTab}
                   onTabChange={setPanelTab}
                   onSelectFile={setSelectedFile}
+                  onRunPrompt={runPrompt}
                 />
               </ResizablePanel>
               <ResizableHandle className="bg-white/[0.06]" />
@@ -149,6 +150,7 @@ export function ForgeWorkspace() {
           tab={panelTab}
           onTabChange={setPanelTab}
           onSelectFile={setSelectedFile}
+          onRunPrompt={runPrompt}
         />
         <ForgeSidebar
           agents={agents}
