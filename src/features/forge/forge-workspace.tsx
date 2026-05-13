@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Box, Play, RotateCcw, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, Bot, Box, Play, RotateCcw, Search, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useShallow } from 'zustand/react/shallow';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ForgeSidebar } from '@/components/forge/forge-sidebar';
 import { ForgeTerminal } from '@/components/forge/forge-terminal';
 import { ForgeRightPanel } from '@/components/forge/forge-right-panel';
@@ -20,6 +21,7 @@ const busyPhases = ['thinking', 'planning', 'building', 'deploying'] as const;
 
 function ForgeWorkspaceInner() {
   const { runPrompt, stop, runPrivatePayDemo, replayLastBuild } = useForgeSimulation();
+  const [agentsOpen, setAgentsOpen] = useState(false);
 
   const {
     phase,
@@ -131,10 +133,18 @@ function ForgeWorkspaceInner() {
 
         <div className="hidden h-6 max-w-[28vw] items-center gap-2 rounded-md border border-white/[0.09] bg-black/25 px-2 text-[10px] text-white/38 md:flex lg:max-w-[34rem]">
           <Search className="size-3 shrink-0" />
-          <span className="truncate">Forge · {RUN_STATUS_LABELS[runStatus]}</span>
+          <span className="truncate">CONGCHAIN-project / Forge workspace - {RUN_STATUS_LABELS[runStatus]}</span>
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => setAgentsOpen(true)}
+            className="flex min-h-8 items-center gap-1.5 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-[10px] text-white/48 transition-colors hover:border-[#9945FF]/30 hover:text-white/82 sm:text-[11px]"
+          >
+            <Bot className="size-3.5 shrink-0" />
+            <span className="hidden sm:inline">Agents</span>
+          </button>
           <div className="hidden items-center gap-1.5 text-[10px] text-white/32 sm:flex sm:text-[11px]">
             <NeuralOrb active={phase !== 'idle'} className="scale-75" />
             <span className="max-w-[8rem] truncate lg:max-w-none">{RUN_STATUS_LABELS[runStatus]}</span>
@@ -152,21 +162,18 @@ function ForgeWorkspaceInner() {
 
       <section className="relative z-10 hidden min-h-0 flex-1 lg:block">
         <ResizablePanelGroup direction="horizontal" className="h-full min-h-0">
-          <ResizablePanel defaultSize={19} minSize={15} maxSize={24}>
-            <ForgeSidebar
-              agents={agents}
-              phase={phase}
-              runStatus={runStatus}
-              deployStatus={deployStatus}
-              promptHistory={promptHistory}
+          <ResizablePanel defaultSize={21} minSize={16} maxSize={30}>
+            <ForgeFileExplorer
+              files={files}
+              selectedFile={selectedFile}
+              buildSteps={buildSteps}
               sandboxSessions={sandboxSessions}
-              terminal={terminal}
               busy={busy}
-              onPromptSelect={runPrompt}
+              onSelectFile={setSelectedFile}
             />
           </ResizablePanel>
           <ResizableHandle className="bg-white/[0.06]" />
-          <ResizablePanel defaultSize={63} minSize={42}>
+          <ResizablePanel defaultSize={79} minSize={50}>
             <ResizablePanelGroup direction="vertical" className="h-full">
               <ResizablePanel defaultSize={68} minSize={42}>
                 <ForgeRightPanel
@@ -198,17 +205,6 @@ function ForgeWorkspaceInner() {
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
-          </ResizablePanel>
-          <ResizableHandle className="bg-white/[0.06]" />
-          <ResizablePanel defaultSize={18} minSize={14} maxSize={24}>
-            <ForgeFileExplorer
-              files={files}
-              selectedFile={selectedFile}
-              buildSteps={buildSteps}
-              agents={agents}
-              busy={busy}
-              onSelectFile={setSelectedFile}
-            />
           </ResizablePanel>
         </ResizablePanelGroup>
       </section>
@@ -257,6 +253,28 @@ function ForgeWorkspaceInner() {
           transition={{ delay: 0.08 }}
           className="max-h-[38vh] min-h-[12rem] shrink-0 overflow-hidden"
         >
+          <ForgeFileExplorer
+            files={files}
+            selectedFile={selectedFile}
+            buildSteps={buildSteps}
+            sandboxSessions={sandboxSessions}
+            busy={busy}
+            onSelectFile={setSelectedFile}
+          />
+        </motion.div>
+      </section>
+
+      <Sheet open={agentsOpen} onOpenChange={setAgentsOpen}>
+        <SheetContent side="right" className="w-[min(28rem,92vw)] border-white/[0.08] bg-[#08080a] p-0 text-white sm:max-w-[28rem]">
+          <SheetHeader className="border-b border-white/[0.07] p-4">
+            <SheetTitle className="flex items-center gap-2 text-white/88">
+              <Bot className="size-4 text-[#C084FC]" />
+              Agent Mesh
+            </SheetTitle>
+            <SheetDescription className="text-white/38">
+              Select and monitor Forge agents without leaving the code workspace.
+            </SheetDescription>
+          </SheetHeader>
           <ForgeSidebar
             agents={agents}
             phase={phase}
@@ -268,8 +286,8 @@ function ForgeWorkspaceInner() {
             busy={busy}
             onPromptSelect={runPrompt}
           />
-        </motion.div>
-      </section>
+        </SheetContent>
+      </Sheet>
     </main>
   );
 }
