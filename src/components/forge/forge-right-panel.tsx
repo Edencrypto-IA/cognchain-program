@@ -1,8 +1,8 @@
 'use client';
 
 import { memo, useMemo } from 'react';
-import { Files, GitCompareArrows, MonitorPlay, PanelsTopLeft } from 'lucide-react';
-import type { ForgeFile, ForgePanelTab, ForgePhase, ForgeRunStatus } from '@/lib/forge/types';
+import { CheckCircle2, Files, GitCompareArrows, MonitorPlay, PanelsTopLeft } from 'lucide-react';
+import type { ForgeFile, ForgePanelTab, ForgePhase, ForgeRunStatus, ForgeSandboxSession } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GlassPanel } from './glass-panel';
@@ -28,8 +28,10 @@ function ForgeRightPanelComponent({
   onSelectFile,
   onPrivatePayDemo,
   onReplayLast,
+  onApplyProposal,
   canReplay,
   busy,
+  latestSandboxSession,
 }: {
   phase: ForgePhase;
   runStatus: ForgeRunStatus;
@@ -41,8 +43,10 @@ function ForgeRightPanelComponent({
   onSelectFile: (path: string) => void;
   onPrivatePayDemo: () => void;
   onReplayLast: () => void;
+  onApplyProposal: () => void;
   canReplay: boolean;
   busy: boolean;
+  latestSandboxSession?: ForgeSandboxSession;
 }) {
   const statusLine = useMemo(() => {
     const deploy = deployStatus ?? '—';
@@ -62,6 +66,7 @@ function ForgeRightPanelComponent({
       ...lines.map(line => `+ ${line}`),
     ].join('\n');
   }, [selected]);
+  const canApplyProposal = files.some(file => file.status === 'created' || file.status === 'modified') && !busy;
 
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-[#111113]/40">
@@ -122,7 +127,24 @@ function ForgeRightPanelComponent({
             </div>
           </TabsContent>
           <TabsContent value="diff" className="min-h-0 p-3">
-            <pre className="h-[min(430px,50vh)] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-[12px] leading-6 text-white/55">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-white/72">Sandbox proposal</p>
+                <p className="truncate text-[11px] text-white/35">
+                  {latestSandboxSession ? `Applied ${latestSandboxSession.hash}` : 'Review generated files before applying.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onApplyProposal}
+                disabled={!canApplyProposal}
+                className="flex min-h-8 items-center gap-1.5 rounded-lg border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <CheckCircle2 className="size-3.5" />
+                Apply Proposal
+              </button>
+            </div>
+            <pre className="h-[min(380px,42vh)] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-[12px] leading-6 text-white/55">
 {`${diffPreview}
 
 Sandbox only - this proposal is not written to the production project.`}

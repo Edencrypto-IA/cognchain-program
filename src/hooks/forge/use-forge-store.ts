@@ -19,6 +19,7 @@ import type {
   ForgePanelTab,
   ForgePhase,
   ForgeRunStatus,
+  ForgeSandboxSession,
   ForgeTerminalLine,
 } from '@/lib/forge/types';
 
@@ -36,6 +37,8 @@ interface ForgeState {
   memoryNodes: ForgeMemoryNode[];
   deployStatus: string;
   panelTab: ForgePanelTab;
+  sandboxSessions: ForgeSandboxSession[];
+  activeSandboxSessionId: string;
   setPhase: (phase: ForgePhase) => void;
   setRunStatus: (runStatus: ForgeRunStatus) => void;
   setActivePrompt: (prompt: string) => void;
@@ -49,6 +52,7 @@ interface ForgeState {
   updateAgent: (id: ForgeAgentId, patch: Partial<ForgeAgent>) => void;
   updateBuildStep: (id: string, status: ForgeBuildStep['status']) => void;
   setDeployStatus: (status: string) => void;
+  applyProposal: () => ForgeSandboxSession | null;
   resetRun: (prompt: string) => void;
   resetSession: () => void;
   restoreIdle: () => void;
@@ -70,6 +74,24 @@ function cloneMemoryNodes() {
   return initialMemoryNodes.map(node => ({ ...node }));
 }
 
+function createSandboxHash(files: ForgeFile[]) {
+  const input = files
+    .map(file => `${file.path}:${file.language}:${file.contents}`)
+    .sort()
+    .join('\n---forge-file---\n');
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `forge_${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+function createSessionTitle(prompt: string) {
+  const clean = prompt.replace(/^\[[^\]]+\]\s*/, '').trim();
+  return clean ? clean.slice(0, 58) : 'Forge sandbox proposal';
+}
+
 export const useForgeStore = create<ForgeState>()(
   persist(
     (set) => ({
@@ -86,6 +108,8 @@ export const useForgeStore = create<ForgeState>()(
       memoryNodes: cloneMemoryNodes(),
       deployStatus: 'Local sandbox',
       panelTab: 'preview',
+      sandboxSessions: [],
+      activeSandboxSessionId: '',
       setPhase: phase => set({ phase }),
       setRunStatus: runStatus => set({ runStatus }),
       setActivePrompt: activePrompt => set({ activePrompt }),
@@ -127,6 +151,32 @@ export const useForgeStore = create<ForgeState>()(
         buildSteps: state.buildSteps.map(step => step.id === id ? { ...step, status } : step),
       })),
       setDeployStatus: deployStatus => set({ deployStatus }),
+      applyProposal: () => {
+        let created: ForgeSandboxSession | null = null;
+        set(state => {
+          const proposalFiles = state.files.filter(file => file.status === 'created' || file.status === 'modified');
+          if (!proposalFiles.length) return {};
+
+          const hash = createSandboxHash(proposalFiles);
+          created = {
+            id: `session_${Date.now().toString(36)}`,
+            title: createSessionTitle(state.activePrompt || state.promptHistory[0] || ''),
+            prompt: state.activePrompt || state.promptHistory[0] || '',
+            files: proposalFiles.map(file => ({ ...file })),
+            appliedAt: new Date().toISOString(),
+            hash,
+            status: 'applied',
+          };
+
+          return {
+            sandboxSessions: [created, ...state.sandboxSessions.filter(session => session.hash !== hash)].slice(0, 8),
+            activeSandboxSessionId: created.id,
+            deployStatus: `Sandbox applied · ${hash}`,
+            panelTab: 'diff',
+          };
+        });
+        return created;
+      },
       resetRun: prompt => set({
         phase: 'thinking',
         runStatus: 'connecting',
@@ -155,6 +205,7 @@ export const useForgeStore = create<ForgeState>()(
         memoryNodes: cloneMemoryNodes(),
         deployStatus: 'Local sandbox',
         panelTab: 'preview',
+        activeSandboxSessionId: '',
       }),
       restoreIdle: () => set(state => ({
         phase: state.phase === 'error' ? 'error' : 'idle',
@@ -182,6 +233,8 @@ export const useForgeStore = create<ForgeState>()(
         memoryNodes: state.memoryNodes,
         deployStatus: state.deployStatus,
         panelTab: state.panelTab,
+        sandboxSessions: state.sandboxSessions,
+        activeSandboxSessionId: state.activeSandboxSessionId,
       }),
     },
   ),

@@ -14,6 +14,7 @@ import { NeuralOrb } from '@/components/forge/neural-orb';
 import { useForgeSimulation } from '@/hooks/forge/use-forge-simulation';
 import { useForgeStore } from '@/hooks/forge/use-forge-store';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
+import { forgeId, nowLabel } from '@/lib/forge/simulation';
 
 const busyPhases = ['thinking', 'planning', 'building', 'deploying'] as const;
 
@@ -32,8 +33,12 @@ function ForgeWorkspaceInner() {
     deployStatus,
     panelTab,
     promptHistory,
+    sandboxSessions,
+    activeSandboxSessionId,
     setPanelTab,
     setSelectedFile,
+    appendTerminal,
+    applyProposal,
     resetSession,
   } = useForgeStore(
     useShallow(s => ({
@@ -48,19 +53,38 @@ function ForgeWorkspaceInner() {
       deployStatus: s.deployStatus,
       panelTab: s.panelTab,
       promptHistory: s.promptHistory,
+      sandboxSessions: s.sandboxSessions,
+      activeSandboxSessionId: s.activeSandboxSessionId,
       setPanelTab: s.setPanelTab,
       setSelectedFile: s.setSelectedFile,
+      appendTerminal: s.appendTerminal,
+      applyProposal: s.applyProposal,
       resetSession: s.resetSession,
     })),
   );
 
   const busy = busyPhases.includes(phase as (typeof busyPhases)[number]);
   const canReplay = promptHistory.length > 0 && !busy;
+  const latestSandboxSession =
+    sandboxSessions.find(session => session.id === activeSandboxSessionId) ?? sandboxSessions[0];
 
   const handleReset = useCallback(() => {
     stop();
     resetSession();
   }, [stop, resetSession]);
+
+  const handleApplyProposal = useCallback(() => {
+    const session = applyProposal();
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: session ? 'success' : 'warning',
+      source: 'Forge Sandbox',
+      text: session
+        ? `Applied ${session.files.length} file proposal(s) to sandbox session ${session.hash}.`
+        : 'No generated file proposal available to apply.',
+    });
+  }, [appendTerminal, applyProposal]);
 
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-[#0f0f10] text-white">
@@ -135,6 +159,7 @@ function ForgeWorkspaceInner() {
               runStatus={runStatus}
               deployStatus={deployStatus}
               promptHistory={promptHistory}
+              sandboxSessions={sandboxSessions}
               terminal={terminal}
               busy={busy}
               onPromptSelect={runPrompt}
@@ -155,8 +180,10 @@ function ForgeWorkspaceInner() {
                   onSelectFile={setSelectedFile}
                   onPrivatePayDemo={runPrivatePayDemo}
                   onReplayLast={replayLastBuild}
+                  onApplyProposal={handleApplyProposal}
                   canReplay={canReplay}
                   busy={busy}
+                  latestSandboxSession={latestSandboxSession}
                 />
               </ResizablePanel>
               <ResizableHandle className="bg-white/[0.06]" />
@@ -203,8 +230,10 @@ function ForgeWorkspaceInner() {
             onSelectFile={setSelectedFile}
             onPrivatePayDemo={runPrivatePayDemo}
             onReplayLast={replayLastBuild}
+            onApplyProposal={handleApplyProposal}
             canReplay={canReplay}
             busy={busy}
+            latestSandboxSession={latestSandboxSession}
           />
         </motion.div>
         <motion.div
@@ -234,6 +263,7 @@ function ForgeWorkspaceInner() {
             runStatus={runStatus}
             deployStatus={deployStatus}
             promptHistory={promptHistory}
+            sandboxSessions={sandboxSessions}
             terminal={terminal}
             busy={busy}
             onPromptSelect={runPrompt}

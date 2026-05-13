@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from 'react';
 import { Clock3, History, Plus, Search, ShieldCheck } from 'lucide-react';
-import type { ForgeAgent, ForgePhase, ForgeRunStatus, ForgeTerminalLine } from '@/lib/forge/types';
+import type { ForgeAgent, ForgePhase, ForgeRunStatus, ForgeSandboxSession, ForgeTerminalLine } from '@/lib/forge/types';
 import { suggestedPrompts } from '@/lib/forge/demo-data';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { NeuralOrb } from './neural-orb';
@@ -14,6 +14,7 @@ function ForgeSidebarComponent({
   runStatus,
   deployStatus,
   promptHistory,
+  sandboxSessions,
   terminal,
   busy,
   onPromptSelect,
@@ -23,6 +24,7 @@ function ForgeSidebarComponent({
   runStatus: ForgeRunStatus;
   deployStatus: string;
   promptHistory: string[];
+  sandboxSessions: ForgeSandboxSession[];
   terminal: ForgeTerminalLine[];
   busy: boolean;
   onPromptSelect: (prompt: string) => void;
@@ -94,6 +96,23 @@ function ForgeSidebarComponent({
           <p className="text-[11px] text-white/32">Deploy</p>
           <p className="truncate text-xs font-medium text-[#14F195]/75">{deployStatus}</p>
         </div>
+
+        {sandboxSessions.length > 0 && (
+          <>
+            <div className="mt-5 mb-2 flex items-center gap-2">
+              <ShieldCheck className="size-4 text-[#C084FC]" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">Sessions</p>
+            </div>
+            <div className="space-y-1">
+              {sandboxSessions.slice(0, 3).map(session => (
+                <div key={session.id} className="rounded-lg border border-white/[0.06] bg-white/[0.025] px-3 py-2">
+                  <p className="truncate text-xs font-medium text-white/58">{session.title}</p>
+                  <p className="mt-1 truncate font-mono text-[10px] text-[#14F195]/65">{session.hash}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="mt-5 mb-2 flex items-center gap-2">
           <History className="size-4 text-[#38BDF8]" />

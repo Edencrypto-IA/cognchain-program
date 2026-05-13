@@ -35,6 +35,16 @@ export interface ForgeFile {
   contents: string;
 }
 
+export interface ForgeSandboxSession {
+  id: string;
+  title: string;
+  prompt: string;
+  files: ForgeFile[];
+  appliedAt: string;
+  hash: string;
+  status: 'applied';
+}
+
 export interface ForgeBuildStep {
   id: string;
   label: string;
@@ -62,4 +72,6 @@ export interface ForgeSessionSnapshot {
   memoryNodes: ForgeMemoryNode[];
   deployStatus: string;
   panelTab: ForgePanelTab;
+  sandboxSessions: ForgeSandboxSession[];
+  activeSandboxSessionId: string;
 }
