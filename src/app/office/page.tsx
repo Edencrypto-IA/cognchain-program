@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Zap, Brain, CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, Users, Activity, Plus, Play, Loader2 } from 'lucide-react';
+import { ArrowLeft, Zap, Brain, CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, Users, Activity, Plus, Play, Loader2, X, Eye, Clock, Hash, Radio, Terminal, ShieldCheck } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,20 @@ function formatAgo(ts: number) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return `${s}s`;
   return `${Math.floor(s / 60)}m`;
+}
+
+function describeFeedEvent(event: FeedEvent) {
+  switch (event.type) {
+    case 'thinking': return event.text ?? 'Aguardando proximo raciocinio do agente';
+    case 'task_start': return `${event.task?.slice(0, 80) ?? 'Tarefa iniciada'} · +${event.reward ?? 0} SOL`;
+    case 'task_done': return event.success ? `Concluiu: ${event.task?.slice(0, 70) ?? 'tarefa'} (${event.duration ?? 0}ms)` : `Falhou: ${event.task?.slice(0, 70) ?? 'tarefa'}`;
+    case 'memory_saved': return `Memoria salva #${event.hash ?? 'pending'} · ${event.snippet?.slice(0, 80) ?? 'sem trecho disponivel'}`;
+    case 'sol_payment': return `${event.fromName ?? 'agente'} -> ${event.toName ?? 'agente'} · ${event.amount ?? 0} SOL`;
+    case 'agent_fired': return `Score ${event.finalScore ?? '-'} · ${event.reason ?? 'limite de performance atingido'}`;
+    case 'agent_hired': return `${event.agent?.name ?? 'Novo agente'} (${MODEL_META[event.agent?.model ?? '']?.label ?? 'modelo'}) contratado`;
+    case 'real_task_done': return `${(event as {task?:string;result?:string}).task ?? 'Tarefa real'} · ${(event as {result?:string}).result?.slice(0, 90) ?? 'resultado registrado'}`;
+    default: return event.text ?? event.task ?? 'Evento registrado';
+  }
 }
 
 // ─── Hologram Face SVG ───────────────────────────────────────────────────────
@@ -97,14 +111,12 @@ function HologramFace({ color, isActive, isFired }: { color: string; isActive: b
 
 // ─── Agent Card — Premium Design ─────────────────────────────────────────────
 
-function AgentCard({ agent, isNew }: { agent: AgentState; isNew?: boolean }) {
+function AgentCard({ agent, isNew, onInspect }: { agent: AgentState; isNew?: boolean; onInspect?: (agent: AgentState) => void }) {
   const meta = MODEL_META[agent.model] ?? { color: '#888', label: agent.model };
   const isFired = agent.status === 'fired';
   const isActive = agent.status === 'thinking' || agent.status === 'executing';
   const color = isFired ? '#EF4444' : meta.color;
-  const prevScore = useRef(agent.score);
-  const delta = agent.score - prevScore.current;
-  useEffect(() => { prevScore.current = agent.score; }, [agent.score]);
+  const delta = 0;
 
   const statusLabel = isFired ? 'DEMITIDO'
     : agent.status === 'thinking' ? 'PENSANDO'
@@ -120,7 +132,11 @@ function AgentCard({ agent, isNew }: { agent: AgentState; isNew?: boolean }) {
       animate={isActive ? { scale: [1, 1.008, 1] } : { scale: 1, opacity: isFired ? 0.6 : 1 }}
       transition={isActive ? { duration: 3.5, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.5 }}
       whileHover={{ y: -5, scale: 1.015 }}
-      className="relative overflow-hidden rounded-[28px] p-6 cursor-default"
+      onClick={() => onInspect?.(agent)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onInspect?.(agent); }}
+      className="group relative overflow-hidden rounded-[28px] p-6 cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/20"
       style={{
         background: '#050505',
         border: `1px solid ${color}25`,
@@ -146,6 +162,7 @@ function AgentCard({ agent, isNew }: { agent: AgentState; isNew?: boolean }) {
             <span className="text-[22px] font-black tracking-wide text-white/90 leading-none">
               {agent.name.toUpperCase()}-{agent.model.toUpperCase().slice(0, 3)}
             </span>
+            <Eye className="ml-auto h-4 w-4 text-white/20 transition group-hover:text-white/60" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-[0.25em]" style={{ color }}>
             {statusLabel}
@@ -288,6 +305,161 @@ function EventRow({ event }: { event: FeedEvent }) {
 
 // ─── Stat Block ───────────────────────────────────────────────────────────────
 
+function AgentLiveInspector({
+  agent,
+  events,
+  onClose,
+}: {
+  agent: AgentState;
+  events: FeedEvent[];
+  onClose: () => void;
+}) {
+  const meta = MODEL_META[agent.model] ?? { color: '#888', label: agent.model };
+  const isActive = agent.status === 'thinking' || agent.status === 'executing';
+  const color = agent.status === 'fired' ? '#EF4444' : meta.color;
+  const latestMemory = events.find(ev => ev.type === 'memory_saved' && ev.hash);
+  const latestTask = events.find(ev => ev.type === 'task_start' || ev.type === 'task_done' || ev.type === 'real_task_done');
+  const successEvents = events.filter(ev => ev.type === 'task_done' && ev.success).length;
+  const failedEvents = events.filter(ev => ev.type === 'task_done' && ev.success === false).length;
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-xl"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] border bg-[#030303] shadow-2xl"
+        style={{ borderColor: `${color}35`, boxShadow: `0 0 80px ${color}22` }}
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="absolute inset-0 opacity-[0.035]"
+          style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full blur-3xl opacity-20" style={{ background: color }} />
+        <div className="absolute -right-24 bottom-0 h-72 w-72 rounded-full blur-3xl opacity-10" style={{ background: '#14F195' }} />
+
+        <div className="relative z-10 flex items-center justify-between border-b border-white/[0.06] px-6 py-5">
+          <div className="flex items-center gap-4">
+            <div className="relative h-14 w-14">
+              <div className="absolute inset-0 rounded-full blur-xl opacity-40" style={{ background: color }} />
+              <div className="relative h-14 w-14 rounded-2xl border border-white/10 bg-black/60 p-1">
+                <HologramFace color={color} isActive={isActive} isFired={agent.status === 'fired'} />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.28em]" style={{ color }}>Agent Live Inspector</span>
+                <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-white/40">
+                  {isActive ? 'live work' : 'standby'}
+                </span>
+              </div>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-white">{agent.name}</h2>
+              <p className="mt-1 text-xs text-white/40">{meta.label} - {agent.goal}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-white/45 transition hover:bg-white/[0.08] hover:text-white"
+            aria-label="Fechar inspector"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[0.95fr_1.35fr]">
+          <section className="border-b border-white/[0.06] p-6 lg:border-b-0 lg:border-r lg:border-white/[0.06]">
+            <div className="mb-6 rounded-3xl border border-white/[0.08] bg-white/[0.025] p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">Current operation</span>
+                <span className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]"
+                  style={{ background: `${color}18`, color }}>
+                  {agent.status}
+                </span>
+              </div>
+              <p className="text-sm leading-relaxed text-white/70">
+                {agent.currentTask || latestTask?.task || 'Aguardando o proximo evento real deste agente.'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Score', value: `${agent.score.toFixed(1)}/10`, icon: <ShieldCheck className="h-4 w-4" /> },
+                { label: 'Memorias', value: String(agent.memoryCount), icon: <Brain className="h-4 w-4" /> },
+                { label: 'Tarefas', value: String(agent.tasksDone), icon: <Terminal className="h-4 w-4" /> },
+                { label: 'SOL', value: agent.solSpent.toFixed(3), icon: <DollarSign className="h-4 w-4" /> },
+              ].map(item => (
+                <div key={item.label} className="rounded-2xl border border-white/[0.07] bg-black/40 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-white/30">{item.icon}<span className="text-[9px] uppercase tracking-[0.22em]">{item.label}</span></div>
+                  <div className="text-xl font-black text-white">{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-white/[0.07] bg-black/40 p-4">
+              <div className="mb-3 flex items-center gap-2 text-white/35">
+                <Hash className="h-4 w-4" />
+                <span className="text-[9px] uppercase tracking-[0.22em]">Latest memory proof</span>
+              </div>
+              {latestMemory ? (
+                <>
+                  <code className="block truncate text-xs font-bold" style={{ color }}>{latestMemory.hash}</code>
+                  <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-white/45">{latestMemory.snippet}</p>
+                </>
+              ) : (
+                <p className="text-xs text-white/30">Nenhuma memoria emitida por este agente nesta sessao ainda.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="flex min-h-[480px] flex-col p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Radio className="h-4 w-4" style={{ color }} />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">Live workstream</span>
+                </div>
+                <p className="mt-1 text-xs text-white/30">Eventos reais filtrados do feed ao vivo do Office.</p>
+              </div>
+              <div className="flex items-center gap-3 text-[10px] text-white/35">
+                <span>{events.length} eventos</span>
+                <span>{successEvents} ok</span>
+                <span>{failedEvents} falhas</span>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-3xl border border-white/[0.07] bg-black/45 p-3">
+              {events.length === 0 ? (
+                <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-3 text-center">
+                  <div className="h-8 w-8 rounded-full border-2 border-white/10 border-t-white/40 animate-spin" />
+                  <p className="max-w-sm text-sm text-white/35">Este agente ainda nao emitiu eventos nesta sessao. Quando ele pensar, executar ou salvar memoria, tudo aparece aqui.</p>
+                </div>
+              ) : (
+                events.map((event, index) => (
+                  <div key={event.id} className="relative border-l border-white/[0.08] pb-4 pl-5 last:pb-0">
+                    <div className="absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full" style={{ background: index === 0 ? color : 'rgba(255,255,255,0.18)', boxShadow: index === 0 ? `0 0 16px ${color}` : 'none' }} />
+                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color }}>{event.type.replaceAll('_', ' ')}</span>
+                        <span className="flex items-center gap-1 text-[10px] text-white/25"><Clock className="h-3 w-3" />{formatAgo(event.ts)}</span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-white/65">{describeFeedEvent(event)}</p>
+                      {event.hash && <code className="mt-3 block truncate rounded-xl border border-white/[0.06] bg-black/45 px-3 py-2 text-[11px] text-white/45">hash: {event.hash}</code>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function StatBlock({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: React.ReactElement }) {
   return (
     <div className="flex-1 px-6 py-5 border-r border-white/[0.05] last:border-r-0">
@@ -313,6 +485,7 @@ export default function OfficePage() {
   const [time, setTime] = useState('');
   const [running, setRunning] = useState(false);
   const [schedulerOn, setSchedulerOn] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
   const esRef = useRef<EventSource | null>(null);
   const eventCounter = useRef(0);
@@ -437,6 +610,11 @@ export default function OfficePage() {
 
   const activeAgents = agents.filter(a => a.status !== 'fired');
   const firedAgents = agents.filter(a => a.status === 'fired');
+  const selectedAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) ?? null : null;
+  const selectedAgentEvents = useMemo(() => {
+    if (!selectedAgent) return [];
+    return feed.filter(ev => ev.agentId === selectedAgent.id || ev.name === selectedAgent.name || ev.agent?.id === selectedAgent.id);
+  }, [feed, selectedAgent]);
 
   return (
     <>
@@ -557,7 +735,7 @@ export default function OfficePage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               {activeAgents.map(agent => (
-                <AgentCard key={agent.id} agent={agent} isNew={newAgentIds.has(agent.id)} />
+                <AgentCard key={agent.id} agent={agent} isNew={newAgentIds.has(agent.id)} onInspect={(a) => setSelectedAgentId(a.id)} />
               ))}
             </div>
 
@@ -571,7 +749,7 @@ export default function OfficePage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   {firedAgents.map(agent => (
-                    <AgentCard key={agent.id} agent={agent} />
+                    <AgentCard key={agent.id} agent={agent} onInspect={(a) => setSelectedAgentId(a.id)} />
                   ))}
                 </div>
               </>
@@ -600,6 +778,14 @@ export default function OfficePage() {
             </div>
           </div>
         </div>
+
+        {selectedAgent && (
+          <AgentLiveInspector
+            agent={selectedAgent}
+            events={selectedAgentEvents}
+            onClose={() => setSelectedAgentId(null)}
+          />
+        )}
       </div>
     </>
   );
