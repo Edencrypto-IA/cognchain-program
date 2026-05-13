@@ -89,7 +89,7 @@ function ForgeWorkspaceInner() {
   }, [appendTerminal, applyProposal]);
 
   return (
-    <main className="relative flex min-h-screen flex-col overflow-hidden bg-[#0f0f10] text-white">
+    <main className="relative flex h-screen max-h-screen min-h-0 flex-col overflow-hidden bg-[#0f0f10] text-white">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/2 top-[-16rem] h-96 w-[42rem] -translate-x-1/2 rounded-full bg-[#9945FF]/8 blur-3xl" />
         <div className="absolute right-[-10rem] bottom-[-12rem] h-96 w-96 rounded-full bg-[#14F195]/5 blur-3xl" />
@@ -160,8 +160,8 @@ function ForgeWorkspaceInner() {
         </div>
       </header>
 
-      <section className="relative z-10 hidden min-h-0 flex-1 lg:block">
-        <ResizablePanelGroup direction="horizontal" className="h-full min-h-0">
+      <section className="relative z-10 hidden min-h-0 flex-1 overflow-hidden lg:block">
+        <ResizablePanelGroup direction="horizontal" className="h-full min-h-0 overflow-hidden">
           <ResizablePanel defaultSize={21} minSize={16} maxSize={30}>
             <ForgeFileExplorer
               files={files}
@@ -174,8 +174,8 @@ function ForgeWorkspaceInner() {
           </ResizablePanel>
           <ResizableHandle className="bg-white/[0.06]" />
           <ResizablePanel defaultSize={79} minSize={50}>
-            <ResizablePanelGroup direction="vertical" className="h-full">
-              <ResizablePanel defaultSize={68} minSize={42}>
+            <ResizablePanelGroup direction="vertical" className="h-full min-h-0 overflow-hidden">
+              <ResizablePanel defaultSize={62} minSize={38}>
                 <ForgeRightPanel
                   phase={phase}
                   runStatus={runStatus}
@@ -194,7 +194,7 @@ function ForgeWorkspaceInner() {
                 />
               </ResizablePanel>
               <ResizableHandle className="bg-white/[0.06]" />
-              <ResizablePanel defaultSize={32} minSize={22}>
+              <ResizablePanel defaultSize={38} minSize={26}>
                 <ForgeTerminal
                   phase={phase}
                   runStatus={runStatus}
