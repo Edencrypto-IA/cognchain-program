@@ -48,6 +48,20 @@ function ForgeRightPanelComponent({
     const deploy = deployStatus ?? '—';
     return `${RUN_STATUS_LABELS[runStatus]} · ${deploy}`;
   }, [runStatus, deployStatus]);
+  const selected = useMemo(
+    () => files.find(file => file.path === selectedFile) ?? files[0],
+    [files, selectedFile],
+  );
+  const diffPreview = useMemo(() => {
+    if (!selected) return 'No file proposal selected.';
+    const lines = selected.contents.split('\n').slice(0, 90);
+    return [
+      `+++ ${selected.path}`,
+      `status: ${selected.status} · language: ${selected.language}`,
+      '',
+      ...lines.map(line => `+ ${line}`),
+    ].join('\n');
+  }, [selected]);
 
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-[#111113]/40">
@@ -109,16 +123,9 @@ function ForgeRightPanelComponent({
           </TabsContent>
           <TabsContent value="diff" className="min-h-0 p-3">
             <pre className="h-[min(430px,50vh)] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-[12px] leading-6 text-white/55">
-{`+ create features/generated/agent-console.tsx
-+ Agent collaboration feed
-+ Verified memory handoff props
-+ Safe UI-only execution boundary
+{`${diffPreview}
 
-~ update generated preview shell
-+ Add Solana proof capsule status
-+ Add cinematic glass surface
-
-Sandbox only — no production deploy from this panel.`}
+Sandbox only - this proposal is not written to the production project.`}
             </pre>
           </TabsContent>
         </Tabs>

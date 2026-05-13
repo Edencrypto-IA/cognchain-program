@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef } from 'react';
 import { PRIVATE_PAY_DEMO_PROMPT } from '@/lib/forge/demo-data';
 import { forgeId, nowLabel } from '@/lib/forge/simulation';
 import { useForgeStore } from './use-forge-store';
-import type { ForgeAgentId } from '@/lib/forge/types';
+import type { ForgeAgentId, ForgeFile } from '@/lib/forge/types';
 
 const FORGE_MODEL = 'nvidia';
 
-type StreamEvent = { status?: string; token?: string; done?: boolean; error?: string };
+type StreamEvent = { status?: string; token?: string; done?: boolean; error?: string; files?: ForgeFile[] };
 
 function parseSseData(raw: string): string | null {
   const data = raw
@@ -31,6 +31,7 @@ export function useForgeSimulation() {
     appendTerminal,
     updateAgent,
     updateBuildStep,
+    upsertFile,
     upsertMemory,
     setDeployStatus,
     setPhase,
@@ -172,6 +173,17 @@ export function useForgeSimulation() {
           finalizeError(evt.error);
           return;
         }
+        if (evt.files?.length) {
+          evt.files.forEach(file => upsertFile(file));
+          updateBuildStep('files', 'complete');
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'success',
+            source: 'Forge Files',
+            text: `${evt.files.length} proposta${evt.files.length > 1 ? 's' : ''} de ficheiro pronta${evt.files.length > 1 ? 's' : ''} no explorer.`,
+          });
+        }
         if (evt.done) {
           finalizeSuccess();
         }
@@ -271,6 +283,7 @@ export function useForgeSimulation() {
       flushPendingTokens,
       updateBuildStep,
       updateAgent,
+      upsertFile,
       upsertMemory,
       setDeployStatus,
       setPhase,

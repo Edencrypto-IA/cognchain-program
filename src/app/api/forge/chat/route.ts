@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { checkRateLimit, validateModel, Limits, MODEL_TIER, ValidationError } from '@/lib/security';
 import { verifyAdminToken } from '@/app/api/auth/verify/route';
 import { requireApiKey } from '@/lib/api-key-auth';
+import type { ForgeFile } from '@/lib/forge/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,17 @@ const FORGE_SYSTEM = `Você é o CongChain Forge — workspace de IA focado em S
 Use devnet nos exemplos por defeito. Nunca afirme que uma transação foi executada on-chain sem o utilizador fornecer uma assinatura ou prova.
 Responda em português salvo se o utilizador escrever noutra língua. Use markdown (###, listas, blocos \`\`\`linguagem).
 Não invente endereços, program IDs, ou assinaturas de transações. Se faltar contexto de código, pede-o de forma objetiva.`;
+
+const FORGE_FILE_INSTRUCTIONS = `
+
+Quando propuser ficheiros para o Forge, use exatamente este formato antes de cada bloco de codigo:
+File: app/example/page.tsx
+\`\`\`tsx
+// codigo aqui
+\`\`\`
+Use no maximo 4 ficheiros por resposta e prefira caminhos dentro de app/, components/, lib/, hooks/ ou solana/.`;
+
+const FORGE_SYSTEM_WITH_FILES = `${FORGE_SYSTEM}${FORGE_FILE_INSTRUCTIONS}`;
 
 function enc(text: string) {
   return new TextEncoder().encode(`data: ${JSON.stringify({ token: text })}\n\n`);
@@ -27,6 +39,62 @@ function encStatus(text: string) {
 }
 
 const FORGE_MAX_TOKENS = 2048;
+const FORGE_MAX_FILE_CONTENT = 24_000;
+const FORGE_MAX_FILES = 4;
+const SAFE_FILE_PREFIXES = ['app/', 'components/', 'lib/', 'hooks/', 'solana/'];
+
+function normalizeForgePath(path: string) {
+  return path
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\\/g, '/')
+    .replace(/^\.?\//, '');
+}
+
+function isSafeForgePath(path: string) {
+  return (
+    path.length > 0 &&
+    path.length <= 140 &&
+    !path.startsWith('/') &&
+    !path.includes('..') &&
+    SAFE_FILE_PREFIXES.some(prefix => path.startsWith(prefix))
+  );
+}
+
+function inferLanguage(path: string, fallback?: string) {
+  if (fallback && fallback.trim()) return fallback.trim().slice(0, 20);
+  if (path.endsWith('.tsx')) return 'tsx';
+  if (path.endsWith('.ts')) return 'ts';
+  if (path.endsWith('.css')) return 'css';
+  if (path.endsWith('.json')) return 'json';
+  if (path.endsWith('.md')) return 'md';
+  return 'txt';
+}
+
+function extractForgeFiles(markdown: string): ForgeFile[] {
+  const files: ForgeFile[] = [];
+  const seen = new Set<string>();
+  const pattern = /(?:^|\n)(?:File|Arquivo):\s*([^\n]+)\n```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(markdown)) && files.length < FORGE_MAX_FILES) {
+    const path = normalizeForgePath(match[1] ?? '');
+    if (!isSafeForgePath(path) || seen.has(path)) continue;
+
+    const contents = (match[3] ?? '').slice(0, FORGE_MAX_FILE_CONTENT).trimEnd();
+    if (!contents) continue;
+
+    seen.add(path);
+    files.push({
+      path,
+      language: inferLanguage(path, match[2]),
+      status: 'created',
+      contents,
+    });
+  }
+
+  return files;
+}
 
 async function streamOpenAI(messages: { role: string; content: string }[], model: string, system: string, controller: ReadableStreamDefaultController) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -129,15 +197,15 @@ export async function POST(req: NextRequest) {
         console.log(`[forge:chat] start model=${selectedModel}`);
 
         if (selectedModel === 'gpt') {
-          full = await streamOpenAI(validMsgs, 'gpt-4o', FORGE_SYSTEM, controller);
+          full = await streamOpenAI(validMsgs, 'gpt-4o', FORGE_SYSTEM_WITH_FILES, controller);
         } else if (selectedModel === 'claude') {
-          full = await streamAnthropic(validMsgs, FORGE_SYSTEM, controller);
+          full = await streamAnthropic(validMsgs, FORGE_SYSTEM_WITH_FILES, controller);
         } else if (selectedModel === 'deepseek') {
-          full = await streamOpenAICompat(validMsgs, 'deepseek-chat', 'https://api.deepseek.com', process.env.DEEPSEEK_API_KEY ?? '', FORGE_SYSTEM, controller);
+          full = await streamOpenAICompat(validMsgs, 'deepseek-chat', 'https://api.deepseek.com', process.env.DEEPSEEK_API_KEY ?? '', FORGE_SYSTEM_WITH_FILES, controller);
         } else if (selectedModel === 'gemini') {
           const { GoogleGenerativeAI } = await import('@google/generative-ai');
           const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
-          const gemModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite', systemInstruction: FORGE_SYSTEM });
+          const gemModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite', systemInstruction: FORGE_SYSTEM_WITH_FILES });
           const chat = gemModel.startChat({ history: [] });
           const result = await chat.sendMessageStream(validMsgs.at(-1)?.content ?? '');
           for await (const chunk of result.stream) {
@@ -152,11 +220,15 @@ export async function POST(req: NextRequest) {
             qwen:    { url: 'https://integrate.api.nvidia.com/v1', name: 'qwen/qwen3-next-80b-a3b-instruct', key: process.env.NVIDIA_QWEN_KEY ?? '' },
           };
           const cfg = modelMap[selectedModel] ?? modelMap.nvidia;
-          full = await streamOpenAICompat(validMsgs, cfg.name, cfg.url, cfg.key, FORGE_SYSTEM, controller);
+          full = await streamOpenAICompat(validMsgs, cfg.name, cfg.url, cfg.key, FORGE_SYSTEM_WITH_FILES, controller);
         }
 
-        console.log(`[forge:chat] done model=${selectedModel} chars=${full.length}`);
-        controller.enqueue(encDone({ model: selectedModel }));
+        const files = extractForgeFiles(full);
+        if (files.length) {
+          controller.enqueue(encStatus(`${files.length} ficheiro${files.length > 1 ? 's' : ''} estruturado${files.length > 1 ? 's' : ''} extraido${files.length > 1 ? 's' : ''}.`));
+        }
+        console.log(`[forge:chat] done model=${selectedModel} chars=${full.length} files=${files.length}`);
+        controller.enqueue(encDone({ model: selectedModel, files }));
       } catch (err) {
         const message = err instanceof ValidationError ? err.message : (err instanceof Error ? err.message : String(err));
         console.error(`[forge:chat] error model=${selectedModel}`, message);
