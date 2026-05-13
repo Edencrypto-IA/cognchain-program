@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUp, Loader2, Square, Terminal } from 'lucide-react';
+import { ArrowUp, Bot, Boxes, Braces, Layers3, Loader2, Square, Terminal } from 'lucide-react';
 import type { ForgePhase, ForgeTerminalLine } from '@/lib/forge/types';
 import { suggestedPrompts } from '@/lib/forge/demo-data';
 
@@ -14,6 +14,15 @@ const lineColors = {
   warning: 'text-[#FBBF24]',
   error: 'text-red-300',
 };
+
+type ForgeComposerMode = 'App' | 'Component' | 'API' | 'Agent';
+
+const composerModes: Array<{ mode: ForgeComposerMode; icon: typeof Layers3; placeholder: string }> = [
+  { mode: 'App', icon: Layers3, placeholder: 'Describe the full app you want Forge to build...' },
+  { mode: 'Component', icon: Boxes, placeholder: 'Describe the component, state, props, and behavior...' },
+  { mode: 'API', icon: Braces, placeholder: 'Describe the endpoint, data contract, and validation...' },
+  { mode: 'Agent', icon: Bot, placeholder: 'Describe the agent workflow, tools, and success criteria...' },
+];
 
 export function ForgeTerminal({
   phase,
@@ -29,8 +38,11 @@ export function ForgeTerminal({
   onStop: () => void;
 }) {
   const [prompt, setPrompt] = useState('');
+  const [mode, setMode] = useState<ForgeComposerMode>('App');
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const running = ['thinking', 'planning', 'building', 'deploying'].includes(phase);
+  const activeMode = composerModes.find(item => item.mode === mode) ?? composerModes[0];
+  const ActiveModeIcon = activeMode.icon;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -39,7 +51,7 @@ export function ForgeTerminal({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!prompt.trim() || running) return;
-    onRunPrompt(prompt);
+    onRunPrompt(`[${mode}] ${prompt}`);
     setPrompt('');
   }
 
@@ -100,37 +112,65 @@ export function ForgeTerminal({
       </div>
 
       <div className="border-t border-white/[0.07] p-3">
-        {!running && (
-          <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-            {suggestedPrompts.map(item => (
-              <button
-                key={item}
-                onClick={() => setPrompt(item)}
-                className="shrink-0 rounded-md border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[11px] text-white/36 transition-colors hover:border-[#9945FF]/30 hover:text-white/70"
-              >
-                {item}
-              </button>
-            ))}
+        <form onSubmit={submit} className="rounded-2xl border border-white/[0.09] bg-[#101013]/95 p-2 shadow-2xl shadow-black/25">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="flex rounded-xl border border-white/[0.07] bg-black/25 p-1">
+              {composerModes.map(({ mode: itemMode, icon: Icon }) => (
+                <button
+                  key={itemMode}
+                  type="button"
+                  onClick={() => setMode(itemMode)}
+                  disabled={running}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                    mode === itemMode
+                      ? 'bg-white/[0.08] text-white/85'
+                      : 'text-white/34 hover:bg-white/[0.045] hover:text-white/65'
+                  }`}
+                >
+                  <Icon className="size-3.5" />
+                  {itemMode}
+                </button>
+              ))}
+            </div>
+
+            {!running && (
+              <div className="hidden min-w-0 flex-1 justify-end gap-1.5 overflow-hidden md:flex">
+                {suggestedPrompts.slice(0, 2).map(item => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setPrompt(item)}
+                    className="truncate rounded-lg border border-white/[0.06] bg-white/[0.025] px-2.5 py-1.5 text-[11px] text-white/32 transition-colors hover:border-[#9945FF]/30 hover:text-white/68"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-        <form onSubmit={submit} className="flex items-end gap-2 rounded-xl border border-white/[0.08] bg-black/30 p-2">
-          <textarea
-            value={prompt}
-            onChange={event => setPrompt(event.target.value)}
-            rows={1}
-            placeholder="Describe what you want Forge to build..."
-            className="min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white/80 outline-none placeholder:text-white/25"
-            disabled={running}
-          />
-          <button
-            type={running ? 'button' : 'submit'}
-            onClick={running ? onStop : undefined}
-            className="grid size-9 shrink-0 place-items-center rounded-lg border border-[#9945FF]/25 bg-[#9945FF]/15 text-[#C084FC] transition-colors hover:border-[#14F195]/35 hover:bg-[#14F195]/10 hover:text-[#14F195] disabled:opacity-40"
-            disabled={!running && !prompt.trim()}
-            aria-label={running ? 'Stop simulation' : 'Run Forge prompt'}
-          >
-            {running ? <Square className="size-4" /> : <ArrowUp className="size-4" />}
-          </button>
+
+          <div className="flex items-end gap-2">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-white/[0.035] text-white/42">
+              <ActiveModeIcon className="size-4" />
+            </div>
+            <textarea
+              value={prompt}
+              onChange={event => setPrompt(event.target.value)}
+              rows={1}
+              placeholder={activeMode.placeholder}
+              className="min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-5 text-white/82 outline-none placeholder:text-white/24"
+              disabled={running}
+            />
+            <button
+              type={running ? 'button' : 'submit'}
+              onClick={running ? onStop : undefined}
+              className="grid size-9 shrink-0 place-items-center rounded-xl border border-[#9945FF]/25 bg-[#9945FF]/15 text-[#C084FC] transition-colors hover:border-[#14F195]/35 hover:bg-[#14F195]/10 hover:text-[#14F195] disabled:opacity-40"
+              disabled={!running && !prompt.trim()}
+              aria-label={running ? 'Stop simulation' : 'Run Forge prompt'}
+            >
+              {running ? <Square className="size-4" /> : <ArrowUp className="size-4" />}
+            </button>
+          </div>
         </form>
       </div>
     </section>
