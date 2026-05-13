@@ -2,9 +2,18 @@
 
 import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bot, Box, Play, RotateCcw, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, Bot, Box, CheckCircle2, Clipboard, Copy, FilePlus2, Play, RotateCcw, Search, ShieldCheck, Sparkles, Square } from 'lucide-react';
 import Link from 'next/link';
 import { useShallow } from 'zustand/react/shallow';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ForgeSidebar } from '@/components/forge/forge-sidebar';
@@ -30,7 +39,7 @@ function ForgeWorkspaceInner() {
     terminal,
     streamedResponse,
     files,
-    selectedFile,
+    selectedFile: selectedFilePath,
     buildSteps,
     deployStatus,
     panelTab,
@@ -69,6 +78,7 @@ function ForgeWorkspaceInner() {
   const canReplay = promptHistory.length > 0 && !busy;
   const latestSandboxSession =
     sandboxSessions.find(session => session.id === activeSandboxSessionId) ?? sandboxSessions[0];
+  const selectedFile = files.find(file => file.path === selectedFilePath) ?? files[0];
 
   const handleReset = useCallback(() => {
     stop();
@@ -88,6 +98,29 @@ function ForgeWorkspaceInner() {
     });
   }, [appendTerminal, applyProposal]);
 
+  const handleCopySelectedFile = useCallback(() => {
+    if (!selectedFile) return;
+    navigator.clipboard?.writeText(selectedFile.contents).catch(() => {});
+  }, [selectedFile]);
+
+  const handleCopySandboxSummary = useCallback(() => {
+    const session = latestSandboxSession;
+    const summary = session
+      ? [
+        `Forge sandbox session: ${session.title}`,
+        `Hash: ${session.hash}`,
+        `Applied at: ${session.appliedAt}`,
+        `Files:`,
+        ...session.files.map(file => `- ${file.path} (${file.language})`),
+      ].join('\n')
+      : [
+        'Forge sandbox proposal',
+        `Selected file: ${selectedFile?.path ?? 'none'}`,
+        `Status: ${deployStatus}`,
+      ].join('\n');
+    navigator.clipboard?.writeText(summary).catch(() => {});
+  }, [deployStatus, latestSandboxSession, selectedFile]);
+
   return (
     <main className="relative flex h-screen max-h-screen min-h-0 flex-col overflow-hidden bg-[#0f0f10] text-white">
       <div className="pointer-events-none absolute inset-0">
@@ -105,9 +138,90 @@ function ForgeWorkspaceInner() {
             <ArrowLeft className="size-3.5" />
           </Link>
           <Box className="size-4 shrink-0 text-white/45" />
-          <span className="hidden text-xs text-white/42 sm:inline">File</span>
-          <span className="hidden text-xs text-white/42 sm:inline">Edit</span>
-          <span className="hidden text-xs text-white/42 sm:inline">Run</span>
+          <div className="hidden items-center gap-0.5 sm:flex">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="rounded px-2 py-1 text-xs text-white/42 outline-none transition-colors hover:bg-white/[0.06] hover:text-white/82 data-[state=open]:bg-white/[0.08] data-[state=open]:text-white/82">
+                File
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 border-white/[0.08] bg-[#0b0b0d] text-white/76">
+                <DropdownMenuLabel className="text-xs text-white/38">Forge Workspace</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={handleReset} className="text-xs">
+                  <FilePlus2 className="size-3.5" />
+                  New Forge Session
+                  <DropdownMenuShortcut>Reset</DropdownMenuShortcut>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleApplyProposal} disabled={busy} className="text-xs">
+                  <CheckCircle2 className="size-3.5" />
+                  Apply Proposal
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleCopySandboxSummary} className="text-xs">
+                  <Clipboard className="size-3.5" />
+                  Copy Sandbox Summary
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/[0.08]" />
+                <DropdownMenuItem disabled className="text-xs">
+                  Export Files
+                  <DropdownMenuShortcut>Soon</DropdownMenuShortcut>
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled className="text-xs">
+                  Save to Project
+                  <DropdownMenuShortcut>Future</DropdownMenuShortcut>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="rounded px-2 py-1 text-xs text-white/42 outline-none transition-colors hover:bg-white/[0.06] hover:text-white/82 data-[state=open]:bg-white/[0.08] data-[state=open]:text-white/82">
+                Edit
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 border-white/[0.08] bg-[#0b0b0d] text-white/76">
+                <DropdownMenuLabel className="text-xs text-white/38">Proposal Tools</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={handleCopySelectedFile} disabled={!selectedFile} className="text-xs">
+                  <Copy className="size-3.5" />
+                  Copy Selected File
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleCopySandboxSummary} className="text-xs">
+                  <Clipboard className="size-3.5" />
+                  Copy Judge Summary
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/[0.08]" />
+                <DropdownMenuItem disabled className="text-xs">
+                  Format Proposal
+                  <DropdownMenuShortcut>Soon</DropdownMenuShortcut>
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled className="text-xs">
+                  Clear Terminal
+                  <DropdownMenuShortcut>Future</DropdownMenuShortcut>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="rounded px-2 py-1 text-xs text-white/42 outline-none transition-colors hover:bg-white/[0.06] hover:text-white/82 data-[state=open]:bg-white/[0.08] data-[state=open]:text-white/82">
+                Run
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 border-white/[0.08] bg-[#0b0b0d] text-white/76">
+                <DropdownMenuLabel className="text-xs text-white/38">Execution</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => void runPrivatePayDemo()} disabled={busy} className="text-xs">
+                  <Play className="size-3.5" />
+                  Run PrivatePay Demo
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void replayLastBuild()} disabled={!canReplay} className="text-xs">
+                  <Sparkles className="size-3.5" />
+                  Replay Last Build
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={stop} disabled={!busy} className="text-xs">
+                  <Square className="size-3.5" />
+                  Stop Stream
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/[0.08]" />
+                <DropdownMenuItem onSelect={handleApplyProposal} disabled={busy} className="text-xs">
+                  <ShieldCheck className="size-3.5" />
+                  Verify Sandbox
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <div className="order-last flex w-full basis-full items-center justify-center gap-1.5 sm:order-none sm:w-auto sm:basis-auto sm:justify-end">
@@ -165,7 +279,7 @@ function ForgeWorkspaceInner() {
           <ResizablePanel defaultSize={21} minSize={16} maxSize={30}>
             <ForgeFileExplorer
               files={files}
-              selectedFile={selectedFile}
+              selectedFile={selectedFilePath}
               buildSteps={buildSteps}
               sandboxSessions={sandboxSessions}
               busy={busy}
@@ -180,7 +294,7 @@ function ForgeWorkspaceInner() {
                   phase={phase}
                   runStatus={runStatus}
                   files={files}
-                  selectedFile={selectedFile}
+                  selectedFile={selectedFilePath}
                   deployStatus={deployStatus}
                   tab={panelTab}
                   onTabChange={setPanelTab}
@@ -219,7 +333,7 @@ function ForgeWorkspaceInner() {
             phase={phase}
             runStatus={runStatus}
             files={files}
-            selectedFile={selectedFile}
+            selectedFile={selectedFilePath}
             deployStatus={deployStatus}
             tab={panelTab}
             onTabChange={setPanelTab}
@@ -255,7 +369,7 @@ function ForgeWorkspaceInner() {
         >
           <ForgeFileExplorer
             files={files}
-            selectedFile={selectedFile}
+            selectedFile={selectedFilePath}
             buildSteps={buildSteps}
             sandboxSessions={sandboxSessions}
             busy={busy}
