@@ -6,17 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GlassPanel } from './glass-panel';
 import { ForgePreview } from './forge-preview';
 import { CodeViewer } from './code-viewer';
-import { BuildStatus } from './build-status';
-import { MemoryMap } from './memory-map';
 import { cn } from '@/lib/utils';
 
 export function ForgeRightPanel({
   phase,
   files,
   selectedFile,
-  buildSteps,
-  memoryNodes,
-  deployStatus,
   tab,
   onTabChange,
   onSelectFile,
@@ -24,19 +19,19 @@ export function ForgeRightPanel({
   phase: ForgePhase;
   files: ForgeFile[];
   selectedFile: string;
-  buildSteps: ForgeBuildStep[];
-  memoryNodes: ForgeMemoryNode[];
-  deployStatus: string;
+  buildSteps?: ForgeBuildStep[];
+  memoryNodes?: ForgeMemoryNode[];
+  deployStatus?: string;
   tab: ForgePanelTab;
   onTabChange: (tab: ForgePanelTab) => void;
   onSelectFile: (path: string) => void;
 }) {
   return (
-    <aside className="flex h-full flex-col gap-3 overflow-hidden p-3">
-      <GlassPanel className="min-h-0 flex-1 p-0">
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-[#111113]/40">
+      <GlassPanel className="min-h-0 flex-1 rounded-none border-0 bg-transparent p-0 shadow-none">
         <Tabs value={tab} onValueChange={value => onTabChange(value as ForgePanelTab)} className="h-full gap-0">
-          <div className="flex items-center justify-between border-b border-white/[0.07] px-3 py-2">
-            <TabsList className="h-8 rounded-xl border border-white/[0.07] bg-white/[0.035] p-1">
+          <div className="flex h-10 items-center justify-between border-b border-white/[0.07] px-3">
+            <TabsList className="h-7 rounded-lg border border-white/[0.06] bg-white/[0.03] p-0.5">
               {[
                 ['preview', MonitorPlay],
                 ['code', PanelsTopLeft],
@@ -46,7 +41,7 @@ export function ForgeRightPanel({
                 <TabsTrigger
                   key={value as string}
                   value={value as string}
-                  className="h-6 rounded-lg px-2 text-[11px] text-white/40 data-[state=active]:bg-white/[0.09] data-[state=active]:text-white"
+                  className="h-6 rounded-md px-2 text-[11px] text-white/38 data-[state=active]:bg-white/[0.08] data-[state=active]:text-white/78"
                 >
                   <Icon className="size-3" />
                   <span className="hidden sm:inline">{value as string}</span>
@@ -94,15 +89,6 @@ No production files are changed by the Forge MVP simulation.`}
           </TabsContent>
         </Tabs>
       </GlassPanel>
-
-      <div className="grid shrink-0 gap-3 xl:grid-cols-2">
-        <GlassPanel>
-          <BuildStatus steps={buildSteps} phase={phase} deployStatus={deployStatus} />
-        </GlassPanel>
-        <GlassPanel>
-          <MemoryMap nodes={memoryNodes} />
-        </GlassPanel>
-      </div>
     </aside>
   );
 }

@@ -2,11 +2,9 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUp, Command, Loader2, Square, Terminal } from 'lucide-react';
+import { ArrowUp, Loader2, Square, Terminal } from 'lucide-react';
 import type { ForgePhase, ForgeTerminalLine } from '@/lib/forge/types';
 import { suggestedPrompts } from '@/lib/forge/demo-data';
-import { GlassPanel } from './glass-panel';
-import { NeuralOrb } from './neural-orb';
 
 const lineColors = {
   system: 'text-[#C084FC]',
@@ -46,29 +44,28 @@ export function ForgeTerminal({
   }
 
   return (
-    <GlassPanel className="flex min-h-[560px] flex-1 flex-col p-0">
-      <header className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
-        <div className="flex items-center gap-3">
-          <NeuralOrb active={running} className="size-10" />
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-white/30">AI Operating Terminal</p>
-            <h2 className="text-lg font-semibold text-white/90">Build with agent memory</h2>
-          </div>
+    <section className="flex h-full min-h-0 flex-1 flex-col border-t border-white/[0.07] bg-[#0b0b0d]/95">
+      <header className="flex h-9 items-center justify-between border-b border-white/[0.07] px-3">
+        <div className="flex items-center gap-4 text-[12px] font-medium">
+          {['Problems', 'Output', 'Debug Console'].map(item => (
+            <span key={item} className="text-white/32">{item}</span>
+          ))}
+          <span className="rounded-md bg-white/[0.07] px-2 py-1 text-white/80">Terminal</span>
         </div>
-        <div className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-white/40 sm:flex">
-          {running ? <Loader2 className="size-3 animate-spin text-[#14F195]" /> : <Command className="size-3 text-[#9945FF]" />}
-          {running ? 'agents executing' : 'sandbox ready'}
+        <div className="flex items-center gap-2 text-[11px] text-white/35">
+          {running && <Loader2 className="size-3 animate-spin text-[#14F195]" />}
+          <span>{running ? 'agents executing' : 'powershell'}</span>
         </div>
       </header>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <div className="space-y-3">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div className="space-y-1.5">
           {terminal.map(line => (
             <motion.div
               key={line.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-[76px_1fr] gap-3 rounded-xl border border-white/[0.04] bg-black/20 px-3 py-2.5 font-mono text-xs"
+              className="grid grid-cols-[64px_1fr] gap-2 rounded-md px-2 py-1.5 font-mono text-[12px]"
             >
               <span className="text-white/22">{line.timestamp}</span>
               <div className="min-w-0">
@@ -102,33 +99,33 @@ export function ForgeTerminal({
         </AnimatePresence>
       </div>
 
-      <div className="border-t border-white/[0.07] p-4">
+      <div className="border-t border-white/[0.07] p-3">
         {!running && (
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
             {suggestedPrompts.map(item => (
               <button
                 key={item}
                 onClick={() => setPrompt(item)}
-                className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-white/40 transition-colors hover:border-[#9945FF]/30 hover:text-white/75"
+                className="shrink-0 rounded-md border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[11px] text-white/36 transition-colors hover:border-[#9945FF]/30 hover:text-white/70"
               >
                 {item}
               </button>
             ))}
           </div>
         )}
-        <form onSubmit={submit} className="flex items-end gap-2 rounded-2xl border border-white/[0.09] bg-black/35 p-2">
+        <form onSubmit={submit} className="flex items-end gap-2 rounded-xl border border-white/[0.08] bg-black/30 p-2">
           <textarea
             value={prompt}
             onChange={event => setPrompt(event.target.value)}
-            rows={2}
-            placeholder="Ask Forge to build an app, agent workflow, API, or Solana-native interface..."
-            className="min-h-12 flex-1 resize-none bg-transparent px-3 py-2 text-sm leading-6 text-white/80 outline-none placeholder:text-white/25"
+            rows={1}
+            placeholder="Describe what you want Forge to build..."
+            className="min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-white/80 outline-none placeholder:text-white/25"
             disabled={running}
           />
           <button
             type={running ? 'button' : 'submit'}
             onClick={running ? onStop : undefined}
-            className="grid size-11 shrink-0 place-items-center rounded-xl border border-[#9945FF]/25 bg-[#9945FF]/15 text-[#C084FC] transition-colors hover:border-[#14F195]/35 hover:bg-[#14F195]/10 hover:text-[#14F195] disabled:opacity-40"
+            className="grid size-9 shrink-0 place-items-center rounded-lg border border-[#9945FF]/25 bg-[#9945FF]/15 text-[#C084FC] transition-colors hover:border-[#14F195]/35 hover:bg-[#14F195]/10 hover:text-[#14F195] disabled:opacity-40"
             disabled={!running && !prompt.trim()}
             aria-label={running ? 'Stop simulation' : 'Run Forge prompt'}
           >
@@ -136,6 +133,6 @@ export function ForgeTerminal({
           </button>
         </form>
       </div>
-    </GlassPanel>
+    </section>
   );
 }
