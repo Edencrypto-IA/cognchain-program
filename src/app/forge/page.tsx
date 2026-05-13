@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { ForgeErrorBoundary } from '@/components/forge/forge-error-boundary';
-import { ForgeWorkspace } from '@/features/forge';
+import { ForgeWorkspaceLoader } from '@/components/forge/forge-workspace-loader';
 
 export const metadata: Metadata = {
   title: 'CongChain Forge — AI Operating Workspace',
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function ForgePage() {
   return (
     <ForgeErrorBoundary>
-      <ForgeWorkspace />
+      <ForgeWorkspaceLoader />
     </ForgeErrorBoundary>
   );
 }

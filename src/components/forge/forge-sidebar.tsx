@@ -1,30 +1,41 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { Clock3, History, Plus, Search, ShieldCheck } from 'lucide-react';
-import type { ForgeAgent, ForgePhase, ForgeTerminalLine } from '@/lib/forge/types';
+import type { ForgeAgent, ForgePhase, ForgeRunStatus, ForgeTerminalLine } from '@/lib/forge/types';
 import { suggestedPrompts } from '@/lib/forge/demo-data';
+import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { NeuralOrb } from './neural-orb';
 import { StatusPill } from './status-pill';
 
-export function ForgeSidebar({
+function ForgeSidebarComponent({
   agents,
   phase,
+  runStatus,
   deployStatus,
   promptHistory,
   terminal,
+  busy,
   onPromptSelect,
 }: {
   agents: ForgeAgent[];
   phase: ForgePhase;
+  runStatus: ForgeRunStatus;
   deployStatus: string;
   promptHistory: string[];
   terminal: ForgeTerminalLine[];
+  busy: boolean;
   onPromptSelect: (prompt: string) => void;
 }) {
-  const history = promptHistory.length > 0 ? promptHistory : suggestedPrompts;
+  const history = useMemo(
+    () => (promptHistory.length > 0 ? promptHistory : suggestedPrompts),
+    [promptHistory],
+  );
+
+  const terminalPreview = useMemo(() => terminal.slice(-4).reverse(), [terminal]);
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-r border-white/[0.07] bg-[#0a0a0c]/70">
+    <aside className="flex h-full min-h-0 flex-col border-r border-white/[0.07] bg-[#0a0a0c]/70 lg:border-r">
       <div className="border-b border-white/[0.07] p-3">
         <div className="mb-3 flex items-center gap-3">
           <NeuralOrb active={phase !== 'idle'} className="size-9" />
@@ -38,18 +49,29 @@ export function ForgeSidebar({
           <input
             placeholder="Search agents..."
             className="h-8 w-full rounded-lg border border-white/[0.06] bg-white/[0.035] pl-8 pr-3 text-xs text-white/65 outline-none placeholder:text-white/22 focus:border-[#9945FF]/25"
+            disabled={busy}
+            aria-busy={busy}
           />
         </div>
-        <button className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] text-xs text-white/70 transition-colors hover:bg-white/[0.05]">
+        <button
+          type="button"
+          disabled={busy}
+          className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] text-xs text-white/70 transition-colors hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
+        >
           <Plus className="size-3.5" />
           New Agent
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="mb-2 flex items-center justify-between">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">Agents</p>
-          <StatusPill status={phase === 'complete' ? 'complete' : phase === 'idle' ? 'idle' : 'running'} label={phase} />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <StatusPill status={phase === 'complete' ? 'complete' : phase === 'idle' ? 'idle' : 'running'} label={phase} />
+            <span className="rounded-md border border-white/[0.06] bg-black/30 px-2 py-0.5 text-[10px] text-white/45">
+              {RUN_STATUS_LABELS[runStatus]}
+            </span>
+          </div>
         </div>
         <div className="space-y-1">
           {agents.map(agent => (
@@ -79,7 +101,13 @@ export function ForgeSidebar({
         </div>
         <div className="space-y-1">
           {history.map(prompt => (
-            <button key={prompt} onClick={() => onPromptSelect(prompt)} className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-white/42 transition-colors hover:bg-white/[0.035] hover:text-white/75">
+            <button
+              key={prompt}
+              type="button"
+              disabled={busy}
+              onClick={() => onPromptSelect(prompt)}
+              className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-white/42 transition-colors hover:bg-white/[0.035] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
+            >
               {prompt}
             </button>
           ))}
@@ -90,7 +118,7 @@ export function ForgeSidebar({
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">Terminal</p>
         </div>
         <div className="space-y-1">
-          {terminal.slice(-4).reverse().map(line => (
+          {terminalPreview.map(line => (
             <div key={line.id} className="flex gap-2 rounded-lg px-2 py-1.5">
               <span className="mt-1 size-1.5 shrink-0 rounded-full bg-white/18" />
               <p className="min-w-0 truncate text-[11px] text-white/32">{line.text}</p>
@@ -101,3 +129,5 @@ export function ForgeSidebar({
     </aside>
   );
 }
+
+export const ForgeSidebar = memo(ForgeSidebarComponent);

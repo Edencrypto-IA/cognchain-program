@@ -1,59 +1,90 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { Files, GitCompareArrows, MonitorPlay, PanelsTopLeft } from 'lucide-react';
-import type { ForgeBuildStep, ForgeFile, ForgeMemoryNode, ForgePanelTab, ForgePhase } from '@/lib/forge/types';
+import type { ForgeFile, ForgePanelTab, ForgePhase, ForgeRunStatus } from '@/lib/forge/types';
+import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GlassPanel } from './glass-panel';
 import { ForgePreview } from './forge-preview';
 import { CodeViewer } from './code-viewer';
 import { cn } from '@/lib/utils';
 
-export function ForgeRightPanel({
+const TAB_CONFIG = [
+  ['preview', MonitorPlay],
+  ['code', PanelsTopLeft],
+  ['files', Files],
+  ['diff', GitCompareArrows],
+] as const;
+
+function ForgeRightPanelComponent({
   phase,
+  runStatus,
   files,
   selectedFile,
+  deployStatus,
   tab,
   onTabChange,
   onSelectFile,
-  onRunPrompt,
+  onPrivatePayDemo,
+  onReplayLast,
+  canReplay,
+  busy,
 }: {
   phase: ForgePhase;
+  runStatus: ForgeRunStatus;
   files: ForgeFile[];
   selectedFile: string;
-  buildSteps?: ForgeBuildStep[];
-  memoryNodes?: ForgeMemoryNode[];
   deployStatus?: string;
   tab: ForgePanelTab;
   onTabChange: (tab: ForgePanelTab) => void;
   onSelectFile: (path: string) => void;
-  onRunPrompt?: (prompt: string) => void;
+  onPrivatePayDemo: () => void;
+  onReplayLast: () => void;
+  canReplay: boolean;
+  busy: boolean;
 }) {
+  const statusLine = useMemo(() => {
+    const deploy = deployStatus ?? '—';
+    return `${RUN_STATUS_LABELS[runStatus]} · ${deploy}`;
+  }, [runStatus, deployStatus]);
+
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-[#111113]/40">
       <GlassPanel className="min-h-0 flex-1 rounded-none border-0 bg-transparent p-0 shadow-none">
         <Tabs value={tab} onValueChange={value => onTabChange(value as ForgePanelTab)} className="h-full gap-0">
-          <div className="flex h-10 items-center justify-between border-b border-white/[0.07] px-3">
-            <TabsList className="h-7 rounded-lg border border-white/[0.06] bg-white/[0.03] p-0.5">
-              {[
-                ['preview', MonitorPlay],
-                ['code', PanelsTopLeft],
-                ['files', Files],
-                ['diff', GitCompareArrows],
-              ].map(([value, Icon]) => (
+          <div className="flex min-h-10 flex-col gap-1.5 border-b border-white/[0.07] px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-3">
+            <TabsList className="h-7 w-full shrink-0 rounded-lg border border-white/[0.06] bg-white/[0.03] p-0.5 sm:w-auto">
+              {TAB_CONFIG.map(([value, Icon]) => (
                 <TabsTrigger
-                  key={value as string}
-                  value={value as string}
-                  className="h-6 rounded-md px-2 text-[11px] text-white/38 data-[state=active]:bg-white/[0.08] data-[state=active]:text-white/78"
+                  key={value}
+                  value={value}
+                  className="h-6 min-w-0 flex-1 rounded-md px-1.5 text-[10px] text-white/38 data-[state=active]:bg-white/[0.08] data-[state=active]:text-white/78 sm:flex-initial sm:px-2 sm:text-[11px]"
                 >
-                  <Icon className="size-3" />
-                  <span className="hidden sm:inline">{value as string}</span>
+                  <Icon className="size-3 shrink-0" />
+                  <span className="hidden sm:inline">{value}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
+            <p
+              className="truncate text-[10px] text-white/38 sm:max-w-[45%] sm:text-[11px] lg:max-w-[55%]"
+              title={statusLine}
+              role="status"
+              aria-live="polite"
+            >
+              {statusLine}
+            </p>
           </div>
 
-          <TabsContent value="preview" className="min-h-0">
-            <ForgePreview phase={phase} onRunPrompt={onRunPrompt} />
+          <TabsContent value="preview" forceMount className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+            <ForgePreview
+              phase={phase}
+              runStatus={runStatus}
+              busy={busy}
+              canReplay={canReplay}
+              onPrivatePayDemo={onPrivatePayDemo}
+              onReplayLast={onReplayLast}
+            />
           </TabsContent>
           <TabsContent value="code" className="min-h-0">
             <CodeViewer files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} />
@@ -63,6 +94,7 @@ export function ForgeRightPanel({
               {files.map(file => (
                 <button
                   key={file.path}
+                  type="button"
                   onClick={() => onSelectFile(file.path)}
                   className={cn(
                     'flex w-full items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2 text-left transition-colors hover:bg-white/[0.04]',
@@ -76,7 +108,7 @@ export function ForgeRightPanel({
             </div>
           </TabsContent>
           <TabsContent value="diff" className="min-h-0 p-3">
-            <pre className="h-[430px] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-[12px] leading-6 text-white/55">
+            <pre className="h-[min(430px,50vh)] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-[12px] leading-6 text-white/55">
 {`+ create features/generated/agent-console.tsx
 + Agent collaboration feed
 + Verified memory handoff props
@@ -86,7 +118,7 @@ export function ForgeRightPanel({
 + Add Solana proof capsule status
 + Add cinematic glass surface
 
-No production files are changed by the Forge MVP simulation.`}
+Sandbox only — no production deploy from this panel.`}
             </pre>
           </TabsContent>
         </Tabs>
@@ -94,3 +126,5 @@ No production files are changed by the Forge MVP simulation.`}
     </aside>
   );
 }
+
+export const ForgeRightPanel = memo(ForgeRightPanelComponent);

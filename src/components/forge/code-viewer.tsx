@@ -1,10 +1,11 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { Copy, FileCode2 } from 'lucide-react';
 import type { ForgeFile } from '@/lib/forge/types';
 import { cn } from '@/lib/utils';
 
-export function CodeViewer({
+function CodeViewerComponent({
   files,
   selectedFile,
   onSelectFile,
@@ -13,7 +14,10 @@ export function CodeViewer({
   selectedFile: string;
   onSelectFile: (path: string) => void;
 }) {
-  const file = files.find(item => item.path === selectedFile) ?? files[0];
+  const file = useMemo(
+    () => files.find(item => item.path === selectedFile) ?? files[0],
+    [files, selectedFile],
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -23,6 +27,7 @@ export function CodeViewer({
             {files.map(item => (
               <button
                 key={item.path}
+                type="button"
                 onClick={() => onSelectFile(item.path)}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] text-white/42 transition-colors',
@@ -42,14 +47,16 @@ export function CodeViewer({
               <p className="text-[10px] uppercase tracking-wider text-white/25">{file?.language} · {file?.status}</p>
             </div>
             <button
+              type="button"
+              disabled={!file}
               onClick={() => file && navigator.clipboard?.writeText(file.contents).catch(() => {})}
-              className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-white/35 transition-colors hover:text-white/75"
+              className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-white/35 transition-colors hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-30"
               aria-label="Copy code"
             >
               <Copy className="size-3.5" />
             </button>
           </div>
-          <pre className="h-[440px] overflow-auto p-4 text-[12px] leading-6 text-white/65">
+          <pre className="h-[min(440px,50vh)] overflow-auto p-4 text-[12px] leading-6 text-white/65">
             <code>{file?.contents}</code>
           </pre>
         </div>
@@ -57,3 +64,5 @@ export function CodeViewer({
     </div>
   );
 }
+
+export const CodeViewer = memo(CodeViewerComponent);

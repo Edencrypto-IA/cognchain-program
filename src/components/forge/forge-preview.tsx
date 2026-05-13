@@ -1,23 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Code2, ExternalLink, LockKeyhole, Play, ReceiptText, ShieldCheck, Sparkles, WalletCards } from 'lucide-react';
-import type { ForgePhase } from '@/lib/forge/types';
-import { suggestedPrompts } from '@/lib/forge/demo-data';
+import type { ForgePhase, ForgeRunStatus } from '@/lib/forge/types';
+import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 
 type PreviewMode = 'product' | 'receipt' | 'code';
 
-export function ForgePreview({
+function ForgePreviewComponent({
   phase,
+  runStatus,
+  busy,
+  canReplay,
   onRunPrompt,
+  onPrivatePayDemo,
+  onReplayLast,
 }: {
   phase: ForgePhase;
+  runStatus: ForgeRunStatus;
+  busy: boolean;
+  canReplay: boolean;
   onRunPrompt?: (prompt: string) => void;
+  onPrivatePayDemo: () => void;
+  onReplayLast: () => void;
 }) {
   const [mode, setMode] = useState<PreviewMode>('product');
+  const [pulseKey, setPulseKey] = useState(0);
+
   const active = ['building', 'deploying', 'complete'].includes(phase);
-  const running = ['thinking', 'planning', 'building', 'deploying'].includes(phase);
+  const streaming = runStatus === 'streaming';
+  const connecting = runStatus === 'connecting';
+
+  const bumpPulse = useCallback(() => {
+    setPulseKey(k => k + 1);
+  }, []);
+
   const progressByPhase: Record<ForgePhase, number> = {
     idle: 8,
     thinking: 18,
@@ -27,21 +45,18 @@ export function ForgePreview({
     complete: 100,
     error: 18,
   };
+
   const statusLabel: Record<ForgePhase, string> = {
     idle: 'Waiting for prompt',
-    thinking: 'Reading intent',
+    thinking: RUN_STATUS_LABELS.connecting,
     planning: 'Architecting PrivatePay',
-    building: 'Generating interface',
+    building: RUN_STATUS_LABELS.streaming,
     deploying: 'Preparing proof capsule',
     complete: 'Receipt layer ready',
     error: 'Recovery needed',
   };
-  const proofSteps = [
-    { label: 'Intent encrypted', ready: ['building', 'deploying', 'complete'].includes(phase) },
-    { label: 'Receipt proof derived', ready: ['deploying', 'complete'].includes(phase) },
-    { label: 'Solana anchor ready', ready: phase === 'complete' },
-  ];
-  const codePreview = phase === 'idle'
+
+  const codePreview = phase === 'idle' && runStatus === 'idle'
     ? `// Waiting for Forge prompt
 export function PrivatePay() {
   return <EncryptedCheckout />;
@@ -54,106 +69,138 @@ export function PrivatePay() {
 
 derivePrivateReceiptProof(receipt.paymentHash);`;
 
-  function startPrivatePayBuild() {
-    onRunPrompt?.(suggestedPrompts[0]);
-  }
+  const proofSteps = [
+    { label: 'Intent encrypted', ready: streaming || ['deploying', 'complete'].includes(phase) },
+    { label: 'Receipt proof derived', ready: ['deploying', 'complete'].includes(phase) },
+    { label: 'Solana anchor ready', ready: phase === 'complete' && runStatus === 'complete' },
+  ];
 
   return (
-    <div className="h-full min-h-[430px] overflow-hidden bg-[#050505]">
-      <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-3 py-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-red-400/70" />
-          <span className="size-2.5 rounded-full bg-yellow-400/70" />
-          <span className="size-2.5 rounded-full bg-[#14F195]/70" />
+    <div className="h-full min-h-[min(430px,42vh)] overflow-hidden bg-[#050505] lg:min-h-[430px]">
+      <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] px-2 py-2 sm:px-3">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="size-2 shrink-0 rounded-full bg-red-400/70 sm:size-2.5" />
+          <span className="size-2 shrink-0 rounded-full bg-yellow-400/70 sm:size-2.5" />
+          <span className="size-2 shrink-0 rounded-full bg-[#14F195]/70 sm:size-2.5" />
         </div>
-        <span className="ml-2 truncate rounded-full border border-white/[0.07] bg-white/[0.035] px-3 py-1 text-[11px] text-white/35">
+        <span className="min-w-0 truncate rounded-full border border-white/[0.07] bg-white/[0.035] px-2 py-1 text-[10px] text-white/35 sm:px-3 sm:text-[11px]">
           privatepay.preview.local
         </span>
-        <div className="hidden rounded-lg border border-white/[0.06] bg-white/[0.025] p-0.5 md:flex">
-          {[
-            ['product', WalletCards],
-            ['receipt', ReceiptText],
-            ['code', Code2],
-          ].map(([itemMode, Icon]) => (
+        <div className="flex shrink-0 rounded-lg border border-white/[0.06] bg-white/[0.025] p-0.5">
+          {(
+            [
+              ['product', WalletCards],
+              ['receipt', ReceiptText],
+              ['code', Code2],
+            ] as const
+          ).map(([itemMode, Icon]) => (
             <button
-              key={itemMode as string}
+              key={itemMode}
               type="button"
-              onClick={() => setMode(itemMode as PreviewMode)}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors ${
+              onClick={() => {
+                setMode(itemMode);
+                bumpPulse();
+              }}
+              className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] transition-colors sm:gap-1.5 sm:px-2 sm:text-[11px] ${
                 mode === itemMode ? 'bg-white/[0.08] text-white/80' : 'text-white/32 hover:text-white/65'
               }`}
             >
-              <Icon className="size-3" />
-              {itemMode as string}
+              <Icon className="size-3 shrink-0" />
+              <span className="hidden capitalize sm:inline">{itemMode}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="relative h-[calc(100%-40px)] overflow-hidden p-5">
+      <div className="relative h-[calc(100%-40px)] overflow-hidden p-3 sm:p-5">
         <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#9945FF]/15 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-44 w-44 rounded-full bg-[#14F195]/10 blur-3xl" />
         <div className="absolute left-1/2 top-10 h-56 w-56 -translate-x-1/2 rounded-full bg-[#38BDF8]/10 blur-3xl" />
 
         <motion.div
-          className="relative h-full overflow-hidden rounded-3xl border border-white/[0.08] bg-[#09090B]/92 p-5 shadow-2xl shadow-black/40"
-          animate={{ y: active ? [0, -4, 0] : 0 }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          key={pulseKey}
+          className="relative h-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#09090B]/92 p-4 shadow-2xl shadow-black/40 sm:rounded-3xl sm:p-5"
+          animate={{ y: active ? [0, -3, 0] : 0 }}
+          transition={{ duration: 4, repeat: active ? Infinity : 0, ease: 'easeInOut' }}
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(153,69,255,0.20),transparent_34%),radial-gradient(circle_at_14%_74%,rgba(20,241,149,0.12),transparent_28%)]" />
+          {streaming && (
+            <motion.div
+              className="pointer-events-none absolute inset-0 z-[1] rounded-2xl ring-2 ring-[#14F195]/20 sm:rounded-3xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.35, 0.65, 0.35] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
 
-          <div className="relative flex h-full min-h-0 flex-col">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
+          <div className="relative z-[2] flex h-full min-h-0 flex-col">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#14F195]/75">PrivatePay Preview</p>
-                <h3 className="mt-2 max-w-lg text-3xl font-semibold leading-tight text-white">
+                <h3 className="mt-2 max-w-lg text-2xl font-semibold leading-tight text-white sm:text-3xl">
                   Private payments for Solana teams.
                 </h3>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-white/46">
-                  Encrypted payment intents, receipt proofs, and a clean checkout surface generated by the Forge agents.
+                  Encrypted payment intents, receipt proofs, and a clean checkout surface — demo UI only, no chain execution.
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={startPrivatePayBuild}
-                  disabled={running}
-                  className="hidden items-center gap-2 rounded-full border border-[#14F195]/20 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                  onClick={onPrivatePayDemo}
+                  disabled={busy}
+                  className="flex min-h-9 items-center gap-2 rounded-full border border-[#14F195]/20 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <Play className="size-3.5" />
-                  {phase === 'complete' ? 'Replay build' : 'Build demo'}
+                  <Play className="size-3.5 shrink-0" />
+                  Run PrivatePay demo
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMode(mode === 'product' ? 'receipt' : 'product')}
-                  className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] p-2 text-white/40 transition-colors hover:text-white/75"
-                  aria-label="Toggle generated preview"
+                  onClick={onReplayLast}
+                  disabled={!canReplay || busy}
+                  className="flex min-h-9 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-white/55 transition-colors hover:border-[#9945FF]/30 hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Sparkles className="size-3.5 shrink-0" />
+                  Replay build
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === 'product' ? 'receipt' : 'product');
+                    bumpPulse();
+                  }}
+                  className="grid size-9 shrink-0 place-items-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/40 transition-colors hover:text-white/75"
+                  aria-label="Toggle product and receipt preview"
                 >
                   <ExternalLink className="size-4" />
                 </button>
               </div>
             </div>
 
-            <div className="mt-5 grid min-h-0 flex-1 gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="mt-4 grid min-h-0 flex-1 gap-3 lg:mt-5 lg:grid-cols-[1.05fr_0.95fr] lg:gap-4">
               <motion.div
-                key={mode}
-                initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }}
+                key={`${mode}-${phase}`}
+                initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="flex min-h-0 flex-col rounded-2xl border border-white/[0.07] bg-black/30 p-4"
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+                className="flex min-h-0 flex-col rounded-2xl border border-white/[0.07] bg-black/30 p-3 sm:p-4"
               >
                 {mode === 'code' ? (
                   <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/30">Live generated code</p>
                         <p className="mt-1 text-sm font-semibold text-white/78">solana/private-payment-proof.ts</p>
                       </div>
-                      <span className="rounded-full border border-[#38BDF8]/20 bg-[#38BDF8]/10 px-2.5 py-1 text-[10px] font-semibold text-[#7DD3FC]">
-                        streaming
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+                          streaming ? 'border-[#14F195]/30 bg-[#14F195]/15 text-[#14F195]' : 'border-[#38BDF8]/20 bg-[#38BDF8]/10 text-[#7DD3FC]'
+                        }`}
+                      >
+                        {connecting ? 'connecting' : streaming ? 'streaming' : 'idle'}
                       </span>
                     </div>
-                    <pre className="mt-4 min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#050505]/80 p-4 font-mono text-[12px] leading-6 text-white/62">
+                    <pre className="mt-3 min-h-0 flex-1 overflow-auto rounded-2xl border border-white/[0.06] bg-[#050505]/80 p-3 font-mono text-[11px] leading-6 text-white/62 sm:mt-4 sm:p-4 sm:text-[12px]">
                       <code>{codePreview}</code>
                     </pre>
                   </div>
@@ -168,11 +215,11 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
                         <p className="text-sm font-semibold text-white/78">ZK-ready payment capsule</p>
                       </div>
                     </div>
-                    <div className="mt-5 grid gap-3">
+                    <div className="mt-4 grid gap-2 sm:mt-5 sm:gap-3">
                       {[
-                        ['payment hash', phase === 'complete' ? '0x8f4e...a91c' : 'deriving...'],
+                        ['payment hash', phase === 'complete' ? '0x8f4e...a91c' : connecting ? '…' : 'deriving…'],
                         ['recipient commitment', 'sha256:7xP4...9kL2'],
-                        ['amount commitment', phase === 'idle' ? 'pending' : 'pedersen:sealed'],
+                        ['amount commitment', phase === 'idle' && runStatus === 'idle' ? 'pending' : 'pedersen:sealed'],
                         ['network', 'solana-devnet'],
                       ].map(([label, value]) => (
                         <div key={label} className="rounded-2xl border border-white/[0.06] bg-white/[0.035] p-3">
@@ -184,58 +231,67 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
                   </div>
                 ) : (
                   <>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="grid size-8 place-items-center rounded-xl bg-[#9945FF]/15 text-[#C084FC]">
-                      <LockKeyhole className="size-4" />
-                    </span>
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/30">Transfer intent</p>
-                      <p className="text-sm font-semibold text-white/78">Encrypted checkout</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="grid size-8 place-items-center rounded-xl bg-[#9945FF]/15 text-[#C084FC]">
+                          <LockKeyhole className="size-4" />
+                        </span>
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/30">Transfer intent</p>
+                          <p className="text-sm font-semibold text-white/78">Encrypted checkout</p>
+                        </div>
+                      </div>
+                      <span className="rounded-full border border-[#14F195]/20 bg-[#14F195]/10 px-2.5 py-1 text-[10px] font-semibold text-[#14F195]">
+                        {statusLabel[phase]}
+                      </span>
                     </div>
-                  </div>
-                  <span className="rounded-full border border-[#14F195]/20 bg-[#14F195]/10 px-2.5 py-1 text-[10px] font-semibold text-[#14F195]">
-                    {statusLabel[phase]}
-                  </span>
-                </div>
 
-                <div className="mt-5 space-y-3">
-                  {[
-                    ['Recipient', '7xP4...9kL2'],
-                    ['Amount', '2.40 SOL'],
-                    ['Private memo', phase === 'complete' ? 'sealed and hashed' : 'encrypting'],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-2xl border border-white/[0.06] bg-white/[0.035] p-3">
-                      <p className="text-[10px] uppercase tracking-[0.16em] text-white/28">{label}</p>
-                      <p className="mt-1 font-mono text-sm text-white/72">{value}</p>
+                    <div className="mt-4 space-y-2 sm:mt-5 sm:space-y-3">
+                      {[
+                        ['Recipient', '7xP4...9kL2'],
+                        ['Amount', '2.40 SOL'],
+                        ['Private memo', phase === 'complete' ? 'sealed and hashed' : streaming ? 'streaming…' : 'encrypting'],
+                      ].map(([label, value]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={bumpPulse}
+                          className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.035] p-3 text-left transition-colors hover:border-[#9945FF]/25 hover:bg-white/[0.055]"
+                        >
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-white/28">{label}</p>
+                          <p className="mt-1 font-mono text-sm text-white/72">{value}</p>
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
 
-                <div className="mt-auto pt-4">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
-                    <motion.div
-                      className="h-full rounded-full bg-gradient-to-r from-[#9945FF] via-[#38BDF8] to-[#14F195]"
-                      animate={{ width: `${progressByPhase[phase]}%` }}
-                      transition={{ duration: 0.55, ease: 'easeOut' }}
-                    />
-                  </div>
-                  <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#14F195]/25 bg-[#14F195]/12 px-4 py-3 text-sm font-semibold text-[#D8FFF0]">
-                    <WalletCards className="size-4" />
-                    {phase === 'complete' ? 'Receipt proof ready' : 'Generate private receipt'}
-                  </button>
-                </div>
+                    <div className="mt-auto pt-3 sm:pt-4">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-[#9945FF] via-[#38BDF8] to-[#14F195]"
+                          animate={{ width: `${progressByPhase[phase]}%` }}
+                          transition={{ duration: 0.45, ease: 'easeOut' }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={bumpPulse}
+                        className="mt-3 flex w-full min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#14F195]/25 bg-[#14F195]/12 px-4 py-3 text-sm font-semibold text-[#D8FFF0] transition-colors hover:bg-[#14F195]/18 sm:mt-4"
+                      >
+                        <WalletCards className="size-4 shrink-0" />
+                        {phase === 'complete' ? 'Receipt proof ready (demo)' : 'Generate private receipt (demo)'}
+                      </button>
+                    </div>
                   </>
                 )}
               </motion.div>
 
-              <div className="flex min-h-0 flex-col gap-3">
-                <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4">
+              <div className="flex min-h-0 flex-col gap-2 sm:gap-3">
+                <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 sm:p-4">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="size-4 text-[#14F195]" />
                     <p className="text-sm font-semibold text-white/78">Proof rail</p>
                   </div>
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-3">
                     {proofSteps.map(step => (
                       <div key={step.label} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/24 px-3 py-2">
                         <span className="text-xs text-white/55">{step.label}</span>
@@ -247,20 +303,20 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1 rounded-2xl border border-[#9945FF]/15 bg-[#9945FF]/[0.05] p-4">
+                <div className="min-h-0 flex-1 rounded-2xl border border-[#9945FF]/15 bg-[#9945FF]/[0.05] p-3 sm:p-4">
                   <div className="flex items-center gap-2">
                     <Sparkles className="size-4 text-[#C084FC]" />
                     <p className="text-sm font-semibold text-white/80">Live build</p>
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-white/48">
+                  <p className="mt-2 text-sm leading-6 text-white/48 sm:mt-3">
                     {phase === 'complete'
-                      ? 'Forge assembled the PrivatePay interface, typed intent route, and Solana receipt proof capsule inside the sandbox.'
-                      : 'Agents are constructing the product surface live: interface first, then API contract, then privacy proof status.'}
+                      ? 'Forge assembled the PrivatePay interface shell in this sandbox. Model output streams in the terminal below.'
+                      : 'Agents stay in sync with model phases: connect → stream → complete. Preview stays mounted while you read the stream.'}
                   </p>
-                  {running && (
-                    <div className="mt-4 flex items-center gap-2 text-[11px] text-[#14F195]/80">
+                  {(busy || streaming) && (
+                    <div className="mt-3 flex items-center gap-2 text-[11px] text-[#14F195]/80 sm:mt-4">
                       <span className="size-1.5 animate-pulse rounded-full bg-[#14F195]" />
-                      Preview is updating as agents create files
+                      {RUN_STATUS_LABELS[runStatus]}
                     </div>
                   )}
                 </div>
@@ -272,3 +328,5 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
     </div>
   );
 }
+
+export const ForgePreview = memo(ForgePreviewComponent);

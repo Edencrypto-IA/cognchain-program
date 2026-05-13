@@ -18,11 +18,13 @@ import type {
   ForgeMemoryNode,
   ForgePanelTab,
   ForgePhase,
+  ForgeRunStatus,
   ForgeTerminalLine,
 } from '@/lib/forge/types';
 
 interface ForgeState {
   phase: ForgePhase;
+  runStatus: ForgeRunStatus;
   promptHistory: string[];
   activePrompt: string;
   streamedResponse: string;
@@ -35,6 +37,7 @@ interface ForgeState {
   deployStatus: string;
   panelTab: ForgePanelTab;
   setPhase: (phase: ForgePhase) => void;
+  setRunStatus: (runStatus: ForgeRunStatus) => void;
   setActivePrompt: (prompt: string) => void;
   setPanelTab: (tab: ForgePanelTab) => void;
   setSelectedFile: (path: string) => void;
@@ -71,6 +74,7 @@ export const useForgeStore = create<ForgeState>()(
   persist(
     (set) => ({
       phase: 'idle',
+      runStatus: 'idle',
       promptHistory: [],
       activePrompt: '',
       streamedResponse: '',
@@ -83,9 +87,10 @@ export const useForgeStore = create<ForgeState>()(
       deployStatus: 'Local sandbox',
       panelTab: 'preview',
       setPhase: phase => set({ phase }),
+      setRunStatus: runStatus => set({ runStatus }),
       setActivePrompt: activePrompt => set({ activePrompt }),
       setPanelTab: panelTab => set({ panelTab }),
-      setSelectedFile: selectedFile => set({ selectedFile, panelTab: 'code' }),
+      setSelectedFile: selectedFile => set({ selectedFile }),
       appendTerminal: line => set(state => ({ terminal: [...state.terminal.slice(-80), line] })),
       appendResponse: chunk => set(state => ({ streamedResponse: `${state.streamedResponse}${chunk}` })),
       addPromptHistory: prompt => set(state => ({
@@ -124,6 +129,7 @@ export const useForgeStore = create<ForgeState>()(
       setDeployStatus: deployStatus => set({ deployStatus }),
       resetRun: prompt => set({
         phase: 'thinking',
+        runStatus: 'connecting',
         activePrompt: prompt,
         streamedResponse: '',
         agents: cloneAgents().map(agent => ({ ...agent, status: 'thinking', progress: Math.max(agent.progress, 16) })),
@@ -137,6 +143,7 @@ export const useForgeStore = create<ForgeState>()(
       }),
       resetSession: () => set({
         phase: 'idle',
+        runStatus: 'idle',
         promptHistory: [],
         activePrompt: '',
         streamedResponse: '',
@@ -151,11 +158,21 @@ export const useForgeStore = create<ForgeState>()(
       }),
       restoreIdle: () => set(state => ({
         phase: state.phase === 'error' ? 'error' : 'idle',
+        runStatus: state.phase === 'error' ? 'error' : 'idle',
         agents: state.agents.map(agent => ({ ...agent, status: agent.progress >= 100 ? 'complete' : 'idle' })),
       })),
     }),
     {
       name: FORGE_STORAGE_KEY,
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<ForgeState>;
+        const rs = p.runStatus;
+        const runStatus: ForgeRunStatus =
+          rs === 'idle' || rs === 'connecting' || rs === 'streaming' || rs === 'complete' || rs === 'error' || rs === 'cancelled'
+            ? rs
+            : current.runStatus;
+        return { ...current, ...p, runStatus };
+      },
       partialize: state => ({
         promptHistory: state.promptHistory,
         streamedResponse: state.streamedResponse,

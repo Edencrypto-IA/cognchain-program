@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { PRIVATE_PAY_DEMO_PROMPT } from '@/lib/forge/demo-data';
 import { forgeId, nowLabel } from '@/lib/forge/simulation';
 import { useForgeStore } from './use-forge-store';
 import type { ForgeAgentId } from '@/lib/forge/types';
@@ -33,6 +34,7 @@ export function useForgeSimulation() {
     upsertMemory,
     setDeployStatus,
     setPhase,
+    setRunStatus,
   } = useForgeStore();
 
   const flushPendingTokens = useCallback(() => {
@@ -59,8 +61,9 @@ export function useForgeSimulation() {
       rafRef.current = null;
     }
     flushPendingTokens();
+    setRunStatus('cancelled');
     setPhase('idle');
-  }, [flushPendingTokens, setPhase]);
+  }, [flushPendingTokens, setPhase, setRunStatus]);
 
   const runPrompt = useCallback(
     async (prompt: string) => {
@@ -98,6 +101,7 @@ export function useForgeSimulation() {
         finalized = true;
         flushPendingTokens();
         ['intent', 'plan', 'files', 'verify', 'deploy'].forEach(id => updateBuildStep(id, 'complete'));
+        setRunStatus('complete');
         setPhase('complete');
         setDeployStatus('Resposta Forge · sem deploy on-chain automático');
 
@@ -131,6 +135,7 @@ export function useForgeSimulation() {
         if (finalized) return;
         finalized = true;
         flushPendingTokens();
+        setRunStatus('error');
         setPhase('error');
         updateBuildStep('intent', 'error');
         setDeployStatus('Erro no modelo');
@@ -156,6 +161,7 @@ export function useForgeSimulation() {
         if (evt.token) {
           if (!firstToken) {
             firstToken = true;
+            setRunStatus('streaming');
             setPhase('building');
             updateBuildStep('intent', 'complete');
             updateBuildStep('plan', 'running');
@@ -234,6 +240,7 @@ export function useForgeSimulation() {
           if (!finalized) {
             finalized = true;
             flushPendingTokens();
+            setRunStatus('cancelled');
             appendTerminal({
               id: forgeId('line'),
               timestamp: nowLabel(),
@@ -267,13 +274,23 @@ export function useForgeSimulation() {
       upsertMemory,
       setDeployStatus,
       setPhase,
+      setRunStatus,
     ],
   );
+
+  const runPrivatePayDemo = useCallback(() => {
+    void runPrompt(PRIVATE_PAY_DEMO_PROMPT);
+  }, [runPrompt]);
+
+  const replayLastBuild = useCallback(() => {
+    const last = useForgeStore.getState().promptHistory[0];
+    if (last) void runPrompt(last);
+  }, [runPrompt]);
 
   useEffect(() => () => {
     abortRef.current?.abort();
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
   }, []);
 
-  return { runPrompt, stop };
+  return { runPrompt, stop, runPrivatePayDemo, replayLastBuild };
 }

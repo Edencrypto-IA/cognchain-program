@@ -163,3 +163,6 @@ export const suggestedPrompts = [
   'Create an agent marketplace landing app with wallet-aware onboarding',
   'Generate a private memory vault interface with ZK proof status',
 ];
+
+/** Default PrivatePay visual demo prompt (same as first suggested prompt). */
+export const PRIVATE_PAY_DEMO_PROMPT = suggestedPrompts[0];

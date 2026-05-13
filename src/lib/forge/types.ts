@@ -4,6 +4,9 @@ export type ForgeAgentStatus = 'idle' | 'thinking' | 'running' | 'blocked' | 'co
 
 export type ForgePhase = 'idle' | 'thinking' | 'planning' | 'building' | 'deploying' | 'complete' | 'error';
 
+/** Fine-grained UX state for Forge (stream lifecycle). */
+export type ForgeRunStatus = 'idle' | 'connecting' | 'streaming' | 'complete' | 'error' | 'cancelled';
+
 export type ForgePanelTab = 'preview' | 'code' | 'files' | 'diff';
 
 export interface ForgeAgent {
@@ -47,6 +50,7 @@ export interface ForgeMemoryNode {
 
 export interface ForgeSessionSnapshot {
   phase: ForgePhase;
+  runStatus: ForgeRunStatus;
   promptHistory: string[];
   activePrompt: string;
   streamedResponse: string;
