@@ -13,7 +13,6 @@ function ForgePreviewComponent({
   runStatus,
   busy,
   canReplay,
-  onRunPrompt,
   onPrivatePayDemo,
   onReplayLast,
 }: {
@@ -21,7 +20,6 @@ function ForgePreviewComponent({
   runStatus: ForgeRunStatus;
   busy: boolean;
   canReplay: boolean;
-  onRunPrompt?: (prompt: string) => void;
   onPrivatePayDemo: () => void;
   onReplayLast: () => void;
 }) {

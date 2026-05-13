@@ -63,13 +63,13 @@ function ForgeWorkspaceInner() {
   }, [stop, resetSession]);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#0f0f10] text-white">
+    <main className="relative flex min-h-screen flex-col overflow-hidden bg-[#0f0f10] text-white">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/2 top-[-16rem] h-96 w-[42rem] -translate-x-1/2 rounded-full bg-[#9945FF]/8 blur-3xl" />
         <div className="absolute right-[-10rem] bottom-[-12rem] h-96 w-96 rounded-full bg-[#14F195]/5 blur-3xl" />
       </div>
 
-      <header className="relative z-10 flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] bg-[#111113]/95 px-2 py-1.5 sm:px-3">
+      <header className="relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] bg-[#111113]/95 px-2 py-1.5 sm:min-h-9 sm:flex-nowrap sm:px-3">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <Link
             href="/"
@@ -84,7 +84,7 @@ function ForgeWorkspaceInner() {
           <span className="hidden text-xs text-white/42 sm:inline">Run</span>
         </div>
 
-        <div className="order-last flex w-full basis-full items-center justify-center gap-1.5 sm:order-none sm:w-auto sm:basis-auto lg:justify-end">
+        <div className="order-last flex w-full basis-full items-center justify-center gap-1.5 sm:order-none sm:w-auto sm:basis-auto sm:justify-end">
           <button
             type="button"
             onClick={() => void runPrivatePayDemo()}
@@ -126,8 +126,8 @@ function ForgeWorkspaceInner() {
         </div>
       </header>
 
-      <section className="relative z-10 hidden h-[calc(100vh-36px)] min-h-0 lg:block">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+      <section className="relative z-10 hidden min-h-0 flex-1 lg:block">
+        <ResizablePanelGroup direction="horizontal" className="h-full min-h-0">
           <ResizablePanel defaultSize={19} minSize={15} maxSize={24}>
             <ForgeSidebar
               agents={agents}
@@ -186,7 +186,7 @@ function ForgeWorkspaceInner() {
         </ResizablePanelGroup>
       </section>
 
-      <section className="relative z-10 flex min-h-0 flex-col gap-3 p-3 pb-4 lg:hidden">
+      <section className="relative z-10 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-3 pb-4 lg:hidden">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -226,7 +226,7 @@ function ForgeWorkspaceInner() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          className="max-h-[38vh] min-h-[12rem] shrink overflow-hidden"
+          className="max-h-[38vh] min-h-[12rem] shrink-0 overflow-hidden"
         >
           <ForgeSidebar
             agents={agents}

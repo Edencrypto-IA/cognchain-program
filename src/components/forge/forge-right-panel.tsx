@@ -52,7 +52,7 @@ function ForgeRightPanelComponent({
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-[#111113]/40">
       <GlassPanel className="min-h-0 flex-1 rounded-none border-0 bg-transparent p-0 shadow-none">
-        <Tabs value={tab} onValueChange={value => onTabChange(value as ForgePanelTab)} className="h-full gap-0">
+        <Tabs value={tab} onValueChange={value => onTabChange(value as ForgePanelTab)} className="flex h-full min-h-0 flex-col gap-0">
           <div className="flex min-h-10 flex-col gap-1.5 border-b border-white/[0.07] px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:px-3">
             <TabsList className="h-7 w-full shrink-0 rounded-lg border border-white/[0.06] bg-white/[0.03] p-0.5 sm:w-auto">
               {TAB_CONFIG.map(([value, Icon]) => (
