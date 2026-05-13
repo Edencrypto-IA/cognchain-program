@@ -30,6 +30,47 @@
 
 ---
 
+## Demo path for judges
+
+Start with the main chat to understand the core product: CognChain lets users talk to multiple AI models while preserving portable memory across sessions and providers.
+
+1. Open the live app and click **Run Hackathon Demo**.
+2. Watch one model create a memory, save it with a hash, and hand it off to another model.
+3. Copy the generated memory hash and paste it back into the chat.
+4. Switch models, for example GPT-4o to Claude, Gemini, DeepSeek, or NVIDIA.
+5. The next model should continue from the verified memory context instead of starting from zero.
+
+The goal of the demo is simple: show that AI memory can survive model changes, session changes, and provider lock-in.
+
+## Caminho rapido da demo
+
+Comece pelo chat principal para entender o produto: o CognChain permite conversar com varias IAs mantendo uma memoria portavel entre sessoes e provedores.
+
+1. Abra o app ao vivo e clique em **Run Hackathon Demo**.
+2. Veja uma IA criar uma memoria, salvar com hash e passar o contexto para outra IA.
+3. Copie o hash gerado e cole novamente no chat.
+4. Troque de modelo, por exemplo GPT-4o para Claude, Gemini, DeepSeek ou NVIDIA.
+5. A proxima IA deve continuar a partir da memoria verificada, sem recomecar do zero.
+
+Esse e o ponto central: a memoria da IA continua mesmo quando o usuario troca de modelo, sessao ou provedor.
+
+## CongChain Forge - AI IDE Sandbox
+
+CongChain Forge (`/forge`) is the new AI-native build workspace inside CognChain. It presents a Cursor-style terminal and preview environment where agents can stream plans, generate structured file proposals, show diffs, and apply proposals into a local sandbox session.
+
+Forge is intentionally safe in this phase:
+
+- Real SSE streaming through `POST /api/forge/chat`
+- Structured file proposals with code, diff, preview, and explorer views
+- Local sandbox sessions with explicit **Apply Proposal**
+- No automatic production writes
+- No automatic deployment
+- No changes to Memory Brain, Solana flows, wallet auth, or the main chat contract
+
+Forge is designed to become the place where users ask AI agents to build apps, APIs, components, agents, and Solana-native systems while seeing the work happen live.
+
+---
+
 <div align="center">
 
 **Language / Idioma / 语言**
