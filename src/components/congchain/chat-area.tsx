@@ -9,6 +9,7 @@ import {
   ChevronDown, ChevronUp, Zap, Check, AlertTriangle, Eye, ExternalLink,
   GitBranch, ArrowRight, Timer, Info, Languages,
   Gem, Code2, Sparkles, Paperclip, ImagePlus, Mic, PenSquare,
+  BarChart3,
 } from 'lucide-react';
 import Orb, { type OrbMode } from './orb';
 import { MODEL_LABELS, type AIModel } from '@/services/memory/memory.model';
@@ -38,6 +39,25 @@ type DemoMemoryPassport = {
   title: string;
 };
 
+type SolMarketSnapshot = {
+  symbol: 'SOL';
+  price: number | null;
+  change24h: number | null;
+  volume24h: number | null;
+  marketCap: number | null;
+  liquidity: number | null;
+  liquidityLabel: string | null;
+  marketCapLabel: string | null;
+  volumeLabel: string | null;
+  chart: number[];
+  protocols: Array<{ name: string; tvl: number; change1d: number | null }>;
+  signal: 'bullish' | 'risk-off' | 'neutral';
+  action: string;
+  trustScore: number;
+  sources: string[];
+  updatedAt: string;
+};
+
 // ============================================================
 // DESIGN LOCK: Original UI preserved. Only additive features.
 // ============================================================
@@ -61,6 +81,7 @@ interface Message {
   poiTxHash?: string;
   poiVotes?: number;
   structuredResponse?: StructuredResponse;
+  marketSnapshot?: SolMarketSnapshot;
 }
 
 // ============================================================
@@ -229,6 +250,104 @@ function DemoFinaleOverlay({ stage, summary, onCopy, copied, onClose }: {
   );
 }
 
+function isSolMarketQuery(text: string) {
+  const normalized = text.toLowerCase();
+  return /(solana|sol\b)/i.test(normalized)
+    && /(pre[cç]o|price|valor|mercado|market|hoje|agora|cotacao|cotação|volume|liquidez)/i.test(normalized);
+}
+
+function SolMarketCard({ snapshot }: { snapshot: SolMarketSnapshot }) {
+  const chart = snapshot.chart.length >= 2 ? snapshot.chart : [snapshot.price ?? 0, snapshot.price ?? 0];
+  const min = Math.min(...chart);
+  const max = Math.max(...chart);
+  const range = max - min || 1;
+  const points = chart.map((value, index) => {
+    const x = (index / Math.max(1, chart.length - 1)) * 100;
+    const y = 82 - ((value - min) / range) * 62;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  const positive = (snapshot.change24h ?? 0) >= 0;
+  const signalLabel = snapshot.signal === 'bullish' ? 'Momentum positivo' : snapshot.signal === 'risk-off' ? 'Risk-off' : 'Neutro';
+  const signalColor = snapshot.signal === 'bullish' ? '#14F195' : snapshot.signal === 'risk-off' ? '#EF4444' : '#F59E0B';
+
+  return (
+    <div className="mb-3 w-full overflow-hidden rounded-2xl border border-[#14F195]/15 bg-[#05070a] shadow-2xl shadow-[#14F195]/5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] bg-white/[0.025] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 p-2 text-[#14F195]">
+            <BarChart3 className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#14F195]/70">SOL Market Intelligence</p>
+            <p className="text-xs text-white/35">Dados vivos: {snapshot.sources.join(' + ')}</p>
+          </div>
+        </div>
+        <div className="rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em]" style={{ borderColor: `${signalColor}44`, background: `${signalColor}18`, color: signalColor }}>
+          {signalLabel}
+        </div>
+      </div>
+
+      <div className="grid gap-px bg-white/[0.06] sm:grid-cols-3">
+        <div className="bg-[#07090d] p-4">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-white/30">Preco SOL</p>
+          <p className="mt-1 text-2xl font-black text-white">${snapshot.price?.toFixed(2) ?? '--'}</p>
+          <p className={`mt-1 text-xs font-bold ${positive ? 'text-[#14F195]' : 'text-[#EF4444]'}`}>
+            {positive ? '+' : ''}{snapshot.change24h?.toFixed(2) ?? '--'}% 24h
+          </p>
+        </div>
+        <div className="bg-[#07090d] p-4">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-white/30">Volume 24h</p>
+          <p className="mt-1 text-2xl font-black text-white">{snapshot.volumeLabel ?? '--'}</p>
+          <p className="mt-1 text-xs text-white/35">Binance/CoinGecko</p>
+        </div>
+        <div className="bg-[#07090d] p-4">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-white/30">Market cap</p>
+          <p className="mt-1 text-2xl font-black text-white">{snapshot.marketCapLabel ?? '--'}</p>
+          <p className="mt-1 text-xs text-white/35">Trust {snapshot.trustScore}/100</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-4 lg:grid-cols-[1.4fr_0.9fr]">
+        <div className="rounded-2xl border border-white/[0.06] bg-black/35 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-white/30">24h chart</span>
+            <span className="text-[10px] text-white/25">{new Date(snapshot.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <svg viewBox="0 0 100 90" className="h-44 w-full overflow-visible">
+            <defs>
+              <linearGradient id="sol-market-fill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={signalColor} stopOpacity="0.35" />
+                <stop offset="100%" stopColor={signalColor} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <polyline points={`0,86 ${points} 100,86`} fill="url(#sol-market-fill)" stroke="none" />
+            <polyline points={points} fill="none" stroke={signalColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-white/[0.06] bg-black/35 p-4">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-white/30">Liquidez Solana DeFi</p>
+            <p className="mt-1 text-xl font-black text-white">{snapshot.liquidityLabel ?? '--'}</p>
+            <div className="mt-3 space-y-1.5">
+              {snapshot.protocols.slice(0, 3).map(protocol => (
+                <div key={protocol.name} className="flex items-center justify-between text-xs">
+                  <span className="truncate text-white/50">{protocol.name}</span>
+                  <span className="font-mono text-white/35">${(protocol.tvl / 1e6).toFixed(1)}M</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#14F195]/15 bg-[#14F195]/[0.04] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14F195]/75">O que fazer agora</p>
+            <p className="mt-2 text-sm leading-relaxed text-white/70">{snapshot.action}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, onCompare, onScore, onCopyHash, onAudit }: {
   message: Message;
   isLatest?: boolean;
@@ -294,7 +413,16 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
             )}
           </div>
         )}
-        {!isUser && message.structuredResponse ? (
+        {!isUser && message.marketSnapshot ? (
+          <>
+            <SolMarketCard snapshot={message.marketSnapshot} />
+            <div className="rounded-2xl px-4 py-3 text-[15px] leading-relaxed bg-white/[0.04] border border-white/[0.06] text-white/80">
+              <div className="prose prose-invert prose-sm max-w-none prose-p:my-1.5 prose-strong:text-white">
+                <ReactMarkdown>{displayContent}</ReactMarkdown>
+              </div>
+            </div>
+          </>
+        ) : !isUser && message.structuredResponse ? (
           (() => {
             try {
               return <ResponseRouter response={message.structuredResponse} />;
@@ -1714,6 +1842,40 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     const startTime = Date.now();
 
     try {
+      if (isSolMarketQuery(userMessage.content)) {
+        setThinkingStatus('Buscando preco, volume e liquidez da Solana...');
+        const marketRes = await fetch('/api/market/sol');
+        if (marketRes.ok) {
+          const snapshot = await marketRes.json() as SolMarketSnapshot;
+          const price = snapshot.price === null ? 'indisponivel' : `$${snapshot.price.toFixed(2)}`;
+          const change = snapshot.change24h === null ? 'indisponivel' : `${snapshot.change24h >= 0 ? '+' : ''}${snapshot.change24h.toFixed(2)}%`;
+          const content = `**SOL esta em ${price}**, com variacao de **${change} em 24h**.\n\n- **Volume 24h:** ${snapshot.volumeLabel ?? 'indisponivel'}\n- **Market cap:** ${snapshot.marketCapLabel ?? 'indisponivel'}\n- **Liquidez Solana DeFi:** ${snapshot.liquidityLabel ?? 'indisponivel'}\n- **Fontes:** ${snapshot.sources.join(', ')}\n\n${snapshot.action}`;
+          const assistantMsg: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content,
+            timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            orbMode: 'success',
+            model: 'market',
+            responseTime: Date.now() - startTime,
+            marketSnapshot: snapshot,
+          };
+          setMessages(prev => [...prev, assistantMsg]);
+          setChatPhase('completed');
+          setOrbMode('idle');
+          setIsTyping(false);
+          if (onSessionUpdate) {
+            onSessionUpdate({
+              id: sessionIdRef.current,
+              title: userMessage.content.slice(0, 55) + (userMessage.content.length > 55 ? '...' : ''),
+              lastMessage: `SOL ${price} (${change})`,
+              timestamp: 'Agora',
+            });
+          }
+          return;
+        }
+      }
+
       const controller = new AbortController();
       streamAbortRef.current?.abort();
       streamAbortRef.current = controller;
