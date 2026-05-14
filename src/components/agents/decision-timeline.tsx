@@ -22,6 +22,7 @@ interface DecisionRecord {
 interface DecisionTimelineProps {
   agentId: string;
   compact?: boolean;
+  onConfigureRules?: () => void;
 }
 
 const ACTION_ICONS: Record<string, string> = {
@@ -64,14 +65,13 @@ function parseCondition(conditionStr: string): string {
   }
 }
 
-export default function DecisionTimeline({ agentId, compact }: DecisionTimelineProps) {
+export default function DecisionTimeline({ agentId, compact, onConfigureRules }: DecisionTimelineProps) {
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     if (!agentId) return;
-    setLoading(true);
     fetch(`/api/agents/${agentId}/decisions?limit=30`)
       .then(r => r.json())
       .then(data => setDecisions(data.decisions || []))
@@ -108,10 +108,20 @@ export default function DecisionTimeline({ agentId, compact }: DecisionTimelineP
         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#9945FF]/10 border border-[#9945FF]/20">
           <Brain className="h-6 w-6 text-[#9945FF]/50" />
         </div>
-        <p className="text-sm text-white/40">Nenhuma decisao autonoma ainda</p>
-        <p className="mt-1 text-[11px] text-white/20 max-w-xs">
-          Adicione regras ao agente para ativar decisoes autonomas. O agente vai ler memorias, decidir e agir automaticamente.
+        <p className="text-sm font-semibold text-white/60">O agente executou, mas ainda nao tinha regra para agir</p>
+        <p className="mt-2 max-w-md text-[11px] leading-relaxed text-white/28">
+          O loop le memorias, sintetiza contexto e verifica regras. Uma decisao so aparece aqui quando existe uma regra ativa como:
+          <span className="mx-1 text-[#14F195]/70">IF memoria contem SOL</span>
+          <span className="text-white/35">THEN analisar mercado ou salvar preferencia.</span>
         </p>
+        {onConfigureRules && (
+          <button
+            onClick={onConfigureRules}
+            className="mt-4 rounded-xl border border-[#9945FF]/25 bg-[#9945FF]/10 px-4 py-2 text-xs font-semibold text-[#B58CFF] transition-colors hover:bg-[#9945FF]/16 hover:text-white"
+          >
+            Criar uma regra para esse agente
+          </button>
+        )}
       </div>
     );
   }
