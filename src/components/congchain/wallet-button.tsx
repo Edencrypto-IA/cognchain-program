@@ -1,17 +1,41 @@
 'use client';
 
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useEffect, useState, useCallback } from 'react';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown } from 'lucide-react';
+import type { WalletName } from '@solana/wallet-adapter-base';
+import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2 } from 'lucide-react';
+
+const WALLET_OPTIONS = [
+  {
+    key: 'phantom',
+    name: 'Phantom',
+    description: 'Carteira Solana principal para browser e mobile.',
+    installUrl: 'https://phantom.app/download',
+    mobileUrl: (url: string, ref: string) => `https://phantom.app/ul/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(ref)}`,
+  },
+  {
+    key: 'solflare',
+    name: 'Solflare',
+    description: 'Carteira Solana com suporte web e app mobile.',
+    installUrl: 'https://solflare.com/download',
+    mobileUrl: (url: string, ref: string) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(ref)}`,
+  },
+];
+
+function isMobileBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+}
 
 export default function WalletButton() {
-  const { publicKey, connected, disconnect, connecting, wallet } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { publicKey, connected, disconnect, connecting, wallet, wallets, select, connect } = useWallet();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [connectError, setConnectError] = useState('');
+  const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const fetchBalance = useCallback(async () => {
@@ -27,13 +51,13 @@ export default function WalletButton() {
       fetchBalance();
       const t = setInterval(fetchBalance, 15_000);
       return () => clearInterval(t);
-    } else {
-      setBalance(null);
     }
+
+    setBalance(null);
   }, [connected, publicKey, fetchBalance]);
 
   function truncate(addr: string) {
-    return `${addr.slice(0, 4)}…${addr.slice(-4)}`;
+    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
   }
 
   function copyAddress() {
@@ -43,21 +67,122 @@ export default function WalletButton() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // ── Not connected ──────────────────────────────────────────────
+  function openWalletFallback(option: typeof WALLET_OPTIONS[number]) {
+    if (typeof window === 'undefined') return;
+    const currentUrl = window.location.href;
+    const ref = window.location.origin;
+    window.location.href = isMobileBrowser()
+      ? option.mobileUrl(currentUrl, ref)
+      : option.installUrl;
+  }
+
+  async function connectWallet(option: typeof WALLET_OPTIONS[number]) {
+    setConnectError('');
+    setConnectingWallet(option.key);
+
+    const candidate = wallets.find(item =>
+      item.adapter.name.toLowerCase().includes(option.name.toLowerCase())
+    );
+
+    if (!candidate) {
+      openWalletFallback(option);
+      setConnectingWallet(null);
+      return;
+    }
+
+    try {
+      select(candidate.adapter.name as WalletName);
+      await new Promise(resolve => setTimeout(resolve, 80));
+      await connect();
+      setPickerOpen(false);
+    } catch {
+      if (isMobileBrowser()) {
+        openWalletFallback(option);
+      } else {
+        setConnectError(`${option.name} nao respondeu. Verifique se a extensao esta instalada e desbloqueada.`);
+      }
+    } finally {
+      setConnectingWallet(null);
+    }
+  }
+
   if (!connected) {
     return (
-      <button
-        onClick={() => setVisible(true)}
-        disabled={connecting}
-        className="inline-flex items-center gap-2 rounded-xl border border-[#9945FF]/30 bg-[#9945FF]/10 px-3 py-2 text-xs font-semibold text-[#9945FF] transition-all hover:bg-[#9945FF]/20 disabled:opacity-50"
-      >
-        <Wallet className="h-3.5 w-3.5" />
-        {connecting ? 'Conectando…' : 'Conectar Carteira'}
-      </button>
+      <>
+        <button
+          onClick={() => setPickerOpen(true)}
+          disabled={connecting || !!connectingWallet}
+          className="inline-flex items-center gap-2 rounded-xl border border-[#9945FF]/30 bg-[#9945FF]/10 px-3 py-2 text-xs font-semibold text-[#9945FF] transition-all hover:bg-[#9945FF]/20 disabled:opacity-50"
+        >
+          <Wallet className="h-3.5 w-3.5" />
+          {connecting || connectingWallet ? 'Conectando...' : 'Conectar Carteira'}
+        </button>
+
+        {pickerOpen && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={() => setPickerOpen(false)} />
+            <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/[0.09] bg-[#090914] shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-white/85">Conectar carteira</p>
+                  <p className="text-[11px] text-white/35">Escolha sua wallet Solana.</p>
+                </div>
+                <button
+                  onClick={() => setPickerOpen(false)}
+                  className="rounded-lg p-1.5 text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/70"
+                  aria-label="Fechar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2 p-3">
+                {WALLET_OPTIONS.map(option => {
+                  const adapter = wallets.find(item =>
+                    item.adapter.name.toLowerCase().includes(option.name.toLowerCase())
+                  )?.adapter;
+                  const busy = connectingWallet === option.key;
+
+                  return (
+                    <button
+                      key={option.key}
+                      onClick={() => connectWallet(option)}
+                      disabled={!!connectingWallet}
+                      className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-left transition-all hover:border-[#9945FF]/30 hover:bg-white/[0.045] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.04]">
+                        {adapter?.icon ? (
+                          <img src={adapter.icon} alt="" className="h-7 w-7 rounded-lg" />
+                        ) : (
+                          <Wallet className="h-5 w-5 text-[#9945FF]" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-white/75">{option.name}</p>
+                        <p className="text-[11px] leading-relaxed text-white/32">{option.description}</p>
+                      </div>
+                      {busy ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#14F195]" />
+                      ) : (
+                        <ExternalLink className="h-4 w-4 text-white/22" />
+                      )}
+                    </button>
+                  );
+                })}
+
+                {connectError && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] leading-relaxed text-red-300/80">
+                    {connectError}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
-  // ── Connected ──────────────────────────────────────────────────
   return (
     <div className="relative">
       <button
@@ -76,24 +201,20 @@ export default function WalletButton() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f0f1e] shadow-xl shadow-black/40">
-            {/* Wallet name */}
             {wallet && (
-              <div className="border-b border-white/[0.06] px-4 py-3 flex items-center gap-2">
+              <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3">
                 {wallet.adapter.icon && (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={wallet.adapter.icon} alt="" className="h-4 w-4 rounded" />
                 )}
                 <span className="text-[11px] font-semibold text-white/60">{wallet.adapter.name}</span>
               </div>
             )}
 
-            {/* Address */}
             <div className="border-b border-white/[0.06] p-4">
-              <p className="mb-1 text-[10px] uppercase tracking-wider text-white/30">Endereço</p>
+              <p className="mb-1 text-[10px] uppercase tracking-wider text-white/30">Endereco</p>
               <p className="break-all font-mono text-[11px] text-white/60">{publicKey!.toString()}</p>
             </div>
 
-            {/* Balance */}
             {balance !== null && (
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <p className="text-[10px] uppercase tracking-wider text-white/30">Saldo</p>
@@ -101,14 +222,13 @@ export default function WalletButton() {
               </div>
             )}
 
-            {/* Actions */}
             <div className="p-2">
               <button
                 onClick={copyAddress}
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/70"
               >
                 {copied ? <Check className="h-3.5 w-3.5 text-[#14F195]" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? 'Copiado!' : 'Copiar endereço'}
+                {copied ? 'Copiado!' : 'Copiar endereco'}
               </button>
               <a
                 href={`https://explorer.solana.com/address/${publicKey!.toString()}`}
