@@ -2907,7 +2907,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         )}
 
         {/* Input area — with context chip */}
-        <div className="border-t border-white/[0.055] bg-[#07070f]/86 p-3 shadow-[0_-18px_40px_rgba(0,0,0,0.22)] backdrop-blur-2xl md:p-4">
+        <div className="border-t border-transparent bg-transparent p-2.5 shadow-none backdrop-blur-2xl sm:p-3 md:border-white/[0.055] md:bg-[#07070f]/86 md:p-4 md:shadow-[0_-18px_40px_rgba(0,0,0,0.22)]">
           <div className="max-w-3xl mx-auto">
             {/* Agent insights notification */}
             {agentInsights && (
@@ -2931,28 +2931,28 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                 <span className="text-[10px] text-white/20">Memory anchored. Hash generated.</span>
               </div>
             )}
-            <div className="relative flex items-end gap-2 rounded-3xl border border-white/[0.085] bg-[#0B0B13]/78 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.045),0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl transition-all duration-200 focus-within:border-[#5AD7FF]/32 focus-within:bg-[#0E0E17]/86">
-              <div className="hidden sm:flex items-center gap-0.5 pb-0.5">
-                <button className="p-1.5 rounded-full hover:bg-white/[0.055] text-white/25 hover:text-white/55 transition-colors"><Paperclip className="w-5 h-5" /></button>
-                <button className="p-1.5 rounded-full hover:bg-white/[0.055] text-white/25 hover:text-white/55 transition-colors"><ImagePlus className="w-5 h-5" /></button>
+            <div className="relative flex min-h-[58px] items-end gap-2 rounded-[28px] border border-[#5AD7FF]/18 bg-[#0D0D16]/94 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_14px_42px_rgba(0,0,0,0.38),0_0_34px_rgba(90,215,255,0.045)] backdrop-blur-2xl transition-all duration-200 focus-within:border-[#5AD7FF]/42 focus-within:bg-[#10101A]/96 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_52px_rgba(0,0,0,0.42),0_0_42px_rgba(90,215,255,0.08)] sm:px-4">
+              <div className="flex items-center gap-0.5 pb-0.5">
+                <button className="p-1.5 rounded-full hover:bg-white/[0.06] text-white/34 hover:text-white/62 transition-colors"><Paperclip className="w-5 h-5" /></button>
+                <button className="p-1.5 rounded-full hover:bg-white/[0.06] text-white/34 hover:text-white/62 transition-colors"><ImagePlus className="w-5 h-5" /></button>
               </div>
               <textarea value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={handleKeyDown}
                 placeholder="Describe what you want to build..." rows={1}
-                className="flex-1 bg-transparent text-white/90 placeholder-white/25 text-[15px] resize-none outline-none max-h-32 py-1 leading-relaxed"
+                className="flex-1 bg-transparent text-[15px] leading-relaxed text-white/92 placeholder-white/38 resize-none outline-none max-h-32 py-1"
                 style={{ height: 'auto', minHeight: '24px' }}
                 onInput={(e) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 128) + 'px'; }} />
               <div className="flex items-center gap-0.5 pb-0.5">
                 <button onClick={() => setOrbMode(orbMode === 'listening' ? 'idle' : 'listening')}
-                  className={`p-1.5 rounded-full transition-colors ${orbMode === 'listening' ? 'bg-[#8B5CF6]/18 text-[#C4B5FD]' : 'hover:bg-white/[0.055] text-white/25 hover:text-white/55'}`}>
+                  className={`p-1.5 rounded-full transition-colors ${orbMode === 'listening' ? 'bg-[#8B5CF6]/18 text-[#C4B5FD]' : 'hover:bg-white/[0.06] text-white/34 hover:text-white/62'}`}>
                   <Mic className="w-5 h-5" />
                 </button>
                 <button onClick={handleSend} disabled={!inputValue.trim() || isTyping}
-                  className={`p-1.5 rounded-full transition-all duration-200 ${inputValue.trim() && !isTyping ? 'bg-gradient-to-r from-[#8B5CF6] via-[#5AD7FF] to-[#14F195] text-[#050509] shadow-lg shadow-[#5AD7FF]/18 hover:shadow-[#14F195]/20' : 'text-white/16 cursor-not-allowed'}`}>
+                  className={`p-2 rounded-full transition-all duration-200 ${inputValue.trim() && !isTyping ? 'bg-gradient-to-r from-[#8B5CF6] via-[#5AD7FF] to-[#14F195] text-[#050509] shadow-lg shadow-[#5AD7FF]/20 hover:shadow-[#14F195]/24' : 'text-white/24 cursor-not-allowed'}`}>
                   <Send className="w-5 h-5" />
                 </button>
               </div>
             </div>
-            <p className="text-center text-[11px] text-white/20 mt-2">CONGCHAIN pode cometer erros. Verifique informacoes importantes.</p>
+            <p className="text-center text-[10px] text-white/18 mt-1.5 md:text-[11px] md:mt-2">CONGCHAIN pode cometer erros. Verifique informacoes importantes.</p>
           </div>
         </div>
       </div>
