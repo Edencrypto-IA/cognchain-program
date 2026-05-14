@@ -4,7 +4,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback } from 'react';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import type { WalletName } from '@solana/wallet-adapter-base';
-import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2 } from 'lucide-react';
+import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye } from 'lucide-react';
 
 const WALLET_OPTIONS = [
   {
@@ -137,6 +137,36 @@ export default function WalletButton() {
               </div>
 
               <div className="space-y-2 p-3">
+                <div className="rounded-2xl border border-[#14F195]/18 bg-gradient-to-br from-[#14F195]/10 via-[#00D1FF]/6 to-[#9945FF]/8 p-3">
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#14F195]/20 bg-[#14F195]/10">
+                      <ShieldCheck className="h-4.5 w-4.5 text-[#14F195]" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#14F195]/80">Read-only first</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-white/42">
+                        Ao conectar, a CONGCHAIN le apenas dados publicos da sua carteira. Nenhum token pode ser movido sem uma aprovacao manual na sua wallet.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {[
+                      { icon: Eye, label: 'Leitura publica', text: 'Endereco e saldo publico.' },
+                      { icon: LockKeyhole, label: 'Sem custodia', text: 'Suas chaves ficam na wallet.' },
+                      { icon: Check, label: 'Assinatura manual', text: 'Toda acao aparece para revisar.' },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-center gap-2 rounded-xl border border-white/[0.055] bg-black/20 px-3 py-2">
+                        <item.icon className="h-3.5 w-3.5 text-[#00D1FF]/70" />
+                        <div>
+                          <p className="text-[10px] font-semibold text-white/65">{item.label}</p>
+                          <p className="text-[10px] text-white/28">{item.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {WALLET_OPTIONS.map(option => {
                   const adapter = wallets.find(item =>
                     item.adapter.name.toLowerCase().includes(option.name.toLowerCase())
