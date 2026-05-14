@@ -2744,30 +2744,48 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
         {/* Messages */}
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto relative"
-          style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(153, 69, 255, 0.03) 0%, transparent 70%)' }}>
+          style={{
+            backgroundImage: [
+              'radial-gradient(circle at 50% 18%, rgba(90, 215, 255, 0.055) 0%, transparent 34%)',
+              'radial-gradient(circle at 50% 44%, rgba(139, 92, 246, 0.045) 0%, transparent 46%)',
+            ].join(', '),
+          }}>
           {isEmpty ? (
-            <div className="flex flex-col items-center justify-center min-h-full px-4 py-8">
-              <div className="mb-6"><Orb mode={orbMode} size="xl" interactive /></div>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.32em] text-[#14F195]/60">CognChain</p>
-              <h2 className="max-w-3xl text-center text-3xl font-semibold leading-tight text-white/92 md:text-5xl">
-                Verifiable Memory Protocol for Autonomous AI Agents.
-              </h2>
-              <p className="mt-4 mb-7 max-w-xl text-center text-sm leading-relaxed text-white/42 md:text-base">
-                Persistent, portable memory that AI agents can prove, inherit, and continue across models.
-              </p>
+            <div className="flex min-h-full flex-col items-center px-4 pb-8 pt-8 sm:pt-10 md:pt-12">
+              <div className="relative flex w-full max-w-4xl flex-col items-center">
+                <div className="pointer-events-none absolute inset-x-0 top-10 mx-auto h-72 max-w-2xl rounded-full bg-[radial-gradient(circle,rgba(20,241,149,0.08),rgba(139,92,246,0.045)_42%,transparent_70%)] blur-3xl" />
+                <div className="relative mb-2 scale-[0.78] md:scale-[0.86]">
+                  <Orb mode={orbMode} size="xl" interactive />
+                </div>
+                <p className="relative mb-3 text-[10px] font-bold uppercase tracking-[0.34em] text-[#5AD7FF]/70">CognChain</p>
+                <h2 className="relative max-w-3xl text-center text-[2.15rem] font-semibold leading-[1.03] text-[#F4F2FF] md:text-[4rem]">
+                  Verifiable Memory Protocol
+                  <span className="block text-white/82">for Autonomous AI Agents.</span>
+                </h2>
+                <p className="relative mt-4 max-w-xl text-center text-sm leading-relaxed text-[#A7A4B6] md:text-base">
+                  Persistent, portable memory that agents can prove, inherit, and continue across models.
+                </p>
+                <div className="relative mt-5 mb-5 flex flex-wrap items-center justify-center gap-2">
+                  {['Verifiable', 'Portable', 'Cross-model'].map(label => (
+                    <span key={label} className="rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1 text-[11px] font-medium text-white/48 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
               {/* Model selector on empty state */}
-              <div className="flex items-center gap-1 mb-6 flex-wrap justify-center">
+              <div className="flex items-center gap-1.5 mb-5 flex-wrap justify-center">
                 {([['gpt', 'GPT-4o', '#10b981'], ['claude', 'Claude', '#f97316'], ['deepseek', 'DeepSeek', '#06b6d4'], ['nvidia', 'Llama', '#9945FF'], ['gemini', 'Gemini', '#3B82F6']] as [AIModel, string, string][]).map(([key, name, color]) => (
                   <button key={key} onClick={() => setSelectedModel(key as AIModel)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${selectedModel === key ? 'bg-white/[0.08] border border-white/[0.12] text-white/90 shadow-sm' : 'bg-white/[0.03] border border-white/[0.06] text-white/40 hover:text-white/60 hover:bg-white/[0.06]'}`}>
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${selectedModel === key ? 'bg-white/[0.08] border border-white/[0.14] text-white/90 shadow-sm' : 'bg-white/[0.025] border border-white/[0.06] text-white/42 hover:text-white/65 hover:bg-white/[0.055]'}`}>
                     <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: color }} />
                     {name}
                   </button>
                 ))}
               </div>
               {/* Memory hash loader */}
-              <div className="w-full max-w-md mb-6">
-                <div className={`flex items-center gap-2 bg-white/[0.03] border rounded-xl px-4 py-2.5 transition-all ${hashError ? 'border-red-500/40' : hashLoading ? 'border-[#9945FF]/40' : 'border-white/[0.06] focus-within:border-[#14F195]/40'}`}>
+              <div className="w-full max-w-md mb-5">
+                <div className={`flex items-center gap-2 bg-[#0A0A12]/70 border rounded-2xl px-4 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl transition-all ${hashError ? 'border-red-500/40' : hashLoading ? 'border-[#8B5CF6]/40' : 'border-white/[0.07] focus-within:border-[#14F195]/40'}`}>
                   <Hash className={`w-4 h-4 flex-shrink-0 ${hashLoading ? 'text-[#9945FF] animate-pulse' : 'text-[#14F195]/40'}`} />
                   <input
                     type="text"
@@ -2806,18 +2824,18 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                 </div>
               </div>
               {/* Quick action cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-lg">
                 {quickActions.map((a, i) => (
                   <button key={i} onClick={() => { setInputValue(a.prompt); }}
-                    className="flex items-center gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-[#9945FF]/30 transition-all duration-200 text-left group">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#9945FF]/20 to-[#14F195]/10 border border-[#9945FF]/20 flex items-center justify-center flex-shrink-0 group-hover:border-[#9945FF]/40 transition-colors text-[#9945FF]/70 group-hover:text-[#9945FF]">{a.icon}</div>
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.025] border border-white/[0.065] hover:bg-white/[0.055] hover:border-[#8B5CF6]/25 transition-all duration-200 text-left group">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#8B5CF6]/18 to-[#14F195]/10 border border-white/[0.08] flex items-center justify-center flex-shrink-0 group-hover:border-[#5AD7FF]/25 transition-colors text-[#A78BFA]/75 group-hover:text-[#5AD7FF]">{a.icon}</div>
                     <p className="text-xs font-medium text-white/60 group-hover:text-white/90 transition-colors">{a.label}</p>
                   </button>
                 ))}
               </div>
               {/* #3 Auto-Demo button */}
               <button onClick={runAutoDemo} disabled={isDemoRunning}
-                className="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/20 border border-[#9945FF]/20 text-[#9945FF]/70 hover:from-[#9945FF]/30 hover:to-[#14F195]/30 hover:text-[#9945FF]/90 transition-all duration-200 disabled:opacity-50 text-sm font-medium">
+                className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#8B5CF6]/18 to-[#14F195]/14 border border-[#8B5CF6]/22 text-[#C4B5FD]/80 hover:from-[#8B5CF6]/26 hover:to-[#14F195]/22 hover:text-white transition-all duration-200 disabled:opacity-50 text-sm font-medium">
                 {isDemoRunning ? (
                   <>
                     <span className="w-4 h-4 border-2 border-[#9945FF]/30 border-t-[#9945FF] rounded-full animate-spin" />
