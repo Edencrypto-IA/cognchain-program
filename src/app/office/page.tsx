@@ -22,6 +22,12 @@ interface FeedEvent {
   oldScore?: number; newScore?: number;
   snippet?: string; hash?: string; scoreGain?: number;
   sources?: string[]; evidence?: string[]; dataQuality?: number;
+  decision?: {
+    summary: string;
+    conclusion: string;
+    action: string;
+    caution: string;
+  };
   fromName?: string; toName?: string; amount?: number;
   finalScore?: number; reason?: string;
   isReal?: boolean; isSimulated?: boolean; source?: string;
@@ -332,9 +338,24 @@ function AgentLiveInspector({
   const isActive = agent.status === 'thinking' || agent.status === 'executing';
   const color = agent.status === 'fired' ? '#EF4444' : meta.color;
   const latestMemory = events.find(ev => ev.type === 'memory_saved' && ev.hash);
+  const latestRealDecision = events.find(ev => ev.isReal && ev.decision);
   const latestTask = events.find(ev => ev.type === 'task_start' || ev.type === 'task_done' || ev.type === 'real_task_done');
   const successEvents = events.filter(ev => ev.type === 'task_done' && ev.success).length;
   const failedEvents = events.filter(ev => ev.type === 'task_done' && ev.success === false).length;
+  const copyDecision = useCallback(async () => {
+    if (!latestRealDecision?.decision) return;
+    const text = [
+      `Agent: ${agent.name}`,
+      `Task: ${latestRealDecision.task ?? 'Real agent run'}`,
+      `Summary: ${latestRealDecision.decision.summary}`,
+      `Conclusion: ${latestRealDecision.decision.conclusion}`,
+      `Action: ${latestRealDecision.decision.action}`,
+      `Caution: ${latestRealDecision.decision.caution}`,
+      latestRealDecision.hash ? `Hash: ${latestRealDecision.hash}` : '',
+      latestRealDecision.sources?.length ? `Sources: ${latestRealDecision.sources.join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+    await navigator.clipboard?.writeText(text).catch(() => {});
+  }, [agent.name, latestRealDecision]);
 
   return (
     <motion.div
@@ -427,6 +448,46 @@ function AgentLiveInspector({
                 <p className="text-xs text-white/30">Nenhuma memoria emitida por este agente nesta sessao ainda.</p>
               )}
             </div>
+
+            {latestRealDecision?.decision ? (
+              <div className="mt-3 rounded-3xl border border-[#14F195]/20 bg-[#14F195]/[0.045] p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#14F195]">Actionable Output</p>
+                    <p className="mt-1 text-xs text-white/35">Decisao gerada a partir de dados reais.</p>
+                  </div>
+                  <button
+                    onClick={copyDecision}
+                    className="rounded-xl border border-[#14F195]/20 bg-black/35 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#14F195]/85 transition hover:bg-[#14F195]/10"
+                  >
+                    Copiar
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">Resumo</p>
+                    <p className="mt-1 text-sm leading-relaxed text-white/75">{latestRealDecision.decision.summary}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">Conclusao</p>
+                    <p className="mt-1 text-sm font-semibold leading-relaxed text-white">{latestRealDecision.decision.conclusion}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">O que fazer agora</p>
+                    <p className="mt-1 text-sm leading-relaxed text-[#14F195]/85">{latestRealDecision.decision.action}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/[0.06] bg-black/35 p-3">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30">Cuidado</p>
+                    <p className="mt-1 text-xs leading-relaxed text-white/45">{latestRealDecision.decision.caution}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/25">Sem decisao real ainda</p>
+                <p className="mt-2 text-xs leading-relaxed text-white/35">Eventos DEMO mostram atividade visual. Para ver uma decisao completa, rode Market Intel ou Wallet Risk.</p>
+              </div>
+            )}
           </section>
 
           <section className="flex min-h-[480px] flex-col p-6">
@@ -465,6 +526,12 @@ function AgentLiveInspector({
                         <span className="flex items-center gap-1 text-[10px] text-white/25"><Clock className="h-3 w-3" />{formatAgo(event.ts)}</span>
                       </div>
                       <p className="text-sm leading-relaxed text-white/65">{describeFeedEvent(event)}</p>
+                      {event.decision && (
+                        <div className="mt-3 rounded-2xl border border-[#14F195]/15 bg-[#14F195]/[0.04] p-3">
+                          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#14F195]/75">O que fazer com isso</p>
+                          <p className="mt-1 text-xs leading-relaxed text-white/65">{event.decision.action}</p>
+                        </div>
+                      )}
                       {event.sources && (
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {event.sources.map(source => (

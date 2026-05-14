@@ -571,6 +571,41 @@ function buildEvidence(category: string, data: Record<string, unknown>): { sourc
   return { sources: ['Agent Office data pipeline'], evidence: ['Dados coletados pelo skill selecionado'] };
 }
 
+function buildDecision(category: string, content: string, evidence: string[]): { summary: string; conclusion: string; action: string; caution: string } {
+  const clean = content.replace(/\s+/g, ' ').trim();
+  const firstSentence = clean.split(/(?<=[.!?])\s+/)[0]?.slice(0, 220) || 'Analise real concluida com dados externos.';
+  const signal = /bullish|compra|comprar|risk-on|positivo|alta/i.test(clean)
+    ? 'Sinal construtivo, mas depende de confirmacao dos dados.'
+    : /bearish|venda|vender|risk-off|negativo|queda|risco alto/i.test(clean)
+      ? 'Sinal defensivo: priorize controle de risco.'
+      : 'Sinal neutro: monitorar antes de agir.';
+
+  if (category === 'market') {
+    return {
+      summary: firstSentence,
+      conclusion: signal,
+      action: 'Use este briefing como contexto no chat, compare com sua tese e monitore SOL/TVL antes de qualquer decisao.',
+      caution: 'Nao e recomendacao financeira. O agente usa snapshots de mercado e pode perder mudancas apos a coleta.',
+    };
+  }
+
+  if (category === 'wallet') {
+    return {
+      summary: firstSentence,
+      conclusion: signal,
+      action: 'Antes de interagir, revise saldo, assinaturas recentes e ativos; se o risco parecer alto, evite aprovar transacoes.',
+      caution: 'Leitura read-only. O agente nao prova identidade do dono da wallet nem garante ausencia de risco.',
+    };
+  }
+
+  return {
+    summary: firstSentence,
+    conclusion: signal,
+    action: evidence[0] ? `Use a evidencia principal: ${evidence[0]}` : 'Revise o output e salve a decisao no chat.',
+    caution: 'Verifique fontes antes de executar qualquer acao.',
+  };
+}
+
 export async function runRealTask(options?: string | RunRealTaskOptions): Promise<boolean> {
   const forceModelKey = typeof options === 'string' ? options : options?.model;
   const taskKind = typeof options === 'string' ? undefined : options?.task;
@@ -625,6 +660,7 @@ export async function runRealTask(options?: string | RunRealTaskOptions): Promis
     // Score = how many live data sources actually returned real data (0-10)
     const dataScore = calcDataScore(skill.category, liveData, agentName);
     const { sources, evidence } = buildEvidence(skill.category, liveData);
+    const decision = buildDecision(skill.category, content, evidence);
 
     // Step 5: Save as AGENT_INSIGHT with score
     const hasContinuity = history.length > 0;
@@ -640,7 +676,7 @@ export async function runRealTask(options?: string | RunRealTaskOptions): Promis
       agentName: hasContinuity ? `${agentName} ↻` : agentName,
       task: skill.name,
       result: content.replace(/\n+/g, ' ').trim().slice(0, 160),
-      hash: mem.hash, ts: Date.now(), isReal: true, sources, evidence, dataQuality: dataScore,
+      hash: mem.hash, ts: Date.now(), isReal: true, sources, evidence, decision, dataQuality: dataScore,
     });
     updateAgentSnapshot({
       id: `real-${agentName.toLowerCase()}`,

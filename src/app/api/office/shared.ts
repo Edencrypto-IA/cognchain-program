@@ -17,6 +17,12 @@ export interface RealEvent {
   isReal: true;
   sources?: string[];
   evidence?: string[];
+  decision?: {
+    summary: string;
+    conclusion: string;
+    action: string;
+    caution: string;
+  };
   dataQuality?: number;
 }
 
