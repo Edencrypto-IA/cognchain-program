@@ -2760,9 +2760,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                   </div>
                 </div>
                 <p className="relative mb-3 text-[10px] font-bold uppercase tracking-[0.34em] text-[#5AD7FF]/70">CognChain</p>
-                <h2 className="relative max-w-3xl text-center text-[2.15rem] font-semibold leading-[1.03] text-[#F4F2FF] md:text-[4rem]">
+                <h2 className="relative max-w-2xl text-center text-[1.95rem] font-semibold leading-[1.06] text-[#F4F2FF] md:text-[3.1rem] lg:text-[3.35rem]">
                   Verifiable Memory Protocol
-                  <span className="block text-white/82">for Autonomous AI Agents.</span>
+                  <span className="block text-white/82">for AI Agents.</span>
                 </h2>
                 <p className="relative mt-4 max-w-xl text-center text-sm leading-relaxed text-[#A7A4B6] md:text-base">
                   Persistent, portable memory that agents can prove, inherit, and continue across models.
