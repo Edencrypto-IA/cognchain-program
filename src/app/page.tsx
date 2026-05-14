@@ -104,11 +104,12 @@ export default function Home() {
             aria-label="Abrir menu lateral"
             title="Abrir menu"
             className="fixed top-3 left-3 z-40 flex h-10 w-10 items-center justify-center rounded-2xl
-              border border-white/[0.08] bg-[#080812]/80 text-white/65 shadow-[0_18px_50px_rgba(0,0,0,0.35)]
-              backdrop-blur-2xl transition-all duration-200 hover:border-[#7c3aed]/35 hover:bg-white/[0.08] hover:text-white
+              border border-[#8B5CF6]/45 bg-gradient-to-br from-[#8B5CF6]/35 via-[#00D1FF]/16 to-[#14F195]/22
+              text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_16px_45px_rgba(139,92,246,0.28),0_0_26px_rgba(20,241,149,0.12)]
+              backdrop-blur-2xl transition-all duration-200 hover:border-[#14F195]/50 hover:from-[#8B5CF6]/48 hover:via-[#00D1FF]/22 hover:to-[#14F195]/32 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_52px_rgba(139,92,246,0.34),0_0_32px_rgba(20,241,149,0.18)]
               focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/40"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-5 w-5 drop-shadow-[0_0_8px_rgba(255,255,255,0.45)]" />
           </button>
         )}
 
