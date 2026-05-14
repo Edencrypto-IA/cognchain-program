@@ -249,10 +249,10 @@ export default function WalletButton() {
         <ChevronDown className={`h-3 w-3 text-[#14F195]/50 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f0f1e] shadow-xl shadow-black/40">
+      {open && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[2147483647] flex items-start justify-center p-4 pt-24 sm:justify-end sm:pr-8">
+          <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
+          <div className="relative w-full max-w-xs overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f0f1e] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
             {wallet && (
               <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3">
                 {wallet.adapter.icon && (
@@ -301,7 +301,8 @@ export default function WalletButton() {
               </button>
             </div>
           </div>
-        </>
+        </div>,
+        document.body
       )}
     </div>
   );
