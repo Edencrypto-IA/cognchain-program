@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { StructuredResponse } from '@/lib/grounding/types';
 import RankingDashboard    from './RankingDashboard';
 import ComparisonDashboard from './ComparisonDashboard';
@@ -91,7 +92,14 @@ function MemoryAnswerCard({
         <section>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-white/25">Resposta</p>
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 text-[14px] leading-relaxed text-white/78">
-            <p className="whitespace-pre-wrap">{answer}</p>
+            <div className="prose prose-invert prose-sm max-w-none
+              prose-p:my-2 prose-headings:my-3 prose-headings:text-white/90 prose-headings:font-semibold
+              prose-strong:text-white prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5
+              prose-table:my-3 prose-table:text-[13px] prose-th:border-white/10 prose-td:border-white/[0.06]
+              prose-th:bg-white/[0.04] prose-th:px-3 prose-th:py-2 prose-td:px-3 prose-td:py-2
+              prose-code:text-[#14F195] prose-code:bg-[#14F195]/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded">
+              <ReactMarkdown>{answer}</ReactMarkdown>
+            </div>
           </div>
         </section>
 
