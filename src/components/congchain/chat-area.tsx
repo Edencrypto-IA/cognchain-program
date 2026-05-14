@@ -1664,8 +1664,8 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
         {FREE.map(m => (
           <button key={m.key} onClick={() => handleClick(m.key, false)}
             className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200
-              ${selectedModel === m.key ? 'bg-white/[0.09] border border-white/[0.12] text-white/90 shadow-sm' : 'border border-transparent text-white/34 hover:text-white/58 hover:bg-white/[0.04]'}`}>
-            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: m.color }} />
+              ${selectedModel === m.key ? 'bg-white/[0.105] border border-white/[0.14] text-white/92 shadow-sm' : 'border border-transparent text-white/48 hover:text-white/72 hover:bg-white/[0.045]'}`}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 shadow-[0_0_10px_currentColor]" style={{ backgroundColor: m.color, color: m.color }} />
             {m.name}
           </button>
         ))}
@@ -1674,14 +1674,14 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
           <button key={m.key} onClick={() => handleClick(m.key, true)}
             className={`relative px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200 group
               ${selectedModel === m.key
-                ? 'bg-white/[0.09] border border-white/[0.12] text-white/90 shadow-sm'
+                ? 'bg-white/[0.105] border border-white/[0.14] text-white/92 shadow-sm'
                 : isAdmin
-                  ? 'border border-transparent text-white/60 hover:text-white/90 hover:bg-white/[0.04]'
-                  : 'border border-transparent text-white/26 hover:text-white/42 hover:bg-white/[0.03]'
+                  ? 'border border-transparent text-white/56 hover:text-white/84 hover:bg-white/[0.04]'
+                  : 'border border-transparent text-white/38 hover:text-white/58 hover:bg-white/[0.035]'
               }`}>
-            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: m.color, opacity: isAdmin ? 1 : 0.4 }} />
+            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 shadow-[0_0_10px_currentColor]" style={{ backgroundColor: m.color, color: m.color, opacity: isAdmin ? 1 : 0.55 }} />
             {m.name}
-            {!isAdmin && <span className="ml-1 text-[9px] font-bold text-[#9945FF]/70 group-hover:text-[#9945FF]">PRO</span>}
+            {!isAdmin && <span className="ml-1 text-[9px] font-bold text-[#A78BFA]/80 group-hover:text-[#C4B5FD]">PRO</span>}
             {isAdmin && selectedModel === m.key && <span className="ml-1 text-[9px] text-[#00d4aa]/60">✓</span>}
           </button>
         ))}
