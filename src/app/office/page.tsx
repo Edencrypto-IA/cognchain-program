@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Zap, Brain, CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, Users, Activity, Plus, Play, Loader2, X, Eye, Clock, Hash, Radio, Terminal, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Zap, Brain, CheckCircle, XCircle, TrendingUp, TrendingDown, DollarSign, Users, Activity, Plus, Play, Loader2, X, Eye, Clock, Hash, Radio, Terminal, ShieldCheck, Wallet, BarChart3 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,6 +16,7 @@ interface AgentState {
 interface FeedEvent {
   id: string; ts: number; type: string;
   agentId?: string; name?: string; model?: string;
+  agentName?: string; modelLabel?: string; result?: string;
   text?: string; task?: string; reward?: number;
   success?: boolean; duration?: number;
   oldScore?: number; newScore?: number;
@@ -492,6 +493,8 @@ export default function OfficePage() {
   const [connected, setConnected] = useState(false);
   const [time, setTime] = useState('');
   const [running, setRunning] = useState(false);
+  const [runningTask, setRunningTask] = useState<'market' | 'wallet' | null>(null);
+  const [walletAddress, setWalletAddress] = useState('');
   const [schedulerOn, setSchedulerOn] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -519,14 +522,20 @@ export default function OfficePage() {
     } catch { /* silent */ }
   }, [schedulerOn]);
 
-  const triggerRealTask = useCallback(async () => {
+  const triggerRealTask = useCallback(async (task: 'market' | 'wallet') => {
     if (running) return;
+    if (task === 'wallet' && !walletAddress.trim()) return;
     setRunning(true);
+    setRunningTask(task);
     try {
-      await fetch('/api/office/run-task', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      await fetch('/api/office/run-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task, walletAddress: walletAddress.trim() || undefined }),
+      });
     } catch { /* silent */ }
-    setTimeout(() => setRunning(false), 8000);
-  }, [running]);
+    setTimeout(() => { setRunning(false); setRunningTask(null); }, 8000);
+  }, [running, walletAddress]);
 
   // Clock
   useEffect(() => {
@@ -537,7 +546,7 @@ export default function OfficePage() {
   }, []);
 
   const addEvent = useCallback((ev: Omit<FeedEvent, 'id'>) => {
-    const e: FeedEvent = { ...ev, id: String(eventCounter.current++) };
+    const e: FeedEvent = { ...ev, name: ev.name ?? ev.agentName, id: String(eventCounter.current++) };
     setFeed(prev => [e, ...prev].slice(0, 80));
   }, []);
 
@@ -593,6 +602,11 @@ export default function OfficePage() {
         }
 
         if (data.type === 'sol_payment') {
+          addEvent(data);
+          return;
+        }
+
+        if (data.type === 'real_task_done') {
           addEvent(data);
           return;
         }
@@ -701,16 +715,35 @@ export default function OfficePage() {
                 ? <><span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />Pausar Demo Live</>
                 : <><Play className="w-3 h-3" />Iniciar Demo Live</>}
             </button>
-            {/* One-shot manual trigger */}
+            {/* Real agent runs */}
             <button
-              onClick={triggerRealTask}
+              onClick={() => triggerRealTask('market')}
               disabled={running || !connected}
-              title="Rodar um agente real com dados externos e IA"
+              title="Rodar Market Intelligence com dados Binance/CoinGecko/DeFiLlama"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-30"
               style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}
             >
-              {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-              <span className="hidden lg:inline">Agente Real</span>
+              {runningTask === 'market' ? <Loader2 className="w-3 h-3 animate-spin" /> : <BarChart3 className="w-3 h-3" />}
+              <span className="hidden lg:inline">Market Intel</span>
+            </button>
+            <div className="hidden xl:flex items-center gap-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-2 py-1.5">
+              <Wallet className="w-3 h-3 text-white/25" />
+              <input
+                value={walletAddress}
+                onChange={(e) => setWalletAddress(e.target.value)}
+                placeholder="wallet para risco"
+                className="w-36 bg-transparent text-[10px] text-white/65 outline-none placeholder:text-white/20"
+              />
+            </div>
+            <button
+              onClick={() => triggerRealTask('wallet')}
+              disabled={running || !connected || !walletAddress.trim()}
+              title="Rodar Wallet Risk Agent com leitura Solana read-only"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-30"
+              style={{ background: 'rgba(20,241,149,0.08)', border: '1px solid rgba(20,241,149,0.2)', color: '#14F195' }}
+            >
+              {runningTask === 'wallet' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wallet className="w-3 h-3" />}
+              <span className="hidden lg:inline">Wallet Risk</span>
             </button>
             <div className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#14F195] live-dot' : 'bg-[#EF4444]'}`} />
@@ -739,6 +772,15 @@ export default function OfficePage() {
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-2 py-1 font-black uppercase tracking-[0.18em] text-[#F59E0B]">Agente Real</span>
             <span>busca dados externos, chama IA e salva memoria com hash real.</span>
+          </div>
+          <div className="flex xl:hidden w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+            <Wallet className="w-3.5 h-3.5 text-white/25" />
+            <input
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              placeholder="cole uma wallet para Wallet Risk"
+              className="min-w-0 flex-1 bg-transparent text-[11px] text-white/65 outline-none placeholder:text-white/20"
+            />
           </div>
         </div>
 

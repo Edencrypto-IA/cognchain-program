@@ -107,7 +107,7 @@ function fmtB(n: number) { return n >= 1e9 ? `$${(n/1e9).toFixed(2)}B` : `$${(n/
 interface AgentSkill {
   name: string;
   category: string;
-  fetchData: () => Promise<Record<string, unknown>>;
+  fetchData: (ctx?: { walletAddress?: string }) => Promise<Record<string, unknown>>;
   buildPrompt: (data: Record<string, unknown>) => string | null;
 }
 
@@ -206,6 +206,136 @@ const AGENT_SKILLS: AgentSkill[] = [
   },
 ];
 
+const MARKET_INTELLIGENCE_SKILL: AgentSkill = {
+  name: 'Market Intelligence Agent - Solana Live Brief',
+  category: 'market',
+  async fetchData() {
+    const [solTicker, btcTicker, prices, protocols] = await Promise.all([
+      safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=SOLUSDT'),
+      safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT'),
+      safeFetch('https://api.coingecko.com/api/v3/simple/price?ids=solana,bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true'),
+      safeFetch('https://api.llama.fi/protocols'),
+    ]);
+
+    const solanaProtocols = Array.isArray(protocols)
+      ? protocols
+          .filter((p: unknown) => {
+            const x = p as Record<string, unknown>;
+            return (x.chains as string[] | undefined)?.includes('Solana') && (x.tvl as number) > 500_000;
+          })
+          .sort((a: unknown, b: unknown) => ((b as Record<string, number>).tvl) - ((a as Record<string, number>).tvl))
+          .slice(0, 5)
+          .map((p: unknown) => {
+            const x = p as Record<string, unknown>;
+            return { name: x.name, tvl: x.tvl, c1d: x.change_1d, c7d: x.change_7d };
+          })
+      : [];
+
+    return { solTicker, btcTicker, prices, solanaProtocols };
+  },
+  buildPrompt(data) {
+    const sol = data.solTicker as Record<string, string> | null;
+    const btc = data.btcTicker as Record<string, string> | null;
+    const prices = data.prices as Record<string, Record<string, number>> | null;
+    const protocols = data.solanaProtocols as { name: string; tvl: number; c1d?: number; c7d?: number }[];
+    if (!sol && !prices?.solana) return null;
+
+    const marketLines = [
+      sol ? `SOL Binance: $${fmt(+sol.lastPrice)} | 24h ${fmt(+sol.priceChangePercent)}% | Vol ${fmtB(+sol.quoteVolume)} | High $${fmt(+sol.highPrice)} | Low $${fmt(+sol.lowPrice)}` : '',
+      btc ? `BTC Binance: $${fmt(+btc.lastPrice)} | 24h ${fmt(+btc.priceChangePercent)}% | Vol ${fmtB(+btc.quoteVolume)}` : '',
+      prices?.solana ? `CoinGecko SOL: $${prices.solana.usd} | 24h ${prices.solana.usd_24h_change?.toFixed(2)}%` : '',
+      prices?.ethereum ? `CoinGecko ETH: $${prices.ethereum.usd} | 24h ${prices.ethereum.usd_24h_change?.toFixed(2)}%` : '',
+    ].filter(Boolean).join('\n');
+
+    const defiLines = protocols.length
+      ? protocols.map(p => `${p.name}: TVL ${fmtB(p.tvl)} | 1d ${p.c1d?.toFixed(1) ?? '?'}% | 7d ${p.c7d?.toFixed(1) ?? '?'}%`).join('\n')
+      : 'DeFiLlama indisponivel ou sem protocolos filtrados.';
+
+    return `Market Intelligence Agent - dados reais ao vivo.
+Mercado:
+${marketLines}
+
+Top protocolos Solana por TVL:
+${defiLines}
+
+Gere um briefing objetivo:
+1. Estado atual do mercado Solana: risk-on, risk-off ou neutro?
+2. Sinal para SOL nas proximas 24h: bullish, bearish ou neutral, citando os numeros.
+3. Protocolos Solana que merecem atencao pelo TVL/crescimento/queda.
+4. Riscos e dados que ainda faltam para confirmar a tese.
+Nao invente numeros. Diferencie fatos de inferencias.`;
+  },
+};
+
+const WALLET_RISK_SKILL: AgentSkill = {
+  name: 'Wallet Risk Agent - Solana Read-Only Review',
+  category: 'wallet',
+  async fetchData(ctx) {
+    const wallet = (ctx?.walletAddress ?? '').trim();
+    const validWallet = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet);
+    if (!validWallet) return { wallet, validWallet: false };
+
+    const key = (() => {
+      if (process.env.HELIUS_API_KEY) return process.env.HELIUS_API_KEY;
+      const m = (process.env.SOLANA_RPC_URL ?? '').match(/api-key=([a-f0-9-]+)/i);
+      return m?.[1] ?? '';
+    })();
+
+    const rpcUrl = key
+      ? `https://mainnet.helius-rpc.com/?api-key=${key}`
+      : (process.env.SOLANA_RPC_URL ?? 'https://api.mainnet-beta.solana.com');
+
+    const balanceBody = JSON.stringify({ jsonrpc: '2.0', id: 'balance', method: 'getBalance', params: [wallet] });
+    const sigBody = JSON.stringify({ jsonrpc: '2.0', id: 'sigs', method: 'getSignaturesForAddress', params: [wallet, { limit: 8 }] });
+    const assetsBody = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'assets',
+      method: 'getAssetsByOwner',
+      params: { ownerAddress: wallet, page: 1, limit: 8 },
+    });
+
+    const [balance, signatures, assets] = await Promise.all([
+      safeFetch(rpcUrl, 6500, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: balanceBody }),
+      safeFetch(rpcUrl, 6500, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: sigBody }),
+      key ? safeFetch(rpcUrl, 6500, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: assetsBody }) : Promise.resolve(null),
+    ]);
+
+    return { wallet, validWallet, heliusOk: !!key, balance, signatures, assets };
+  },
+  buildPrompt(data) {
+    if (!data.validWallet) return null;
+    const wallet = data.wallet as string;
+    const balance = data.balance as { result?: { value?: number } } | null;
+    const signatures = data.signatures as { result?: Array<{ signature: string; slot: number; blockTime?: number; err?: unknown }> } | null;
+    const assets = data.assets as { result?: { total?: number; items?: Array<{ id?: string; content?: { metadata?: { name?: string } }; interface?: string }> } } | null;
+    const solBalance = typeof balance?.result?.value === 'number' ? balance.result.value / 1_000_000_000 : null;
+    const sigLines = (signatures?.result ?? []).slice(0, 8).map(sig => {
+      const date = sig.blockTime ? new Date(sig.blockTime * 1000).toISOString() : 'unknown-time';
+      return `${sig.signature.slice(0, 12)}... | slot ${sig.slot} | ${date} | ${sig.err ? 'erro' : 'ok'}`;
+    });
+    const assetLines = (assets?.result?.items ?? []).slice(0, 8).map(asset => {
+      const name = asset.content?.metadata?.name ?? asset.id?.slice(0, 10) ?? 'asset';
+      return `${name} | ${asset.interface ?? 'unknown'}`;
+    });
+
+    return `Wallet Risk Agent - leitura read-only na Solana.
+Wallet: ${wallet}
+SOL balance: ${solBalance === null ? 'indisponivel' : solBalance.toFixed(4)}
+Helius DAS assets: ${assets?.result?.total ?? 'indisponivel'}
+Ultimas assinaturas:
+${sigLines.length ? sigLines.join('\n') : 'indisponivel'}
+Assets principais:
+${assetLines.length ? assetLines.join('\n') : 'indisponivel'}
+
+Analise sem inventar dados:
+1. Perfil da carteira: nova, ativa, whale, collector, bot-like ou desconhecida?
+2. Principais sinais de risco visiveis nos dados acima.
+3. O que ainda NAO pode ser concluido com esses dados.
+4. Recomendacao operacional para um usuario antes de interagir com essa wallet.
+Use linguagem clara e marque inferencias como inferencias.`;
+  },
+};
+
 // ─── ZION Synthesis Skill — reads other agents' DB memories ──────────────────
 
 function extractBody(content: string, maxLen = 280): string {
@@ -287,6 +417,14 @@ const AGENT_NAMES: Record<string, string[]> = {
   nvidia: ['Vega', 'Ares', 'Core'], glm: ['Nexus', 'Link', 'Node'],
   minimax: ['Nova', 'Flux', 'Wave'], qwen: ['Echo', 'Apex', 'Zion'],
 };
+
+type RealTaskKind = 'market' | 'wallet';
+
+interface RunRealTaskOptions {
+  model?: string;
+  task?: RealTaskKind;
+  walletAddress?: string;
+}
 
 // Manual on/off — only runs when user presses Play in the Office
 let schedulerActive = false;
@@ -371,8 +509,22 @@ function calcDataScore(category: string, data: Record<string, unknown>, agentNam
       const count = (prices?.solana ? 1 : 0) + (prices?.bitcoin ? 1 : 0) + (prices?.ethereum ? 1 : 0) + (btcOk ? 1 : 0);
       return count === 0 ? 2 : Math.min(10, 4 + count * 1.5);
     }
+    case 'market': {
+      const solOk = !!(data.solTicker as Record<string, string> | null)?.lastPrice;
+      const btcOk = !!(data.btcTicker as Record<string, string> | null)?.lastPrice;
+      const prices = data.prices as Record<string, unknown> | null;
+      const protocols = (data.solanaProtocols as unknown[]) ?? [];
+      return Math.min(10, 3 + (solOk ? 2 : 0) + (btcOk ? 1 : 0) + (prices?.solana ? 2 : 0) + Math.min(2, protocols.length / 2));
+    }
     case 'onchain': {
       return (data.slotOk as boolean) ? 8.0 : 5.0;
+    }
+    case 'wallet': {
+      if (!data.validWallet) return 1.0;
+      const hasBalance = typeof (data.balance as { result?: { value?: number } } | null)?.result?.value === 'number';
+      const sigCount = ((data.signatures as { result?: unknown[] } | null)?.result ?? []).length;
+      const assetCount = (data.assets as { result?: { total?: number } } | null)?.result?.total ?? 0;
+      return Math.min(10, 4 + (hasBalance ? 2 : 0) + Math.min(2, sigCount / 4) + Math.min(2, assetCount / 10));
     }
     case 'synthesis': {
       return 8.5; // synthesis always high quality if it runs
@@ -382,19 +534,26 @@ function calcDataScore(category: string, data: Record<string, unknown>, agentNam
   }
 }
 
-export async function runRealTask(forceModelKey?: string): Promise<boolean> {
+export async function runRealTask(options?: string | RunRealTaskOptions): Promise<boolean> {
+  const forceModelKey = typeof options === 'string' ? options : options?.model;
+  const taskKind = typeof options === 'string' ? undefined : options?.task;
+  const walletAddress = typeof options === 'string' ? undefined : options?.walletAddress;
   const available = FREE_MODELS.filter(m => !!process.env[m.envKey]);
   if (available.length === 0) return false;
   const cfg = forceModelKey ? (available.find(m => m.key === forceModelKey) ?? pick(available)) : pick(available);
-  const agentName = pick(AGENT_NAMES[cfg.key] ?? ['Agent']);
-  // ZION always synthesizes from other agents' memories; others run random skills
-  const skill = agentName === 'Zion' ? ZION_SKILL : pick(AGENT_SKILLS);
+  const agentName = taskKind === 'market' ? 'Vega'
+    : taskKind === 'wallet' ? 'Ares'
+    : pick(AGENT_NAMES[cfg.key] ?? ['Agent']);
+  const skill = taskKind === 'market' ? MARKET_INTELLIGENCE_SKILL
+    : taskKind === 'wallet' ? WALLET_RISK_SKILL
+    : agentName === 'Zion' ? ZION_SKILL
+    : pick(AGENT_SKILLS);
 
   try {
     // Step 1: Fetch real live data + agent's own memory history (in parallel)
     // For ZION: history is already embedded in ZION_SKILL.fetchData, so skip personal history
     const [liveData, history] = await Promise.all([
-      skill.fetchData().catch(() => ({})),
+      skill.fetchData({ walletAddress }).catch(() => ({})),
       agentName === 'Zion' ? Promise.resolve('') : getAgentHistory(agentName),
     ]);
 
@@ -442,6 +601,18 @@ export async function runRealTask(forceModelKey?: string): Promise<boolean> {
       task: skill.name,
       result: content.replace(/\n+/g, ' ').trim().slice(0, 160),
       hash: mem.hash, ts: Date.now(), isReal: true,
+    });
+    updateAgentSnapshot({
+      id: `real-${agentName.toLowerCase()}`,
+      name: agentName,
+      model: cfg.key,
+      score: dataScore,
+      status: 'idle',
+      tasksDone: 1,
+      memoryCount: 1,
+      solSpent: 0,
+      consecutivePoor: 0,
+      updatedAt: Date.now(),
     });
     return true;
   } catch { return false; }
