@@ -86,6 +86,8 @@ function generateNewAgent(model: string): AgentState {
   };
 }
 
+const simulatedEventMeta = { isSimulated: true, source: 'office-demo-loop' };
+
 // ─── Agent Skills — real data fetching + AI analysis ─────────────────────────
 
 async function safeFetch(url: string, ms = 5000, opts?: RequestInit): Promise<unknown> {
@@ -513,14 +515,14 @@ export async function GET(req: NextRequest) {
             agent.status = 'thinking';
             sync(agent);
             const thought = pick(THOUGHTS[agent.model] ?? THOUGHTS.nvidia);
-            controller.enqueue(enc({ type: 'thinking', agentId: agent.id, name: agent.name, model: agent.model, text: thought, ts }));
+            controller.enqueue(enc({ type: 'thinking', agentId: agent.id, name: agent.name, model: agent.model, text: thought, ts, ...simulatedEventMeta }));
 
           } else if (roll < 0.60) {
             const task = pick(TASK_TITLES);
             const reward = parseFloat(rand(0.005, 0.025).toFixed(4));
             agent.status = 'executing'; agent.currentTask = task;
             sync(agent);
-            controller.enqueue(enc({ type: 'task_start', agentId: agent.id, name: agent.name, model: agent.model, task, reward, ts }));
+            controller.enqueue(enc({ type: 'task_start', agentId: agent.id, name: agent.name, model: agent.model, task, reward, ts, ...simulatedEventMeta }));
 
             await sleep(rand(1500, 3500));
             if (stopped) break;
@@ -535,29 +537,29 @@ export async function GET(req: NextRequest) {
             agent.consecutivePoor = success ? 0 : agent.consecutivePoor + 1;
             sync(agent);
 
-            controller.enqueue(enc({ type: 'task_done', agentId: agent.id, name: agent.name, model: agent.model, task, reward, success, duration: Math.round(rand(800, 3200)), oldScore: parseFloat(oldScore.toFixed(1)), newScore: parseFloat(agent.score.toFixed(1)), ts }));
+            controller.enqueue(enc({ type: 'task_done', agentId: agent.id, name: agent.name, model: agent.model, task, reward, success, duration: Math.round(rand(800, 3200)), oldScore: parseFloat(oldScore.toFixed(1)), newScore: parseFloat(agent.score.toFixed(1)), ts, ...simulatedEventMeta }));
 
             if (agent.consecutivePoor >= 3 || agent.score < 3.0) {
               await sleep(800);
               agent.status = 'fired'; sync(agent);
-              controller.enqueue(enc({ type: 'agent_fired', agentId: agent.id, name: agent.name, model: agent.model, finalScore: parseFloat(agent.score.toFixed(1)), reason: agent.score < 3.0 ? 'Score crítico abaixo de 3.0' : '3 falhas consecutivas', ts: Date.now() }));
+              controller.enqueue(enc({ type: 'agent_fired', agentId: agent.id, name: agent.name, model: agent.model, finalScore: parseFloat(agent.score.toFixed(1)), reason: agent.score < 3.0 ? 'Score crítico abaixo de 3.0' : '3 falhas consecutivas', ts: Date.now(), ...simulatedEventMeta }));
 
               await sleep(3000);
               if (stopped) break;
               const newAgent = generateNewAgent(pick(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'qwen']));
               agents.push(newAgent); sync(newAgent);
-              controller.enqueue(enc({ type: 'agent_hired', agent: newAgent, ts: Date.now() }));
+              controller.enqueue(enc({ type: 'agent_hired', agent: newAgent, ts: Date.now(), ...simulatedEventMeta }));
             }
 
           } else if (roll < 0.80) {
             const mem = recentMems.length > 0 ? pick(recentMems) : null;
             const snippet = mem ? mem.content.replace(/\n/g, ' ').slice(0, 60) : pick(MEMORY_SNIPPETS);
-            const hash = mem ? mem.hash.slice(0, 8) : Math.random().toString(16).slice(2, 10);
+            const hash = mem ? mem.hash.slice(0, 8) : undefined;
             agent.memoryCount++; totalMems++;
             const scoreGain = rand(0.05, 0.2);
             agent.score = Math.min(10, agent.score + scoreGain);
             sync(agent);
-            controller.enqueue(enc({ type: 'memory_saved', agentId: agent.id, name: agent.name, model: agent.model, snippet, hash, scoreGain: parseFloat(scoreGain.toFixed(2)), ts }));
+            controller.enqueue(enc({ type: 'memory_saved', agentId: agent.id, name: agent.name, model: agent.model, snippet, hash, scoreGain: parseFloat(scoreGain.toFixed(2)), ts, ...simulatedEventMeta }));
 
           } else {
             const others = pool.filter(a => a.id !== agent.id);
@@ -566,7 +568,7 @@ export async function GET(req: NextRequest) {
               const amount = parseFloat(rand(0.001, 0.01).toFixed(4));
               agent.solSpent += amount; totalSol += amount;
               sync(agent);
-              controller.enqueue(enc({ type: 'sol_payment', fromId: agent.id, fromName: agent.name, toId: receiver.id, toName: receiver.name, amount, ts }));
+              controller.enqueue(enc({ type: 'sol_payment', fromId: agent.id, fromName: agent.name, toId: receiver.id, toName: receiver.name, amount, ts, ...simulatedEventMeta }));
             }
           }
         }

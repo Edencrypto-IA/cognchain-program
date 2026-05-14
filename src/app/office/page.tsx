@@ -22,6 +22,7 @@ interface FeedEvent {
   snippet?: string; hash?: string; scoreGain?: number;
   fromName?: string; toName?: string; amount?: number;
   finalScore?: number; reason?: string;
+  isReal?: boolean; isSimulated?: boolean; source?: string;
   agent?: AgentState;
 }
 
@@ -53,8 +54,8 @@ function describeFeedEvent(event: FeedEvent) {
     case 'thinking': return event.text ?? 'Aguardando proximo raciocinio do agente';
     case 'task_start': return `${event.task?.slice(0, 80) ?? 'Tarefa iniciada'} · +${event.reward ?? 0} SOL`;
     case 'task_done': return event.success ? `Concluiu: ${event.task?.slice(0, 70) ?? 'tarefa'} (${event.duration ?? 0}ms)` : `Falhou: ${event.task?.slice(0, 70) ?? 'tarefa'}`;
-    case 'memory_saved': return `Memoria salva #${event.hash ?? 'pending'} · ${event.snippet?.slice(0, 80) ?? 'sem trecho disponivel'}`;
-    case 'sol_payment': return `${event.fromName ?? 'agente'} -> ${event.toName ?? 'agente'} · ${event.amount ?? 0} SOL`;
+    case 'memory_saved': return event.hash ? `Memoria salva #${event.hash} · ${event.snippet?.slice(0, 80) ?? 'sem trecho disponivel'}` : `Memoria visualizada em modo demo · ${event.snippet?.slice(0, 80) ?? 'sem trecho disponivel'}`;
+    case 'sol_payment': return event.isSimulated ? `${event.fromName ?? 'agente'} -> ${event.toName ?? 'agente'} · ${event.amount ?? 0} SOL demo` : `${event.fromName ?? 'agente'} -> ${event.toName ?? 'agente'} · ${event.amount ?? 0} SOL`;
     case 'agent_fired': return `Score ${event.finalScore ?? '-'} · ${event.reason ?? 'limite de performance atingido'}`;
     case 'agent_hired': return `${event.agent?.name ?? 'Novo agente'} (${MODEL_META[event.agent?.model ?? '']?.label ?? 'modelo'}) contratado`;
     case 'real_task_done': return `${(event as {task?:string;result?:string}).task ?? 'Tarefa real'} · ${(event as {result?:string}).result?.slice(0, 90) ?? 'resultado registrado'}`;
@@ -293,8 +294,11 @@ function EventRow({ event }: { event: FeedEvent }) {
               {event.newScore.toFixed(1)}
             </span>
           )}
-          {(event as {isReal?: boolean}).isReal && (
+          {event.isReal && (
             <span className="text-[8px] font-black text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/25 px-1.5 py-0.5 rounded-full tracking-widest">REAL</span>
+          )}
+          {event.isSimulated && (
+            <span className="text-[8px] font-black text-white/35 bg-white/[0.04] border border-white/[0.08] px-1.5 py-0.5 rounded-full tracking-widest">DEMO</span>
           )}
         </div>
         <p className="text-[10px] text-white/40 leading-relaxed line-clamp-2">{getDesc()}</p>
@@ -443,7 +447,11 @@ function AgentLiveInspector({
                     <div className="absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full" style={{ background: index === 0 ? color : 'rgba(255,255,255,0.18)', boxShadow: index === 0 ? `0 0 16px ${color}` : 'none' }} />
                     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4">
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color }}>{event.type.replaceAll('_', ' ')}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color }}>{event.type.replaceAll('_', ' ')}</span>
+                          {event.isReal && <span className="rounded-full border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-1.5 py-0.5 text-[8px] font-black tracking-widest text-[#F59E0B]">REAL</span>}
+                          {event.isSimulated && <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[8px] font-black tracking-widest text-white/35">DEMO</span>}
+                        </div>
                         <span className="flex items-center gap-1 text-[10px] text-white/25"><Clock className="h-3 w-3" />{formatAgo(event.ts)}</span>
                       </div>
                       <p className="text-sm leading-relaxed text-white/65">{describeFeedEvent(event)}</p>
@@ -690,18 +698,19 @@ export default function OfficePage() {
               }}
             >
               {schedulerOn
-                ? <><span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />Pausar Agentes</>
-                : <><Play className="w-3 h-3" />Iniciar Agentes</>}
+                ? <><span className="w-2 h-2 rounded-full bg-[#14F195] animate-pulse" />Pausar Demo Live</>
+                : <><Play className="w-3 h-3" />Iniciar Demo Live</>}
             </button>
             {/* One-shot manual trigger */}
             <button
               onClick={triggerRealTask}
               disabled={running || !connected}
-              title="Executar uma tarefa real agora"
+              title="Rodar um agente real com dados externos e IA"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-30"
               style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#F59E0B' }}
             >
               {running ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+              <span className="hidden lg:inline">Agente Real</span>
             </button>
             <div className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#14F195] live-dot' : 'bg-[#EF4444]'}`} />
@@ -722,6 +731,17 @@ export default function OfficePage() {
         </div>
 
         {/* ── Main Content ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.05] bg-black/55 px-6 py-2 text-[10px] text-white/35">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-black uppercase tracking-[0.18em] text-white/45">Demo Live</span>
+            <span>mantem o escritorio vivo com eventos visuais marcados como DEMO.</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-2 py-1 font-black uppercase tracking-[0.18em] text-[#F59E0B]">Agente Real</span>
+            <span>busca dados externos, chama IA e salva memoria com hash real.</span>
+          </div>
+        </div>
+
         <div className="flex flex-1 min-h-0 overflow-hidden">
 
           {/* ── Agent Grid ── */}
