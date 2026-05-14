@@ -4,7 +4,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-import type { WalletName } from '@solana/wallet-adapter-base';
+import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
 import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye } from 'lucide-react';
 
 const WALLET_OPTIONS = [
@@ -30,7 +30,7 @@ function isMobileBrowser() {
 }
 
 export default function WalletButton() {
-  const { publicKey, connected, disconnect, connecting, wallet, wallets, select, connect } = useWallet();
+  const { publicKey, connected, disconnect, connecting, wallet, wallets, select } = useWallet();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
@@ -49,6 +49,9 @@ export default function WalletButton() {
 
   useEffect(() => {
     if (connected && publicKey) {
+      setPickerOpen(false);
+      setConnectingWallet(null);
+      setConnectError('');
       fetchBalance();
       const t = setInterval(fetchBalance, 15_000);
       return () => clearInterval(t);
@@ -91,16 +94,33 @@ export default function WalletButton() {
       return;
     }
 
+    const readyState = candidate.adapter.readyState;
+    const canConnect =
+      readyState === WalletReadyState.Installed ||
+      readyState === WalletReadyState.Loadable;
+
+    if (!canConnect && !isMobileBrowser()) {
+      openWalletFallback(option);
+      setConnectingWallet(null);
+      return;
+    }
+
     try {
       select(candidate.adapter.name as WalletName);
-      await new Promise(resolve => setTimeout(resolve, 80));
-      await connect();
+      await Promise.race([
+        candidate.adapter.connected ? Promise.resolve() : candidate.adapter.connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('wallet_timeout')), 15_000)),
+      ]);
       setPickerOpen(false);
-    } catch {
+    } catch (error) {
       if (isMobileBrowser()) {
         openWalletFallback(option);
       } else {
-        setConnectError(`${option.name} nao respondeu. Verifique se a extensao esta instalada e desbloqueada.`);
+        setConnectError(
+          error instanceof Error && error.message === 'wallet_timeout'
+            ? `${option.name} abriu, mas nao concluiu a conexao. Desbloqueie a carteira e aprove a conexao.`
+            : `${option.name} nao respondeu. Verifique se a extensao esta instalada e desbloqueada.`
+        );
       }
     } finally {
       setConnectingWallet(null);
