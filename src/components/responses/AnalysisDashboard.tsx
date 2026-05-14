@@ -38,7 +38,11 @@ function RadialScore({ value, color }: { value: number; color: string }) {
 }
 
 export default function AnalysisDashboard({ section, allSources, meta }: AnalysisDashboardProps) {
-  const items = section.items;
+  const items = section.items.filter(item => {
+    const key = Object.keys(item)[0];
+    return key && key.trim().length > 0;
+  });
+  if (items.length < 4) return null;
   const overall = Math.round(SCORES.reduce((s, n) => s + n, 0) / SCORES.length);
 
   return (
