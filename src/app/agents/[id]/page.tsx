@@ -829,7 +829,14 @@ export default function AgentDetailPage() {
                   onConfigureRules={() => setActiveTab('rules')}
                 />
               )}
-              {activeTab === 'rules'     && <RuleBuilder agentId={id} />}
+              {activeTab === 'rules'     && (
+                <RuleBuilder
+                  agentId={id}
+                  agentName={agent.name}
+                  agentGoal={agent.goal}
+                  agentTools={agent.tools}
+                />
+              )}
               {activeTab === 'solana'    && <SolanaIntentPanel agentId={id} />}
             </div>
           </div>

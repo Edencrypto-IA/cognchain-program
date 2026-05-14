@@ -21,6 +21,17 @@ interface Rule {
 
 interface RuleBuilderProps {
   agentId: string;
+  agentName?: string;
+  agentGoal?: string;
+  agentTools?: string[];
+}
+
+interface RuleSuggestion {
+  name: string;
+  conditionType: string;
+  conditionValue: string;
+  action: string;
+  reason: string;
 }
 
 const CONDITION_TYPES = [
@@ -38,7 +49,66 @@ const ACTIONS = [
   { key: 'memory_query', label: '\u{1F50D} Query Memoria', description: 'Buscar memorias' },
 ];
 
-export default function RuleBuilder({ agentId }: RuleBuilderProps) {
+function buildRuleSuggestions(agentGoal = '', agentTools: string[] = []): RuleSuggestion[] {
+  const goal = agentGoal.toLowerCase();
+  const suggestions: RuleSuggestion[] = [
+    {
+      name: 'Analisar memorias de alta confianca',
+      conditionType: 'memory_score_above',
+      conditionValue: '8',
+      action: 'analyze',
+      reason: 'Quando uma memoria forte aparecer, o agente transforma isso em analise acionavel.',
+    },
+    {
+      name: 'Registrar preferencia recorrente',
+      conditionType: 'memory_contains',
+      conditionValue: 'prefere',
+      action: 'save_preference',
+      reason: 'Bom para agentes que aprendem o estilo do usuario e preservam contexto futuro.',
+    },
+    {
+      name: 'Revisar memoria recente',
+      conditionType: 'memory_newer_than',
+      conditionValue: '24',
+      action: 'memory_query',
+      reason: 'Mantem o agente atento ao que mudou nas ultimas 24 horas.',
+    },
+  ];
+
+  if (goal.includes('solana') || goal.includes('wallet') || goal.includes('mercado') || agentTools.includes('blockchain')) {
+    suggestions.unshift({
+      name: 'Alertar quando memoria citar Solana',
+      conditionType: 'memory_contains',
+      conditionValue: 'Solana',
+      action: 'notify',
+      reason: 'Ideal para agentes de mercado, carteira, risco ou monitoramento on-chain.',
+    });
+  }
+
+  if (goal.includes('risco') || goal.includes('security') || goal.includes('seguran')) {
+    suggestions.unshift({
+      name: 'Investigar sinais de risco',
+      conditionType: 'memory_contains',
+      conditionValue: 'risco',
+      action: 'analyze',
+      reason: 'Faz o agente reagir quando uma memoria indicar ameaca, perda, exploit ou anomalia.',
+    });
+  }
+
+  if (agentTools.includes('blockchain')) {
+    suggestions.push({
+      name: 'Ancorar prova de memoria critica',
+      conditionType: 'memory_score_above',
+      conditionValue: '9',
+      action: 'blockchain_anchor',
+      reason: 'Quando a memoria for muito relevante, gera trilha verificavel on-chain.',
+    });
+  }
+
+  return suggestions.slice(0, 5);
+}
+
+export default function RuleBuilder({ agentId, agentName, agentGoal, agentTools = [] }: RuleBuilderProps) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,6 +139,15 @@ export default function RuleBuilder({ agentId }: RuleBuilderProps) {
     setAction('notify');
     setActionParams('');
     setShowForm(false);
+  }
+
+  function applySuggestion(suggestion: RuleSuggestion) {
+    setRuleName(suggestion.name);
+    setConditionType(suggestion.conditionType);
+    setConditionValue(suggestion.conditionValue);
+    setAction(suggestion.action);
+    setActionParams('');
+    setShowForm(true);
   }
 
   async function handleCreate() {
@@ -116,6 +195,7 @@ export default function RuleBuilder({ agentId }: RuleBuilderProps) {
   }
 
   const conditionTypeInfo = CONDITION_TYPES.find(c => c.type === conditionType);
+  const suggestions = buildRuleSuggestions(agentGoal, agentTools);
 
   return (
     <div className="space-y-4">
@@ -141,6 +221,52 @@ export default function RuleBuilder({ agentId }: RuleBuilderProps) {
           {showForm ? <XIcon className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
           {showForm ? 'Cancelar' : 'Nova Regra'}
         </button>
+      </div>
+
+      {/* Suggested rules */}
+      <div className="rounded-xl border border-[#00D1FF]/14 bg-gradient-to-br from-[#00D1FF]/6 via-white/[0.012] to-[#9945FF]/7 p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#00D1FF]/65">
+              Sugestoes para {agentName || 'este agente'}
+            </p>
+            <p className="mt-1 text-[11px] text-white/30">
+              Escolha uma regra sugerida. Ela so sera ativada depois que voce confirmar.
+            </p>
+          </div>
+          <Lightbulb className="h-4 w-4 text-[#14F195]/65" />
+        </div>
+
+        <div className="grid gap-2">
+          {suggestions.map(suggestion => {
+            const actionLabel = ACTIONS.find(a => a.key === suggestion.action)?.label || suggestion.action;
+            const conditionLabel = CONDITION_TYPES.find(c => c.type === suggestion.conditionType)?.label || suggestion.conditionType;
+            return (
+              <button
+                key={`${suggestion.name}-${suggestion.conditionValue}`}
+                onClick={() => applySuggestion(suggestion)}
+                className="group rounded-xl border border-white/[0.055] bg-black/20 p-3 text-left transition-all hover:border-[#9945FF]/24 hover:bg-white/[0.035]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-white/70 group-hover:text-white/85">{suggestion.name}</p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-white/30">{suggestion.reason}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-white/35">
+                      <span className="rounded bg-[#9945FF]/10 px-1.5 py-0.5 font-mono text-[#B58CFF]/70">IF</span>
+                      <span>{conditionLabel}: {suggestion.conditionValue}</span>
+                      <ArrowRight className="h-3 w-3 text-white/18" />
+                      <span className="rounded bg-[#14F195]/10 px-1.5 py-0.5 font-mono text-[#14F195]/70">THEN</span>
+                      <span>{actionLabel}</span>
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-lg border border-white/[0.06] px-2 py-1 text-[10px] font-semibold text-white/35 group-hover:border-[#14F195]/25 group-hover:text-[#14F195]/70">
+                    Usar
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Create Form */}
