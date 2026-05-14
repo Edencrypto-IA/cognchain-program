@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
-import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye } from 'lucide-react';
+import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift } from 'lucide-react';
 
 const WALLET_OPTIONS = [
   {
@@ -38,6 +38,9 @@ export default function WalletButton() {
   const [connectError, setConnectError] = useState('');
   const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [airdropLoading, setAirdropLoading] = useState(false);
+  const [airdropMessage, setAirdropMessage] = useState('');
+  const [airdropTx, setAirdropTx] = useState('');
   const walletButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -71,6 +74,36 @@ export default function WalletButton() {
     navigator.clipboard.writeText(publicKey.toString()).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function requestDevnetAirdrop() {
+    if (!publicKey) return;
+    setAirdropLoading(true);
+    setAirdropMessage('');
+    setAirdropTx('');
+
+    try {
+      const res = await fetch('/api/wallet/airdrop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicKey: publicKey.toString() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAirdropMessage(data.error || 'Airdrop indisponivel agora.');
+        return;
+      }
+
+      setBalance(typeof data.balance === 'number' ? data.balance : balance);
+      setAirdropTx(data.signature || '');
+      setAirdropMessage(`+${data.amount || 1} Devnet SOL recebido.`);
+      void fetchBalance();
+    } catch {
+      setAirdropMessage('Nao foi possivel solicitar airdrop agora.');
+    } finally {
+      setAirdropLoading(false);
+    }
   }
 
   function openConnectedMenu() {
@@ -262,6 +295,7 @@ export default function WalletButton() {
       >
         <div className="h-2 w-2 rounded-full bg-[#14F195] animate-pulse" />
         <span>{truncate(publicKey!.toString())}</span>
+        <span className="rounded-full bg-[#14F195]/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[#14F195]/70">Devnet</span>
         {balance !== null && (
           <span className="text-[#14F195]/60">{balance.toFixed(3)} SOL</span>
         )}
@@ -294,12 +328,43 @@ export default function WalletButton() {
 
             {balance !== null && (
               <div className="border-b border-white/[0.06] px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider text-white/30">Saldo</p>
+                <p className="text-[10px] uppercase tracking-wider text-white/30">Saldo Devnet</p>
                 <p className="mt-0.5 text-lg font-bold text-white/80">{balance.toFixed(4)} SOL</p>
               </div>
             )}
 
             <div className="p-2">
+              <div className="mb-2 rounded-xl border border-[#14F195]/16 bg-[#14F195]/7 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-semibold text-[#14F195]/80">Solana Devnet Sandbox</p>
+                    <p className="text-[10px] leading-relaxed text-white/30">Use SOL de teste para construir sem gastar fundos reais.</p>
+                  </div>
+                  <span className="rounded-full bg-[#14F195]/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-[#14F195]/70">safe</span>
+                </div>
+                <button
+                  onClick={requestDevnetAirdrop}
+                  disabled={airdropLoading}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#14F195]/18 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/16 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {airdropLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Gift className="h-3.5 w-3.5" />}
+                  {airdropLoading ? 'Solicitando...' : 'Receber 1 Devnet SOL'}
+                </button>
+                {airdropMessage && (
+                  <p className="mt-2 text-[10px] leading-relaxed text-white/38">{airdropMessage}</p>
+                )}
+                {airdropTx && (
+                  <a
+                    href={`https://explorer.solana.com/tx/${airdropTx}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#00D1FF]/70 hover:text-[#00D1FF]"
+                  >
+                    Ver airdrop no Explorer
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
               <button
                 onClick={copyAddress}
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/70"
@@ -308,7 +373,7 @@ export default function WalletButton() {
                 {copied ? 'Copiado!' : 'Copiar endereco'}
               </button>
               <a
-                href={`https://explorer.solana.com/address/${publicKey!.toString()}`}
+                href={`https://explorer.solana.com/address/${publicKey!.toString()}?cluster=devnet`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/70"

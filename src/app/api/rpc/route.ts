@@ -11,8 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
  *  - Max body: 64 KB
  */
 
-const HELIUS_RPC = process.env.SOLANA_RPC_URL ||
+const DEFAULT_RPC = process.env.SOLANA_RPC_URL ||
   'https://api.devnet.solana.com';
+const DEVNET_RPC = 'https://api.devnet.solana.com';
 
 // Allowed JSON-RPC methods — blocks anything dangerous or irrelevant
 const ALLOWED_METHODS = new Set([
@@ -62,6 +63,8 @@ setInterval(() => {
 }, 120_000);
 
 export async function POST(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const upstreamRpc = searchParams.get('cluster') === 'devnet' ? DEVNET_RPC : DEFAULT_RPC;
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 
   if (!checkRate(ip)) {
@@ -104,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   // Forward to Helius
   try {
-    const upstream = await fetch(HELIUS_RPC, {
+    const upstream = await fetch(upstreamRpc, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

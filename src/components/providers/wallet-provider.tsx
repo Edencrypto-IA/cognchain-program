@@ -7,7 +7,7 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 
 // Helius mainnet via server proxy (hides API key from browser)
 function getRpcEndpoint(): string {
-  if (typeof window !== 'undefined') return `${window.location.origin}/api/rpc`;
+  if (typeof window !== 'undefined') return `${window.location.origin}/api/rpc?cluster=devnet`;
   return 'https://api.mainnet-beta.solana.com';
 }
 
