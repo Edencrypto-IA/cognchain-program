@@ -2607,13 +2607,16 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     const hash = msg.memoryHash || msg.structuredResponse?.meta?.onChainHash;
     const fromModel = msg.model ? (MODEL_LABELS[msg.model as AIModel] || msg.model) : 'CONGCHAIN';
     const toModel = MODEL_LABELS[model] || model;
+    const createdAt = msg.structuredResponse?.meta?.verifiedAt
+      ? new Date(msg.structuredResponse.meta.verifiedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+      : msg.timestamp;
     setPreviousModel(msg.model || selectedModel);
     setSelectedModel(model);
     setContextActive(true);
     setInputValue(
       hash
-        ? `Continue esta memoria verificada com ${toModel}.\n\nHash: ${hash}\nOrigem: ${fromModel}\n\nUse o contexto da resposta anterior e aprofunde com decisoes praticas, fontes e proximos passos.`
-        : `Continue esta resposta com ${toModel}.\n\nOrigem: ${fromModel}\n\nUse o contexto anterior e aprofunde com decisoes praticas, fontes e proximos passos.`
+        ? `Continue esta memoria verificada com ${toModel}.\n\nFormato obrigatorio da resposta:\n### Com base no hash ${hash}\nMemoria salva em ${createdAt}, criada por ${fromModel}.\n\n### Aprofundando a Memoria Verificada\nEscreva abaixo o aprofundamento com clareza, contexto, decisoes praticas, fontes quando disponiveis e proximos passos.\n\nNao repita o texto original inteiro; continue a partir dele.`
+        : `Continue esta resposta com ${toModel}.\n\nFormato obrigatorio da resposta:\n### Aprofundando a Memoria Verificada\nOrigem: ${fromModel}\n\nEscreva o aprofundamento com clareza, contexto, decisoes praticas, fontes quando disponiveis e proximos passos.`
     );
     toast({
       title: `Memoria pronta para ${toModel}`,
@@ -2784,7 +2787,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                         const ctx = `⚡ Memória Verificada · CognChain on Solana\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nHash: ${mem.hash}\nModelo: ${mem.model} · Score: ${mem.score ?? '—'}/10\nCriada em: ${createdAt}\nStatus: ${mem.verified ? '✓ Verificado on-chain' : '⏳ Pendente'}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${mem.content}`;
                         setMessages([{ id: Date.now().toString(), role: 'assistant', content: ctx, timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }]);
                         setHashInput('');
-                        setInputValue('Continue e aprofunde esta memória verificada:');
+                        setInputValue(`Continue e aprofunde esta memoria verificada.\n\nFormato obrigatorio da resposta:\n### Com base no hash ${mem.hash}\nMemoria salva em ${createdAt}, criada por ${MODEL_LABELS[mem.model as AIModel] || mem.model}.\n\n### Aprofundando a Memoria Verificada\nEscreva abaixo o aprofundamento com clareza, contexto, decisoes praticas, fontes quando disponiveis e proximos passos.\n\nNao repita o texto original inteiro; continue a partir dele.`);
                       } catch (err) {
                         setHashError(err instanceof Error ? err.message : 'Erro ao carregar');
                       } finally {
