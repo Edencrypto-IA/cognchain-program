@@ -1660,24 +1660,24 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
   return (
     <>
       {showUpgrade && <UpgradeModal model={showUpgrade} onClose={() => setShowUpgrade(null)} />}
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex items-center gap-1 flex-wrap rounded-full border border-white/[0.055] bg-white/[0.025] px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
         {FREE.map(m => (
           <button key={m.key} onClick={() => handleClick(m.key, false)}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200
-              ${selectedModel === m.key ? 'bg-white/[0.08] border border-white/[0.12] text-white/90 shadow-sm' : 'text-white/30 hover:text-white/50 hover:bg-white/[0.04]'}`}>
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200
+              ${selectedModel === m.key ? 'bg-white/[0.09] border border-white/[0.12] text-white/90 shadow-sm' : 'border border-transparent text-white/34 hover:text-white/58 hover:bg-white/[0.04]'}`}>
             <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: m.color }} />
             {m.name}
           </button>
         ))}
-        <span className="w-px h-4 bg-white/10 mx-0.5" />
+        <span className="w-px h-4 bg-white/[0.08] mx-0.5" />
         {PRO.map(m => (
           <button key={m.key} onClick={() => handleClick(m.key, true)}
-            className={`relative px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 group
+            className={`relative px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200 group
               ${selectedModel === m.key
-                ? 'bg-white/[0.08] border border-white/[0.12] text-white/90 shadow-sm'
+                ? 'bg-white/[0.09] border border-white/[0.12] text-white/90 shadow-sm'
                 : isAdmin
-                  ? 'text-white/60 hover:text-white/90 hover:bg-white/[0.04]'
-                  : 'text-white/25 hover:text-white/40 hover:bg-white/[0.03]'
+                  ? 'border border-transparent text-white/60 hover:text-white/90 hover:bg-white/[0.04]'
+                  : 'border border-transparent text-white/26 hover:text-white/42 hover:bg-white/[0.03]'
               }`}>
             <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: m.color, opacity: isAdmin ? 1 : 0.4 }} />
             {m.name}
@@ -2658,7 +2658,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       <DemoCommandCenter stage={demoStage} total={DEMO_TOTAL} />
       <div className="flex-1 flex flex-col h-full min-w-0">
         {/* Header — #6 microcopy + model selector + timeline btn */}
-        <header className="flex items-center justify-between pl-14 pr-4 md:px-5 py-2 border-b border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl">
+        <header className="flex items-center justify-between pl-14 pr-4 md:px-5 py-2.5 border-b border-white/[0.055] bg-[#07070f]/82 shadow-[inset_0_-1px_0_rgba(255,255,255,0.025)] backdrop-blur-2xl">
           <div className="flex items-center gap-3">
             {/* #10 Mascote micro-state tooltip */}
             <div className="relative group h-10 w-10 shrink-0">
@@ -2677,8 +2677,8 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               </div>
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-sm font-semibold text-white/90">CognChain</h1>
-              <p className="text-[11px] text-white/35">Verifiable Memory Protocol for AI Agents.</p>
+              <h1 className="text-sm font-semibold tracking-[-0.01em] text-white/90">CognChain</h1>
+              <p className="max-w-[190px] text-[11px] leading-snug text-white/34">Verifiable Memory Protocol for AI Agents.</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -2686,7 +2686,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
             <div className="hidden sm:flex items-center gap-1.5">
               <WalletAdapterButton />
               <div className="relative">
-                <button onClick={() => setShowLangMenu(!showLangMenu)} className={`p-1.5 rounded-lg transition-colors ${showLangMenu ? 'bg-white/[0.08] text-white/70' : 'hover:bg-white/[0.06] text-white/30 hover:text-white/60'}`} title="Traduzir">
+                <button onClick={() => setShowLangMenu(!showLangMenu)} className={`p-1.5 rounded-full transition-colors ${showLangMenu ? 'bg-white/[0.08] text-white/70' : 'hover:bg-white/[0.055] text-white/30 hover:text-white/62'}`} title="Traduzir">
                   {isTranslating ? (
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white/70 rounded-full animate-spin block" />
                   ) : (
@@ -2707,13 +2707,13 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                   </div>
                 )}
               </div>
-              <button onClick={() => setShowTimeline(true)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors" title="Evolution Timeline">
+              <button onClick={() => setShowTimeline(true)} className="p-1.5 rounded-full hover:bg-white/[0.055] text-white/30 hover:text-white/62 transition-colors" title="Evolution Timeline">
                 <GitBranch className="w-4 h-4" />
               </button>
             </div>
             {/* Always visible: new chat */}
             {messages.length > 1 && (
-              <button onClick={handleNewChat} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors" title="Nova conversa">
+              <button onClick={handleNewChat} className="p-1.5 rounded-full hover:bg-white/[0.055] text-white/30 hover:text-white/62 transition-colors" title="Nova conversa">
                 <PenSquare className="w-4 h-4" />
               </button>
             )}
@@ -2722,12 +2722,12 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               <ModelSelector selectedModel={selectedModel} onModelChange={handleModelSwitch} />
             </div>
             {/* Status badge: desktop only */}
-            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium
-              ${orbMode === 'idle' ? 'bg-[#14F195]/10 text-[#14F195]/70 border border-[#14F195]/20' :
-                orbMode === 'thinking' ? 'bg-[#00D1FF]/10 text-[#00D1FF]/70 border border-[#00D1FF]/20' :
-                orbMode === 'typing' ? 'bg-[#14F195]/10 text-[#14F195]/70 border border-[#14F195]/20' :
+            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]
+              ${orbMode === 'idle' ? 'bg-[#14F195]/[0.08] text-[#14F195]/72 border border-[#14F195]/18' :
+                orbMode === 'thinking' ? 'bg-[#5AD7FF]/[0.08] text-[#5AD7FF]/72 border border-[#5AD7FF]/18' :
+                orbMode === 'typing' ? 'bg-[#14F195]/[0.08] text-[#14F195]/72 border border-[#14F195]/18' :
                 orbMode === 'error' ? 'bg-[#FF4458]/10 text-[#FF4458]/70 border border-[#FF4458]/20' :
-                'bg-[#14F195]/10 text-[#14F195]/70 border border-[#14F195]/20'}`}>
+                'bg-[#14F195]/[0.08] text-[#14F195]/72 border border-[#14F195]/18'}`}>
               <span className={`w-1.5 h-1.5 rounded-full animate-pulse
                 ${orbMode === 'idle' ? 'bg-[#14F195]' : orbMode === 'thinking' ? 'bg-[#00D1FF]' : orbMode === 'typing' ? 'bg-[#14F195]' : orbMode === 'error' ? 'bg-[#FF4458]' : 'bg-[#14F195]'}`} />
               {orbMode === 'idle' && 'Online'}{orbMode === 'thinking' && 'Pensando...'}
@@ -2907,7 +2907,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         )}
 
         {/* Input area — with context chip */}
-        <div className="border-t border-white/[0.06] bg-[#0a0a14]/80 backdrop-blur-xl p-3 md:p-4">
+        <div className="border-t border-white/[0.055] bg-[#07070f]/86 p-3 shadow-[0_-18px_40px_rgba(0,0,0,0.22)] backdrop-blur-2xl md:p-4">
           <div className="max-w-3xl mx-auto">
             {/* Agent insights notification */}
             {agentInsights && (
@@ -2931,10 +2931,10 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                 <span className="text-[10px] text-white/20">Memory anchored. Hash generated.</span>
               </div>
             )}
-            <div className="relative flex items-end gap-2 bg-white/[0.04] border border-white/[0.08] rounded-2xl px-4 py-3 focus-within:border-[#9945FF]/40 focus-within:bg-white/[0.06] transition-all duration-200">
+            <div className="relative flex items-end gap-2 rounded-3xl border border-white/[0.085] bg-[#0B0B13]/78 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.045),0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl transition-all duration-200 focus-within:border-[#5AD7FF]/32 focus-within:bg-[#0E0E17]/86">
               <div className="hidden sm:flex items-center gap-0.5 pb-0.5">
-                <button className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors"><Paperclip className="w-5 h-5" /></button>
-                <button className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors"><ImagePlus className="w-5 h-5" /></button>
+                <button className="p-1.5 rounded-full hover:bg-white/[0.055] text-white/25 hover:text-white/55 transition-colors"><Paperclip className="w-5 h-5" /></button>
+                <button className="p-1.5 rounded-full hover:bg-white/[0.055] text-white/25 hover:text-white/55 transition-colors"><ImagePlus className="w-5 h-5" /></button>
               </div>
               <textarea value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={handleKeyDown}
                 placeholder="Describe what you want to build..." rows={1}
@@ -2943,11 +2943,11 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                 onInput={(e) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 128) + 'px'; }} />
               <div className="flex items-center gap-0.5 pb-0.5">
                 <button onClick={() => setOrbMode(orbMode === 'listening' ? 'idle' : 'listening')}
-                  className={`p-1.5 rounded-lg transition-colors ${orbMode === 'listening' ? 'bg-[#9945FF]/20 text-[#9945FF]' : 'hover:bg-white/[0.06] text-white/25 hover:text-white/50'}`}>
+                  className={`p-1.5 rounded-full transition-colors ${orbMode === 'listening' ? 'bg-[#8B5CF6]/18 text-[#C4B5FD]' : 'hover:bg-white/[0.055] text-white/25 hover:text-white/55'}`}>
                   <Mic className="w-5 h-5" />
                 </button>
                 <button onClick={handleSend} disabled={!inputValue.trim() || isTyping}
-                  className={`p-1.5 rounded-lg transition-all duration-200 ${inputValue.trim() && !isTyping ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-lg shadow-[#9945FF]/25 hover:shadow-[#9945FF]/40' : 'text-white/15 cursor-not-allowed'}`}>
+                  className={`p-1.5 rounded-full transition-all duration-200 ${inputValue.trim() && !isTyping ? 'bg-gradient-to-r from-[#8B5CF6] via-[#5AD7FF] to-[#14F195] text-[#050509] shadow-lg shadow-[#5AD7FF]/18 hover:shadow-[#14F195]/20' : 'text-white/16 cursor-not-allowed'}`}>
                   <Send className="w-5 h-5" />
                 </button>
               </div>
