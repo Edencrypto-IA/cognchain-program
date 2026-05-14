@@ -2907,8 +2907,8 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         )}
 
         {/* Input area — with context chip */}
-        <div className="border-t border-transparent bg-transparent p-2.5 shadow-none backdrop-blur-2xl sm:p-3 md:border-white/[0.055] md:bg-[#07070f]/86 md:p-4 md:shadow-[0_-18px_40px_rgba(0,0,0,0.22)]">
-          <div className="max-w-3xl mx-auto">
+        <div className="border-t border-transparent bg-transparent p-2.5 shadow-none backdrop-blur-2xl sm:p-3 md:border-transparent md:bg-transparent md:p-5 md:shadow-none">
+          <div className="mx-auto max-w-3xl lg:max-w-4xl">
             {/* Agent insights notification */}
             {agentInsights && (
               <div className="flex items-center justify-between mb-2 px-1">
@@ -2931,7 +2931,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                 <span className="text-[10px] text-white/20">Memory anchored. Hash generated.</span>
               </div>
             )}
-            <div className="relative flex min-h-[58px] items-end gap-2 rounded-[28px] border border-[#5AD7FF]/18 bg-[#0D0D16]/94 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_14px_42px_rgba(0,0,0,0.38),0_0_34px_rgba(90,215,255,0.045)] backdrop-blur-2xl transition-all duration-200 focus-within:border-[#5AD7FF]/42 focus-within:bg-[#10101A]/96 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_52px_rgba(0,0,0,0.42),0_0_42px_rgba(90,215,255,0.08)] sm:px-4">
+            <div className="relative flex min-h-[58px] items-end gap-2 rounded-[28px] border border-[#5AD7FF]/18 bg-[#0D0D16]/94 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_14px_42px_rgba(0,0,0,0.38),0_0_34px_rgba(90,215,255,0.045)] backdrop-blur-2xl transition-all duration-200 focus-within:border-[#5AD7FF]/42 focus-within:bg-[#10101A]/96 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_52px_rgba(0,0,0,0.42),0_0_42px_rgba(90,215,255,0.08)] sm:px-4 md:min-h-[64px] md:rounded-[32px] md:border-[#5AD7FF]/20 md:px-5 md:py-3.5 md:shadow-[inset_0_1px_0_rgba(255,255,255,0.075),0_24px_70px_rgba(0,0,0,0.34),0_0_46px_rgba(90,215,255,0.055)]">
               <div className="flex items-center gap-0.5 pb-0.5">
                 <button className="p-1.5 rounded-full hover:bg-white/[0.06] text-white/34 hover:text-white/62 transition-colors"><Paperclip className="w-5 h-5" /></button>
                 <button className="p-1.5 rounded-full hover:bg-white/[0.06] text-white/34 hover:text-white/62 transition-colors"><ImagePlus className="w-5 h-5" /></button>
