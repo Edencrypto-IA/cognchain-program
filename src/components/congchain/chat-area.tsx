@@ -2754,8 +2754,10 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
             <div className="flex min-h-full flex-col items-center px-4 pb-8 pt-8 sm:pt-10 md:pt-12">
               <div className="relative flex w-full max-w-4xl flex-col items-center">
                 <div className="pointer-events-none absolute inset-x-0 top-10 mx-auto h-72 max-w-2xl rounded-full bg-[radial-gradient(circle,rgba(20,241,149,0.08),rgba(139,92,246,0.045)_42%,transparent_70%)] blur-3xl" />
-                <div className="relative mb-2 scale-[0.78] md:scale-[0.86]">
-                  <Orb mode={orbMode} size="xl" interactive />
+                <div className="relative mb-2 flex h-32 w-32 items-center justify-center md:h-36 md:w-36">
+                  <div className="absolute left-1/2 top-1/2 scale-[0.58] -translate-x-1/2 -translate-y-1/2 md:scale-[0.64]">
+                    <Orb mode={orbMode} size="xl" interactive />
+                  </div>
                 </div>
                 <p className="relative mb-3 text-[10px] font-bold uppercase tracking-[0.34em] text-[#5AD7FF]/70">CognChain</p>
                 <h2 className="relative max-w-3xl text-center text-[2.15rem] font-semibold leading-[1.03] text-[#F4F2FF] md:text-[4rem]">
