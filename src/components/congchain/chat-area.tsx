@@ -2743,7 +2743,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         </div>
 
         {/* Messages */}
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto relative"
+        <div ref={chatContainerRef} className={`relative ${isEmpty ? 'flex-none overflow-visible xl:flex-1 xl:overflow-y-auto' : 'flex-1 overflow-y-auto'}`}
           style={{
             backgroundImage: [
               'radial-gradient(circle at 50% 18%, rgba(90, 215, 255, 0.055) 0%, transparent 34%)',
@@ -2751,23 +2751,23 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
             ].join(', '),
           }}>
           {isEmpty ? (
-            <div className="flex min-h-full flex-col items-center px-4 pb-8 pt-8 sm:pt-10 md:pt-12">
+            <div className="flex min-h-0 flex-col items-center px-4 pb-4 pt-5 sm:pt-7 md:pt-7 xl:min-h-full xl:pb-8 xl:pt-12">
               <div className="relative flex w-full max-w-4xl flex-col items-center">
-                <div className="pointer-events-none absolute inset-x-0 top-10 mx-auto h-72 max-w-2xl rounded-full bg-[radial-gradient(circle,rgba(20,241,149,0.08),rgba(139,92,246,0.045)_42%,transparent_70%)] blur-3xl" />
-                <div className="relative mb-2 flex h-32 w-32 items-center justify-center md:h-36 md:w-36">
-                  <div className="absolute left-1/2 top-1/2 scale-[0.58] -translate-x-1/2 -translate-y-1/2 md:scale-[0.64]">
+                <div className="pointer-events-none absolute inset-x-0 top-6 mx-auto h-56 max-w-2xl rounded-full bg-[radial-gradient(circle,rgba(20,241,149,0.08),rgba(139,92,246,0.045)_42%,transparent_70%)] blur-3xl xl:top-10 xl:h-72" />
+                <div className="relative mb-1 flex h-24 w-24 items-center justify-center md:h-28 md:w-28 xl:mb-2 xl:h-36 xl:w-36">
+                  <div className="absolute left-1/2 top-1/2 scale-[0.46] -translate-x-1/2 -translate-y-1/2 md:scale-[0.52] xl:scale-[0.64]">
                     <Orb mode={orbMode} size="xl" interactive />
                   </div>
                 </div>
-                <p className="relative mb-3 text-[10px] font-bold uppercase tracking-[0.34em] text-[#5AD7FF]/70">CognChain</p>
-                <h2 className="relative max-w-2xl text-center text-[1.95rem] font-semibold leading-[1.06] text-[#F4F2FF] md:text-[3.1rem] lg:text-[3.35rem]">
+                <p className="relative mb-2 text-[9px] font-bold uppercase tracking-[0.34em] text-[#5AD7FF]/70 xl:mb-3 xl:text-[10px]">CognChain</p>
+                <h2 className="relative max-w-2xl text-center text-[1.55rem] font-semibold leading-[1.06] text-[#F4F2FF] md:text-[2.45rem] xl:text-[3.35rem]">
                   Verifiable Memory Protocol
                   <span className="block text-white/82">for AI Agents.</span>
                 </h2>
-                <p className="relative mt-4 max-w-xl text-center text-sm leading-relaxed text-[#A7A4B6] md:text-base">
+                <p className="relative mt-3 max-w-xl text-center text-xs leading-relaxed text-[#A7A4B6] md:text-sm xl:mt-4 xl:text-base">
                   Persistent, portable memory that agents can prove, inherit, and continue across models.
                 </p>
-                <div className="relative mt-5 mb-5 flex flex-wrap items-center justify-center gap-2">
+                <div className="relative mt-3 mb-3 flex flex-wrap items-center justify-center gap-2 xl:mt-5 xl:mb-5">
                   {['Verifiable', 'Portable', 'Cross-model'].map(label => (
                     <span key={label} className="rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1 text-[11px] font-medium text-white/48 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                       {label}
