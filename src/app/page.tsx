@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Menu } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import Sidebar from '@/components/congchain/sidebar';
 import ChatArea from '@/components/congchain/chat-area';
 import { type OrbMode } from '@/components/congchain/orb';
@@ -97,16 +97,18 @@ export default function Home() {
 
       {/* Main chat area */}
       <main className="flex-1 flex flex-col min-w-0 relative">
-        {/* Mobile menu button */}
+        {/* Sidebar reopen button */}
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
-            className="fixed top-3 left-3 z-30 p-2 rounded-xl
-              bg-white/[0.05] border border-white/[0.08]
-              hover:bg-white/[0.08] transition-colors
-              md:hidden backdrop-blur-xl"
+            aria-label="Abrir menu lateral"
+            title="Abrir menu"
+            className="fixed top-3 left-3 z-40 flex h-10 w-10 items-center justify-center rounded-2xl
+              border border-white/[0.08] bg-[#080812]/80 text-white/65 shadow-[0_18px_50px_rgba(0,0,0,0.35)]
+              backdrop-blur-2xl transition-all duration-200 hover:border-[#7c3aed]/35 hover:bg-white/[0.08] hover:text-white
+              focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/40"
           >
-            <Menu className="w-5 h-5 text-white/70" />
+            <ChevronRight className="h-5 w-5" />
           </button>
         )}
 

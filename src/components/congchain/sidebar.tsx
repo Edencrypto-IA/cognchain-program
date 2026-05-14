@@ -95,7 +95,7 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
           border-r border-white/[0.055]
           shadow-[inset_-1px_0_0_rgba(255,255,255,0.025)]
           transition-all duration-300 ease-in-out
-          ${isOpen ? 'w-[280px] translate-x-0' : 'w-0 -translate-x-full md:translate-x-0 md:w-[280px]'}
+          ${isOpen ? 'w-[280px] translate-x-0' : 'w-0 -translate-x-full md:w-0 md:-translate-x-full'}
           overflow-hidden
         `}
       >
