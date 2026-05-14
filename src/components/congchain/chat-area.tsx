@@ -348,7 +348,7 @@ function SolMarketCard({ snapshot }: { snapshot: SolMarketSnapshot }) {
   );
 }
 
-function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, onCompare, onScore, onCopyHash, onAudit }: {
+function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, onCompare, onScore, onCopyHash, onAudit, onContinueMemory }: {
   message: Message;
   isLatest?: boolean;
   isStreaming?: boolean;
@@ -358,6 +358,7 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
   onScore: (msg: Message) => void;
   onCopyHash: (hash: string) => void;
   onAudit: (msg: Message) => void;
+  onContinueMemory: (msg: Message, model: AIModel) => void;
 }) {
   const isUser = message.role === 'user';
   const displayContent = (isStreaming && streamedContent !== undefined) ? streamedContent : message.content;
@@ -425,7 +426,16 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
         ) : !isUser && message.structuredResponse ? (
           (() => {
             try {
-              return <ResponseRouter response={message.structuredResponse} />;
+              return (
+                <ResponseRouter
+                  response={message.structuredResponse}
+                  content={displayContent}
+                  modelLabel={message.model ? (MODEL_LABELS[message.model as AIModel] || message.model) : 'CONGCHAIN'}
+                  timestamp={message.timestamp}
+                  memoryHash={message.memoryHash || message.structuredResponse.meta.onChainHash}
+                  onContinueMemory={(model) => onContinueMemory(message, model as AIModel)}
+                />
+              );
             } catch {
               return (
                 <div className="rounded-2xl px-4 py-3 text-[15px] leading-relaxed bg-white/[0.04] border border-white/[0.06] text-white/80">
@@ -2556,6 +2566,24 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     }).catch(() => {});
   }, [toast]);
 
+  const handleContinueMemory = useCallback((msg: Message, model: AIModel) => {
+    const hash = msg.memoryHash || msg.structuredResponse?.meta?.onChainHash;
+    const fromModel = msg.model ? (MODEL_LABELS[msg.model as AIModel] || msg.model) : 'CONGCHAIN';
+    const toModel = MODEL_LABELS[model] || model;
+    setPreviousModel(msg.model || selectedModel);
+    setSelectedModel(model);
+    setContextActive(true);
+    setInputValue(
+      hash
+        ? `Continue esta memoria verificada com ${toModel}.\n\nHash: ${hash}\nOrigem: ${fromModel}\n\nUse o contexto da resposta anterior e aprofunde com decisoes praticas, fontes e proximos passos.`
+        : `Continue esta resposta com ${toModel}.\n\nOrigem: ${fromModel}\n\nUse o contexto anterior e aprofunde com decisoes praticas, fontes e proximos passos.`
+    );
+    toast({
+      title: `Memoria pronta para ${toModel}`,
+      description: hash ? `${hash.substring(0, 16)}...` : 'Contexto carregado no prompt.',
+    });
+  }, [selectedModel, toast]);
+
   const handleAudit = useCallback((msg: Message) => {
     if (!msg.memoryHash) return;
     setAuditHash(msg.memoryHash);
@@ -2769,7 +2797,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                     isLatest={idx === messages.length - 1 && msg.role === 'assistant'}
                     isStreaming={isStreamingMessage}
                     streamedContent={isStreamingMessage ? streamedContent : undefined}
-                    onSave={handleSave} onCompare={handleCompare} onScore={handleScoreOpen} onCopyHash={handleCopyHash} onAudit={handleAudit} />
+                    onSave={handleSave} onCompare={handleCompare} onScore={handleScoreOpen} onCopyHash={handleCopyHash} onAudit={handleAudit} onContinueMemory={handleContinueMemory} />
                 );
               })}
               <ThinkingPanel
