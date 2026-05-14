@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { ChevronRight } from 'lucide-react';
 import Sidebar from '@/components/congchain/sidebar';
 import ChatArea from '@/components/congchain/chat-area';
@@ -35,12 +35,7 @@ export default function Home() {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [orbMode, setOrbMode] = useState<OrbMode>('idle');
   const [chatKey, setChatKey] = useState(0);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-
-  // Load sessions from localStorage on mount
-  useEffect(() => {
-    setConversations(loadStoredSessions());
-  }, []);
+  const [conversations, setConversations] = useState<Conversation[]>(() => loadStoredSessions());
 
   // Called by ChatArea whenever a message exchange happens
   const handleSessionUpdate = useCallback((session: Conversation) => {
