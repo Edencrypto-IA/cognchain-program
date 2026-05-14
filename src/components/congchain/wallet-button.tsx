@@ -1,7 +1,7 @@
 'use client';
 
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
@@ -38,6 +38,8 @@ export default function WalletButton() {
   const [connectError, setConnectError] = useState('');
   const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const walletButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
   const fetchBalance = useCallback(async () => {
     if (!publicKey) return;
@@ -69,6 +71,22 @@ export default function WalletButton() {
     navigator.clipboard.writeText(publicKey.toString()).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function openConnectedMenu() {
+    const rect = walletButtonRef.current?.getBoundingClientRect();
+    if (!rect || typeof window === 'undefined') {
+      setOpen(o => !o);
+      return;
+    }
+
+    const width = 256;
+    const padding = 12;
+    setMenuPosition({
+      top: rect.bottom + 8,
+      left: Math.min(Math.max(rect.left, padding), window.innerWidth - width - padding),
+    });
+    setOpen(o => !o);
   }
 
   function openWalletFallback(option: typeof WALLET_OPTIONS[number]) {
@@ -238,7 +256,8 @@ export default function WalletButton() {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={walletButtonRef}
+        onClick={openConnectedMenu}
         className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/[0.08] px-3 py-2 text-xs font-semibold text-[#14F195] transition-all hover:bg-[#14F195]/15"
       >
         <div className="h-2 w-2 rounded-full bg-[#14F195] animate-pulse" />
@@ -250,9 +269,15 @@ export default function WalletButton() {
       </button>
 
       {open && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[2147483647] flex items-start justify-center p-4 pt-24 sm:justify-end sm:pr-8">
-          <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-xs overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f0f1e] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+        <div className="fixed inset-0 z-[2147483647]">
+          <div className="absolute inset-0 bg-black/25 backdrop-blur-[1.5px]" onClick={() => setOpen(false)} />
+          <div
+            className="absolute w-[256px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f0f1e] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+            style={{
+              top: menuPosition?.top ?? 72,
+              left: menuPosition?.left ?? 16,
+            }}
+          >
             {wallet && (
               <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3">
                 {wallet.adapter.icon && (
