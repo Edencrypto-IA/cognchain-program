@@ -20,24 +20,24 @@ const MODE_CONFIG: Record<OrbMode, {
 }> = {
   idle: {
     colors: ['#8B5CF6', '#5AD7FF', '#14F195'],
-    glowColor: 'rgba(139, 92, 246, 0.26)',
-    speed: 0.0022,
-    particleCount: 14,
-    pulseIntensity: 0.06,
+    glowColor: 'rgba(139, 92, 246, 0.3)',
+    speed: 0.0034,
+    particleCount: 18,
+    pulseIntensity: 0.1,
   },
   thinking: {
     colors: ['#8B5CF6', '#5AD7FF', '#14F195', '#C4B5FD'],
-    glowColor: 'rgba(90, 215, 255, 0.36)',
-    speed: 0.007,
-    particleCount: 28,
-    pulseIntensity: 0.16,
+    glowColor: 'rgba(90, 215, 255, 0.42)',
+    speed: 0.009,
+    particleCount: 36,
+    pulseIntensity: 0.24,
   },
   typing: {
     colors: ['#14F195', '#5AD7FF', '#A7F3D0'],
-    glowColor: 'rgba(20, 241, 149, 0.28)',
-    speed: 0.0048,
-    particleCount: 22,
-    pulseIntensity: 0.1,
+    glowColor: 'rgba(20, 241, 149, 0.34)',
+    speed: 0.0066,
+    particleCount: 30,
+    pulseIntensity: 0.16,
   },
   error: {
     colors: ['#FF4458', '#FB7185', '#FFB86B'],
@@ -48,17 +48,17 @@ const MODE_CONFIG: Record<OrbMode, {
   },
   success: {
     colors: ['#14F195', '#A7F3D0', '#5AD7FF'],
-    glowColor: 'rgba(20, 241, 149, 0.3)',
-    speed: 0.003,
-    particleCount: 18,
-    pulseIntensity: 0.09,
+    glowColor: 'rgba(20, 241, 149, 0.36)',
+    speed: 0.0048,
+    particleCount: 24,
+    pulseIntensity: 0.14,
   },
   listening: {
     colors: ['#8B5CF6', '#5AD7FF', '#C4B5FD'],
-    glowColor: 'rgba(139, 92, 246, 0.34)',
-    speed: 0.006,
-    particleCount: 26,
-    pulseIntensity: 0.18,
+    glowColor: 'rgba(139, 92, 246, 0.4)',
+    speed: 0.008,
+    particleCount: 34,
+    pulseIntensity: 0.24,
   },
 };
 
@@ -93,16 +93,16 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
 
   const createParticle = useCallback((time: number): Particle => {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 0.08 + Math.random() * 0.36;
+    const speed = 0.12 + Math.random() * 0.52;
     const dist = (orbSize / 2) * (0.22 + Math.random() * 0.42);
     return {
       x: Math.cos(angle) * dist,
       y: Math.sin(angle) * dist,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      size: 0.7 + Math.random() * 1.8,
+      size: 0.75 + Math.random() * 2.1,
       life: time,
-      maxLife: 110 + Math.random() * 170,
+      maxLife: 90 + Math.random() * 150,
       hue: Math.random(),
     };
   }, [orbSize]);
@@ -145,12 +145,15 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       particlesRef.current = particlesRef.current.filter(p => (t - p.life) < p.maxLife);
 
       // Draw outer glow
-      const pulseScale = 1 + Math.sin(t * cfg.speed * 10) * cfg.pulseIntensity;
-      const surfaceScale = 1 + Math.sin(t * cfg.speed * 5) * cfg.pulseIntensity * 0.35;
+      const aliveWave = Math.sin(t * cfg.speed * 4.5) * 0.5 + Math.sin(t * cfg.speed * 9.3 + 1.4) * 0.5;
+      const pulseScale = 1 + aliveWave * cfg.pulseIntensity;
+      const surfaceScale = 1 + aliveWave * cfg.pulseIntensity * 0.42;
+      const driftX = Math.sin(t * cfg.speed * 2.1) * radius * 0.025;
+      const driftY = Math.cos(t * cfg.speed * 1.7) * radius * 0.025;
       const glowRadius = radius * 2.05 * pulseScale;
       const outerGlow = ctx.createRadialGradient(
-        centerX, centerY, radius * 0.5,
-        centerX, centerY, glowRadius
+        centerX + driftX, centerY + driftY, radius * 0.5,
+        centerX + driftX, centerY + driftY, glowRadius
       );
       outerGlow.addColorStop(0, cfg.glowColor);
       outerGlow.addColorStop(0.42, cfg.glowColor.replace(/[\d.]+\)$/, '0.12)'));
@@ -161,7 +164,7 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       // Draw particles (behind the orb)
       particlesRef.current.forEach(p => {
         const age = (t - p.life) / p.maxLife;
-        const alpha = Math.sin(age * Math.PI) * 0.45;
+        const alpha = Math.sin(age * Math.PI) * (mode === 'idle' ? 0.5 : 0.62);
         const colorIdx = Math.floor(p.hue * (cfg.colors.length - 1));
         const color = cfg.colors[Math.min(colorIdx, cfg.colors.length - 1)];
 
@@ -178,7 +181,7 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
 
         // Update particle position
         const pullAngle = Math.atan2(-p.y, -p.x);
-        const pullForce = 0.008;
+        const pullForce = mode === 'idle' ? 0.01 : 0.014;
         p.vx += Math.cos(pullAngle) * pullForce;
         p.vy += Math.sin(pullAngle) * pullForce;
 
@@ -187,8 +190,8 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
           p.vy += (Math.random() - 0.5) * 0.3;
         }
 
-        p.x += p.vx;
-        p.y += p.vy;
+        p.x += p.vx + Math.sin(t * 0.018 + p.hue * 8) * 0.08;
+        p.y += p.vy + Math.cos(t * 0.015 + p.hue * 7) * 0.08;
 
         // Respawn if too far
         const dist = Math.sqrt(p.x * p.x + p.y * p.y);
@@ -199,8 +202,8 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
 
       // Draw main orb sphere
       const gradient = ctx.createRadialGradient(
-        centerX - radius * 0.3,
-        centerY - radius * 0.3,
+        centerX - radius * (0.3 + Math.sin(t * cfg.speed * 2) * 0.04),
+        centerY - radius * (0.3 + Math.cos(t * cfg.speed * 2.4) * 0.04),
         radius * 0.1,
         centerX,
         centerY,
@@ -208,7 +211,7 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       );
 
       // Animated color cycling
-      const colorProgress = (Math.sin(t * cfg.speed) + 1) / 2;
+      const colorProgress = (Math.sin(t * cfg.speed * 1.6) + 1) / 2;
       const colorIdx = colorProgress * (cfg.colors.length - 1);
       const c1Idx = Math.floor(colorIdx);
       const c2Idx = Math.min(c1Idx + 1, cfg.colors.length - 1);
@@ -224,6 +227,21 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       ctx.arc(centerX, centerY, radius * surfaceScale, 0, Math.PI * 2);
       ctx.fillStyle = gradient;
       ctx.fill();
+
+      // Living core glow.
+      ctx.save();
+      const coreAngle = t * cfg.speed * 1.8;
+      const coreX = centerX + Math.cos(coreAngle) * radius * 0.12;
+      const coreY = centerY + Math.sin(coreAngle * 0.8) * radius * 0.1;
+      const core = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, radius * 0.55);
+      core.addColorStop(0, 'rgba(255,255,255,0.32)');
+      core.addColorStop(0.32, withAlpha(cfg.colors[(c1Idx + 1) % cfg.colors.length], 0.2));
+      core.addColorStop(1, 'transparent');
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius * surfaceScale, 0, Math.PI * 2);
+      ctx.fillStyle = core;
+      ctx.fill();
+      ctx.restore();
 
       // Glass edge and subtle inner shadow.
       ctx.save();
@@ -245,8 +263,8 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       const nodeCount = mode === 'thinking' ? 10 : 7;
       const nodes: { x: number; y: number }[] = [];
       for (let i = 0; i < nodeCount; i++) {
-        const angle = (i / nodeCount) * Math.PI * 2 + t * cfg.speed * 2;
-        const dist = radius * 0.38 * (0.5 + Math.sin(t * cfg.speed * 3 + i) * 0.24);
+        const angle = (i / nodeCount) * Math.PI * 2 + t * cfg.speed * (mode === 'idle' ? 3.2 : 4.4);
+        const dist = radius * 0.42 * (0.55 + Math.sin(t * cfg.speed * 4 + i) * 0.28);
         nodes.push({
           x: centerX + Math.cos(angle) * dist,
           y: centerY + Math.sin(angle) * dist,
@@ -254,7 +272,7 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       }
 
       ctx.strokeStyle = cfg.colors[0];
-      ctx.lineWidth = 0.45;
+      ctx.lineWidth = mode === 'idle' ? 0.5 : 0.65;
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const d = Math.sqrt(
@@ -264,7 +282,7 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.globalAlpha = (1 - d / (radius * 0.8)) * 0.14;
+            ctx.globalAlpha = (1 - d / (radius * 0.8)) * (mode === 'idle' ? 0.18 : 0.26);
             ctx.stroke();
           }
         }
@@ -273,10 +291,10 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       // Draw nodes
       nodes.forEach((node, i) => {
         ctx.beginPath();
-        const nodeSize = 1 + Math.sin(t * cfg.speed * 4 + i) * 0.45;
+        const nodeSize = 1.1 + Math.sin(t * cfg.speed * 6 + i) * 0.65;
         ctx.arc(node.x, node.y, nodeSize, 0, Math.PI * 2);
         ctx.fillStyle = cfg.colors[i % cfg.colors.length];
-        ctx.globalAlpha = 0.42 + Math.sin(t * cfg.speed * 5 + i) * 0.22;
+        ctx.globalAlpha = 0.5 + Math.sin(t * cfg.speed * 6 + i) * 0.28;
         ctx.fill();
       });
       ctx.restore();
@@ -284,11 +302,11 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       // Specular highlight
       ctx.save();
       const specGrad = ctx.createRadialGradient(
-        centerX - radius * 0.32,
-        centerY - radius * 0.32,
+        centerX - radius * (0.32 + Math.sin(t * cfg.speed * 2.2) * 0.05),
+        centerY - radius * (0.32 + Math.cos(t * cfg.speed * 2) * 0.04),
         0,
-        centerX - radius * 0.32,
-        centerY - radius * 0.32,
+        centerX - radius * (0.32 + Math.sin(t * cfg.speed * 2.2) * 0.05),
+        centerY - radius * (0.32 + Math.cos(t * cfg.speed * 2) * 0.04),
         radius * 0.46
       );
       specGrad.addColorStop(0, 'rgba(255, 255, 255, 0.62)');
@@ -299,7 +317,15 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
       ctx.fillStyle = specGrad;
       ctx.fill();
       ctx.beginPath();
-      ctx.ellipse(centerX - radius * 0.18, centerY - radius * 0.35, radius * 0.2, radius * 0.08, -0.45, 0, Math.PI * 2);
+      ctx.ellipse(
+        centerX - radius * 0.18 + Math.sin(t * cfg.speed * 3) * radius * 0.04,
+        centerY - radius * 0.35 + Math.cos(t * cfg.speed * 2.7) * radius * 0.035,
+        radius * 0.2,
+        radius * 0.08,
+        -0.45,
+        0,
+        Math.PI * 2
+      );
       ctx.fillStyle = 'rgba(255,255,255,0.32)';
       ctx.fill();
       ctx.restore();
@@ -321,12 +347,12 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
         ctx.save();
         for (let i = 0; i < 3; i++) {
           const ringPhase = (t * cfg.speed * 3 + i * 2) % (Math.PI * 2);
-          const ringAlpha = Math.sin(ringPhase) * 0.1;
+          const ringAlpha = Math.sin(ringPhase) * 0.16;
           const ringRadius = radius * (1.1 + i * 0.2) + Math.sin(ringPhase) * 5;
           ctx.beginPath();
           ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
           ctx.strokeStyle = withAlpha(cfg.colors[i % cfg.colors.length], Math.abs(ringAlpha));
-          ctx.lineWidth = 0.8;
+          ctx.lineWidth = 1;
           ctx.stroke();
         }
         ctx.restore();
@@ -341,7 +367,7 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
           ctx.beginPath();
           ctx.arc(centerX, centerY, waveRadius, wave, wave + Math.PI * 0.5);
           ctx.strokeStyle = `rgba(20, 241, 149, ${0.2 - i * 0.04})`;
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1.25;
           ctx.stroke();
         }
         ctx.restore();
@@ -355,7 +381,7 @@ export default function Orb({ mode, size = 'lg', className = '', interactive = t
         ctx.beginPath();
         ctx.arc(centerX, centerY, pulseR, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(153, 69, 255, ${0.3 - Math.sin(pulseWave) * 0.2})`;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
         ctx.restore();
       }
