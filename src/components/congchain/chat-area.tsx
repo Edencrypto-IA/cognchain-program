@@ -257,15 +257,29 @@ function isSolMarketQuery(text: string) {
 }
 
 function SolMarketCard({ snapshot }: { snapshot: SolMarketSnapshot }) {
-  const chart = snapshot.chart.length >= 2 ? snapshot.chart : [snapshot.price ?? 0, snapshot.price ?? 0];
+  const currentPrice = snapshot.price ?? 0;
+  const previousPrice = currentPrice && snapshot.change24h !== null
+    ? currentPrice / (1 + snapshot.change24h / 100)
+    : currentPrice;
+  const fallbackChart = Array.from({ length: 24 }, (_, index) => {
+    const progress = index / 23;
+    const wave = Math.sin(progress * Math.PI * 2) * Math.abs(currentPrice - previousPrice) * 0.08;
+    return previousPrice + (currentPrice - previousPrice) * progress + wave;
+  });
+  const chart = snapshot.chart.length >= 3 ? snapshot.chart : fallbackChart;
   const min = Math.min(...chart);
   const max = Math.max(...chart);
   const range = max - min || 1;
-  const points = chart.map((value, index) => {
-    const x = (index / Math.max(1, chart.length - 1)) * 100;
-    const y = 82 - ((value - min) / range) * 62;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
-  }).join(' ');
+  const pointPairs = chart.map((value, index) => {
+    const x = 3 + (index / Math.max(1, chart.length - 1)) * 94;
+    const y = 78 - ((value - min) / range) * 58;
+    return { x, y, value };
+  });
+  const points = pointPairs.map(point => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
+  const areaPoints = pointPairs.length
+    ? `${pointPairs[0].x.toFixed(2)},84 ${points} ${pointPairs[pointPairs.length - 1].x.toFixed(2)},84`
+    : '';
+  const lastPoint = pointPairs[pointPairs.length - 1];
   const positive = (snapshot.change24h ?? 0) >= 0;
   const signalLabel = snapshot.signal === 'bullish' ? 'Momentum positivo' : snapshot.signal === 'risk-off' ? 'Risk-off' : 'Neutro';
   const signalColor = snapshot.signal === 'bullish' ? '#14F195' : snapshot.signal === 'risk-off' ? '#EF4444' : '#F59E0B';
@@ -319,9 +333,32 @@ function SolMarketCard({ snapshot }: { snapshot: SolMarketSnapshot }) {
                 <stop offset="0%" stopColor={signalColor} stopOpacity="0.35" />
                 <stop offset="100%" stopColor={signalColor} stopOpacity="0" />
               </linearGradient>
+              <filter id="sol-market-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="1.2" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
             </defs>
-            <polyline points={`0,86 ${points} 100,86`} fill="url(#sol-market-fill)" stroke="none" />
-            <polyline points={points} fill="none" stroke={signalColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            {[22, 42, 62, 82].map(y => (
+              <line key={y} x1="3" x2="97" y1={y} y2={y} stroke="rgba(255,255,255,0.06)" strokeDasharray="1.5 3" />
+            ))}
+            <polyline points={areaPoints} fill="url(#sol-market-fill)" stroke="none" />
+            <polyline points={points} fill="none" stroke={signalColor} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" filter="url(#sol-market-glow)" />
+            {pointPairs.filter((_, index) => index % 6 === 0).map(point => (
+              <circle key={`${point.x}-${point.y}`} cx={point.x} cy={point.y} r="1.3" fill="#05070a" stroke={signalColor} strokeWidth="1" />
+            ))}
+            {lastPoint && (
+              <>
+                <circle cx={lastPoint.x} cy={lastPoint.y} r="2.2" fill={signalColor} />
+                <text x="96" y={Math.max(12, lastPoint.y - 5)} textAnchor="end" fill={signalColor} fontSize="4.5" fontWeight="700">
+                  ${lastPoint.value.toFixed(2)}
+                </text>
+              </>
+            )}
+            <text x="3" y="10" fill="rgba(255,255,255,0.28)" fontSize="4.5">${max.toFixed(2)} high</text>
+            <text x="3" y="88" fill="rgba(255,255,255,0.22)" fontSize="4.5">${min.toFixed(2)} low</text>
           </svg>
         </div>
 

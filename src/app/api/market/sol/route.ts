@@ -22,19 +22,24 @@ function fmtB(value: number | null | undefined) {
 }
 
 export async function GET() {
-  const [ticker, cg, protocols, klines] = await Promise.all([
+  const [ticker, cg, protocols, klines, cgChart] = await Promise.all([
     safeFetch('https://api.binance.com/api/v3/ticker/24hr?symbol=SOLUSDT'),
     safeFetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true'),
     safeFetch('https://api.llama.fi/protocols'),
     safeFetch('https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=1h&limit=24'),
+    safeFetch('https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days=1&interval=hourly'),
   ]);
 
   const binance = ticker as Record<string, string> | null;
   const coingecko = (cg as { solana?: Record<string, number> } | null)?.solana;
   const klineRows = Array.isArray(klines) ? klines : [];
-  const chart = klineRows
+  const binanceChart = klineRows
     .map(row => Array.isArray(row) ? Number(row[4]) : NaN)
     .filter(n => Number.isFinite(n));
+  const coingeckoChart = ((cgChart as { prices?: Array<[number, number]> } | null)?.prices ?? [])
+    .map(row => Number(row[1]))
+    .filter(n => Number.isFinite(n));
+  const chart = binanceChart.length >= 8 ? binanceChart : coingeckoChart;
 
   const solanaProtocols = Array.isArray(protocols)
     ? protocols
