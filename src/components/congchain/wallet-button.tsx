@@ -2,6 +2,7 @@
 
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import type { WalletName } from '@solana/wallet-adapter-base';
 import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye } from 'lucide-react';
@@ -118,8 +119,8 @@ export default function WalletButton() {
           {connecting || connectingWallet ? 'Conectando...' : 'Conectar Carteira'}
         </button>
 
-        {pickerOpen && (
-          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+        {pickerOpen && typeof document !== 'undefined' && createPortal(
+          <div className="fixed inset-0 z-[2147483647] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={() => setPickerOpen(false)} />
             <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/[0.09] bg-[#090914] shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
@@ -207,7 +208,8 @@ export default function WalletButton() {
                 )}
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </>
     );
