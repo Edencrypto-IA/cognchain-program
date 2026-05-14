@@ -5,6 +5,8 @@
 export interface RealEvent {
   seq: number;
   type: string;
+  agentId?: string;
+  name?: string;
   model: string;
   modelLabel: string;
   agentName: string;
@@ -13,6 +15,9 @@ export interface RealEvent {
   hash: string;
   ts: number;
   isReal: true;
+  sources?: string[];
+  evidence?: string[];
+  dataQuality?: number;
 }
 
 const events: RealEvent[] = [];

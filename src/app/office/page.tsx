@@ -21,6 +21,7 @@ interface FeedEvent {
   success?: boolean; duration?: number;
   oldScore?: number; newScore?: number;
   snippet?: string; hash?: string; scoreGain?: number;
+  sources?: string[]; evidence?: string[]; dataQuality?: number;
   fromName?: string; toName?: string; amount?: number;
   finalScore?: number; reason?: string;
   isReal?: boolean; isSimulated?: boolean; source?: string;
@@ -301,8 +302,16 @@ function EventRow({ event }: { event: FeedEvent }) {
           {event.isSimulated && (
             <span className="text-[8px] font-black text-white/35 bg-white/[0.04] border border-white/[0.08] px-1.5 py-0.5 rounded-full tracking-widest">DEMO</span>
           )}
+          {event.sources?.slice(0, 2).map(source => (
+            <span key={source} className="hidden lg:inline-flex text-[8px] font-black text-[#14F195]/70 bg-[#14F195]/10 border border-[#14F195]/15 px-1.5 py-0.5 rounded-full tracking-widest">
+              {source.split(' ')[0]}
+            </span>
+          ))}
         </div>
-        <p className="text-[10px] text-white/40 leading-relaxed line-clamp-2">{getDesc()}</p>
+        <p className="text-[10px] text-white/40 leading-relaxed line-clamp-2">{describeFeedEvent(event)}</p>
+        {event.evidence && (
+          <p className="mt-1 text-[9px] text-[#14F195]/45 line-clamp-1">{event.evidence[0]}</p>
+        )}
       </div>
     </div>
   );
@@ -456,6 +465,22 @@ function AgentLiveInspector({
                         <span className="flex items-center gap-1 text-[10px] text-white/25"><Clock className="h-3 w-3" />{formatAgo(event.ts)}</span>
                       </div>
                       <p className="text-sm leading-relaxed text-white/65">{describeFeedEvent(event)}</p>
+                      {event.sources && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {event.sources.map(source => (
+                            <span key={source} className="rounded-full border border-[#14F195]/15 bg-[#14F195]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-[#14F195]/75">
+                              {source}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {event.evidence && (
+                        <div className="mt-3 space-y-1 rounded-2xl border border-white/[0.06] bg-black/35 p-3">
+                          {event.evidence.map(item => (
+                            <p key={item} className="text-[11px] leading-relaxed text-white/45">{item}</p>
+                          ))}
+                        </div>
+                      )}
                       {event.hash && <code className="mt-3 block truncate rounded-xl border border-white/[0.06] bg-black/45 px-3 py-2 text-[11px] text-white/45">hash: {event.hash}</code>}
                     </div>
                   </div>
@@ -607,6 +632,25 @@ export default function OfficePage() {
         }
 
         if (data.type === 'real_task_done') {
+          setAgents(prev => {
+            const id = data.agentId ?? `real-${String(data.agentName ?? data.name ?? 'agent').toLowerCase()}`;
+            const existing = prev.find(a => a.id === id);
+            const nextAgent: AgentState = {
+              id,
+              name: data.name ?? data.agentName ?? 'Real Agent',
+              model: data.model ?? 'nvidia',
+              goal: data.task ?? 'Execucao real com dados externos',
+              score: data.dataQuality ?? existing?.score ?? 8,
+              status: 'idle',
+              currentTask: undefined,
+              memoryCount: (existing?.memoryCount ?? 0) + 1,
+              solSpent: existing?.solSpent ?? 0,
+              tasksDone: (existing?.tasksDone ?? 0) + 1,
+              consecutivePoor: 0,
+            };
+            return existing ? prev.map(a => a.id === id ? { ...a, ...nextAgent } : a) : [nextAgent, ...prev];
+          });
+          setSelectedAgentId(data.agentId ?? `real-${String(data.agentName ?? data.name ?? 'agent').toLowerCase()}`);
           addEvent(data);
           return;
         }

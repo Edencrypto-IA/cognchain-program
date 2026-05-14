@@ -534,6 +534,43 @@ function calcDataScore(category: string, data: Record<string, unknown>, agentNam
   }
 }
 
+function buildEvidence(category: string, data: Record<string, unknown>): { sources: string[]; evidence: string[] } {
+  if (category === 'market') {
+    const sol = data.solTicker as Record<string, string> | null;
+    const btc = data.btcTicker as Record<string, string> | null;
+    const prices = data.prices as Record<string, Record<string, number>> | null;
+    const protocols = data.solanaProtocols as { name: string; tvl: number; c1d?: number; c7d?: number }[] | undefined;
+    return {
+      sources: ['Binance 24hr ticker', 'CoinGecko simple price', 'DeFiLlama protocols'],
+      evidence: [
+        sol ? `Binance SOLUSDT $${fmt(+sol.lastPrice)} (${fmt(+sol.priceChangePercent)}% 24h), volume ${fmtB(+sol.quoteVolume)}` : 'Binance SOLUSDT indisponivel',
+        btc ? `Binance BTCUSDT $${fmt(+btc.lastPrice)} (${fmt(+btc.priceChangePercent)}% 24h)` : 'Binance BTCUSDT indisponivel',
+        prices?.solana ? `CoinGecko SOL $${prices.solana.usd} (${prices.solana.usd_24h_change?.toFixed(2)}% 24h)` : 'CoinGecko SOL indisponivel',
+        protocols?.length ? `DeFiLlama top Solana TVL: ${protocols.slice(0, 3).map(p => `${p.name} ${fmtB(p.tvl)}`).join(', ')}` : 'DeFiLlama protocolos indisponiveis',
+      ],
+    };
+  }
+
+  if (category === 'wallet') {
+    const wallet = data.wallet as string | undefined;
+    const balance = data.balance as { result?: { value?: number } } | null;
+    const signatures = data.signatures as { result?: unknown[] } | null;
+    const assets = data.assets as { result?: { total?: number } } | null;
+    const solBalance = typeof balance?.result?.value === 'number' ? balance.result.value / 1_000_000_000 : null;
+    return {
+      sources: ['Solana RPC getBalance', 'Solana RPC getSignaturesForAddress', 'Helius DAS getAssetsByOwner'],
+      evidence: [
+        wallet ? `Wallet analisada: ${wallet.slice(0, 6)}...${wallet.slice(-6)}` : 'Wallet nao informada',
+        solBalance === null ? 'Balance indisponivel' : `Balance ${solBalance.toFixed(4)} SOL`,
+        `Assinaturas recentes encontradas: ${signatures?.result?.length ?? 0}`,
+        assets?.result?.total === undefined ? 'Assets Helius indisponiveis' : `Assets Helius: ${assets.result.total}`,
+      ],
+    };
+  }
+
+  return { sources: ['Agent Office data pipeline'], evidence: ['Dados coletados pelo skill selecionado'] };
+}
+
 export async function runRealTask(options?: string | RunRealTaskOptions): Promise<boolean> {
   const forceModelKey = typeof options === 'string' ? options : options?.model;
   const taskKind = typeof options === 'string' ? undefined : options?.task;
@@ -587,6 +624,7 @@ export async function runRealTask(options?: string | RunRealTaskOptions): Promis
     // Step 4: Calculate data-quality score (dynamic confidence)
     // Score = how many live data sources actually returned real data (0-10)
     const dataScore = calcDataScore(skill.category, liveData, agentName);
+    const { sources, evidence } = buildEvidence(skill.category, liveData);
 
     // Step 5: Save as AGENT_INSIGHT with score
     const hasContinuity = history.length > 0;
@@ -596,11 +634,13 @@ export async function runRealTask(options?: string | RunRealTaskOptions): Promis
 
     const { pushRealEvent } = await import('../shared');
     pushRealEvent({
+      agentId: `real-${agentName.toLowerCase()}`,
+      name: agentName,
       type: 'real_task_done', model: cfg.key, modelLabel: cfg.label,
       agentName: hasContinuity ? `${agentName} ↻` : agentName,
       task: skill.name,
       result: content.replace(/\n+/g, ' ').trim().slice(0, 160),
-      hash: mem.hash, ts: Date.now(), isReal: true,
+      hash: mem.hash, ts: Date.now(), isReal: true, sources, evidence, dataQuality: dataScore,
     });
     updateAgentSnapshot({
       id: `real-${agentName.toLowerCase()}`,
