@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -16,6 +16,8 @@ import {
   Check,
   Loader2,
   Shield,
+  Activity,
+  CheckCircle2,
 } from 'lucide-react';
 import ContextVisualization from '@/components/agents/context-visualization';
 import DeployDialog from '@/components/agents/deploy-dialog';
@@ -36,6 +38,17 @@ interface Agent {
   memoryCount: number;
   totalInteractions: number;
   createdAt: string;
+}
+
+type LoopWorkStatus = 'pending' | 'running' | 'complete' | 'error';
+
+interface LoopWorkEvent {
+  id: string;
+  title: string;
+  detail: string;
+  source: string;
+  status: LoopWorkStatus;
+  timestamp: number;
 }
 
 const MODELS = [
@@ -63,6 +76,62 @@ const TOOL_NAMES: Record<string, string> = {
   blockchain: 'Blockchain Query',
   data_analysis: 'Data Analysis',
 };
+
+function buildLoopWorkstream(agent: Agent, command: string): LoopWorkEvent[] {
+  const now = Date.now();
+  const action = command === 'start' ? 'Loop armado e ciclo inicial disparado' : 'Execucao manual disparada';
+
+  return [
+    {
+      id: 'connect',
+      title: action,
+      detail: `POST /api/agents/${agent.id}/loop`,
+      source: 'Agent Runtime',
+      status: 'running',
+      timestamp: now,
+    },
+    {
+      id: 'memory',
+      title: 'Lendo memorias verificadas',
+      detail: 'Buscando top memorias por score para montar contexto operacional.',
+      source: 'Memory Brain',
+      status: 'pending',
+      timestamp: now + 1,
+    },
+    {
+      id: 'model',
+      title: 'Sintetizando insight autonomo',
+      detail: `${agent.model.toUpperCase()} recebe objetivo, personalidade e memorias relevantes.`,
+      source: 'AI Router',
+      status: 'pending',
+      timestamp: now + 2,
+    },
+    {
+      id: 'rules',
+      title: 'Avaliando regras ativas',
+      detail: 'Decision Engine compara condicoes com evidencias de memoria.',
+      source: 'Rule Engine',
+      status: 'pending',
+      timestamp: now + 3,
+    },
+    {
+      id: 'tools',
+      title: 'Executando ferramentas permitidas',
+      detail: 'Acoes sao executadas apenas quando uma regra ativa encontra evidencia.',
+      source: 'Tool Layer',
+      status: 'pending',
+      timestamp: now + 4,
+    },
+    {
+      id: 'proof',
+      title: 'Salvando resultado e prova',
+      detail: 'Novas decisoes entram na timeline; prova on-chain e memoria sao best-effort.',
+      source: 'Proof Layer',
+      status: 'pending',
+      timestamp: now + 5,
+    },
+  ];
+}
 
 // Mock data for context visualization (would come from API in production)
 const MOCK_MEMORIES = [
@@ -92,6 +161,99 @@ const MOCK_MEMORIES = [
   },
 ];
 
+function LoopWorkstreamPanel({
+  events,
+  isBusy,
+  loopStatus,
+}: {
+  events: LoopWorkEvent[];
+  isBusy: boolean;
+  loopStatus: any;
+}) {
+  const visibleEvents = events.length > 0
+    ? events
+    : loopStatus?.isRunning
+      ? [{
+          id: 'waiting',
+          title: 'Loop autonomo ativo',
+          detail: 'Aguardando o proximo ciclo agendado. Use Executar Agora para disparar uma leitura imediatamente.',
+          source: 'Agent Runtime',
+          status: 'running' as const,
+          timestamp: Date.now(),
+        }]
+      : [];
+
+  if (visibleEvents.length === 0) return null;
+
+  const completed = visibleEvents.filter(event => event.status === 'complete').length;
+  const progress = Math.max(12, Math.round((completed / visibleEvents.length) * 100));
+
+  return (
+    <div className="border-b border-white/[0.04] bg-gradient-to-br from-[#9945FF]/7 via-white/[0.015] to-[#14F195]/5 p-4">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#14F195]/20 bg-[#14F195]/10">
+            {isBusy ? (
+              <Activity className="h-4 w-4 animate-pulse text-[#14F195]" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-[#14F195]" />
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">Live workstream</p>
+            <p className="text-[11px] text-white/30">O agente esta executando o ciclo real: memoria, modelo, regras e prova.</p>
+          </div>
+        </div>
+        <div className="rounded-full border border-white/[0.06] bg-black/25 px-3 py-1 text-[10px] text-white/35">
+          {isBusy ? 'executando agora' : loopStatus?.isRunning ? 'loop ativo' : 'ultimo ciclo concluido'}
+        </div>
+      </div>
+
+      <div className="mb-3 h-1 overflow-hidden rounded-full bg-white/[0.05]">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#9945FF] via-[#00D1FF] to-[#14F195] transition-all duration-500"
+          style={{ width: `${isBusy ? Math.min(progress + 14, 88) : 100}%` }}
+        />
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {visibleEvents.map((event) => {
+          const running = event.status === 'running';
+          const complete = event.status === 'complete';
+          const failed = event.status === 'error';
+          return (
+            <div
+              key={event.id}
+              className={`rounded-xl border p-3 transition-all ${
+                running
+                  ? 'border-[#14F195]/25 bg-[#14F195]/7 shadow-[0_0_30px_rgba(20,241,149,0.06)]'
+                  : complete
+                    ? 'border-[#00D1FF]/16 bg-white/[0.025]'
+                    : failed
+                      ? 'border-red-500/20 bg-red-500/5'
+                      : 'border-white/[0.055] bg-black/20'
+              }`}
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 text-[11px] font-semibold text-white/70">
+                  <span className={`h-2 w-2 rounded-full ${
+                    running ? 'animate-pulse bg-[#14F195]' : complete ? 'bg-[#00D1FF]' : failed ? 'bg-red-400' : 'bg-white/18'
+                  }`} />
+                  {event.title}
+                </span>
+                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[9px] uppercase tracking-wider text-white/28">
+                  {event.source}
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-white/38">{event.detail}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function AgentDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -106,13 +268,66 @@ export default function AgentDetailPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loopStatus, setLoopStatus] = useState<any>(null);
+  const [loopWorkstream, setLoopWorkstream] = useState<LoopWorkEvent[]>([]);
+  const [loopBusy, setLoopBusy] = useState(false);
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<'decisions' | 'rules' | 'solana'>('decisions');
+  const loopTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Editable fields
   const [name, setName] = useState('');
   const [goal, setGoal] = useState('');
   const [personality, setPersonality] = useState('');
   const [model, setModel] = useState('gpt');
+
+  function clearLoopTimers() {
+    loopTimersRef.current.forEach(timer => clearTimeout(timer));
+    loopTimersRef.current = [];
+  }
+
+  function startVisualWorkstream(command: string) {
+    if (!agent) return;
+    clearLoopTimers();
+    setActiveTab('decisions');
+    setLoopBusy(true);
+    const events = buildLoopWorkstream(agent, command);
+    setLoopWorkstream(events);
+
+    events.slice(1).forEach((event, index) => {
+      const timer = setTimeout(() => {
+        setLoopWorkstream(prev => prev.map(item => {
+          if (item.id === event.id) return { ...item, status: 'running' };
+          const currentIndex = events.findIndex(step => step.id === item.id);
+          return currentIndex < index + 1 && item.status !== 'error'
+            ? { ...item, status: 'complete' }
+            : item;
+        }));
+      }, 650 + index * 720);
+      loopTimersRef.current.push(timer);
+    });
+  }
+
+  function finishVisualWorkstream(successful: boolean, detail?: string) {
+    clearLoopTimers();
+    setLoopBusy(false);
+    setLoopWorkstream(prev => prev.map((event, index) => {
+      if (!successful && index === prev.length - 1) {
+        return { ...event, status: 'error', detail: detail || event.detail };
+      }
+      return {
+        ...event,
+        status: successful ? 'complete' : event.status === 'running' ? 'error' : event.status,
+        detail: successful && index === prev.length - 1 && detail ? detail : event.detail,
+      };
+    }));
+  }
+
+  useEffect(() => {
+    return () => {
+      loopTimersRef.current.forEach(timer => clearTimeout(timer));
+      loopTimersRef.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchAgent() {
@@ -191,6 +406,9 @@ export default function AgentDetailPage() {
 
   async function handleLoop(command: string, intervalMs?: number) {
     if (!agent) return;
+    if (command === 'start' || command === 'trigger') {
+      startVisualWorkstream(command);
+    }
     try {
       const res = await fetch(`/api/agents/${agent.id}/loop`, {
         method: 'POST',
@@ -198,10 +416,56 @@ export default function AgentDetailPage() {
         body: JSON.stringify({ command, intervalMs }),
       });
       const data = await res.json();
-      setLoopStatus(data.status || data);
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao controlar loop');
+      }
+
+      if (data.status) {
+        setLoopStatus(data.status);
+      } else if (data.result) {
+        setLoopStatus((prev: any) => ({
+          ...(prev || {}),
+          agentId: agent.id,
+          isRunning: prev?.isRunning || false,
+          lastRun: data.result.timestamp,
+          totalRuns: (prev?.totalRuns || 0) + 1,
+          totalDecisions: (prev?.totalDecisions || 0) + (data.result.decisions || 0),
+          lastInsight: data.result.insight || prev?.lastInsight || '',
+        }));
+      } else {
+        setLoopStatus(data);
+      }
+
+      if (command === 'start' || command === 'trigger') {
+        const decisions = data.result?.decisions ?? data.status?.totalDecisions ?? 0;
+        finishVisualWorkstream(true, decisions > 0
+          ? `${decisions} decisao(oes) registradas. A timeline foi atualizada.`
+          : 'Ciclo concluido. Nenhuma regra ativa encontrou evidencia suficiente nesta rodada.'
+        );
+        setTimelineRefreshKey(prev => prev + 1);
+      }
+
+      if (command === 'stop') {
+        clearLoopTimers();
+        setLoopBusy(false);
+        setLoopWorkstream(prev => prev.length
+          ? prev.map(event => event.status === 'running' ? { ...event, status: 'complete', detail: 'Loop interrompido pelo usuario.' } : event)
+          : [{
+              id: 'stopped',
+              title: 'Loop interrompido',
+              detail: 'O agente parou de executar ciclos automaticos.',
+              source: 'Agent Runtime',
+              status: 'complete',
+              timestamp: Date.now(),
+            }]
+        );
+      }
+
       setSuccess(data.message || '');
       setTimeout(() => setSuccess(''), 3000);
-    } catch {
+    } catch (err) {
+      finishVisualWorkstream(false, err instanceof Error ? err.message : 'Erro ao controlar loop');
       setError('Erro ao controlar loop');
     }
   }
@@ -435,6 +699,7 @@ export default function AgentDetailPage() {
                     </div>
                     <button
                       onClick={() => handleLoop('stop')}
+                      disabled={loopBusy}
                       className="px-3 py-1.5 rounded-lg border border-red-500/20 text-[11px] text-red-400 hover:bg-red-500/5 transition-colors"
                     >
                       Parar
@@ -443,16 +708,18 @@ export default function AgentDetailPage() {
                 ) : (
                   <button
                     onClick={() => handleLoop('start', 30000)}
-                    className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/20 border border-[#9945FF]/20 text-[11px] text-[#9945FF]/80 hover:from-[#9945FF]/30 hover:to-[#14F195]/30 transition-all"
+                    disabled={loopBusy}
+                    className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#9945FF]/20 to-[#14F195]/20 border border-[#9945FF]/20 text-[11px] text-[#9945FF]/80 hover:from-[#9945FF]/30 hover:to-[#14F195]/30 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Iniciar Loop (30s)
+                    {loopBusy ? 'Executando...' : 'Iniciar Loop (30s)'}
                   </button>
                 )}
                 <button
                   onClick={() => handleLoop('trigger')}
-                  className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-[11px] text-white/40 hover:bg-white/[0.04] transition-colors"
+                  disabled={loopBusy}
+                  className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-[11px] text-white/40 hover:bg-white/[0.04] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Executar Agora
+                  {loopBusy ? 'Rodando...' : 'Executar Agora'}
                 </button>
               </div>
             </div>
@@ -474,6 +741,12 @@ export default function AgentDetailPage() {
                 </div>
               </div>
             )}
+
+            <LoopWorkstreamPanel
+              events={loopWorkstream}
+              isBusy={loopBusy}
+              loopStatus={loopStatus}
+            />
 
             {/* Tabs: Decisions / Rules / Solana */}
             <div className="flex border-b border-white/[0.04]">
@@ -498,7 +771,7 @@ export default function AgentDetailPage() {
 
             {/* Tab content */}
             <div className="p-4">
-              {activeTab === 'decisions' && <DecisionTimeline agentId={id} />}
+              {activeTab === 'decisions' && <DecisionTimeline key={timelineRefreshKey} agentId={id} />}
               {activeTab === 'rules'     && <RuleBuilder agentId={id} />}
               {activeTab === 'solana'    && <SolanaIntentPanel agentId={id} />}
             </div>

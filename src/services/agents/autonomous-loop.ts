@@ -158,6 +158,7 @@ export function startAutonomousLoop(agentId: string, intervalMs = 60_000): void 
 
   state.intervalId = setInterval(() => runCycle(agentId, state), intervalMs);
   runningLoops.set(agentId, state);
+  void runCycle(agentId, state);
   console.log(`[Loop] Started agent ${agentId} (${intervalMs / 1000}s interval)`);
 }
 
