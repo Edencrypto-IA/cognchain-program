@@ -2674,8 +2674,8 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               </div>
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-sm font-semibold text-white/90">CONGCHAIN</h1>
-              <p className="text-[11px] text-white/35">Memory that any AI can continue.</p>
+              <h1 className="text-sm font-semibold text-white/90">CognChain</h1>
+              <p className="text-[11px] text-white/35">Verifiable Memory Protocol for AI Agents.</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -2745,10 +2745,15 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           {isEmpty ? (
             <div className="flex flex-col items-center justify-center min-h-full px-4 py-8">
               <div className="mb-6"><Orb mode={orbMode} size="xl" interactive /></div>
-              <h2 className="text-2xl md:text-3xl font-bold text-white/90 mb-1 text-center">Start with an intelligence</h2>
-              <p className="text-sm text-white/40 mb-6 text-center max-w-md">Memory that any AI can continue.</p>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.32em] text-[#14F195]/60">CognChain</p>
+              <h2 className="max-w-3xl text-center text-3xl font-semibold leading-tight text-white/92 md:text-5xl">
+                Verifiable Memory Protocol for Autonomous AI Agents.
+              </h2>
+              <p className="mt-4 mb-7 max-w-xl text-center text-sm leading-relaxed text-white/42 md:text-base">
+                Persistent, portable memory that AI agents can prove, inherit, and continue across models.
+              </p>
               {/* Model selector on empty state */}
-              <div className="flex items-center gap-1 mb-6">
+              <div className="flex items-center gap-1 mb-6 flex-wrap justify-center">
                 {([['gpt', 'GPT-4o', '#10b981'], ['claude', 'Claude', '#f97316'], ['deepseek', 'DeepSeek', '#06b6d4'], ['nvidia', 'Llama', '#9945FF'], ['gemini', 'Gemini', '#3B82F6']] as [AIModel, string, string][]).map(([key, name, color]) => (
                   <button key={key} onClick={() => setSelectedModel(key as AIModel)}
                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${selectedModel === key ? 'bg-white/[0.08] border border-white/[0.12] text-white/90 shadow-sm' : 'bg-white/[0.03] border border-white/[0.06] text-white/40 hover:text-white/60 hover:bg-white/[0.06]'}`}>
