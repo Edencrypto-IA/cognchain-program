@@ -47,3 +47,20 @@ It shows:
 - review/dismiss actions.
 
 The card does not call APIs, create transactions, or request wallet signatures.
+
+## Phase 3.1 multilingual detector
+
+The local intent detector is now explicit and auditable before any AI parser is introduced.
+
+It can:
+
+- detect wallet commands in Portuguese, English, Spanish, and French keyword sets;
+- return the detected intent, confidence, matched keywords, likely language, and whether the prompt looks financial;
+- keep `classifyWalletAgentIntent()` backward compatible for existing callers;
+- extract common Solana token symbols, SOL amount, target price, recipient address, and payroll headcount.
+
+It still cannot:
+
+- approve or execute an action;
+- call market, DEX, wallet, or scheduler APIs;
+- replace the future AI parser for ambiguous natural language.

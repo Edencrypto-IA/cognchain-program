@@ -9,6 +9,16 @@ export type WalletAgentIntentType =
 
 export type WalletAgentRiskLevel = 'low' | 'medium' | 'high' | 'blocked';
 
+export type WalletAgentLanguageHint = 'pt' | 'en' | 'es' | 'fr' | 'mixed' | 'unknown';
+
+export type WalletAgentIntentDetection = {
+  type: WalletAgentIntentType;
+  confidence: number;
+  matchedKeywords: string[];
+  languageHint: WalletAgentLanguageHint;
+  isFinancialCommand: boolean;
+};
+
 export type WalletAgentApprovalStep =
   | 'intent_preview'
   | 'user_confirmed_in_app'

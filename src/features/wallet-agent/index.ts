@@ -2,9 +2,11 @@ export type {
   WalletAgentApprovalStep,
   WalletAgentCommandInput,
   WalletAgentCoreResult,
+  WalletAgentIntentDetection,
   WalletAgentIntentEntities,
   WalletAgentIntentDraft,
   WalletAgentIntentType,
+  WalletAgentLanguageHint,
   WalletAgentPreview,
   WalletAgentRiskLevel,
   WalletAgentSafetyResult,
@@ -17,6 +19,7 @@ export { WalletAgentPreviewCard } from './components/wallet-agent-preview-card';
 export {
   classifyWalletAgentIntent,
   createWalletAgentSummary,
+  detectWalletAgentIntent,
   estimateWalletAgentRisk,
   extractWalletAgentEntities,
 } from './intent-classifier';
