@@ -57,6 +57,100 @@ function ReviewItem({ item }: { item: WalletAgentReviewItem }) {
   );
 }
 
+function TransactionJourney({ result }: { result: WalletAgentCoreResult }) {
+  const { draft } = result;
+  const finalized = draft.submittedTransaction?.confirmationStatus === 'finalized';
+  const confirmed = finalized || draft.submittedTransaction?.confirmationStatus === 'confirmed';
+  const journey = [
+    {
+      label: 'Intencao',
+      detail: 'Comando entendido',
+      done: true,
+      active: !draft.internalConfirmation,
+    },
+    {
+      label: 'Revisao',
+      detail: 'Confirmacao no app',
+      done: !!draft.internalConfirmation,
+      active: !!draft.internalConfirmation && !draft.transactionProposal,
+    },
+    {
+      label: 'Proposta',
+      detail: draft.transactionProposal?.status.replaceAll('_', ' ') ?? 'Aguardando',
+      done: !!draft.transactionProposal,
+      active: !!draft.transactionProposal && !draft.preparedTransaction,
+    },
+    {
+      label: 'Preparada',
+      detail: draft.preparedTransaction ? 'Payload sem assinatura' : 'Aguardando',
+      done: !!draft.preparedTransaction,
+      active: !!draft.preparedTransaction && !draft.signedTransaction,
+    },
+    {
+      label: 'Assinada',
+      detail: draft.signedTransaction ? 'Wallet aprovou' : 'Aguardando wallet',
+      done: !!draft.signedTransaction,
+      active: !!draft.signedTransaction && !draft.submittedTransaction,
+    },
+    {
+      label: 'Devnet',
+      detail: draft.submittedTransaction?.confirmationStatus ?? 'Nao enviada',
+      done: !!draft.submittedTransaction,
+      active: !!draft.submittedTransaction && !confirmed,
+    },
+    {
+      label: 'Final',
+      detail: finalized ? 'Finalizada' : confirmed ? 'Confirmada' : 'Pendente',
+      done: confirmed,
+      active: confirmed,
+    },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.045] via-white/[0.02] to-[#00D1FF]/[0.035] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/48">Transaction Journey</p>
+          <p className="mt-1 text-sm leading-relaxed text-white/48">Cada etapa exige uma acao visivel do usuario.</p>
+        </div>
+        <span className="rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#14F195]">
+          Devnet only
+        </span>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-7">
+        {journey.map((step, index) => (
+          <div
+            key={step.label}
+            className={`relative rounded-2xl border p-3 transition-colors ${
+              step.done
+                ? 'border-[#14F195]/18 bg-[#14F195]/[0.07]'
+                : step.active
+                  ? 'border-[#5AD7FF]/24 bg-[#5AD7FF]/[0.07]'
+                  : 'border-white/[0.06] bg-black/18'
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-bold ${
+                step.done
+                  ? 'border-[#14F195]/25 bg-[#14F195]/12 text-[#14F195]'
+                  : step.active
+                    ? 'border-[#5AD7FF]/25 bg-[#5AD7FF]/12 text-[#7DE3FF]'
+                    : 'border-white/[0.08] bg-white/[0.03] text-white/34'
+              }`}>
+                {step.done ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}
+              </span>
+              {step.active && !step.done && <span className="h-1.5 w-1.5 rounded-full bg-[#5AD7FF] shadow-[0_0_14px_rgba(90,215,255,0.9)]" />}
+            </div>
+            <p className="text-xs font-semibold text-white/72">{step.label}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-white/38">{step.detail}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function WalletAgentReviewPanel({
   result,
   onClose,
@@ -122,6 +216,8 @@ export function WalletAgentReviewPanel({
         <div className="max-h-[calc(92vh-118px)] overflow-y-auto p-4 sm:p-5">
           <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-4">
+              {valueMoving && <TransactionJourney result={result} />}
+
               <div className="grid gap-3 sm:grid-cols-2">
                 {review.items.map(item => (
                   <ReviewItem key={item.label} item={item} />

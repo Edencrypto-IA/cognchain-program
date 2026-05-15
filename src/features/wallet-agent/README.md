@@ -266,3 +266,20 @@ It still cannot:
 - retry submission automatically;
 - treat Devnet confirmation as mainnet settlement;
 - hide transaction errors from the user.
+
+## Phase 4.5 transaction journey UI
+
+Wallet Agent now shows a visual transaction journey inside the review panel.
+
+It can:
+
+- map the flow from intent to final confirmation;
+- show which steps are complete, active, or pending;
+- explain that each value-moving stage requires a visible user action;
+- keep all execution logic unchanged while improving user comprehension.
+
+It still cannot:
+
+- change transaction state by itself;
+- replace wallet approval;
+- hide missing or failed stages.
