@@ -12,6 +12,8 @@ export type {
 } from './types';
 
 export { createWalletAgentCore } from './core';
+export { createWalletAgentDemoPreview, WALLET_AGENT_DEMO_PROMPTS } from './demo';
+export { WalletAgentPreviewCard } from './components/wallet-agent-preview-card';
 export {
   classifyWalletAgentIntent,
   createWalletAgentSummary,

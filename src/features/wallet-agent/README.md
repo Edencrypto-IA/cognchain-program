@@ -31,3 +31,19 @@ It still cannot:
 - schedule real jobs;
 - call DEX APIs;
 - move funds.
+
+## Phase 3 preview card
+
+The preview card is a UI-only component for showing a parsed intent before any execution path exists.
+
+It shows:
+
+- intent type;
+- network;
+- token and value when detected;
+- risk label;
+- safety checklist;
+- wallet-signature disclosure;
+- review/dismiss actions.
+
+The card does not call APIs, create transactions, or request wallet signatures.
