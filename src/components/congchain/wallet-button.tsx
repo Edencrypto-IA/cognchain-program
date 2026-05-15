@@ -3,7 +3,7 @@
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
 import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift, FlaskConical } from 'lucide-react';
 
@@ -24,6 +24,24 @@ const WALLET_OPTIONS = [
   },
 ];
 
+const DEVNET_WALLET_STORAGE_KEY = 'congchain_devnet_wallet_v1';
+
+type DevnetWalletSnapshot = {
+  publicKey: string;
+  secretKey: number[];
+  createdAt: string;
+  balance: number;
+  airdropTx?: string;
+};
+
+type DevnetWalletCreatedDetail = {
+  publicKey: string;
+  createdAt: string;
+  balance: number;
+  airdropTx?: string;
+  airdropStatus: 'success' | 'pending' | 'failed';
+};
+
 function isMobileBrowser() {
   if (typeof navigator === 'undefined') return false;
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
@@ -41,8 +59,28 @@ export default function WalletButton() {
   const [airdropLoading, setAirdropLoading] = useState(false);
   const [airdropMessage, setAirdropMessage] = useState('');
   const [airdropTx, setAirdropTx] = useState('');
+  const [devnetWallet, setDevnetWallet] = useState<DevnetWalletSnapshot | null>(null);
   const walletButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+
+  const activeAddress = connected ? publicKey?.toString() ?? null : devnetWallet?.publicKey ?? null;
+  const activeBalance = connected ? balance : devnetWallet?.balance ?? null;
+  const activeWalletName = connected ? wallet?.adapter.name ?? 'Wallet' : 'CongChain Devnet';
+  const activeWalletIcon = connected ? wallet?.adapter.icon : null;
+  const isDevnetSandbox = !connected && !!devnetWallet;
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DEVNET_WALLET_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as DevnetWalletSnapshot;
+      if (parsed?.publicKey && Array.isArray(parsed.secretKey)) {
+        setDevnetWallet(parsed);
+      }
+    } catch {
+      window.localStorage.removeItem(DEVNET_WALLET_STORAGE_KEY);
+    }
+  }, []);
 
   const fetchBalance = useCallback(async () => {
     if (!publicKey) return;
@@ -51,6 +89,22 @@ export default function WalletButton() {
       setBalance(lamports / LAMPORTS_PER_SOL);
     } catch { /* silent */ }
   }, [publicKey, connection]);
+
+  const fetchDevnetBalance = useCallback(async (address: string) => {
+    try {
+      const lamports = await connection.getBalance(new PublicKey(address));
+      const nextBalance = lamports / LAMPORTS_PER_SOL;
+      setDevnetWallet(prev => {
+        if (!prev || prev.publicKey !== address) return prev;
+        const next = { ...prev, balance: nextBalance };
+        window.localStorage.setItem(DEVNET_WALLET_STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
+      return nextBalance;
+    } catch {
+      return null;
+    }
+  }, [connection]);
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -65,44 +119,157 @@ export default function WalletButton() {
     setBalance(null);
   }, [connected, publicKey, fetchBalance]);
 
+  useEffect(() => {
+    if (!devnetWallet || connected) return;
+    void fetchDevnetBalance(devnetWallet.publicKey);
+    const t = setInterval(() => void fetchDevnetBalance(devnetWallet.publicKey), 15_000);
+    return () => clearInterval(t);
+  }, [connected, devnetWallet, fetchDevnetBalance]);
+
+  useEffect(() => {
+    if (!open || !activeAddress || menuPosition || typeof window === 'undefined') return;
+    const frame = window.requestAnimationFrame(() => {
+      const rect = walletButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = 256;
+      const padding = 12;
+      setMenuPosition({
+        top: rect.bottom + 8,
+        left: Math.min(Math.max(rect.left, padding), window.innerWidth - width - padding),
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeAddress, menuPosition, open]);
+
   function truncate(addr: string) {
     return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
   }
 
   function copyAddress() {
-    if (!publicKey) return;
-    navigator.clipboard.writeText(publicKey.toString()).catch(() => {});
+    if (!activeAddress) return;
+    navigator.clipboard.writeText(activeAddress).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function persistDevnetWallet(next: DevnetWalletSnapshot | null) {
+    if (!next) {
+      window.localStorage.removeItem(DEVNET_WALLET_STORAGE_KEY);
+      setDevnetWallet(null);
+      return;
+    }
+
+    window.localStorage.setItem(DEVNET_WALLET_STORAGE_KEY, JSON.stringify(next));
+    setDevnetWallet(next);
+  }
+
+  function announceDevnetWallet(detail: DevnetWalletCreatedDetail) {
+    window.dispatchEvent(new CustomEvent('congchain:devnet-wallet-created', { detail }));
+  }
+
+  async function requestAirdropForAddress(address: string) {
+    const res = await fetch('/api/wallet/airdrop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicKey: address }),
+    });
+    const data = await res.json();
+    return { res, data };
+  }
+
   async function requestDevnetAirdrop() {
-    if (!publicKey) return;
+    if (!activeAddress) return;
     setAirdropLoading(true);
     setAirdropMessage('');
     setAirdropTx('');
 
     try {
-      const res = await fetch('/api/wallet/airdrop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publicKey: publicKey.toString() }),
-      });
-      const data = await res.json();
+      const { res, data } = await requestAirdropForAddress(activeAddress);
 
       if (!res.ok) {
         setAirdropMessage(data.error || 'Airdrop indisponivel agora.');
         return;
       }
 
-      setBalance(typeof data.balance === 'number' ? data.balance : balance);
+      const nextBalance = typeof data.balance === 'number' ? data.balance : activeBalance;
+      if (connected) {
+        setBalance(nextBalance);
+      } else {
+        setDevnetWallet(prev => {
+          if (!prev) return prev;
+          const next = { ...prev, balance: nextBalance ?? prev.balance, airdropTx: data.signature || prev.airdropTx };
+          window.localStorage.setItem(DEVNET_WALLET_STORAGE_KEY, JSON.stringify(next));
+          return next;
+        });
+      }
       setAirdropTx(data.signature || '');
       setAirdropMessage(`+${data.amount || 1} Devnet SOL recebido.`);
-      void fetchBalance();
+      if (connected) void fetchBalance();
+      else void fetchDevnetBalance(activeAddress);
     } catch {
       setAirdropMessage('Nao foi possivel solicitar airdrop agora.');
     } finally {
       setAirdropLoading(false);
+    }
+  }
+
+  async function createDevnetSandboxWallet() {
+    setConnectError('');
+    setAirdropMessage('');
+    setAirdropTx('');
+    setConnectingWallet('devnet');
+
+    const keypair = Keypair.generate();
+    const createdAt = new Date().toISOString();
+    const snapshot: DevnetWalletSnapshot = {
+      publicKey: keypair.publicKey.toString(),
+      secretKey: Array.from(keypair.secretKey),
+      createdAt,
+      balance: 0,
+    };
+
+    persistDevnetWallet(snapshot);
+
+    try {
+      const { res, data } = await requestAirdropForAddress(snapshot.publicKey);
+      if (!res.ok) {
+        setAirdropMessage(data.error || 'Carteira criada. Airdrop indisponivel agora.');
+        announceDevnetWallet({
+          publicKey: snapshot.publicKey,
+          createdAt,
+          balance: 0,
+          airdropStatus: 'failed',
+        });
+        return;
+      }
+
+      const next: DevnetWalletSnapshot = {
+        ...snapshot,
+        balance: typeof data.balance === 'number' ? data.balance : 1,
+        airdropTx: data.signature || '',
+      };
+      persistDevnetWallet(next);
+      setAirdropTx(next.airdropTx || '');
+      setAirdropMessage(`+${data.amount || 1} Devnet SOL recebido.`);
+      announceDevnetWallet({
+        publicKey: next.publicKey,
+        createdAt,
+        balance: next.balance,
+        airdropTx: next.airdropTx,
+        airdropStatus: 'success',
+      });
+    } catch {
+      setAirdropMessage('Carteira criada. Nao foi possivel solicitar airdrop agora.');
+      announceDevnetWallet({
+        publicKey: snapshot.publicKey,
+        createdAt,
+        balance: 0,
+        airdropStatus: 'failed',
+      });
+    } finally {
+      setConnectingWallet(null);
+      setPickerOpen(false);
+      setOpen(true);
     }
   }
 
@@ -178,7 +345,7 @@ export default function WalletButton() {
     }
   }
 
-  if (!connected) {
+  if (!connected && !devnetWallet) {
     return (
       <>
         <button
@@ -256,6 +423,32 @@ export default function WalletButton() {
                   </div>
                 </div>
 
+                <button
+                  onClick={createDevnetSandboxWallet}
+                  disabled={!!connectingWallet}
+                  className="flex w-full items-center gap-3 rounded-xl border border-[#14F195]/18 bg-gradient-to-r from-[#14F195]/10 via-[#00D1FF]/8 to-[#9945FF]/8 p-3 text-left transition-all hover:border-[#14F195]/35 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 shadow-[0_0_22px_rgba(20,241,149,0.12)]">
+                    <span className="text-sm font-black text-[#14F195]">S</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-white/78">Devnet Sandbox</p>
+                      <span className="rounded-full bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#14F195]/70">
+                        criar + airdrop
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-white/34">
+                      Cria uma carteira local de testes e solicita 1 SOL Devnet automaticamente.
+                    </p>
+                  </div>
+                  {connectingWallet === 'devnet' ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-[#14F195]" />
+                  ) : (
+                    <FlaskConical className="h-4 w-4 text-[#14F195]/70" />
+                  )}
+                </button>
+
                 {WALLET_OPTIONS.map(option => {
                   const adapter = wallets.find(item =>
                     item.adapter.name.toLowerCase().includes(option.name.toLowerCase())
@@ -311,10 +504,10 @@ export default function WalletButton() {
         className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/[0.08] px-3 py-2 text-xs font-semibold text-[#14F195] transition-all hover:bg-[#14F195]/15"
       >
         <div className="h-2 w-2 rounded-full bg-[#14F195] animate-pulse" />
-        <span>{truncate(publicKey!.toString())}</span>
+        <span>{activeAddress ? truncate(activeAddress) : 'Carteira'}</span>
         <span className="rounded-full bg-[#14F195]/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[#14F195]/70">Devnet</span>
-        {balance !== null && (
-          <span className="text-[#14F195]/60">{balance.toFixed(3)} SOL</span>
+        {activeBalance !== null && activeBalance !== undefined && (
+          <span className="text-[#14F195]/60">{activeBalance.toFixed(3)} SOL</span>
         )}
         <ChevronDown className={`h-3 w-3 text-[#14F195]/50 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -329,24 +522,29 @@ export default function WalletButton() {
               left: menuPosition?.left ?? 16,
             }}
           >
-            {wallet && (
+            {(activeWalletName || activeWalletIcon) && (
               <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3">
-                {wallet.adapter.icon && (
-                  <img src={wallet.adapter.icon} alt="" className="h-4 w-4 rounded" />
+                {activeWalletIcon ? (
+                  <img src={activeWalletIcon} alt="" className="h-4 w-4 rounded" />
+                ) : (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#14F195]/15 text-[9px] font-black text-[#14F195]">S</span>
                 )}
-                <span className="text-[11px] font-semibold text-white/60">{wallet.adapter.name}</span>
+                <span className="text-[11px] font-semibold text-white/60">{activeWalletName}</span>
+                {isDevnetSandbox && (
+                  <span className="ml-auto rounded-full bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#14F195]/70">local</span>
+                )}
               </div>
             )}
 
             <div className="border-b border-white/[0.06] p-4">
               <p className="mb-1 text-[10px] uppercase tracking-wider text-white/30">Endereco</p>
-              <p className="break-all font-mono text-[11px] text-white/60">{publicKey!.toString()}</p>
+              <p className="break-all font-mono text-[11px] text-white/60">{activeAddress}</p>
             </div>
 
-            {balance !== null && (
+            {activeBalance !== null && activeBalance !== undefined && (
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <p className="text-[10px] uppercase tracking-wider text-white/30">Saldo Devnet</p>
-                <p className="mt-0.5 text-lg font-bold text-white/80">{balance.toFixed(4)} SOL</p>
+                <p className="mt-0.5 text-lg font-bold text-white/80">{activeBalance.toFixed(4)} SOL</p>
               </div>
             )}
 
@@ -390,7 +588,7 @@ export default function WalletButton() {
                 {copied ? 'Copiado!' : 'Copiar endereco'}
               </button>
               <a
-                href={`https://explorer.solana.com/address/${publicKey!.toString()}?cluster=devnet`}
+                href={`https://explorer.solana.com/address/${activeAddress}?cluster=devnet`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white/70"
@@ -400,7 +598,14 @@ export default function WalletButton() {
                 Ver no Explorer
               </a>
               <button
-                onClick={() => { disconnect(); setOpen(false); }}
+                onClick={() => {
+                  if (isDevnetSandbox) {
+                    persistDevnetWallet(null);
+                  } else {
+                    disconnect();
+                  }
+                  setOpen(false);
+                }}
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs text-red-400/60 transition-colors hover:bg-red-500/5 hover:text-red-400"
               >
                 <LogOut className="h-3.5 w-3.5" />

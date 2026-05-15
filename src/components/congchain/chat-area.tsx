@@ -58,6 +58,14 @@ type SolMarketSnapshot = {
   updatedAt: string;
 };
 
+type DevnetWalletCreatedEvent = CustomEvent<{
+  publicKey: string;
+  createdAt: string;
+  balance: number;
+  airdropTx?: string;
+  airdropStatus: 'success' | 'pending' | 'failed';
+}>;
+
 // ============================================================
 // DESIGN LOCK: Original UI preserved. Only additive features.
 // ============================================================
@@ -1793,6 +1801,67 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       streamAbortRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    const handleDevnetWalletCreated = (event: Event) => {
+      const {
+        publicKey: createdPublicKey,
+        createdAt,
+        balance: devnetBalance,
+        airdropTx: createdAirdropTx,
+        airdropStatus,
+      } = (event as DevnetWalletCreatedEvent).detail;
+      const createdAtLabel = new Date(createdAt).toLocaleString('pt-BR', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      });
+      const shortAddress = `${createdPublicKey.slice(0, 4)}...${createdPublicKey.slice(-4)}`;
+      const airdropLine = airdropStatus === 'success'
+        ? `Airdrop concluido: ${devnetBalance.toFixed(4)} SOL Devnet disponivel para testes.`
+        : 'A carteira foi criada, mas o faucet da Devnet nao respondeu agora. Voce pode tentar o airdrop novamente no card da carteira.';
+      const explorerLine = createdAirdropTx
+        ? `Transacao do airdrop: https://explorer.solana.com/tx/${createdAirdropTx}?cluster=devnet`
+        : `Endereco no Explorer: https://explorer.solana.com/address/${createdPublicKey}?cluster=devnet`;
+
+      const content = [
+        '### Solana Devnet Sandbox criado',
+        '',
+        'A CONGCHAIN criou uma carteira local de teste para voce construir sem usar SOL real.',
+        '',
+        `- Rede: Solana Devnet`,
+        `- Endereco: ${createdPublicKey}`,
+        `- Criada em: ${createdAtLabel}`,
+        `- Saldo inicial: ${devnetBalance.toFixed(4)} SOL Devnet`,
+        `- Status: ${airdropLine}`,
+        '',
+        'Como usar:',
+        '- Clique na carteira no topo para ver endereco, saldo e Explorer.',
+        '- Use essa carteira para testar memorias, agentes e futuros fluxos on-chain na Devnet.',
+        '- Ela e uma sandbox local deste navegador. Nao envie fundos reais para esse endereco.',
+        '',
+        explorerLine,
+      ].join('\n');
+
+      setMessages(prev => [...prev, {
+        id: `devnet-wallet-${Date.now()}`,
+        role: 'assistant',
+        content,
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        orbMode: 'success',
+        model: selectedModel,
+      }]);
+      setOrbMode('success');
+      onSessionUpdate?.({
+        id: sessionIdRef.current,
+        title: 'Carteira Devnet criada',
+        lastMessage: `Devnet Sandbox ${shortAddress}`,
+        timestamp: 'Agora',
+      });
+    };
+
+    window.addEventListener('congchain:devnet-wallet-created', handleDevnetWalletCreated);
+    return () => window.removeEventListener('congchain:devnet-wallet-created', handleDevnetWalletCreated);
+  }, [onSessionUpdate, selectedModel, setOrbMode]);
 
   // Nova conversa — limpa mensagens e estado
   const handleNewChat = useCallback(() => {
