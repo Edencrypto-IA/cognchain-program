@@ -153,3 +153,22 @@ It still cannot:
 - persist intent history to the backend;
 - sync history across devices;
 - execute or sign any historical intent.
+
+## Phase 3.7 read-only wallet snapshot
+
+Wallet Agent now reads the active wallet context before showing a financial review.
+
+It can:
+
+- read the connected Phantom/Solflare public address through the Solana wallet adapter;
+- read the local CongChain Devnet Sandbox wallet when no external wallet is connected;
+- fetch the current SOL balance on Solana Devnet in read-only mode;
+- show wallet source and balance inside the review details;
+- save the wallet snapshot metadata in local intent history.
+
+It still cannot:
+
+- request a wallet signature;
+- build or serialize transactions;
+- move funds;
+- read private keys or seed phrases.

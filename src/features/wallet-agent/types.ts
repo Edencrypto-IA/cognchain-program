@@ -50,6 +50,7 @@ export type WalletAgentIntentDraft = {
   createdAt: string;
   network: 'solana-devnet' | 'solana-mainnet';
   walletAddress?: string | null;
+  walletSnapshot?: WalletAgentWalletSnapshot | null;
   summary: string;
   entities: WalletAgentIntentEntities;
   estimatedValueSol?: number;
@@ -85,6 +86,17 @@ export type WalletAgentHistoryEntry = {
   createdAt: string;
   updatedAt: string;
   confirmationId?: string;
+  walletAddress?: string | null;
+  walletSource?: WalletAgentWalletSnapshot['source'];
+  walletBalanceSol?: number | null;
+};
+
+export type WalletAgentWalletSnapshot = {
+  address: string;
+  network: WalletAgentIntentDraft['network'];
+  balanceSol: number | null;
+  source: 'wallet-adapter' | 'devnet-sandbox';
+  readAt: string;
 };
 
 export type WalletAgentIntentEntities = {
@@ -109,6 +121,7 @@ export type WalletAgentCommandInput = {
   prompt: string;
   network?: 'solana-devnet' | 'solana-mainnet';
   walletAddress?: string | null;
+  walletSnapshot?: WalletAgentWalletSnapshot | null;
   now?: Date;
   parsedIntent?: WalletAgentParsedIntent;
 };

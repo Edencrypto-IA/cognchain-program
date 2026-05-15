@@ -22,13 +22,14 @@ import {
   createWalletAgentCore,
   detectWalletAgentIntent,
   readWalletAgentHistory,
+  readWalletAgentWalletSnapshot,
   upsertWalletAgentHistory,
   type WalletAgentCoreResult,
   type WalletAgentHistoryEntry,
   type WalletAgentParsedIntent,
 } from '@/features/wallet-agent';
 import dynamic from 'next/dynamic';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
 const WalletAdapterButton = dynamic(() => import('./wallet-button'), { ssr: false });
@@ -1729,6 +1730,7 @@ interface ChatAreaProps {
 }
 
 export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeConvId }: ChatAreaProps) {
+  const { connection } = useConnection();
   const { publicKey } = useWallet();
   const walletAddress = publicKey?.toString() ?? null;
   const [messages, setMessages] = useState<Message[]>([{
@@ -2007,6 +2009,15 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     }
   }, [selectedModel]);
 
+  const readWalletAgentSnapshot = useCallback(async () => {
+    try {
+      return await readWalletAgentWalletSnapshot(connection, publicKey);
+    } catch (error) {
+      console.warn('[wallet-agent] wallet snapshot unavailable', error);
+      return null;
+    }
+  }, [connection, publicKey]);
+
   // Chat API
   const handleSend = useCallback(async () => {
     if (!inputValue.trim() || isTyping) return;
@@ -2043,10 +2054,13 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     if (walletDetection.isFinancialCommand && walletDetection.confidence >= 0.74) {
       setThinkingStatus('Interpretando comando financeiro com parser seguro...');
       const parsedIntent = await parseWalletAgentIntent(userMessage.content);
+      setThinkingStatus('Lendo carteira em modo somente leitura...');
+      const walletSnapshot = await readWalletAgentSnapshot();
       const walletAgentResult = createWalletAgentCore({
         prompt: userMessage.content,
-        walletAddress,
-        network: 'solana-devnet',
+        walletAddress: walletSnapshot?.address ?? walletAddress,
+        network: walletSnapshot?.network ?? 'solana-devnet',
+        walletSnapshot,
         parsedIntent,
       });
       const assistantMsg: Message = {
@@ -2305,7 +2319,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setIsTyping(false);
       console.error('[chat-stream] request:error', err);
     }
-  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages, walletAddress, parseWalletAgentIntent, recordWalletAgentHistory]);
+  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages, walletAddress, parseWalletAgentIntent, readWalletAgentSnapshot, recordWalletAgentHistory]);
 
   // Save memory API — #6 microcopy
   const handleSave = useCallback(async (msg: Message) => {

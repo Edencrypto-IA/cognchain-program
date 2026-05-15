@@ -18,6 +18,7 @@ export type {
   WalletAgentRiskLevel,
   WalletAgentSafetyResult,
   WalletAgentSafetyStatus,
+  WalletAgentWalletSnapshot,
 } from './types';
 
 export { createWalletAgentCore } from './core';
@@ -27,6 +28,7 @@ export {
   readWalletAgentHistory,
   upsertWalletAgentHistory,
 } from './history';
+export { readWalletAgentWalletSnapshot } from './wallet-snapshot';
 export {
   WALLET_AGENT_AI_PARSER_SYSTEM,
   createLocalParsedIntent,

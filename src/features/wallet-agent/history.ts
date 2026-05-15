@@ -30,6 +30,9 @@ export function createWalletAgentHistoryEntry(
     createdAt: draft.createdAt,
     updatedAt: new Date().toISOString(),
     confirmationId: draft.internalConfirmation?.confirmationId,
+    walletAddress: draft.walletSnapshot?.address ?? draft.walletAddress ?? null,
+    walletSource: draft.walletSnapshot?.source,
+    walletBalanceSol: draft.walletSnapshot?.balanceSol,
   };
 }
 

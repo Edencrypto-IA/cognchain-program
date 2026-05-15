@@ -19,9 +19,14 @@ import type {
 
 function createWarnings(input: WalletAgentCommandInput, draft: WalletAgentIntentDraft) {
   const warnings: string[] = [];
+  const walletAddress = input.walletSnapshot?.address ?? input.walletAddress;
 
-  if (isValueMovingIntent(draft.type) && !input.walletAddress) {
+  if (isValueMovingIntent(draft.type) && !walletAddress) {
     warnings.push('Conecte uma carteira antes de preparar qualquer transacao assinavel.');
+  }
+
+  if (input.walletAddress && !input.walletSnapshot) {
+    warnings.push('Carteira detectada, mas a leitura de saldo ainda nao foi confirmada.');
   }
 
   if (draft.riskLevel === 'high') {
@@ -72,7 +77,8 @@ function presentValue(value: string | number | undefined, fallback = 'A confirma
 
 function createReviewDetails(draft: WalletAgentIntentDraft, input: WalletAgentCommandInput): WalletAgentReviewDetails {
   const valueMoving = isValueMovingIntent(draft.type);
-  const walletStatus = input.walletAddress ? 'ready' : valueMoving ? 'missing' : 'review';
+  const walletAddress = input.walletSnapshot?.address ?? input.walletAddress;
+  const walletStatus = walletAddress ? 'ready' : valueMoving ? 'missing' : 'review';
   const tokenStatus = draft.entities.tokenSymbol ? 'ready' : 'review';
   const valueStatus = draft.entities.amountSol || draft.entities.targetPriceUsd || draft.type === 'RISK_CHECK'
     ? 'ready'
@@ -100,8 +106,19 @@ function createReviewDetails(draft: WalletAgentIntentDraft, input: WalletAgentCo
       },
       {
         label: 'Carteira',
-        value: input.walletAddress ?? 'Nenhuma carteira conectada',
+        value: walletAddress
+          ? `${walletAddress} (${input.walletSnapshot?.source === 'devnet-sandbox' ? 'Devnet Sandbox' : 'Wallet conectada'})`
+          : 'Nenhuma carteira conectada',
         status: walletStatus,
+      },
+      {
+        label: 'Saldo lido',
+        value: input.walletSnapshot
+          ? input.walletSnapshot.balanceSol === null
+            ? 'Saldo indisponivel'
+            : `${input.walletSnapshot.balanceSol.toFixed(4)} SOL`
+          : 'Sem leitura de wallet',
+        status: input.walletSnapshot ? 'ready' : 'review',
       },
       {
         label: 'Token',
@@ -158,7 +175,8 @@ export function createWalletAgentCore(input: WalletAgentCommandInput): WalletAge
     type,
     userPrompt: input.prompt,
     network: input.network ?? 'solana-devnet',
-    walletAddress: input.walletAddress,
+    walletAddress: input.walletSnapshot?.address ?? input.walletAddress,
+    walletSnapshot: input.walletSnapshot ?? null,
     summary,
     entities,
     estimatedValueSol: entities.amountSol,
