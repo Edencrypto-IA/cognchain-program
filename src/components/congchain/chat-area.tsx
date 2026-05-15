@@ -27,6 +27,7 @@ import {
   prepareWalletAgentDevnetTransaction,
   signWalletAgentDevnetTransaction,
   saveWalletAgentDevnetReceipt,
+  saveWalletAgentLocalRule,
   submitWalletAgentDevnetTransaction,
   upsertWalletAgentHistory,
   type WalletAgentCoreResult,
@@ -2047,6 +2048,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
   const handleWalletAgentConfirm = useCallback((result: WalletAgentCoreResult) => {
     const confirmed = confirmWalletAgentIntent(result);
+    const localRule = saveWalletAgentLocalRule(confirmed);
     setWalletAgentReview(confirmed);
     recordWalletAgentHistory(confirmed);
     setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
@@ -2059,9 +2061,11 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     ));
     toast({
       title: 'Intencao confirmada no app',
-      description: confirmed.draft.requiresWalletSignature
-        ? 'Ainda falta a assinatura explicita na carteira antes de qualquer transacao.'
-        : 'Fluxo somente leitura confirmado para analise segura.',
+      description: localRule
+        ? 'Regra local salva para revisao manual. Ela nao executa nada sozinha.'
+        : confirmed.draft.requiresWalletSignature
+          ? 'Ainda falta a assinatura explicita na carteira antes de qualquer transacao.'
+          : 'Fluxo somente leitura confirmado para analise segura.',
     });
   }, [recordWalletAgentHistory, toast]);
 

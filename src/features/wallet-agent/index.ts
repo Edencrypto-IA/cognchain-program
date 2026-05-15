@@ -11,6 +11,9 @@ export type {
   WalletAgentIntentDraft,
   WalletAgentIntentType,
   WalletAgentLanguageHint,
+  WalletAgentLocalRule,
+  WalletAgentLocalRuleStatus,
+  WalletAgentLocalRuleTrigger,
   WalletAgentParsedIntent,
   WalletAgentParserSource,
   WalletAgentPreview,
@@ -48,6 +51,13 @@ export {
   saveWalletAgentDevnetReceipt,
   upsertWalletAgentDevnetReceipt,
 } from './receipts';
+export {
+  canCreateWalletAgentLocalRule,
+  createWalletAgentLocalRule,
+  readWalletAgentLocalRules,
+  saveWalletAgentLocalRule,
+  upsertWalletAgentLocalRule,
+} from './rules';
 export { readWalletAgentWalletSnapshot } from './wallet-snapshot';
 export {
   WALLET_AGENT_AI_PARSER_SYSTEM,

@@ -119,6 +119,55 @@ export type WalletAgentDevnetReceipt = {
   summary: string;
 };
 
+export type WalletAgentLocalRuleStatus = 'manual_review';
+
+export type WalletAgentLocalRuleTrigger =
+  | {
+      kind: 'time';
+      label: string;
+      scheduledFor?: string;
+    }
+  | {
+      kind: 'price';
+      label: string;
+      tokenSymbol?: string;
+      targetPriceUsd?: number;
+    }
+  | {
+      kind: 'risk';
+      label: string;
+      tokenSymbol?: string;
+    }
+  | {
+      kind: 'batch_review';
+      label: string;
+      scheduledFor?: string;
+      employeeCount?: number;
+    };
+
+export type WalletAgentLocalRule = {
+  id: string;
+  intentId: string;
+  type: WalletAgentIntentType;
+  status: WalletAgentLocalRuleStatus;
+  network: WalletAgentIntentDraft['network'];
+  walletAddress: string | null;
+  summary: string;
+  trigger: WalletAgentLocalRuleTrigger;
+  action: {
+    kind: 'notify_only' | 'prepare_for_manual_signature';
+    label: string;
+  };
+  safety: {
+    canAutoExecute: false;
+    requiresWalletSignature: boolean;
+    notes: string[];
+  };
+  createdAt: string;
+  updatedAt: string;
+  confirmationId?: string;
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

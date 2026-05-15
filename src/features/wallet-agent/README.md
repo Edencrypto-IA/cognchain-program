@@ -352,3 +352,21 @@ It still cannot:
 - sync local receipts across browsers or devices;
 - display receipts that were never saved in this browser;
 - replace the existing transaction review and wallet approval steps.
+
+## Phase 5.1 local rule vault
+
+Wallet Agent now creates local rule records for confirmed watch, schedule, payroll, and risk intents.
+
+It can:
+
+- save a local rule after explicit in-app confirmation;
+- support `PRICE_ALERT`, `SCHEDULE_PAYMENT`, `PAYROLL_BATCH`, and `RISK_CHECK` as manual-review rules;
+- store trigger context, action mode, wallet address, confirmation ID, and safety notes in `localStorage`;
+- mark every rule as `manual_review` with `canAutoExecute: false`.
+
+It still cannot:
+
+- run a background scheduler;
+- sign, submit, buy, sell, or pay from a rule;
+- create mainnet automation;
+- bypass a future explicit wallet approval.
