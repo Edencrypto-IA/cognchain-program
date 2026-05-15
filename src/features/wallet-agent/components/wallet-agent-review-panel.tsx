@@ -20,6 +20,7 @@ type WalletAgentReviewPanelProps = {
   onClose: () => void;
   onConfirm: (result: WalletAgentCoreResult) => void;
   onPrepareTransaction?: (result: WalletAgentCoreResult) => void;
+  onSignTransaction?: (result: WalletAgentCoreResult) => void;
   history?: WalletAgentHistoryEntry[];
 };
 
@@ -59,6 +60,7 @@ export function WalletAgentReviewPanel({
   onClose,
   onConfirm,
   onPrepareTransaction,
+  onSignTransaction,
   history = [],
 }: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
@@ -67,10 +69,14 @@ export function WalletAgentReviewPanel({
   const confirmed = !!draft.internalConfirmation?.confirmed;
   const proposal = draft.transactionProposal;
   const preparedTransaction = draft.preparedTransaction;
+  const signedTransaction = draft.signedTransaction;
   const canPrepareTransaction = !!proposal
     && proposal.status === 'ready_for_wallet_signature'
     && !preparedTransaction
     && !!onPrepareTransaction;
+  const canSignTransaction = !!preparedTransaction
+    && !signedTransaction
+    && !!onSignTransaction;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/72 px-3 py-4 backdrop-blur-xl">
@@ -210,6 +216,26 @@ export function WalletAgentReviewPanel({
                 </div>
               )}
 
+              {signedTransaction && (
+                <div className="rounded-2xl border border-[#9945FF]/18 bg-[#9945FF]/[0.06] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-[#B58CFF]" />
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B58CFF]/85">Assinada pela wallet</p>
+                    </div>
+                    <span className="rounded-full border border-[#9945FF]/18 bg-[#9945FF]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#C4B5FD]">
+                      nao enviada
+                    </span>
+                  </div>
+                  <p className="break-words text-xs leading-relaxed text-white/48">
+                    Signer: {signedTransaction.signerAddress}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-white/42">
+                    A assinatura foi aprovada na wallet, mas a transacao ainda nao foi transmitida para a rede.
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-2xl border border-white/[0.07] bg-black/24 p-4">
                 <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-white/42">Obrigatorio antes de executar</p>
                 <div className="space-y-2.5">
@@ -257,6 +283,16 @@ export function WalletAgentReviewPanel({
                   >
                     <Send className="h-4 w-4" />
                     Preparar transacao Devnet
+                  </button>
+                )}
+                {canSignTransaction && (
+                  <button
+                    type="button"
+                    onClick={() => onSignTransaction(result)}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#9945FF]/24 bg-[#9945FF]/12 px-4 py-3 text-sm font-semibold text-[#C4B5FD] transition-colors hover:bg-[#9945FF]/18"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    Assinar na wallet
                   </button>
                 )}
               </div>

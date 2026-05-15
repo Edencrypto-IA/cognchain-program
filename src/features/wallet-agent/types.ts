@@ -65,6 +65,7 @@ export type WalletAgentIntentDraft = {
   internalConfirmation?: WalletAgentInternalConfirmation;
   transactionProposal?: WalletAgentTransactionProposal | null;
   preparedTransaction?: WalletAgentPreparedTransaction | null;
+  signedTransaction?: WalletAgentSignedTransaction | null;
 };
 
 export type WalletAgentInternalConfirmation = {
@@ -94,6 +95,7 @@ export type WalletAgentHistoryEntry = {
   walletBalanceSol?: number | null;
   transactionProposalStatus?: WalletAgentTransactionProposal['status'];
   preparedTransactionStatus?: WalletAgentPreparedTransaction['status'];
+  signedTransactionStatus?: WalletAgentSignedTransaction['status'];
 };
 
 export type WalletAgentWalletSnapshot = {
@@ -147,6 +149,17 @@ export type WalletAgentPreparedTransaction = {
   createdAt: string;
   warnings: string[];
   nextStep: 'wallet_signature_required';
+};
+
+export type WalletAgentSignedTransaction = {
+  id: string;
+  status: 'signed_not_submitted';
+  network: 'solana-devnet';
+  signedTransactionBase64: string;
+  signedAt: string;
+  signerAddress: string;
+  nextStep: 'submit_to_devnet';
+  warnings: string[];
 };
 
 export type WalletAgentIntentEntities = {

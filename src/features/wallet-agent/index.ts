@@ -20,6 +20,7 @@ export type {
   WalletAgentRiskLevel,
   WalletAgentSafetyResult,
   WalletAgentSafetyStatus,
+  WalletAgentSignedTransaction,
   WalletAgentTransactionProposal,
   WalletAgentTransactionProposalStatus,
   WalletAgentWalletSnapshot,
@@ -27,7 +28,10 @@ export type {
 
 export { createWalletAgentCore } from './core';
 export { canConfirmWalletAgentIntent, confirmWalletAgentIntent } from './confirmation';
-export { prepareWalletAgentDevnetTransaction } from './devnet-transaction';
+export {
+  prepareWalletAgentDevnetTransaction,
+  signWalletAgentDevnetTransaction,
+} from './devnet-transaction';
 export { createWalletAgentTransactionProposal } from './transaction-proposal';
 export {
   createWalletAgentHistoryEntry,

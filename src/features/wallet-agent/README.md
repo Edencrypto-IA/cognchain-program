@@ -210,3 +210,22 @@ It still cannot:
 - submit a signed transaction;
 - build swaps, payroll batches, or privacy transfers;
 - execute anything on mainnet.
+
+## Phase 4.2 explicit wallet signature
+
+Wallet Agent can now ask the connected wallet to sign a prepared Devnet transaction.
+
+It can:
+
+- deserialize the prepared unsigned transaction locally;
+- request an explicit signature through Phantom/Solflare wallet adapter;
+- verify the connected signer matches the transaction origin;
+- store the signed transaction as `signed_not_submitted`;
+- show clearly that the signed transaction has not been sent to Solana.
+
+It still cannot:
+
+- submit the signed transaction to Devnet;
+- sign with the local Devnet Sandbox key;
+- sign on behalf of the user;
+- bypass wallet approval.

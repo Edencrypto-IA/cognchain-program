@@ -24,6 +24,7 @@ import {
   readWalletAgentHistory,
   readWalletAgentWalletSnapshot,
   prepareWalletAgentDevnetTransaction,
+  signWalletAgentDevnetTransaction,
   upsertWalletAgentHistory,
   type WalletAgentCoreResult,
   type WalletAgentHistoryEntry,
@@ -1732,7 +1733,7 @@ interface ChatAreaProps {
 
 export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeConvId }: ChatAreaProps) {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const walletAddress = publicKey?.toString() ?? null;
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome', role: 'assistant',
@@ -2014,6 +2015,35 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       });
     }
   }, [connection, recordWalletAgentHistory, toast]);
+
+  const handleWalletAgentSignTransaction = useCallback(async (result: WalletAgentCoreResult) => {
+    try {
+      const signed = await signWalletAgentDevnetTransaction(result, signTransaction, walletAddress);
+      setWalletAgentReview(signed);
+      recordWalletAgentHistory(signed);
+      setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
+        ? {
+            ...message,
+            walletAgentResult: signed,
+            content: signed.preview.description,
+          }
+        : message
+      ));
+      toast({
+        title: signed.draft.signedTransaction ? 'Assinatura aprovada' : 'Assinatura indisponivel',
+        description: signed.draft.signedTransaction
+          ? 'A wallet assinou a transacao. Ela ainda nao foi enviada para a Devnet.'
+          : signed.safety.reason,
+      });
+    } catch (error) {
+      console.warn('[wallet-agent] wallet signature failed', error);
+      toast({
+        title: 'Assinatura cancelada ou falhou',
+        description: 'Nenhuma transacao foi enviada. Voce pode revisar e tentar novamente.',
+        variant: 'destructive',
+      });
+    }
+  }, [recordWalletAgentHistory, signTransaction, toast, walletAddress]);
 
   const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
     const controller = new AbortController();
@@ -3210,6 +3240,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           onClose={() => setWalletAgentReview(null)}
           onConfirm={handleWalletAgentConfirm}
           onPrepareTransaction={handleWalletAgentPrepareTransaction}
+          onSignTransaction={handleWalletAgentSignTransaction}
           history={walletAgentHistory}
         />
       )}

@@ -10,6 +10,8 @@ import type {
   WalletAgentPreparedTransaction,
 } from './types';
 
+type SignTransaction = (transaction: Transaction) => Promise<Transaction>;
+
 function isSupportedDevnetTransfer(result: WalletAgentCoreResult) {
   const { draft } = result;
 
@@ -103,6 +105,89 @@ export async function prepareWalletAgentDevnetTransaction(
     review: {
       ...result.review,
       subtitle: 'Transacao Devnet preparada localmente. Revise o payload e assine somente se estiver correto.',
+    },
+  };
+}
+
+function transactionFromBase64(serializedTransactionBase64: string) {
+  const binary = globalThis.atob(serializedTransactionBase64);
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return Transaction.from(bytes);
+}
+
+export async function signWalletAgentDevnetTransaction(
+  result: WalletAgentCoreResult,
+  signTransaction: SignTransaction | undefined,
+  signerAddress: string | null,
+  now = new Date()
+): Promise<WalletAgentCoreResult> {
+  const prepared = result.draft.preparedTransaction;
+
+  if (!prepared || prepared.status !== 'prepared_unsigned') {
+    return {
+      ...result,
+      safety: {
+        ...result.safety,
+        reason: 'Prepare uma transacao Devnet antes de solicitar assinatura da wallet.',
+      },
+    };
+  }
+
+  if (!signTransaction || !signerAddress) {
+    return {
+      ...result,
+      safety: {
+        ...result.safety,
+        reason: 'Wallet externa com assinatura nao esta conectada. Use Phantom ou Solflare para assinar.',
+      },
+    };
+  }
+
+  if (signerAddress !== prepared.fromAddress) {
+    return {
+      ...result,
+      safety: {
+        ...result.safety,
+        status: 'blocked',
+        reason: 'A wallet conectada nao corresponde a carteira de origem da transacao preparada.',
+      },
+    };
+  }
+
+  const transaction = transactionFromBase64(prepared.serializedTransactionBase64);
+  const signedTransaction = await signTransaction(transaction);
+  const signedTransactionBase64 = signedTransaction
+    .serialize({ requireAllSignatures: true, verifySignatures: true })
+    .toString('base64');
+
+  return {
+    ...result,
+    draft: {
+      ...result.draft,
+      approvalStep: 'wallet_signed',
+      signedTransaction: {
+        id: `was_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`,
+        status: 'signed_not_submitted',
+        network: 'solana-devnet',
+        signedTransactionBase64,
+        signedAt: now.toISOString(),
+        signerAddress,
+        nextStep: 'submit_to_devnet',
+        warnings: [
+          'Transacao assinada pela wallet do usuario.',
+          'A transacao ainda nao foi enviada para a rede.',
+          'O envio para Devnet deve ser uma etapa separada com confirmacao visivel.',
+        ],
+      },
+    },
+    safety: {
+      ...result.safety,
+      status: 'ready_for_wallet_signature',
+      reason: 'Transacao assinada pela wallet. Ainda nao foi enviada para a Solana Devnet.',
+    },
+    review: {
+      ...result.review,
+      subtitle: 'Transacao assinada pela wallet. O envio para Devnet ainda exige uma etapa separada.',
     },
   };
 }
