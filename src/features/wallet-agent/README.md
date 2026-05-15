@@ -283,3 +283,20 @@ It still cannot:
 - change transaction state by itself;
 - replace wallet approval;
 - hide missing or failed stages.
+
+## Phase 4.6 human chat updates
+
+Wallet Agent now writes clearer chat messages after each transaction stage.
+
+It can:
+
+- explain review, preparation, signature, submission, and confirmation in plain language;
+- show short wallet addresses, value, hash, Explorer link, status, and next step;
+- remind the user that every stage requires visible approval;
+- keep execution logic unchanged while improving trust and comprehension.
+
+It still cannot:
+
+- execute a stage from a message alone;
+- hide technical errors;
+- imply mainnet execution for Devnet actions.

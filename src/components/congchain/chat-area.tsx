@@ -76,6 +76,81 @@ type SolMarketSnapshot = {
   updatedAt: string;
 };
 
+function formatShortAddress(address?: string | null) {
+  if (!address) return 'nao informado';
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+function formatWalletAgentChatUpdate(result: WalletAgentCoreResult, stage: 'review' | 'prepared' | 'signed' | 'submitted' | 'confirmed') {
+  const { draft } = result;
+  const amount = draft.preparedTransaction?.amountSol ?? draft.entities.amountSol;
+  const recipient = draft.preparedTransaction?.toAddress ?? draft.entities.recipientAddress;
+  const lines: string[] = [];
+
+  if (stage === 'review') {
+    lines.push('### Revisao segura registrada');
+    lines.push('');
+    lines.push('Entendi a intencao e deixei tudo organizado para voce revisar antes de qualquer assinatura.');
+    lines.push('');
+    lines.push(`- Rede: ${draft.network === 'solana-devnet' ? 'Solana Devnet' : 'Solana Mainnet'}`);
+    lines.push(`- Carteira: ${formatShortAddress(draft.walletAddress)}`);
+    lines.push(`- Proximo passo: ${draft.requiresWalletSignature ? 'preparar a transacao de teste na Devnet' : 'seguir como analise somente leitura'}`);
+  }
+
+  if (stage === 'prepared') {
+    lines.push('### Transacao Devnet preparada');
+    lines.push('');
+    lines.push('Criei o payload localmente, mas ele ainda nao foi assinado e nada foi enviado para a rede.');
+    lines.push('');
+    lines.push(`- De: ${formatShortAddress(draft.preparedTransaction?.fromAddress)}`);
+    lines.push(`- Para: ${formatShortAddress(recipient)}`);
+    if (amount) lines.push(`- Valor: ${amount} SOL Devnet`);
+    lines.push('- Proximo passo: abrir sua wallet para assinatura explicita.');
+  }
+
+  if (stage === 'signed') {
+    lines.push('### Assinatura aprovada na wallet');
+    lines.push('');
+    lines.push('Sua wallet assinou a transacao, mas ela ainda nao foi enviada para a Solana Devnet.');
+    lines.push('');
+    lines.push(`- Signer: ${formatShortAddress(draft.signedTransaction?.signerAddress)}`);
+    lines.push('- Proximo passo: enviar para Devnet quando voce autorizar.');
+  }
+
+  if (stage === 'submitted') {
+    lines.push('### Transacao enviada para Solana Devnet');
+    lines.push('');
+    lines.push('A transacao foi transmitida para a rede de testes. Agora voce pode acompanhar a confirmacao.');
+    lines.push('');
+    lines.push(`- Hash: ${draft.submittedTransaction?.signature ?? 'aguardando'}`);
+    lines.push(`- Explorer: ${draft.submittedTransaction?.explorerUrl ?? 'indisponivel'}`);
+    lines.push('- Proximo passo: verificar confirmacao.');
+  }
+
+  if (stage === 'confirmed') {
+    const status = draft.submittedTransaction?.confirmationStatus ?? 'submitted';
+    lines.push('### Status da Devnet atualizado');
+    lines.push('');
+    lines.push(status === 'finalized'
+      ? 'Perfeito: a transacao foi finalizada na Solana Devnet.'
+      : status === 'confirmed'
+        ? 'A transacao ja esta confirmada na Solana Devnet.'
+        : status === 'error'
+          ? 'A Devnet retornou erro para esta transacao. O Explorer mostra o detalhe tecnico.'
+          : status === 'not_found'
+            ? 'A assinatura ainda nao apareceu no historico da Devnet. Tente verificar novamente em alguns segundos.'
+            : 'A transacao foi processada e ainda pode evoluir para confirmed/finalized.');
+    lines.push('');
+    lines.push(`- Status: ${status}`);
+    if (draft.submittedTransaction?.slot) lines.push(`- Slot: ${draft.submittedTransaction.slot}`);
+    if (draft.submittedTransaction?.explorerUrl) lines.push(`- Explorer: ${draft.submittedTransaction.explorerUrl}`);
+  }
+
+  lines.push('');
+  lines.push('Nada acontece sem sua aprovacao visivel. Mainnet continua bloqueada neste fluxo.');
+  return lines.join('\n');
+}
+
 type DevnetWalletCreatedEvent = CustomEvent<{
   publicKey: string;
   createdAt: string;
@@ -1974,10 +2049,10 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     setWalletAgentReview(confirmed);
     recordWalletAgentHistory(confirmed);
     setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
-      ? {
+        ? {
           ...message,
           walletAgentResult: confirmed,
-          content: confirmed.preview.description,
+          content: formatWalletAgentChatUpdate(confirmed, 'review'),
         }
       : message
     ));
@@ -1998,7 +2073,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         ? {
             ...message,
             walletAgentResult: prepared,
-            content: prepared.preview.description,
+            content: formatWalletAgentChatUpdate(prepared, 'prepared'),
           }
         : message
       ));
@@ -2027,7 +2102,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         ? {
             ...message,
             walletAgentResult: signed,
-            content: signed.preview.description,
+            content: formatWalletAgentChatUpdate(signed, 'signed'),
           }
         : message
       ));
@@ -2056,9 +2131,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         ? {
             ...message,
             walletAgentResult: submitted,
-            content: submitted.draft.submittedTransaction
-              ? `${submitted.preview.description}\n\nDevnet tx: ${submitted.draft.submittedTransaction.explorerUrl}`
-              : submitted.preview.description,
+            content: formatWalletAgentChatUpdate(submitted, 'submitted'),
           }
         : message
       ));
@@ -2087,9 +2160,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         ? {
             ...message,
             walletAgentResult: confirmed,
-            content: confirmed.draft.submittedTransaction
-              ? `${confirmed.preview.description}\n\nDevnet tx: ${confirmed.draft.submittedTransaction.explorerUrl}\nStatus: ${confirmed.draft.submittedTransaction.confirmationStatus}`
-              : confirmed.preview.description,
+            content: formatWalletAgentChatUpdate(confirmed, 'confirmed'),
           }
         : message
       ));
