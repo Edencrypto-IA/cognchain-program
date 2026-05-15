@@ -334,3 +334,21 @@ It still cannot:
 - treat local receipts as on-chain proof by themselves;
 - save mainnet execution receipts;
 - execute or confirm anything without the existing user-triggered flow.
+
+## Phase 4.9 Devnet receipt history
+
+Wallet Agent now shows locally saved Devnet receipts inside the review panel.
+
+It can:
+
+- list recent local receipts with type, signature, status, value, recipient, slot, and saved time;
+- copy a clean receipt summary to the clipboard;
+- open each receipt directly in Solana Explorer;
+- refresh the visible list when the current transaction is submitted or confirmed.
+
+It still cannot:
+
+- prove ownership of local receipt data without checking Solana Explorer;
+- sync local receipts across browsers or devices;
+- display receipts that were never saved in this browser;
+- replace the existing transaction review and wallet approval steps.

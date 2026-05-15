@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,8 +14,14 @@ import {
   Zap,
   X,
 } from 'lucide-react';
-import type { WalletAgentCoreResult, WalletAgentHistoryEntry, WalletAgentReviewItem } from '../types';
+import type {
+  WalletAgentCoreResult,
+  WalletAgentDevnetReceipt,
+  WalletAgentHistoryEntry,
+  WalletAgentReviewItem,
+} from '../types';
 import { canConfirmWalletAgentIntent } from '../confirmation';
+import { readWalletAgentDevnetReceipts } from '../receipts';
 
 type WalletAgentReviewPanelProps = {
   result: WalletAgentCoreResult;
@@ -180,6 +186,127 @@ function buildTransactionSummary(result: WalletAgentCoreResult) {
   ].filter(Boolean).join('\n');
 }
 
+function formatReceiptDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function shortenSignature(signature: string) {
+  return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
+}
+
+function buildReceiptSummary(receipt: WalletAgentDevnetReceipt) {
+  return [
+    'CONGCHAIN Devnet Transaction Receipt',
+    '',
+    `Receipt ID: ${receipt.id}`,
+    `Intent ID: ${receipt.intentId}`,
+    `Type: ${receipt.type}`,
+    `Network: ${receipt.network}`,
+    `Wallet: ${receipt.walletAddress ?? 'not connected'}`,
+    `Recipient: ${receipt.recipientAddress ?? 'not provided'}`,
+    `Amount: ${receipt.amountSol ?? 'not provided'} SOL`,
+    `Signature: ${receipt.signature}`,
+    `Status: ${receipt.confirmationStatus}`,
+    receipt.slot ? `Slot: ${receipt.slot}` : null,
+    `Submitted at: ${receipt.submittedAt}`,
+    receipt.confirmedAt ? `Confirmed at: ${receipt.confirmedAt}` : null,
+    `Saved locally at: ${receipt.savedAt}`,
+    `Updated locally at: ${receipt.updatedAt}`,
+    `Explorer: ${receipt.explorerUrl}`,
+    '',
+    `Summary: ${receipt.summary}`,
+    '',
+    'Safety: local browser receipt only. No private keys, seed phrases, or signed payloads are stored.',
+  ].filter(Boolean).join('\n');
+}
+
+function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
+  const [receipts, setReceipts] = useState<WalletAgentDevnetReceipt[]>([]);
+  const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setReceipts(readWalletAgentDevnetReceipts());
+  }, [refreshKey]);
+
+  function copyReceipt(receipt: WalletAgentDevnetReceipt) {
+    navigator.clipboard?.writeText(buildReceiptSummary(receipt)).then(() => {
+      setCopiedReceiptId(receipt.id);
+      window.setTimeout(() => setCopiedReceiptId(null), 1600);
+    }).catch(() => {});
+  }
+
+  return (
+    <div className="rounded-2xl border border-[#14F195]/14 bg-[#14F195]/[0.035] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <FileCheck2 className="h-4 w-4 text-[#14F195]" />
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#14F195]/85">Recibos Devnet salvos</p>
+        </div>
+        <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
+          local
+        </span>
+      </div>
+
+      {receipts.length === 0 ? (
+        <p className="text-sm leading-relaxed text-white/38">
+          Nenhum recibo Devnet salvo neste navegador ainda. Depois do envio, ele aparece aqui automaticamente.
+        </p>
+      ) : (
+        <div className="space-y-2.5">
+          {receipts.slice(0, 5).map(receipt => (
+            <div key={receipt.id} className="rounded-xl border border-white/[0.07] bg-black/24 p-3">
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-white/68">{receipt.type.replaceAll('_', ' ')}</p>
+                  <p className="mt-1 font-mono text-[11px] text-[#14F195]/80">{shortenSignature(receipt.signature)}</p>
+                </div>
+                <span className="shrink-0 rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]">
+                  {receipt.confirmationStatus}
+                </span>
+              </div>
+
+              <div className="grid gap-2 text-[11px] leading-relaxed text-white/42 sm:grid-cols-2">
+                <p>Valor: {receipt.amountSol ?? 'n/a'} SOL</p>
+                <p>Salvo: {formatReceiptDate(receipt.savedAt)}</p>
+                <p className="truncate">Destino: {receipt.recipientAddress ?? 'n/a'}</p>
+                <p>{receipt.slot ? `Slot: ${receipt.slot}` : 'Slot: aguardando'}</p>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyReceipt(receipt)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {copiedReceiptId === receipt.id ? 'Recibo copiado' : 'Copiar recibo'}
+                </button>
+                <a
+                  href={receipt.explorerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#14F195]/14 bg-[#14F195]/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/12 hover:text-[#8FFFE0]"
+                >
+                  Ver Explorer
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WalletAgentReviewPanel({
   result,
   onClose,
@@ -198,6 +325,7 @@ export function WalletAgentReviewPanel({
   const preparedTransaction = draft.preparedTransaction;
   const signedTransaction = draft.signedTransaction;
   const submittedTransaction = draft.submittedTransaction;
+  const receiptsRefreshKey = `${submittedTransaction?.signature ?? 'none'}:${submittedTransaction?.confirmationStatus ?? 'none'}:${submittedTransaction?.slot ?? 'none'}`;
   const canPrepareTransaction = !!proposal
     && proposal.status === 'ready_for_wallet_signature'
     && !preparedTransaction
@@ -530,6 +658,8 @@ export function WalletAgentReviewPanel({
                   </div>
                 )}
               </div>
+
+              <DevnetReceiptsHistory refreshKey={receiptsRefreshKey} />
             </div>
           </div>
         </div>
