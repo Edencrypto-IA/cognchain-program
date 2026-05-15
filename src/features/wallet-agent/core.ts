@@ -32,6 +32,10 @@ function createWarnings(input: WalletAgentCommandInput, draft: WalletAgentIntent
     warnings.push('Privacidade deve proteger metadados sem remover consentimento, auditoria ou seguranca do usuario.');
   }
 
+  if (input.parsedIntent?.source === 'ai' && input.parsedIntent.confidence < 0.72) {
+    warnings.push('Parser de IA com baixa confianca: revise todos os campos antes de continuar.');
+  }
+
   return warnings;
 }
 
@@ -118,6 +122,13 @@ function createReviewDetails(draft: WalletAgentIntentDraft, input: WalletAgentCo
         value: draft.riskLevel,
         status: draft.riskLevel === 'high' || draft.riskLevel === 'blocked' ? 'review' : 'ready',
       },
+      {
+        label: 'Parser',
+        value: input.parsedIntent
+          ? `${input.parsedIntent.source} (${Math.round(input.parsedIntent.confidence * 100)}%)`
+          : 'local',
+        status: input.parsedIntent?.source === 'ai' ? 'ready' : 'review',
+      },
     ],
     requiredBeforeExecution: [
       'Confirmar todos os campos em linguagem humana.',
@@ -136,8 +147,11 @@ function createReviewDetails(draft: WalletAgentIntentDraft, input: WalletAgentCo
 }
 
 export function createWalletAgentCore(input: WalletAgentCommandInput): WalletAgentCoreResult {
-  const type = classifyWalletAgentIntent(input.prompt);
-  const entities = extractWalletAgentEntities(input.prompt);
+  const type = input.parsedIntent?.type ?? classifyWalletAgentIntent(input.prompt);
+  const entities = {
+    ...extractWalletAgentEntities(input.prompt),
+    ...input.parsedIntent?.entities,
+  };
   const riskLevel = estimateWalletAgentRisk(type, entities);
   const summary = createWalletAgentSummary(type, entities);
   const baseDraft = createSafeIntentDraft({
@@ -148,7 +162,7 @@ export function createWalletAgentCore(input: WalletAgentCommandInput): WalletAge
     entities,
     estimatedValueSol: entities.amountSol,
     riskLevel,
-    sources: [],
+    sources: input.parsedIntent?.source === 'ai' ? ['wallet-agent-ai-parser'] : ['wallet-agent-local-detector'],
   });
   const draft = {
     ...baseDraft,

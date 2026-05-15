@@ -19,6 +19,17 @@ export type WalletAgentIntentDetection = {
   isFinancialCommand: boolean;
 };
 
+export type WalletAgentParserSource = 'local' | 'ai' | 'fallback';
+
+export type WalletAgentParsedIntent = {
+  source: WalletAgentParserSource;
+  type: WalletAgentIntentType;
+  confidence: number;
+  entities: Partial<WalletAgentIntentEntities>;
+  missingFields: string[];
+  notes: string[];
+};
+
 export type WalletAgentApprovalStep =
   | 'intent_preview'
   | 'user_confirmed_in_app'
@@ -73,6 +84,7 @@ export type WalletAgentCommandInput = {
   network?: 'solana-devnet' | 'solana-mainnet';
   walletAddress?: string | null;
   now?: Date;
+  parsedIntent?: WalletAgentParsedIntent;
 };
 
 export type WalletAgentPreview = {

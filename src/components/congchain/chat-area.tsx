@@ -20,6 +20,7 @@ import {
   createWalletAgentCore,
   detectWalletAgentIntent,
   type WalletAgentCoreResult,
+  type WalletAgentParsedIntent,
 } from '@/features/wallet-agent';
 import dynamic from 'next/dynamic';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -1942,6 +1943,30 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     setWalletAgentReview(result);
   }, []);
 
+  const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
+
+    try {
+      const response = await fetch('/api/wallet-agent/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, model: selectedModel }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) return undefined;
+
+      const data = await response.json() as { parsedIntent?: WalletAgentParsedIntent };
+      return data.parsedIntent;
+    } catch (error) {
+      console.warn('[wallet-agent] parser fallback', error);
+      return undefined;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }, [selectedModel]);
+
   // Chat API
   const handleSend = useCallback(async () => {
     if (!inputValue.trim() || isTyping) return;
@@ -1976,10 +2001,13 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
 
     const walletDetection = detectWalletAgentIntent(userMessage.content);
     if (walletDetection.isFinancialCommand && walletDetection.confidence >= 0.74) {
+      setThinkingStatus('Interpretando comando financeiro com parser seguro...');
+      const parsedIntent = await parseWalletAgentIntent(userMessage.content);
       const walletAgentResult = createWalletAgentCore({
         prompt: userMessage.content,
         walletAddress,
         network: 'solana-devnet',
+        parsedIntent,
       });
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -2236,7 +2264,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setIsTyping(false);
       console.error('[chat-stream] request:error', err);
     }
-  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages, walletAddress]);
+  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages, walletAddress, parseWalletAgentIntent]);
 
   // Save memory API — #6 microcopy
   const handleSave = useCallback(async (msg: Message) => {

@@ -99,3 +99,22 @@ It still cannot:
 - confirm the intent internally;
 - prepare or sign a transaction;
 - persist the draft to backend history.
+
+## Phase 3.4 AI parser with local fallback
+
+Wallet Agent now has an optional AI parser behind `/api/wallet-agent/parse`.
+
+It can:
+
+- ask the selected model to return a strict JSON intent draft;
+- enrich detected fields such as token, amount, target price, recipient, schedule, and payroll count;
+- attach parser source and confidence to the review panel;
+- fall back to the local detector if the AI call times out, fails, or returns invalid JSON;
+- rate limit parser calls separately from the main chat.
+
+It still cannot:
+
+- approve the parsed intent;
+- execute or prepare real transactions;
+- trust AI output without review;
+- bypass wallet signature requirements.
