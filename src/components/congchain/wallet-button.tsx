@@ -360,8 +360,8 @@ export default function WalletButton() {
         {pickerOpen && typeof document !== 'undefined' && createPortal(
           <div className="fixed inset-0 z-[2147483647] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={() => setPickerOpen(false)} />
-            <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/[0.09] bg-[#090914] shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
-              <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+            <div className="relative flex max-h-[min(720px,calc(100vh-32px))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-[#090914] shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
+              <div className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-white/85">Conectar carteira</p>
                   <p className="text-[11px] text-white/35">Escolha sua wallet Solana para usar a Devnet.</p>
@@ -375,11 +375,11 @@ export default function WalletButton() {
                 </button>
               </div>
 
-              <div className="space-y-2 p-3">
-                <div className="rounded-2xl border border-[#14F195]/18 bg-gradient-to-br from-[#14F195]/10 via-[#00D1FF]/6 to-[#9945FF]/8 p-3">
-                  <div className="mb-3 flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#14F195]/20 bg-[#14F195]/10">
-                      <ShieldCheck className="h-4.5 w-4.5 text-[#14F195]" />
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3">
+                <div className="rounded-2xl border border-[#14F195]/18 bg-gradient-to-br from-[#14F195]/10 via-[#00D1FF]/6 to-[#9945FF]/8 p-2.5">
+                  <div className="mb-2 flex items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#14F195]/20 bg-[#14F195]/10">
+                      <ShieldCheck className="h-4 w-4 text-[#14F195]" />
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#14F195]/80">Read-only first</p>
@@ -389,7 +389,7 @@ export default function WalletButton() {
                     </div>
                   </div>
 
-                  <div className="grid gap-2">
+                  <div className="grid gap-2 sm:grid-cols-3">
                     {[
                       { icon: Eye, label: 'Leitura publica', text: 'Endereco e saldo publico.' },
                       { icon: LockKeyhole, label: 'Sem custodia', text: 'Suas chaves ficam na wallet.' },
@@ -406,9 +406,9 @@ export default function WalletButton() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/7 p-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#00D1FF]/18 bg-[#00D1FF]/10">
-                    <FlaskConical className="h-4.5 w-4.5 text-[#00D1FF]" />
+                <div className="flex items-start gap-3 rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/7 p-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#00D1FF]/18 bg-[#00D1FF]/10">
+                    <FlaskConical className="h-4 w-4 text-[#00D1FF]" />
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -426,9 +426,9 @@ export default function WalletButton() {
                 <button
                   onClick={createDevnetSandboxWallet}
                   disabled={!!connectingWallet}
-                  className="flex w-full items-center gap-3 rounded-xl border border-[#14F195]/18 bg-gradient-to-r from-[#14F195]/10 via-[#00D1FF]/8 to-[#9945FF]/8 p-3 text-left transition-all hover:border-[#14F195]/35 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center gap-3 rounded-xl border border-[#14F195]/18 bg-gradient-to-r from-[#14F195]/10 via-[#00D1FF]/8 to-[#9945FF]/8 p-2.5 text-left transition-all hover:border-[#14F195]/35 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 shadow-[0_0_22px_rgba(20,241,149,0.12)]">
+                  <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 shadow-[0_0_22px_rgba(20,241,149,0.12)]">
                     <span className="text-sm font-black text-[#14F195]">S</span>
                   </div>
                   <div className="min-w-0 flex-1">
@@ -460,11 +460,11 @@ export default function WalletButton() {
                       key={option.key}
                       onClick={() => connectWallet(option)}
                       disabled={!!connectingWallet}
-                      className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-left transition-all hover:border-[#9945FF]/30 hover:bg-white/[0.045] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-2.5 text-left transition-all hover:border-[#9945FF]/30 hover:bg-white/[0.045] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.04]">
+                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.04]">
                         {adapter?.icon ? (
-                          <img src={adapter.icon} alt="" className="h-7 w-7 rounded-lg" />
+                          <img src={adapter.icon} alt="" className="h-6 w-6 rounded-lg" />
                         ) : (
                           <Wallet className="h-5 w-5 text-[#9945FF]" />
                         )}
