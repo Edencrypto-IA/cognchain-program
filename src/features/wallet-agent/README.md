@@ -11,3 +11,23 @@ The product rule is intentionally strict:
 - Privacy features must protect user metadata without bypassing user consent.
 
 Phase 1 is policy only. No swap, payment, payroll, or signing flow is executed here.
+
+## Phase 2 core
+
+The Wallet Agent Core turns a user command into a safe intent draft.
+
+It can:
+
+- classify wallet commands into typed intents;
+- extract basic entities such as token, SOL amount, target price, recipient, and employee count;
+- estimate an initial risk level;
+- produce a preview checklist;
+- run the safety policy before anything reaches a wallet.
+
+It still cannot:
+
+- execute swaps;
+- sign transactions;
+- schedule real jobs;
+- call DEX APIs;
+- move funds.

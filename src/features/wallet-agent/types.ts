@@ -29,6 +29,7 @@ export type WalletAgentIntentDraft = {
   createdAt: string;
   network: 'solana-devnet' | 'solana-mainnet';
   summary: string;
+  entities: WalletAgentIntentEntities;
   estimatedValueSol?: number;
   riskLevel: WalletAgentRiskLevel;
   approvalStep: WalletAgentApprovalStep;
@@ -39,10 +40,43 @@ export type WalletAgentIntentDraft = {
   warnings: string[];
 };
 
+export type WalletAgentIntentEntities = {
+  tokenSymbol?: string;
+  quoteTokenSymbol?: string;
+  amountSol?: number;
+  recipientAddress?: string;
+  scheduledFor?: string;
+  targetPriceUsd?: number;
+  employeeCount?: number;
+};
+
 export type WalletAgentSafetyResult = {
   status: WalletAgentSafetyStatus;
   allowed: boolean;
   reason: string;
   requiredSteps: WalletAgentApprovalStep[];
   warnings: string[];
+};
+
+export type WalletAgentCommandInput = {
+  prompt: string;
+  network?: 'solana-devnet' | 'solana-mainnet';
+  walletAddress?: string | null;
+  now?: Date;
+};
+
+export type WalletAgentPreview = {
+  title: string;
+  description: string;
+  networkLabel: string;
+  primaryActionLabel: string;
+  nextStep: string;
+  checklist: string[];
+  disclosures: string[];
+};
+
+export type WalletAgentCoreResult = {
+  draft: WalletAgentIntentDraft;
+  safety: WalletAgentSafetyResult;
+  preview: WalletAgentPreview;
 };
