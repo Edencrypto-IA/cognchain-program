@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
-import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift } from 'lucide-react';
+import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift, FlaskConical } from 'lucide-react';
 
 const WALLET_OPTIONS = [
   {
@@ -197,7 +197,7 @@ export default function WalletButton() {
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-white/85">Conectar carteira</p>
-                  <p className="text-[11px] text-white/35">Escolha sua wallet Solana.</p>
+                  <p className="text-[11px] text-white/35">Escolha sua wallet Solana para usar a Devnet.</p>
                 </div>
                 <button
                   onClick={() => setPickerOpen(false)}
@@ -236,6 +236,23 @@ export default function WalletButton() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/7 p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#00D1FF]/18 bg-[#00D1FF]/10">
+                    <FlaskConical className="h-4.5 w-4.5 text-[#00D1FF]" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#00D1FF]/80">Solana Devnet Sandbox</p>
+                      <span className="rounded-full bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#14F195]/75">
+                        teste sem SOL real
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-white/38">
+                      A CONGCHAIN vai ler saldo e enviar airdrops na Devnet. A sua conta Phantom continua a mesma, mas o app usa a rede de testes.
+                    </p>
                   </div>
                 </div>
 
