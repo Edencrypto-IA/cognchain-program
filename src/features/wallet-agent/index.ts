@@ -8,6 +8,8 @@ export type {
   WalletAgentIntentType,
   WalletAgentLanguageHint,
   WalletAgentPreview,
+  WalletAgentReviewDetails,
+  WalletAgentReviewItem,
   WalletAgentRiskLevel,
   WalletAgentSafetyResult,
   WalletAgentSafetyStatus,
@@ -16,6 +18,7 @@ export type {
 export { createWalletAgentCore } from './core';
 export { createWalletAgentDemoPreview, WALLET_AGENT_DEMO_PROMPTS } from './demo';
 export { WalletAgentPreviewCard } from './components/wallet-agent-preview-card';
+export { WalletAgentReviewPanel } from './components/wallet-agent-review-panel';
 export {
   classifyWalletAgentIntent,
   createWalletAgentSummary,

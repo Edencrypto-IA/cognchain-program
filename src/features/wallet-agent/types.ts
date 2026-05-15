@@ -85,8 +85,25 @@ export type WalletAgentPreview = {
   disclosures: string[];
 };
 
+export type WalletAgentReviewItem = {
+  label: string;
+  value: string;
+  status: 'ready' | 'missing' | 'review';
+};
+
+export type WalletAgentReviewDetails = {
+  title: string;
+  subtitle: string;
+  intentLabel: string;
+  custodyLabel: string;
+  items: WalletAgentReviewItem[];
+  requiredBeforeExecution: string[];
+  blockedActions: string[];
+};
+
 export type WalletAgentCoreResult = {
   draft: WalletAgentIntentDraft;
   safety: WalletAgentSafetyResult;
   preview: WalletAgentPreview;
+  review: WalletAgentReviewDetails;
 };

@@ -81,3 +81,21 @@ It still cannot:
 - submit swaps, payments, payroll, schedules, or private transfers;
 - request a wallet signature;
 - perform background automation.
+
+## Phase 3.3 review details
+
+The preview card can now open a detailed review panel.
+
+It can:
+
+- show the original command, detected intent, network, wallet, token, amount or target condition;
+- separate ready, missing, and review-needed fields;
+- explain custody and signature requirements;
+- list the steps required before execution;
+- list actions that CongChain must never perform automatically.
+
+It still cannot:
+
+- confirm the intent internally;
+- prepare or sign a transaction;
+- persist the draft to backend history.

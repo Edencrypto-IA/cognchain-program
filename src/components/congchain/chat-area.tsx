@@ -16,6 +16,7 @@ import { MODEL_LABELS, type AIModel } from '@/services/memory/memory.model';
 import type { StructuredResponse } from '@/lib/grounding/types';
 import {
   WalletAgentPreviewCard,
+  WalletAgentReviewPanel,
   createWalletAgentCore,
   detectWalletAgentIntent,
   type WalletAgentCoreResult,
@@ -1783,6 +1784,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [auditHash, setAuditHash] = useState<string | null>(null);
   const [auditModel, setAuditModel] = useState<string | undefined>(undefined);
   const [streamedContent, setStreamedContent] = useState('');
+  const [walletAgentReview, setWalletAgentReview] = useState<WalletAgentCoreResult | null>(null);
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const streamWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1937,13 +1939,8 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   }, [selectedModel, pendingModel]);
 
   const handleWalletAgentReview = useCallback((result: WalletAgentCoreResult) => {
-    toast({
-      title: 'Wallet Agent preparado',
-      description: result.draft.requiresWalletSignature
-        ? 'A proxima fase vai abrir a revisao detalhada antes de qualquer assinatura na carteira.'
-        : 'A proxima fase vai abrir a analise detalhada com fontes e evidencias.',
-    });
-  }, [toast]);
+    setWalletAgentReview(result);
+  }, []);
 
   // Chat API
   const handleSend = useCallback(async () => {
@@ -3093,6 +3090,12 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       />
       {auditHash && (
         <MemoryAuditTrail hash={auditHash} model={auditModel} onClose={() => setAuditHash(null)} />
+      )}
+      {walletAgentReview && (
+        <WalletAgentReviewPanel
+          result={walletAgentReview}
+          onClose={() => setWalletAgentReview(null)}
+        />
       )}
       <ScoreModal isOpen={showScoreModal} onClose={() => setShowScoreModal(false)} onSubmit={handleScoreSubmit} />
       <CompareView isOpen={showCompare} onClose={() => setShowCompare(false)} prompt={comparePrompt} results={compareResults} isLoading={compareLoading} />

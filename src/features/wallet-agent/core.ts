@@ -14,6 +14,7 @@ import type {
   WalletAgentCoreResult,
   WalletAgentIntentDraft,
   WalletAgentPreview,
+  WalletAgentReviewDetails,
 } from './types';
 
 function createWarnings(input: WalletAgentCommandInput, draft: WalletAgentIntentDraft) {
@@ -60,6 +61,80 @@ function createPreview(draft: WalletAgentIntentDraft): WalletAgentPreview {
   };
 }
 
+function presentValue(value: string | number | undefined, fallback = 'A confirmar') {
+  if (value === undefined || value === '') return fallback;
+  return String(value);
+}
+
+function createReviewDetails(draft: WalletAgentIntentDraft, input: WalletAgentCommandInput): WalletAgentReviewDetails {
+  const valueMoving = isValueMovingIntent(draft.type);
+  const walletStatus = input.walletAddress ? 'ready' : valueMoving ? 'missing' : 'review';
+  const tokenStatus = draft.entities.tokenSymbol ? 'ready' : 'review';
+  const valueStatus = draft.entities.amountSol || draft.entities.targetPriceUsd || draft.type === 'RISK_CHECK'
+    ? 'ready'
+    : valueMoving
+      ? 'missing'
+      : 'review';
+
+  return {
+    title: valueMoving ? 'Revisao obrigatoria antes de assinar' : 'Revisao de analise segura',
+    subtitle: valueMoving
+      ? 'Esta etapa apenas organiza a intencao. Nenhuma transacao sera preparada sem confirmacao interna e assinatura da wallet.'
+      : 'Esta etapa valida o pedido como somente leitura antes de consultar dados reais e fontes externas.',
+    intentLabel: draft.type.toLowerCase().replaceAll('_', ' '),
+    custodyLabel: valueMoving ? 'Custodia do usuario - assinatura obrigatoria' : 'Somente leitura - sem assinatura',
+    items: [
+      {
+        label: 'Comando original',
+        value: draft.userPrompt,
+        status: 'ready',
+      },
+      {
+        label: 'Rede',
+        value: draft.network === 'solana-devnet' ? 'Solana Devnet' : 'Solana Mainnet',
+        status: 'ready',
+      },
+      {
+        label: 'Carteira',
+        value: input.walletAddress ?? 'Nenhuma carteira conectada',
+        status: walletStatus,
+      },
+      {
+        label: 'Token',
+        value: presentValue(draft.entities.tokenSymbol),
+        status: tokenStatus,
+      },
+      {
+        label: 'Valor / condicao',
+        value: draft.entities.amountSol
+          ? `${draft.entities.amountSol} SOL`
+          : draft.entities.targetPriceUsd
+            ? `Preco alvo: $${draft.entities.targetPriceUsd}`
+            : presentValue(undefined),
+        status: valueStatus,
+      },
+      {
+        label: 'Risco inicial',
+        value: draft.riskLevel,
+        status: draft.riskLevel === 'high' || draft.riskLevel === 'blocked' ? 'review' : 'ready',
+      },
+    ],
+    requiredBeforeExecution: [
+      'Confirmar todos os campos em linguagem humana.',
+      'Buscar fontes reais de preco, liquidez, contrato e destino.',
+      'Exibir taxas, slippage, rede e impacto esperado.',
+      valueMoving ? 'Pedir confirmacao interna antes de abrir assinatura da wallet.' : 'Manter a resposta como analise sem transacao.',
+      valueMoving ? 'Exigir assinatura final dentro da wallet conectada.' : 'Registrar apenas evidencias e recomendacao.',
+    ],
+    blockedActions: [
+      'Mover fundos automaticamente.',
+      'Assinar transacoes pelo backend.',
+      'Usar seed phrase, private key ou permissao invisivel.',
+      'Executar ordens agendadas sem nova aprovacao no horario.',
+    ],
+  };
+}
+
 export function createWalletAgentCore(input: WalletAgentCommandInput): WalletAgentCoreResult {
   const type = classifyWalletAgentIntent(input.prompt);
   const entities = extractWalletAgentEntities(input.prompt);
@@ -81,6 +156,7 @@ export function createWalletAgentCore(input: WalletAgentCommandInput): WalletAge
   };
   const safety = evaluateWalletAgentSafety(draft);
   const preview = createPreview(draft);
+  const review = createReviewDetails(draft, input);
 
-  return { draft, safety, preview };
+  return { draft, safety, preview, review };
 }
