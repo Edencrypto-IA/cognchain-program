@@ -100,6 +100,25 @@ export type WalletAgentHistoryEntry = {
   submittedSignature?: string;
 };
 
+export type WalletAgentDevnetReceipt = {
+  id: string;
+  intentId: string;
+  type: WalletAgentIntentType;
+  network: 'solana-devnet';
+  walletAddress: string | null;
+  recipientAddress?: string;
+  amountSol?: number;
+  signature: string;
+  explorerUrl: string;
+  confirmationStatus: WalletAgentSubmittedTransaction['confirmationStatus'];
+  submittedAt: string;
+  confirmedAt?: string;
+  slot?: number;
+  savedAt: string;
+  updatedAt: string;
+  summary: string;
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

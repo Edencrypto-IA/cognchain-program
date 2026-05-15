@@ -2,6 +2,7 @@ export type {
   WalletAgentApprovalStep,
   WalletAgentCommandInput,
   WalletAgentCoreResult,
+  WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
   WalletAgentHistoryStatus,
   WalletAgentInternalConfirmation,
@@ -41,6 +42,12 @@ export {
   readWalletAgentHistory,
   upsertWalletAgentHistory,
 } from './history';
+export {
+  createWalletAgentDevnetReceipt,
+  readWalletAgentDevnetReceipts,
+  saveWalletAgentDevnetReceipt,
+  upsertWalletAgentDevnetReceipt,
+} from './receipts';
 export { readWalletAgentWalletSnapshot } from './wallet-snapshot';
 export {
   WALLET_AGENT_AI_PARSER_SYSTEM,

@@ -26,6 +26,7 @@ import {
   readWalletAgentWalletSnapshot,
   prepareWalletAgentDevnetTransaction,
   signWalletAgentDevnetTransaction,
+  saveWalletAgentDevnetReceipt,
   submitWalletAgentDevnetTransaction,
   upsertWalletAgentHistory,
   type WalletAgentCoreResult,
@@ -2125,6 +2126,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const handleWalletAgentSubmitTransaction = useCallback(async (result: WalletAgentCoreResult) => {
     try {
       const submitted = await submitWalletAgentDevnetTransaction(result, connection);
+      const receipt = saveWalletAgentDevnetReceipt(submitted);
       setWalletAgentReview(submitted);
       recordWalletAgentHistory(submitted);
       setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
@@ -2138,7 +2140,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       toast({
         title: submitted.draft.submittedTransaction ? 'Transacao enviada para Devnet' : 'Envio indisponivel',
         description: submitted.draft.submittedTransaction
-          ? submitted.draft.submittedTransaction.signature
+          ? receipt
+            ? `Recibo local salvo: ${submitted.draft.submittedTransaction.signature}`
+            : submitted.draft.submittedTransaction.signature
           : submitted.safety.reason,
       });
     } catch (error) {
@@ -2154,6 +2158,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const handleWalletAgentConfirmTransaction = useCallback(async (result: WalletAgentCoreResult) => {
     try {
       const confirmed = await confirmWalletAgentDevnetTransaction(result, connection);
+      const receipt = saveWalletAgentDevnetReceipt(confirmed);
       setWalletAgentReview(confirmed);
       recordWalletAgentHistory(confirmed);
       setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
@@ -2166,7 +2171,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       ));
       toast({
         title: 'Status Devnet atualizado',
-        description: confirmed.draft.submittedTransaction?.confirmationStatus ?? confirmed.safety.reason,
+        description: receipt
+          ? `Recibo local atualizado: ${receipt.confirmationStatus}`
+          : confirmed.draft.submittedTransaction?.confirmationStatus ?? confirmed.safety.reason,
       });
     } catch (error) {
       console.warn('[wallet-agent] devnet confirmation check failed', error);

@@ -316,3 +316,21 @@ It still cannot:
 - export private keys or secrets;
 - copy hidden transaction data;
 - change or execute transaction state.
+
+## Phase 4.8 local Devnet receipt
+
+Wallet Agent now saves a local browser receipt after Devnet submission and updates it after confirmation checks.
+
+It can:
+
+- store signature, Explorer URL, wallet, recipient, amount, status, slot, and timestamps in `localStorage`;
+- update the same receipt as confirmation moves from submitted to processed, confirmed, or finalized;
+- keep a small local receipt history for the current browser;
+- avoid storing signed transaction payloads, seed phrases, private keys, or wallet secrets.
+
+It still cannot:
+
+- sync receipts across devices;
+- treat local receipts as on-chain proof by themselves;
+- save mainnet execution receipts;
+- execute or confirm anything without the existing user-triggered flow.
