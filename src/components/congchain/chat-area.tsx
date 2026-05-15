@@ -18,9 +18,13 @@ import {
   WalletAgentPreviewCard,
   WalletAgentReviewPanel,
   confirmWalletAgentIntent,
+  createWalletAgentHistoryEntry,
   createWalletAgentCore,
   detectWalletAgentIntent,
+  readWalletAgentHistory,
+  upsertWalletAgentHistory,
   type WalletAgentCoreResult,
+  type WalletAgentHistoryEntry,
   type WalletAgentParsedIntent,
 } from '@/features/wallet-agent';
 import dynamic from 'next/dynamic';
@@ -1787,6 +1791,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [auditModel, setAuditModel] = useState<string | undefined>(undefined);
   const [streamedContent, setStreamedContent] = useState('');
   const [walletAgentReview, setWalletAgentReview] = useState<WalletAgentCoreResult | null>(null);
+  const [walletAgentHistory, setWalletAgentHistory] = useState<WalletAgentHistoryEntry[]>([]);
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const streamWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1817,6 +1822,10 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       if (streamFrameRef.current) cancelAnimationFrame(streamFrameRef.current);
       streamAbortRef.current?.abort();
     };
+  }, []);
+
+  useEffect(() => {
+    setWalletAgentHistory(readWalletAgentHistory());
   }, []);
 
   useEffect(() => {
@@ -1944,9 +1953,20 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     setWalletAgentReview(result);
   }, []);
 
+  const recordWalletAgentHistory = useCallback((result: WalletAgentCoreResult) => {
+    const status = result.draft.internalConfirmation?.nextApprovalStep === 'wallet_signature_required'
+      ? 'wallet_signature_required'
+      : result.draft.internalConfirmation?.confirmed
+        ? 'confirmed'
+        : 'previewed';
+    const next = upsertWalletAgentHistory(createWalletAgentHistoryEntry(result, status));
+    setWalletAgentHistory(next);
+  }, []);
+
   const handleWalletAgentConfirm = useCallback((result: WalletAgentCoreResult) => {
     const confirmed = confirmWalletAgentIntent(result);
     setWalletAgentReview(confirmed);
+    recordWalletAgentHistory(confirmed);
     setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
       ? {
           ...message,
@@ -1961,7 +1981,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         ? 'Ainda falta a assinatura explicita na carteira antes de qualquer transacao.'
         : 'Fluxo somente leitura confirmado para analise segura.',
     });
-  }, [toast]);
+  }, [recordWalletAgentHistory, toast]);
 
   const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
     const controller = new AbortController();
@@ -2038,6 +2058,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         model: 'wallet-agent',
         walletAgentResult,
       };
+      recordWalletAgentHistory(walletAgentResult);
       setMessages(prev => [...prev, assistantMsg]);
       setChatPhase('completed');
       setThinkingStatus('Analisando...');
@@ -2284,7 +2305,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setIsTyping(false);
       console.error('[chat-stream] request:error', err);
     }
-  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages, walletAddress, parseWalletAgentIntent]);
+  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages, walletAddress, parseWalletAgentIntent, recordWalletAgentHistory]);
 
   // Save memory API — #6 microcopy
   const handleSave = useCallback(async (msg: Message) => {
@@ -3144,6 +3165,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           result={walletAgentReview}
           onClose={() => setWalletAgentReview(null)}
           onConfirm={handleWalletAgentConfirm}
+          history={walletAgentHistory}
         />
       )}
       <ScoreModal isOpen={showScoreModal} onClose={() => setShowScoreModal(false)} onSubmit={handleScoreSubmit} />

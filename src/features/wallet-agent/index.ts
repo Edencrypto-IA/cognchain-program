@@ -2,6 +2,8 @@ export type {
   WalletAgentApprovalStep,
   WalletAgentCommandInput,
   WalletAgentCoreResult,
+  WalletAgentHistoryEntry,
+  WalletAgentHistoryStatus,
   WalletAgentInternalConfirmation,
   WalletAgentIntentDetection,
   WalletAgentIntentEntities,
@@ -20,6 +22,11 @@ export type {
 
 export { createWalletAgentCore } from './core';
 export { canConfirmWalletAgentIntent, confirmWalletAgentIntent } from './confirmation';
+export {
+  createWalletAgentHistoryEntry,
+  readWalletAgentHistory,
+  upsertWalletAgentHistory,
+} from './history';
 export {
   WALLET_AGENT_AI_PARSER_SYSTEM,
   createLocalParsedIntent,

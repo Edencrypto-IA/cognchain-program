@@ -70,6 +70,23 @@ export type WalletAgentInternalConfirmation = {
   nextApprovalStep: WalletAgentApprovalStep;
 };
 
+export type WalletAgentHistoryStatus = 'previewed' | 'confirmed' | 'wallet_signature_required';
+
+export type WalletAgentHistoryEntry = {
+  id: string;
+  status: WalletAgentHistoryStatus;
+  type: WalletAgentIntentType;
+  network: WalletAgentIntentDraft['network'];
+  summary: string;
+  tokenSymbol?: string;
+  amountSol?: number;
+  targetPriceUsd?: number;
+  riskLevel: WalletAgentRiskLevel;
+  createdAt: string;
+  updatedAt: string;
+  confirmationId?: string;
+};
+
 export type WalletAgentIntentEntities = {
   tokenSymbol?: string;
   quoteTokenSymbol?: string;

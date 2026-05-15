@@ -136,3 +136,20 @@ It still cannot:
 - open a wallet signature request;
 - serialize or prepare a real transaction;
 - execute confirmed intents automatically.
+
+## Phase 3.6 local intent history
+
+Wallet Agent now records a safe local history of intent drafts in the browser.
+
+It can:
+
+- store previewed and confirmed intents in `localStorage`;
+- update an existing history item when the same draft is confirmed;
+- show the most recent local intents inside the review panel;
+- keep only a bounded list of recent items to avoid unbounded storage growth.
+
+It still cannot:
+
+- persist intent history to the backend;
+- sync history across devices;
+- execute or sign any historical intent.

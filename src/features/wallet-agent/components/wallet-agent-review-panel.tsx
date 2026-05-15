@@ -3,19 +3,21 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  Clock3,
   LockKeyhole,
   ShieldCheck,
   Wallet,
   Zap,
   X,
 } from 'lucide-react';
-import type { WalletAgentCoreResult, WalletAgentReviewItem } from '../types';
+import type { WalletAgentCoreResult, WalletAgentHistoryEntry, WalletAgentReviewItem } from '../types';
 import { canConfirmWalletAgentIntent } from '../confirmation';
 
 type WalletAgentReviewPanelProps = {
   result: WalletAgentCoreResult;
   onClose: () => void;
   onConfirm: (result: WalletAgentCoreResult) => void;
+  history?: WalletAgentHistoryEntry[];
 };
 
 const STATUS_STYLES: Record<WalletAgentReviewItem['status'], { label: string; className: string }> = {
@@ -49,7 +51,7 @@ function ReviewItem({ item }: { item: WalletAgentReviewItem }) {
   );
 }
 
-export function WalletAgentReviewPanel({ result, onClose, onConfirm }: WalletAgentReviewPanelProps) {
+export function WalletAgentReviewPanel({ result, onClose, onConfirm, history = [] }: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
   const valueMoving = draft.requiresWalletSignature;
   const confirmationCheck = canConfirmWalletAgentIntent(result);
@@ -168,6 +170,30 @@ export function WalletAgentReviewPanel({ result, onClose, onConfirm }: WalletAge
                   <CheckCircle2 className="h-4 w-4" />
                   {confirmed ? 'Confirmado no app' : 'Confirmar intencao no app'}
                 </button>
+              </div>
+
+              <div className="rounded-2xl border border-white/[0.07] bg-black/24 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Clock3 className="h-4 w-4 text-[#5AD7FF]" />
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/42">Historico local</p>
+                </div>
+                {history.length === 0 ? (
+                  <p className="text-sm leading-relaxed text-white/38">Nenhuma intencao anterior registrada neste navegador.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {history.slice(0, 4).map(item => (
+                      <div key={item.id} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <p className="truncate text-xs font-semibold text-white/62">{item.type.replaceAll('_', ' ')}</p>
+                          <span className="shrink-0 rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[9px] text-white/38">
+                            {item.status}
+                          </span>
+                        </div>
+                        <p className="line-clamp-2 text-xs leading-relaxed text-white/38">{item.summary}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
