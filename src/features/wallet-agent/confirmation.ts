@@ -1,4 +1,5 @@
 import { isValueMovingIntent } from './security-policy';
+import { createWalletAgentTransactionProposal } from './transaction-proposal';
 import type { WalletAgentCoreResult, WalletAgentInternalConfirmation } from './types';
 
 export function canConfirmWalletAgentIntent(result: WalletAgentCoreResult) {
@@ -57,16 +58,25 @@ export function confirmWalletAgentIntent(
     approvalStep: nextApprovalStep,
     internalConfirmation: confirmation,
   };
+  const transactionProposal = createWalletAgentTransactionProposal(draft, now);
+  const proposalReady = transactionProposal?.status === 'ready_for_wallet_signature';
 
   return {
     ...result,
-    draft,
+    draft: {
+      ...draft,
+      transactionProposal,
+    },
     safety: {
       ...result.safety,
-      status: nextApprovalStep === 'wallet_signature_required'
+      status: proposalReady
         ? 'ready_for_wallet_signature'
         : result.safety.status,
-      reason: confirmationCheck.reason,
+      reason: proposalReady
+        ? confirmationCheck.reason
+        : transactionProposal
+          ? 'Confirmacao interna registrada. A proposta ainda precisa de dados completos antes da assinatura.'
+          : confirmationCheck.reason,
     },
     review: {
       ...result.review,

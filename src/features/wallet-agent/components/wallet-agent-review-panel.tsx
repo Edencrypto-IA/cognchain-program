@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  FileCheck2,
   LockKeyhole,
   ShieldCheck,
   Wallet,
@@ -56,6 +57,7 @@ export function WalletAgentReviewPanel({ result, onClose, onConfirm, history = [
   const valueMoving = draft.requiresWalletSignature;
   const confirmationCheck = canConfirmWalletAgentIntent(result);
   const confirmed = !!draft.internalConfirmation?.confirmed;
+  const proposal = draft.transactionProposal;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/72 px-3 py-4 backdrop-blur-xl">
@@ -130,6 +132,43 @@ export function WalletAgentReviewPanel({ result, onClose, onConfirm, history = [
                 </div>
                 <p className="text-sm leading-relaxed text-white/62">{safety.reason}</p>
               </div>
+
+              {proposal && (
+                <div className="rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/[0.045] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <FileCheck2 className="h-4 w-4 text-[#00D1FF]" />
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#00D1FF]/85">Proposta de transacao</p>
+                    </div>
+                    <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/46">
+                      {proposal.status.replaceAll('_', ' ')}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-white/62">{proposal.summary}</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/[0.06] bg-black/18 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-white/30">Tipo</p>
+                      <p className="mt-1 text-xs font-semibold text-white/66">{proposal.kind.replaceAll('_', ' ')}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.06] bg-black/18 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-white/30">Taxa estimada</p>
+                      <p className="mt-1 text-xs font-semibold text-white/66">{proposal.estimatedFeeSol.toFixed(6)} SOL</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {proposal.checks.map(check => (
+                      <div key={check.label} className="rounded-xl border border-white/[0.06] bg-black/18 p-3">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold text-white/64">{check.label}</p>
+                          <span className="text-[10px] uppercase tracking-[0.12em] text-white/34">{check.status}</span>
+                        </div>
+                        <p className="text-xs leading-relaxed text-white/42">{check.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-white/42">{proposal.requiredWalletAction}</p>
+                </div>
+              )}
 
               <div className="rounded-2xl border border-white/[0.07] bg-black/24 p-4">
                 <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-white/42">Obrigatorio antes de executar</p>

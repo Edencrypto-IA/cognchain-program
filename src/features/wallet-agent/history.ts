@@ -33,6 +33,7 @@ export function createWalletAgentHistoryEntry(
     walletAddress: draft.walletSnapshot?.address ?? draft.walletAddress ?? null,
     walletSource: draft.walletSnapshot?.source,
     walletBalanceSol: draft.walletSnapshot?.balanceSol,
+    transactionProposalStatus: draft.transactionProposal?.status,
   };
 }
 

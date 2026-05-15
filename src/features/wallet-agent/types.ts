@@ -62,6 +62,7 @@ export type WalletAgentIntentDraft = {
   sources: string[];
   warnings: string[];
   internalConfirmation?: WalletAgentInternalConfirmation;
+  transactionProposal?: WalletAgentTransactionProposal | null;
 };
 
 export type WalletAgentInternalConfirmation = {
@@ -89,6 +90,7 @@ export type WalletAgentHistoryEntry = {
   walletAddress?: string | null;
   walletSource?: WalletAgentWalletSnapshot['source'];
   walletBalanceSol?: number | null;
+  transactionProposalStatus?: WalletAgentTransactionProposal['status'];
 };
 
 export type WalletAgentWalletSnapshot = {
@@ -97,6 +99,30 @@ export type WalletAgentWalletSnapshot = {
   balanceSol: number | null;
   source: 'wallet-adapter' | 'devnet-sandbox';
   readAt: string;
+};
+
+export type WalletAgentTransactionProposalStatus =
+  | 'blocked'
+  | 'needs_more_details'
+  | 'ready_for_wallet_signature';
+
+export type WalletAgentTransactionProposal = {
+  id: string;
+  status: WalletAgentTransactionProposalStatus;
+  kind: 'swap_intent' | 'transfer_intent' | 'payroll_intent' | 'privacy_transfer_intent';
+  network: WalletAgentIntentDraft['network'];
+  fromAddress: string;
+  createdAt: string;
+  summary: string;
+  estimatedFeeSol: number;
+  requiredWalletAction: string;
+  missingFields: string[];
+  checks: Array<{
+    label: string;
+    status: 'pass' | 'missing' | 'blocked' | 'review';
+    detail: string;
+  }>;
+  unsignedPayloadStatus: 'not_created';
 };
 
 export type WalletAgentIntentEntities = {

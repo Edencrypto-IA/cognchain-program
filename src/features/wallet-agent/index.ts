@@ -18,11 +18,14 @@ export type {
   WalletAgentRiskLevel,
   WalletAgentSafetyResult,
   WalletAgentSafetyStatus,
+  WalletAgentTransactionProposal,
+  WalletAgentTransactionProposalStatus,
   WalletAgentWalletSnapshot,
 } from './types';
 
 export { createWalletAgentCore } from './core';
 export { canConfirmWalletAgentIntent, confirmWalletAgentIntent } from './confirmation';
+export { createWalletAgentTransactionProposal } from './transaction-proposal';
 export {
   createWalletAgentHistoryEntry,
   readWalletAgentHistory,

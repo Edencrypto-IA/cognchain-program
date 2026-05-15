@@ -172,3 +172,22 @@ It still cannot:
 - build or serialize transactions;
 - move funds;
 - read private keys or seed phrases.
+
+## Phase 3.8 safe transaction proposal
+
+Wallet Agent now creates an auditable transaction proposal after in-app confirmation.
+
+It can:
+
+- turn a confirmed value-moving intent into a typed proposal;
+- show whether the proposal is blocked, incomplete, or ready for a future wallet signature;
+- list missing fields such as token, amount, recipient, schedule, or payroll budget;
+- estimate a minimal Devnet fee label for user review;
+- show safety checks before any wallet payload exists.
+
+It still cannot:
+
+- create a real unsigned transaction payload;
+- open the wallet signature modal;
+- submit transactions to Solana;
+- execute scheduled or autonomous transfers.
