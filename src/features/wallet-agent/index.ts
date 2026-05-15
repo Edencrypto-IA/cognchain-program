@@ -13,6 +13,8 @@ export type {
   WalletAgentParsedIntent,
   WalletAgentParserSource,
   WalletAgentPreview,
+  WalletAgentPreparedTransaction,
+  WalletAgentPreparedTransactionStatus,
   WalletAgentReviewDetails,
   WalletAgentReviewItem,
   WalletAgentRiskLevel,
@@ -25,6 +27,7 @@ export type {
 
 export { createWalletAgentCore } from './core';
 export { canConfirmWalletAgentIntent, confirmWalletAgentIntent } from './confirmation';
+export { prepareWalletAgentDevnetTransaction } from './devnet-transaction';
 export { createWalletAgentTransactionProposal } from './transaction-proposal';
 export {
   createWalletAgentHistoryEntry,

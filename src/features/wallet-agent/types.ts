@@ -34,6 +34,7 @@ export type WalletAgentApprovalStep =
   | 'intent_preview'
   | 'user_confirmed_in_app'
   | 'wallet_signature_required'
+  | 'unsigned_transaction_prepared'
   | 'wallet_signed'
   | 'executed';
 
@@ -63,6 +64,7 @@ export type WalletAgentIntentDraft = {
   warnings: string[];
   internalConfirmation?: WalletAgentInternalConfirmation;
   transactionProposal?: WalletAgentTransactionProposal | null;
+  preparedTransaction?: WalletAgentPreparedTransaction | null;
 };
 
 export type WalletAgentInternalConfirmation = {
@@ -91,6 +93,7 @@ export type WalletAgentHistoryEntry = {
   walletSource?: WalletAgentWalletSnapshot['source'];
   walletBalanceSol?: number | null;
   transactionProposalStatus?: WalletAgentTransactionProposal['status'];
+  preparedTransactionStatus?: WalletAgentPreparedTransaction['status'];
 };
 
 export type WalletAgentWalletSnapshot = {
@@ -123,6 +126,27 @@ export type WalletAgentTransactionProposal = {
     detail: string;
   }>;
   unsignedPayloadStatus: 'not_created';
+};
+
+export type WalletAgentPreparedTransactionStatus =
+  | 'prepared_unsigned'
+  | 'blocked'
+  | 'unsupported';
+
+export type WalletAgentPreparedTransaction = {
+  id: string;
+  status: WalletAgentPreparedTransactionStatus;
+  network: 'solana-devnet';
+  kind: 'sol_transfer';
+  fromAddress: string;
+  toAddress: string;
+  amountSol: number;
+  latestBlockhash: string;
+  lastValidBlockHeight: number;
+  serializedTransactionBase64: string;
+  createdAt: string;
+  warnings: string[];
+  nextStep: 'wallet_signature_required';
 };
 
 export type WalletAgentIntentEntities = {

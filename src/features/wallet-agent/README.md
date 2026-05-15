@@ -191,3 +191,22 @@ It still cannot:
 - open the wallet signature modal;
 - submit transactions to Solana;
 - execute scheduled or autonomous transfers.
+
+## Phase 4.1 Devnet unsigned transaction preparation
+
+Wallet Agent can now prepare a local unsigned Solana Devnet transaction for the safest first execution path.
+
+It can:
+
+- prepare only simple SOL transfer payloads on Solana Devnet;
+- require an internally confirmed proposal before preparation;
+- require wallet, recipient, amount, and Devnet network;
+- serialize an unsigned transaction locally with a recent blockhash;
+- show that the payload is not signed and was not submitted.
+
+It still cannot:
+
+- ask Phantom or Solflare for a signature;
+- submit a signed transaction;
+- build swaps, payroll batches, or privacy transfers;
+- execute anything on mainnet.

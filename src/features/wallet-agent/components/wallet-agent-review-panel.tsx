@@ -6,6 +6,7 @@ import {
   Clock3,
   FileCheck2,
   LockKeyhole,
+  Send,
   ShieldCheck,
   Wallet,
   Zap,
@@ -18,6 +19,7 @@ type WalletAgentReviewPanelProps = {
   result: WalletAgentCoreResult;
   onClose: () => void;
   onConfirm: (result: WalletAgentCoreResult) => void;
+  onPrepareTransaction?: (result: WalletAgentCoreResult) => void;
   history?: WalletAgentHistoryEntry[];
 };
 
@@ -52,12 +54,23 @@ function ReviewItem({ item }: { item: WalletAgentReviewItem }) {
   );
 }
 
-export function WalletAgentReviewPanel({ result, onClose, onConfirm, history = [] }: WalletAgentReviewPanelProps) {
+export function WalletAgentReviewPanel({
+  result,
+  onClose,
+  onConfirm,
+  onPrepareTransaction,
+  history = [],
+}: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
   const valueMoving = draft.requiresWalletSignature;
   const confirmationCheck = canConfirmWalletAgentIntent(result);
   const confirmed = !!draft.internalConfirmation?.confirmed;
   const proposal = draft.transactionProposal;
+  const preparedTransaction = draft.preparedTransaction;
+  const canPrepareTransaction = !!proposal
+    && proposal.status === 'ready_for_wallet_signature'
+    && !preparedTransaction
+    && !!onPrepareTransaction;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/72 px-3 py-4 backdrop-blur-xl">
@@ -170,6 +183,33 @@ export function WalletAgentReviewPanel({ result, onClose, onConfirm, history = [
                 </div>
               )}
 
+              {preparedTransaction && (
+                <div className="rounded-2xl border border-[#14F195]/18 bg-[#14F195]/[0.055] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Send className="h-4 w-4 text-[#14F195]" />
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#14F195]/85">Transacao Devnet preparada</p>
+                    </div>
+                    <span className="rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]">
+                      sem assinatura
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/[0.06] bg-black/18 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-white/30">Destino</p>
+                      <p className="mt-1 break-words text-xs font-semibold text-white/66">{preparedTransaction.toAddress}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.06] bg-black/18 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-white/30">Valor</p>
+                      <p className="mt-1 text-xs font-semibold text-white/66">{preparedTransaction.amountSol} SOL</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-white/42">
+                    Payload criado localmente com blockhash recente. Nada foi assinado ou enviado para a rede.
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-2xl border border-white/[0.07] bg-black/24 p-4">
                 <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-white/42">Obrigatorio antes de executar</p>
                 <div className="space-y-2.5">
@@ -209,6 +249,16 @@ export function WalletAgentReviewPanel({ result, onClose, onConfirm, history = [
                   <CheckCircle2 className="h-4 w-4" />
                   {confirmed ? 'Confirmado no app' : 'Confirmar intencao no app'}
                 </button>
+                {canPrepareTransaction && (
+                  <button
+                    type="button"
+                    onClick={() => onPrepareTransaction(result)}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#00D1FF]/22 bg-[#00D1FF]/10 px-4 py-3 text-sm font-semibold text-[#7DE3FF] transition-colors hover:bg-[#00D1FF]/15"
+                  >
+                    <Send className="h-4 w-4" />
+                    Preparar transacao Devnet
+                  </button>
+                )}
               </div>
 
               <div className="rounded-2xl border border-white/[0.07] bg-black/24 p-4">

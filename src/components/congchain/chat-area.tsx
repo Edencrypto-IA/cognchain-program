@@ -23,6 +23,7 @@ import {
   detectWalletAgentIntent,
   readWalletAgentHistory,
   readWalletAgentWalletSnapshot,
+  prepareWalletAgentDevnetTransaction,
   upsertWalletAgentHistory,
   type WalletAgentCoreResult,
   type WalletAgentHistoryEntry,
@@ -1985,6 +1986,35 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     });
   }, [recordWalletAgentHistory, toast]);
 
+  const handleWalletAgentPrepareTransaction = useCallback(async (result: WalletAgentCoreResult) => {
+    try {
+      const prepared = await prepareWalletAgentDevnetTransaction(result, connection);
+      setWalletAgentReview(prepared);
+      recordWalletAgentHistory(prepared);
+      setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
+        ? {
+            ...message,
+            walletAgentResult: prepared,
+            content: prepared.preview.description,
+          }
+        : message
+      ));
+      toast({
+        title: prepared.draft.preparedTransaction ? 'Transacao Devnet preparada' : 'Builder indisponivel',
+        description: prepared.draft.preparedTransaction
+          ? 'Payload sem assinatura criado localmente. Nada foi enviado para a rede.'
+          : 'Esse tipo de intencao ainda precisa de mais dados ou builder proprio.',
+      });
+    } catch (error) {
+      console.warn('[wallet-agent] devnet transaction prepare failed', error);
+      toast({
+        title: 'Nao foi possivel preparar a transacao',
+        description: 'Revise endereco, valor e rede antes de tentar novamente.',
+        variant: 'destructive',
+      });
+    }
+  }, [connection, recordWalletAgentHistory, toast]);
+
   const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -3179,6 +3209,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           result={walletAgentReview}
           onClose={() => setWalletAgentReview(null)}
           onConfirm={handleWalletAgentConfirm}
+          onPrepareTransaction={handleWalletAgentPrepareTransaction}
           history={walletAgentHistory}
         />
       )}
