@@ -21,6 +21,7 @@ export type {
   WalletAgentSafetyResult,
   WalletAgentSafetyStatus,
   WalletAgentSignedTransaction,
+  WalletAgentSubmittedTransaction,
   WalletAgentTransactionProposal,
   WalletAgentTransactionProposalStatus,
   WalletAgentWalletSnapshot,
@@ -31,6 +32,7 @@ export { canConfirmWalletAgentIntent, confirmWalletAgentIntent } from './confirm
 export {
   prepareWalletAgentDevnetTransaction,
   signWalletAgentDevnetTransaction,
+  submitWalletAgentDevnetTransaction,
 } from './devnet-transaction';
 export { createWalletAgentTransactionProposal } from './transaction-proposal';
 export {

@@ -36,6 +36,7 @@ export function createWalletAgentHistoryEntry(
     transactionProposalStatus: draft.transactionProposal?.status,
     preparedTransactionStatus: draft.preparedTransaction?.status,
     signedTransactionStatus: draft.signedTransaction?.status,
+    submittedSignature: draft.submittedTransaction?.signature,
   };
 }
 

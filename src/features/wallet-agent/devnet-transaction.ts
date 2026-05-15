@@ -115,6 +115,11 @@ function transactionFromBase64(serializedTransactionBase64: string) {
   return Transaction.from(bytes);
 }
 
+function bytesFromBase64(serializedTransactionBase64: string) {
+  const binary = globalThis.atob(serializedTransactionBase64);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
 export async function signWalletAgentDevnetTransaction(
   result: WalletAgentCoreResult,
   signTransaction: SignTransaction | undefined,
@@ -188,6 +193,63 @@ export async function signWalletAgentDevnetTransaction(
     review: {
       ...result.review,
       subtitle: 'Transacao assinada pela wallet. O envio para Devnet ainda exige uma etapa separada.',
+    },
+  };
+}
+
+export async function submitWalletAgentDevnetTransaction(
+  result: WalletAgentCoreResult,
+  connection: Connection,
+  now = new Date()
+): Promise<WalletAgentCoreResult> {
+  const signed = result.draft.signedTransaction;
+
+  if (!signed || signed.status !== 'signed_not_submitted') {
+    return {
+      ...result,
+      safety: {
+        ...result.safety,
+        reason: 'Assine a transacao na wallet antes de enviar para a Devnet.',
+      },
+    };
+  }
+
+  const rawTransaction = bytesFromBase64(signed.signedTransactionBase64);
+  const signature = await connection.sendRawTransaction(rawTransaction, {
+    skipPreflight: false,
+    preflightCommitment: 'confirmed',
+    maxRetries: 3,
+  });
+  const explorerUrl = `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+
+  return {
+    ...result,
+    draft: {
+      ...result.draft,
+      approvalStep: 'executed',
+      submittedTransaction: {
+        id: `wtx_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`,
+        status: 'submitted_to_devnet',
+        network: 'solana-devnet',
+        signature,
+        explorerUrl,
+        submittedAt: now.toISOString(),
+        confirmationStatus: 'submitted',
+        warnings: [
+          'Transacao enviada para Solana Devnet.',
+          'Devnet usa SOL de teste e nao movimenta fundos reais.',
+          'A confirmacao final pode levar alguns segundos no Explorer.',
+        ],
+      },
+    },
+    safety: {
+      ...result.safety,
+      status: 'draft_only',
+      reason: 'Transacao enviada para Solana Devnet. Acompanhe pelo Explorer.',
+    },
+    review: {
+      ...result.review,
+      subtitle: 'Transacao enviada para Solana Devnet. Use o hash para acompanhar a confirmacao.',
     },
   };
 }

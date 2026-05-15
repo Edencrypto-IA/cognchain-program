@@ -229,3 +229,22 @@ It still cannot:
 - sign with the local Devnet Sandbox key;
 - sign on behalf of the user;
 - bypass wallet approval.
+
+## Phase 4.3 controlled Devnet submission
+
+Wallet Agent can now submit a signed transaction to Solana Devnet after a separate user action.
+
+It can:
+
+- send only a previously signed Devnet transaction;
+- use `sendRawTransaction` with preflight enabled;
+- store the Devnet signature and Explorer URL;
+- show that the transaction was submitted on the test network;
+- avoid automatic retries beyond the RPC send configuration.
+
+It still cannot:
+
+- submit anything to mainnet;
+- submit unsigned transactions;
+- automate scheduled sends;
+- hide the transaction hash or network from the user.

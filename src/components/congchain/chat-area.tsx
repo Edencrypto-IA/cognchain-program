@@ -25,6 +25,7 @@ import {
   readWalletAgentWalletSnapshot,
   prepareWalletAgentDevnetTransaction,
   signWalletAgentDevnetTransaction,
+  submitWalletAgentDevnetTransaction,
   upsertWalletAgentHistory,
   type WalletAgentCoreResult,
   type WalletAgentHistoryEntry,
@@ -2045,6 +2046,37 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     }
   }, [recordWalletAgentHistory, signTransaction, toast, walletAddress]);
 
+  const handleWalletAgentSubmitTransaction = useCallback(async (result: WalletAgentCoreResult) => {
+    try {
+      const submitted = await submitWalletAgentDevnetTransaction(result, connection);
+      setWalletAgentReview(submitted);
+      recordWalletAgentHistory(submitted);
+      setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
+        ? {
+            ...message,
+            walletAgentResult: submitted,
+            content: submitted.draft.submittedTransaction
+              ? `${submitted.preview.description}\n\nDevnet tx: ${submitted.draft.submittedTransaction.explorerUrl}`
+              : submitted.preview.description,
+          }
+        : message
+      ));
+      toast({
+        title: submitted.draft.submittedTransaction ? 'Transacao enviada para Devnet' : 'Envio indisponivel',
+        description: submitted.draft.submittedTransaction
+          ? submitted.draft.submittedTransaction.signature
+          : submitted.safety.reason,
+      });
+    } catch (error) {
+      console.warn('[wallet-agent] devnet submit failed', error);
+      toast({
+        title: 'Envio para Devnet falhou',
+        description: 'Nenhuma nova tentativa automatica foi feita. Revise saldo, blockhash e tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  }, [connection, recordWalletAgentHistory, toast]);
+
   const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -3241,6 +3273,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           onConfirm={handleWalletAgentConfirm}
           onPrepareTransaction={handleWalletAgentPrepareTransaction}
           onSignTransaction={handleWalletAgentSignTransaction}
+          onSubmitTransaction={handleWalletAgentSubmitTransaction}
           history={walletAgentHistory}
         />
       )}
