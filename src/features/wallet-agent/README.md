@@ -64,3 +64,20 @@ It still cannot:
 - approve or execute an action;
 - call market, DEX, wallet, or scheduler APIs;
 - replace the future AI parser for ambiguous natural language.
+
+## Phase 3.2 chat preview card
+
+The main chat can now surface a Wallet Agent preview card when the local detector recognizes a financial command.
+
+It can:
+
+- show the parsed intent directly in the chat;
+- explain risk, network, token, value, checklist, and wallet-signature requirements;
+- keep normal chat streaming untouched for non-financial prompts;
+- stop before execution and only show a safe review path.
+
+It still cannot:
+
+- submit swaps, payments, payroll, schedules, or private transfers;
+- request a wallet signature;
+- perform background automation.

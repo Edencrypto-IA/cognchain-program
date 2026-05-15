@@ -14,6 +14,12 @@ import {
 import Orb, { type OrbMode } from './orb';
 import { MODEL_LABELS, type AIModel } from '@/services/memory/memory.model';
 import type { StructuredResponse } from '@/lib/grounding/types';
+import {
+  WalletAgentPreviewCard,
+  createWalletAgentCore,
+  detectWalletAgentIntent,
+  type WalletAgentCoreResult,
+} from '@/features/wallet-agent';
 import dynamic from 'next/dynamic';
 import { useWallet } from '@solana/wallet-adapter-react';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
@@ -90,6 +96,7 @@ interface Message {
   poiVotes?: number;
   structuredResponse?: StructuredResponse;
   marketSnapshot?: SolMarketSnapshot;
+  walletAgentResult?: WalletAgentCoreResult;
 }
 
 // ============================================================
@@ -393,7 +400,7 @@ function SolMarketCard({ snapshot }: { snapshot: SolMarketSnapshot }) {
   );
 }
 
-function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, onCompare, onScore, onCopyHash, onAudit, onContinueMemory }: {
+function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, onCompare, onScore, onCopyHash, onAudit, onContinueMemory, onWalletAgentReview }: {
   message: Message;
   isLatest?: boolean;
   isStreaming?: boolean;
@@ -404,6 +411,7 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
   onCopyHash: (hash: string) => void;
   onAudit: (msg: Message) => void;
   onContinueMemory: (msg: Message, model: AIModel) => void;
+  onWalletAgentReview: (result: WalletAgentCoreResult) => void;
 }) {
   const isUser = message.role === 'user';
   const displayContent = (isStreaming && streamedContent !== undefined) ? streamedContent : message.content;
@@ -420,7 +428,7 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
           </div>
         )}
       </div>
-      <div className={`flex-1 max-w-[85%] md:max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex-1 max-w-[85%] ${message.walletAgentResult ? 'md:max-w-[82%]' : 'md:max-w-[70%]'} ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`flex items-center gap-2 mb-1.5 flex-wrap ${isUser ? 'flex-row-reverse' : ''}`}>
           <span className="text-xs font-semibold text-white/60">{isUser ? 'Voce' : 'CONGCHAIN'}</span>
           <span className="text-[11px] text-white/25">{message.timestamp}</span>
@@ -459,7 +467,12 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
             )}
           </div>
         )}
-        {!isUser && message.marketSnapshot ? (
+        {!isUser && message.walletAgentResult ? (
+          <WalletAgentPreviewCard
+            result={message.walletAgentResult}
+            onReview={() => onWalletAgentReview(message.walletAgentResult!)}
+          />
+        ) : !isUser && message.marketSnapshot ? (
           <>
             <SolMarketCard snapshot={message.marketSnapshot} />
             <div className="rounded-2xl px-4 py-3 text-[15px] leading-relaxed bg-white/[0.04] border border-white/[0.06] text-white/80">
@@ -533,7 +546,7 @@ function ChatMessage({ message, isLatest, isStreaming, streamedContent, onSave, 
             }
           </div>
         )}
-        {isLatest && !isUser && (
+        {isLatest && !isUser && !message.walletAgentResult && (
           <div className="flex items-center gap-1 mt-2 flex-wrap">
             <button className="p-1 rounded hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors" title="Copiar"><CopyIcon className="w-4 h-4" /></button>
             <button className="p-1 rounded hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors" title="Gostei"><ThumbUpIcon className="w-4 h-4" /></button>
@@ -1923,6 +1936,15 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     }
   }, [selectedModel, pendingModel]);
 
+  const handleWalletAgentReview = useCallback((result: WalletAgentCoreResult) => {
+    toast({
+      title: 'Wallet Agent preparado',
+      description: result.draft.requiresWalletSignature
+        ? 'A proxima fase vai abrir a revisao detalhada antes de qualquer assinatura na carteira.'
+        : 'A proxima fase vai abrir a analise detalhada com fontes e evidencias.',
+    });
+  }, [toast]);
+
   // Chat API
   const handleSend = useCallback(async () => {
     if (!inputValue.trim() || isTyping) return;
@@ -1954,6 +1976,37 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         timestamp: 'Agora',
       });
     }
+
+    const walletDetection = detectWalletAgentIntent(userMessage.content);
+    if (walletDetection.isFinancialCommand && walletDetection.confidence >= 0.74) {
+      const walletAgentResult = createWalletAgentCore({
+        prompt: userMessage.content,
+        walletAddress,
+        network: 'solana-devnet',
+      });
+      const assistantMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: walletAgentResult.preview.description,
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        orbMode: 'success',
+        model: 'wallet-agent',
+        walletAgentResult,
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+      setChatPhase('completed');
+      setThinkingStatus('Analisando...');
+      setReasoningChunks([]);
+      setOrbMode('idle');
+      onSessionUpdate?.({
+        id: sessionIdRef.current,
+        title: userMessage.content.slice(0, 55) + (userMessage.content.length > 55 ? '...' : ''),
+        lastMessage: walletAgentResult.preview.title,
+        timestamp: 'Agora',
+      });
+      return;
+    }
+
     setIsTyping(true);
     const startTime = Date.now();
 
@@ -2186,7 +2239,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
       setIsTyping(false);
       console.error('[chat-stream] request:error', err);
     }
-  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages]);
+  }, [inputValue, isTyping, messages, selectedModel, previousModel, contextActive, setOrbMode, onSessionUpdate, originalMessages, walletAddress]);
 
   // Save memory API — #6 microcopy
   const handleSave = useCallback(async (msg: Message) => {
@@ -2931,7 +2984,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                     isLatest={idx === messages.length - 1 && msg.role === 'assistant'}
                     isStreaming={isStreamingMessage}
                     streamedContent={isStreamingMessage ? streamedContent : undefined}
-                    onSave={handleSave} onCompare={handleCompare} onScore={handleScoreOpen} onCopyHash={handleCopyHash} onAudit={handleAudit} onContinueMemory={handleContinueMemory} />
+                    onSave={handleSave} onCompare={handleCompare} onScore={handleScoreOpen} onCopyHash={handleCopyHash} onAudit={handleAudit} onContinueMemory={handleContinueMemory} onWalletAgentReview={handleWalletAgentReview} />
                 );
               })}
               <ThinkingPanel
