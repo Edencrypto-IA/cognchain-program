@@ -300,3 +300,19 @@ It still cannot:
 - execute a stage from a message alone;
 - hide technical errors;
 - imply mainnet execution for Devnet actions.
+
+## Phase 4.7 copy transaction summary
+
+Wallet Agent now provides a local copy action for the current transaction summary.
+
+It can:
+
+- copy intent, network, wallet, recipient, amount, risk, proposal, signature, status, slot, and Explorer URL;
+- work entirely in the browser clipboard;
+- keep the summary aligned with the visible transaction state.
+
+It still cannot:
+
+- export private keys or secrets;
+- copy hidden transaction data;
+- change or execute transaction state.

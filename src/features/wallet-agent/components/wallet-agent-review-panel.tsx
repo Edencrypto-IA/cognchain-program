@@ -1,9 +1,11 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Copy,
   FileCheck2,
   LockKeyhole,
   Send,
@@ -151,6 +153,33 @@ function TransactionJourney({ result }: { result: WalletAgentCoreResult }) {
   );
 }
 
+function buildTransactionSummary(result: WalletAgentCoreResult) {
+  const { draft } = result;
+  const submitted = draft.submittedTransaction;
+  const prepared = draft.preparedTransaction;
+
+  return [
+    'CONGCHAIN Wallet Agent Transaction Summary',
+    '',
+    `Intent: ${draft.type}`,
+    `Network: ${draft.network}`,
+    `Wallet: ${draft.walletAddress ?? 'not connected'}`,
+    `Recipient: ${prepared?.toAddress ?? draft.entities.recipientAddress ?? 'not provided'}`,
+    `Amount: ${prepared?.amountSol ?? draft.entities.amountSol ?? 'not provided'} SOL`,
+    `Risk: ${draft.riskLevel}`,
+    `Proposal: ${draft.transactionProposal?.status ?? 'not created'}`,
+    `Prepared: ${draft.preparedTransaction?.status ?? 'not prepared'}`,
+    `Signed: ${draft.signedTransaction?.status ?? 'not signed'}`,
+    `Submitted: ${submitted?.status ?? 'not submitted'}`,
+    `Confirmation: ${submitted?.confirmationStatus ?? 'not checked'}`,
+    submitted?.signature ? `Signature: ${submitted.signature}` : null,
+    submitted?.explorerUrl ? `Explorer: ${submitted.explorerUrl}` : null,
+    submitted?.slot ? `Slot: ${submitted.slot}` : null,
+    '',
+    'Safety: no mainnet action in this flow. Every value-moving stage requires visible user approval.',
+  ].filter(Boolean).join('\n');
+}
+
 export function WalletAgentReviewPanel({
   result,
   onClose,
@@ -183,6 +212,15 @@ export function WalletAgentReviewPanel({
     && submittedTransaction.confirmationStatus !== 'finalized'
     && submittedTransaction.confirmationStatus !== 'error'
     && !!onConfirmTransaction;
+  const [summaryCopied, setSummaryCopied] = useState(false);
+  const transactionSummary = useMemo(() => buildTransactionSummary(result), [result]);
+
+  function copyTransactionSummary() {
+    navigator.clipboard?.writeText(transactionSummary).then(() => {
+      setSummaryCopied(true);
+      window.setTimeout(() => setSummaryCopied(false), 1600);
+    }).catch(() => {});
+  }
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/72 px-3 py-4 backdrop-blur-xl">
@@ -455,6 +493,16 @@ export function WalletAgentReviewPanel({
                   >
                     <Clock3 className="h-4 w-4" />
                     Verificar confirmacao
+                  </button>
+                )}
+                {valueMoving && (
+                  <button
+                    type="button"
+                    onClick={copyTransactionSummary}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3 text-sm font-semibold text-white/62 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                  >
+                    <Copy className="h-4 w-4" />
+                    {summaryCopied ? 'Resumo copiado' : 'Copiar resumo da transacao'}
                   </button>
                 )}
               </div>
