@@ -158,6 +158,7 @@ export function createWalletAgentCore(input: WalletAgentCommandInput): WalletAge
     type,
     userPrompt: input.prompt,
     network: input.network ?? 'solana-devnet',
+    walletAddress: input.walletAddress,
     summary,
     entities,
     estimatedValueSol: entities.amountSol,

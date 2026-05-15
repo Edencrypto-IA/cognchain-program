@@ -49,6 +49,7 @@ export type WalletAgentIntentDraft = {
   userPrompt: string;
   createdAt: string;
   network: 'solana-devnet' | 'solana-mainnet';
+  walletAddress?: string | null;
   summary: string;
   entities: WalletAgentIntentEntities;
   estimatedValueSol?: number;
@@ -59,6 +60,14 @@ export type WalletAgentIntentDraft = {
   canAutoExecute: false;
   sources: string[];
   warnings: string[];
+  internalConfirmation?: WalletAgentInternalConfirmation;
+};
+
+export type WalletAgentInternalConfirmation = {
+  confirmed: boolean;
+  confirmedAt: string;
+  confirmationId: string;
+  nextApprovalStep: WalletAgentApprovalStep;
 };
 
 export type WalletAgentIntentEntities = {

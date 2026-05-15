@@ -6,13 +6,16 @@ import {
   LockKeyhole,
   ShieldCheck,
   Wallet,
+  Zap,
   X,
 } from 'lucide-react';
 import type { WalletAgentCoreResult, WalletAgentReviewItem } from '../types';
+import { canConfirmWalletAgentIntent } from '../confirmation';
 
 type WalletAgentReviewPanelProps = {
   result: WalletAgentCoreResult;
   onClose: () => void;
+  onConfirm: (result: WalletAgentCoreResult) => void;
 };
 
 const STATUS_STYLES: Record<WalletAgentReviewItem['status'], { label: string; className: string }> = {
@@ -46,9 +49,11 @@ function ReviewItem({ item }: { item: WalletAgentReviewItem }) {
   );
 }
 
-export function WalletAgentReviewPanel({ result, onClose }: WalletAgentReviewPanelProps) {
+export function WalletAgentReviewPanel({ result, onClose, onConfirm }: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
   const valueMoving = draft.requiresWalletSignature;
+  const confirmationCheck = canConfirmWalletAgentIntent(result);
+  const confirmed = !!draft.internalConfirmation?.confirmed;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/72 px-3 py-4 backdrop-blur-xl">
@@ -104,6 +109,18 @@ export function WalletAgentReviewPanel({ result, onClose }: WalletAgentReviewPan
             </div>
 
             <div className="space-y-4">
+              {confirmed && (
+                <div className="rounded-2xl border border-[#14F195]/20 bg-[#14F195]/[0.07] p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#14F195]" />
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#14F195]/85">Confirmacao interna registrada</p>
+                  </div>
+                  <p className="text-sm leading-relaxed text-white/62">
+                    ID {draft.internalConfirmation?.confirmationId}. Esta confirmacao nao assina nem envia transacao.
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-2xl border border-[#14F195]/16 bg-[#14F195]/[0.045] p-4">
                 <div className="mb-3 flex items-center gap-2">
                   {valueMoving ? <Wallet className="h-4 w-4 text-[#14F195]" /> : <LockKeyhole className="h-4 w-4 text-[#14F195]" />}
@@ -134,6 +151,23 @@ export function WalletAgentReviewPanel({ result, onClose }: WalletAgentReviewPan
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-[#9945FF]" />
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/48">Portao de confirmacao</p>
+                </div>
+                <p className="mb-3 text-sm leading-relaxed text-white/52">{confirmationCheck.reason}</p>
+                <button
+                  type="button"
+                  onClick={() => onConfirm(result)}
+                  disabled={!confirmationCheck.allowed || confirmed}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#14F195]/22 bg-[#14F195]/10 px-4 py-3 text-sm font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:border-white/[0.06] disabled:bg-white/[0.025] disabled:text-white/28"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {confirmed ? 'Confirmado no app' : 'Confirmar intencao no app'}
+                </button>
               </div>
             </div>
           </div>

@@ -17,6 +17,7 @@ import type { StructuredResponse } from '@/lib/grounding/types';
 import {
   WalletAgentPreviewCard,
   WalletAgentReviewPanel,
+  confirmWalletAgentIntent,
   createWalletAgentCore,
   detectWalletAgentIntent,
   type WalletAgentCoreResult,
@@ -1943,6 +1944,25 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     setWalletAgentReview(result);
   }, []);
 
+  const handleWalletAgentConfirm = useCallback((result: WalletAgentCoreResult) => {
+    const confirmed = confirmWalletAgentIntent(result);
+    setWalletAgentReview(confirmed);
+    setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
+      ? {
+          ...message,
+          walletAgentResult: confirmed,
+          content: confirmed.preview.description,
+        }
+      : message
+    ));
+    toast({
+      title: 'Intencao confirmada no app',
+      description: confirmed.draft.requiresWalletSignature
+        ? 'Ainda falta a assinatura explicita na carteira antes de qualquer transacao.'
+        : 'Fluxo somente leitura confirmado para analise segura.',
+    });
+  }, [toast]);
+
   const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -3123,6 +3143,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
         <WalletAgentReviewPanel
           result={walletAgentReview}
           onClose={() => setWalletAgentReview(null)}
+          onConfirm={handleWalletAgentConfirm}
         />
       )}
       <ScoreModal isOpen={showScoreModal} onClose={() => setShowScoreModal(false)} onSubmit={handleScoreSubmit} />

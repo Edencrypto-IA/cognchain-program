@@ -118,3 +118,21 @@ It still cannot:
 - execute or prepare real transactions;
 - trust AI output without review;
 - bypass wallet signature requirements.
+
+## Phase 3.5 internal confirmation gate
+
+Wallet Agent now has an explicit in-app confirmation step after review.
+
+It can:
+
+- block confirmation for value-moving intents until a wallet address is present;
+- mark a reviewed intent as internally confirmed;
+- move value-moving drafts from `intent_preview` to `wallet_signature_required`;
+- keep read-only intents as non-signing analysis flows;
+- show a confirmation ID in the review panel.
+
+It still cannot:
+
+- open a wallet signature request;
+- serialize or prepare a real transaction;
+- execute confirmed intents automatically.
