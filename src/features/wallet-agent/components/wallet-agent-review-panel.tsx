@@ -22,6 +22,7 @@ type WalletAgentReviewPanelProps = {
   onPrepareTransaction?: (result: WalletAgentCoreResult) => void;
   onSignTransaction?: (result: WalletAgentCoreResult) => void;
   onSubmitTransaction?: (result: WalletAgentCoreResult) => void;
+  onConfirmTransaction?: (result: WalletAgentCoreResult) => void;
   history?: WalletAgentHistoryEntry[];
 };
 
@@ -63,6 +64,7 @@ export function WalletAgentReviewPanel({
   onPrepareTransaction,
   onSignTransaction,
   onSubmitTransaction,
+  onConfirmTransaction,
   history = [],
 }: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
@@ -83,6 +85,10 @@ export function WalletAgentReviewPanel({
   const canSubmitTransaction = !!signedTransaction
     && !submittedTransaction
     && !!onSubmitTransaction;
+  const canConfirmTransaction = !!submittedTransaction
+    && submittedTransaction.confirmationStatus !== 'finalized'
+    && submittedTransaction.confirmationStatus !== 'error'
+    && !!onConfirmTransaction;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/72 px-3 py-4 backdrop-blur-xl">
@@ -256,6 +262,15 @@ export function WalletAgentReviewPanel({
                   <p className="break-words text-xs leading-relaxed text-white/50">
                     Signature: {submittedTransaction.signature}
                   </p>
+                  <p className="mt-2 text-xs leading-relaxed text-white/44">
+                    Status: {submittedTransaction.confirmationStatus}
+                    {submittedTransaction.slot ? ` | Slot: ${submittedTransaction.slot}` : ''}
+                  </p>
+                  {submittedTransaction.errorMessage && (
+                    <p className="mt-2 break-words text-xs leading-relaxed text-[#FF8A9E]">
+                      {submittedTransaction.errorMessage}
+                    </p>
+                  )}
                   <a
                     href={submittedTransaction.explorerUrl}
                     target="_blank"
@@ -334,6 +349,16 @@ export function WalletAgentReviewPanel({
                   >
                     <Send className="h-4 w-4" />
                     Enviar para Devnet
+                  </button>
+                )}
+                {canConfirmTransaction && (
+                  <button
+                    type="button"
+                    onClick={() => onConfirmTransaction(result)}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#5AD7FF]/24 bg-[#5AD7FF]/10 px-4 py-3 text-sm font-semibold text-[#7DE3FF] transition-colors hover:bg-[#5AD7FF]/15"
+                  >
+                    <Clock3 className="h-4 w-4" />
+                    Verificar confirmacao
                   </button>
                 )}
               </div>

@@ -248,3 +248,21 @@ It still cannot:
 - submit unsigned transactions;
 - automate scheduled sends;
 - hide the transaction hash or network from the user.
+
+## Phase 4.4 Devnet confirmation check
+
+Wallet Agent can now verify the submitted Devnet transaction status on demand.
+
+It can:
+
+- query Solana Devnet signature status by transaction hash;
+- show `submitted`, `processed`, `confirmed`, `finalized`, `not_found`, or `error`;
+- store slot and confirmation timestamp when available;
+- keep confirmation as a manual user-triggered check to avoid background loops.
+
+It still cannot:
+
+- poll forever in the background;
+- retry submission automatically;
+- treat Devnet confirmation as mainnet settlement;
+- hide transaction errors from the user.

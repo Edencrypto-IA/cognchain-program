@@ -18,6 +18,7 @@ import {
   WalletAgentPreviewCard,
   WalletAgentReviewPanel,
   confirmWalletAgentIntent,
+  confirmWalletAgentDevnetTransaction,
   createWalletAgentHistoryEntry,
   createWalletAgentCore,
   detectWalletAgentIntent,
@@ -2077,6 +2078,35 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     }
   }, [connection, recordWalletAgentHistory, toast]);
 
+  const handleWalletAgentConfirmTransaction = useCallback(async (result: WalletAgentCoreResult) => {
+    try {
+      const confirmed = await confirmWalletAgentDevnetTransaction(result, connection);
+      setWalletAgentReview(confirmed);
+      recordWalletAgentHistory(confirmed);
+      setMessages(prev => prev.map(message => message.walletAgentResult?.draft.id === result.draft.id
+        ? {
+            ...message,
+            walletAgentResult: confirmed,
+            content: confirmed.draft.submittedTransaction
+              ? `${confirmed.preview.description}\n\nDevnet tx: ${confirmed.draft.submittedTransaction.explorerUrl}\nStatus: ${confirmed.draft.submittedTransaction.confirmationStatus}`
+              : confirmed.preview.description,
+          }
+        : message
+      ));
+      toast({
+        title: 'Status Devnet atualizado',
+        description: confirmed.draft.submittedTransaction?.confirmationStatus ?? confirmed.safety.reason,
+      });
+    } catch (error) {
+      console.warn('[wallet-agent] devnet confirmation check failed', error);
+      toast({
+        title: 'Nao foi possivel verificar',
+        description: 'A Devnet nao respondeu agora. Tente novamente em alguns segundos.',
+        variant: 'destructive',
+      });
+    }
+  }, [connection, recordWalletAgentHistory, toast]);
+
   const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -3274,6 +3304,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           onPrepareTransaction={handleWalletAgentPrepareTransaction}
           onSignTransaction={handleWalletAgentSignTransaction}
           onSubmitTransaction={handleWalletAgentSubmitTransaction}
+          onConfirmTransaction={handleWalletAgentConfirmTransaction}
           history={walletAgentHistory}
         />
       )}

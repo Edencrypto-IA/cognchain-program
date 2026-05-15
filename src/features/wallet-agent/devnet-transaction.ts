@@ -253,3 +253,84 @@ export async function submitWalletAgentDevnetTransaction(
     },
   };
 }
+
+export async function confirmWalletAgentDevnetTransaction(
+  result: WalletAgentCoreResult,
+  connection: Connection,
+  now = new Date()
+): Promise<WalletAgentCoreResult> {
+  const submitted = result.draft.submittedTransaction;
+
+  if (!submitted?.signature) {
+    return {
+      ...result,
+      safety: {
+        ...result.safety,
+        reason: 'Envie uma transacao para Devnet antes de verificar confirmacao.',
+      },
+    };
+  }
+
+  const response = await connection.getSignatureStatuses([submitted.signature], {
+    searchTransactionHistory: true,
+  });
+  const status = response.value[0];
+
+  if (!status) {
+    return {
+      ...result,
+      draft: {
+        ...result.draft,
+        submittedTransaction: {
+          ...submitted,
+          confirmationStatus: 'not_found',
+          errorMessage: 'A assinatura ainda nao apareceu no historico da Devnet.',
+        },
+      },
+      safety: {
+        ...result.safety,
+        reason: 'A transacao ainda nao foi encontrada no historico da Devnet.',
+      },
+    };
+  }
+
+  const confirmationStatus = status.err
+    ? 'error'
+    : status.confirmationStatus ?? 'processed';
+  const finalized = confirmationStatus === 'finalized';
+  const confirmed = confirmationStatus === 'confirmed' || finalized;
+
+  return {
+    ...result,
+    draft: {
+      ...result.draft,
+      submittedTransaction: {
+        ...submitted,
+        confirmationStatus,
+        confirmedAt: confirmed ? now.toISOString() : submitted.confirmedAt,
+        slot: status.slot,
+        errorMessage: status.err ? JSON.stringify(status.err) : undefined,
+      },
+    },
+    safety: {
+      ...result.safety,
+      reason: status.err
+        ? 'A transacao retornou erro na Devnet.'
+        : finalized
+          ? 'Transacao finalizada na Solana Devnet.'
+          : confirmed
+            ? 'Transacao confirmada na Solana Devnet.'
+            : 'Transacao processada, aguardando confirmacao final.',
+    },
+    review: {
+      ...result.review,
+      subtitle: status.err
+        ? 'A Devnet retornou erro para esta transacao. Revise o Explorer.'
+        : finalized
+          ? 'Transacao finalizada na Solana Devnet.'
+          : confirmed
+            ? 'Transacao confirmada na Solana Devnet.'
+            : 'Transacao processada. Voce pode verificar novamente em alguns segundos.',
+    },
+  };
+}

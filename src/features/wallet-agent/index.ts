@@ -30,6 +30,7 @@ export type {
 export { createWalletAgentCore } from './core';
 export { canConfirmWalletAgentIntent, confirmWalletAgentIntent } from './confirmation';
 export {
+  confirmWalletAgentDevnetTransaction,
   prepareWalletAgentDevnetTransaction,
   signWalletAgentDevnetTransaction,
   submitWalletAgentDevnetTransaction,

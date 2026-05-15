@@ -171,7 +171,10 @@ export type WalletAgentSubmittedTransaction = {
   signature: string;
   explorerUrl: string;
   submittedAt: string;
-  confirmationStatus: 'submitted';
+  confirmationStatus: 'submitted' | 'processed' | 'confirmed' | 'finalized' | 'error' | 'not_found';
+  confirmedAt?: string;
+  slot?: number;
+  errorMessage?: string;
   warnings: string[];
 };
 
