@@ -51,3 +51,6 @@ next-env.d.ts
 .turbo/
 coverage/
 *.pem
+
+# Local Claude/Cursor task lock
+.claude/scheduled_tasks.lock
