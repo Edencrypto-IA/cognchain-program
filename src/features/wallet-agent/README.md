@@ -564,3 +564,23 @@ It still cannot:
 - send emails without a configured provider;
 - connect Phantom embedded wallets;
 - move funds, sign transactions, or authorize wallet actions from email alone.
+
+## Phase 6.3 email identity linked to Wallet Agent
+
+Wallet Agent now reads the active `cog_user` email identity and uses it for alert drafts.
+
+It can:
+
+- load `/api/auth/email/me` inside the Wallet Agent review panel;
+- prefer the connected account email over a manually typed local email;
+- mark whether the email came from `cog_user` or manual local input;
+- show whether the `cog_user` session was verified by magic link;
+- include email source and verification status in copied notification drafts and chat summaries.
+
+It still cannot:
+
+- send email automatically;
+- require email login before using Wallet Agent;
+- replace Phantom, Solflare, Devnet Sandbox, or wallet signatures;
+- sync alert rules to a backend account database;
+- authorize financial actions from email identity alone.

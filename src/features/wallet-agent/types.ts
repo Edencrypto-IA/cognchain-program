@@ -204,6 +204,8 @@ export type WalletAgentLocalNotificationPreferences = {
   emailPrepared: boolean;
   emailAddress: string | null;
   emailVerifiedLocally: boolean;
+  emailSource: 'manual' | 'cog_user' | null;
+  emailSessionVerified: boolean;
   walletApprovalEnabled: boolean;
   updatedAt: string;
 };
@@ -217,6 +219,8 @@ export type WalletAgentLocalNotificationDraft = {
   message: string;
   emailAddress: string | null;
   emailVerifiedLocally: boolean;
+  emailSource: 'manual' | 'cog_user' | null;
+  emailSessionVerified: boolean;
   walletActionRequired: boolean;
   deliveryPlan: string[];
   blockedActions: string[];

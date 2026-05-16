@@ -168,7 +168,7 @@ function formatWalletAgentNotificationChatMessage(
     .join(' + ');
   const emailNote = draft.channels.includes('email')
     ? draft.emailVerifiedLocally && draft.emailAddress
-      ? `- Email: preparado para ${draft.emailAddress}; nenhum email foi enviado nesta etapa.`
+      ? `- Email: preparado para ${draft.emailAddress}${draft.emailSource === 'cog_user' ? draft.emailSessionVerified ? ' (conta verificada)' : ' (conta conectada)' : ' (manual)'}; nenhum email foi enviado nesta etapa.`
       : '- Email: canal preparado, mas ainda pendente de verificacao local.'
     : '- Email: desativado nas preferencias locais deste alerta.';
 

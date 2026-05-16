@@ -30,6 +30,8 @@ function createDefaultNotificationPreferences(now = new Date()): WalletAgentLoca
     emailPrepared: true,
     emailAddress: null,
     emailVerifiedLocally: false,
+    emailSource: null,
+    emailSessionVerified: false,
     walletApprovalEnabled: true,
     updatedAt: now.toISOString(),
   };
@@ -58,6 +60,12 @@ export function readWalletAgentNotificationPreferences(): WalletAgentLocalNotifi
       emailVerifiedLocally: typeof parsed?.emailAddress === 'string'
         ? isWalletAgentNotificationEmailValid(parsed.emailAddress)
         : defaults.emailVerifiedLocally,
+      emailSource: parsed?.emailSource === 'manual' || parsed?.emailSource === 'cog_user'
+        ? parsed.emailSource
+        : defaults.emailSource,
+      emailSessionVerified: typeof parsed?.emailSessionVerified === 'boolean'
+        ? parsed.emailSessionVerified
+        : defaults.emailSessionVerified,
       walletApprovalEnabled: typeof parsed?.walletApprovalEnabled === 'boolean'
         ? parsed.walletApprovalEnabled
         : defaults.walletApprovalEnabled,
@@ -85,6 +93,10 @@ export function saveWalletAgentNotificationPreferences(
     updatedAt: now.toISOString(),
   };
   next.emailVerifiedLocally = !!next.emailAddress && isWalletAgentNotificationEmailValid(next.emailAddress);
+  if (!next.emailAddress) {
+    next.emailSource = null;
+    next.emailSessionVerified = false;
+  }
 
   if (canUseLocalStorage()) {
     window.localStorage.setItem(WALLET_AGENT_NOTIFICATION_PREFERENCES_KEY, JSON.stringify(next));
@@ -405,6 +417,8 @@ export function createWalletAgentLocalNotificationDraft(
       : `A CONGCHAIN ${chatText}${emailText} quando a regra "${rule.trigger.label}" precisar de revisao manual.${walletText}`,
     emailAddress: emailReady ? preferences.emailAddress : null,
     emailVerifiedLocally: emailReady,
+    emailSource: emailReady ? preferences.emailSource : null,
+    emailSessionVerified: emailReady ? preferences.emailSessionVerified : false,
     walletActionRequired,
     deliveryPlan: [
       preferences.chatEnabled

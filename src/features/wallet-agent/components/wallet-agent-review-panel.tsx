@@ -334,6 +334,8 @@ function buildNotificationDraftSummary(draft: WalletAgentLocalNotificationDraft)
     `Status: ${draft.status}`,
     `Channels: ${draft.channels.join(', ')}`,
     `Email: ${draft.emailVerifiedLocally ? draft.emailAddress : 'pending local verification'}`,
+    `Email source: ${draft.emailSource ?? 'none'}`,
+    `Email session verified: ${draft.emailSessionVerified ? 'yes' : 'no'}`,
     `Wallet action required: ${draft.walletActionRequired ? 'yes' : 'no'}`,
     `Created at: ${draft.createdAt}`,
     '',
@@ -354,6 +356,25 @@ function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['c
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
   return 'carteira';
+}
+
+function getNotificationEmailStatus(preferences: WalletAgentLocalNotificationPreferences) {
+  if (preferences.emailSource === 'cog_user' && preferences.emailSessionVerified) return 'conta verificada';
+  if (preferences.emailSource === 'cog_user') return 'conta conectada';
+  if (preferences.emailVerifiedLocally) return 'validado local';
+  return 'pendente';
+}
+
+function getNotificationEmailStatusClass(preferences: WalletAgentLocalNotificationPreferences) {
+  if (preferences.emailSource === 'cog_user' && preferences.emailSessionVerified) {
+    return 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]';
+  }
+
+  if (preferences.emailVerifiedLocally) {
+    return 'border-[#00D1FF]/18 bg-[#00D1FF]/10 text-[#7DE3FF]';
+  }
+
+  return 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]';
 }
 
 function getRuleStatusClassName(status: WalletAgentLocalRule['status']) {
@@ -474,6 +495,32 @@ function LocalRulesHistory({
     setSentNotificationId(null);
   }, [refreshKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch('/api/auth/email/me')
+      .then(response => response.json())
+      .then(data => {
+        if (cancelled || !data?.authenticated || !data.user?.email) return;
+
+        const next = saveWalletAgentNotificationPreferences({
+          emailAddress: data.user.email,
+          emailPrepared: true,
+          emailSource: 'cog_user',
+          emailSessionVerified: !!data.user.verified,
+        });
+        setNotificationPreferences(next);
+        setEmailInput(next.emailAddress ?? '');
+        setActiveNotificationDraft(null);
+        setSentNotificationId(null);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function copyRule(rule: WalletAgentLocalRule) {
     navigator.clipboard?.writeText(buildRuleSummary(rule)).then(() => {
       setCopiedRuleId(rule.id);
@@ -540,6 +587,8 @@ function LocalRulesHistory({
     const next = saveWalletAgentNotificationPreferences({
       emailAddress: normalized || null,
       emailPrepared: normalized ? notificationPreferences.emailPrepared : false,
+      emailSource: normalized ? 'manual' : null,
+      emailSessionVerified: false,
     });
     setNotificationPreferences(next);
     setEmailInput(next.emailAddress ?? '');
@@ -630,12 +679,8 @@ function LocalRulesHistory({
               <Mail className="h-3.5 w-3.5 text-[#7DE3FF]" />
               Email para alertas
             </span>
-            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
-              notificationPreferences.emailVerifiedLocally
-                ? 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
-                : 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
-            }`}>
-              {notificationPreferences.emailVerifiedLocally ? 'validado local' : 'pendente'}
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${getNotificationEmailStatusClass(notificationPreferences)}`}>
+              {getNotificationEmailStatus(notificationPreferences)}
             </span>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -658,9 +703,11 @@ function LocalRulesHistory({
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-white/34">
             {emailInput.trim() && !isWalletAgentNotificationEmailValid(emailInput)
-              ? 'Formato invalido. Use um email como nome@dominio.com.'
-              : notificationPreferences.emailVerifiedLocally
-                ? `Rascunhos podem mencionar ${notificationPreferences.emailAddress}. Envio real ainda nao existe.`
+                ? 'Formato invalido. Use um email como nome@dominio.com.'
+              : notificationPreferences.emailSource === 'cog_user'
+                ? `Usando email da conta: ${notificationPreferences.emailAddress}${notificationPreferences.emailSessionVerified ? ' (verificado por magic link).' : ' (sessao local).' }`
+                : notificationPreferences.emailVerifiedLocally
+                  ? `Rascunhos podem mencionar ${notificationPreferences.emailAddress}. Envio real ainda nao existe.`
                 : 'Informe um email para os rascunhos mostrarem o destino futuro.'}
           </p>
         </div>
