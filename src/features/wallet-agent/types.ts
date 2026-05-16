@@ -319,6 +319,37 @@ export type WalletAgentAlertPersistenceRecord = {
   blockedActions: string[];
 };
 
+export type WalletAgentAlertServerReceipt = {
+  id: string;
+  ownerEmail: string;
+  recordId: string;
+  deliveryId: string;
+  ruleId: string;
+  draftId: string;
+  receiptId: string;
+  receiptStatus: WalletAgentAlertDeliveryReceipt['status'];
+  target: string;
+  provider: string;
+  title: string;
+  message: string;
+  eventAt: string;
+  createdAt: string;
+  updatedAt: string;
+  storage: {
+    mode: 'memory';
+    durable: false;
+    persisted: true;
+    reason: string;
+  };
+  safety: {
+    metadataOnly: true;
+    canStoreSecrets: false;
+    canExecuteTransaction: false;
+    canSchedule: false;
+    notes: string[];
+  };
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

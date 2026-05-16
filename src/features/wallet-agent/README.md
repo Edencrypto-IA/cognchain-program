@@ -789,3 +789,23 @@ It still cannot:
 - resend failed emails automatically;
 - schedule future alerts;
 - use account history to request wallet signatures or execute transactions.
+
+## Phase 8.3 server-side alert receipt API
+
+Wallet Agent now has a server-side API for account-owned alert receipts.
+
+It can:
+
+- write a receipt through `POST /api/wallet-agent/alert-records/receipts`;
+- read receipts through `GET /api/wallet-agent/alert-records/receipts`;
+- require a verified `cog_user` email identity before reading or writing;
+- store sent and failed alert receipts in bounded server memory;
+- keep all stored data metadata-only.
+
+It still cannot:
+
+- provide durable database persistence;
+- survive server restarts or serverless cold starts;
+- write receipts for unverified email identities;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from server receipts;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.

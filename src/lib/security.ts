@@ -39,6 +39,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/wallet/sign': { windowMs: 60_000, maxRequests: 20 },
   '/api/wallet-agent/alerts': { windowMs: 60_000, maxRequests: 12 },
   '/api/wallet-agent/alert-records': { windowMs: 60_000, maxRequests: 12 },
+  '/api/wallet-agent/alert-records/receipts': { windowMs: 60_000, maxRequests: 20 },
   '/api/wallet-agent/alerts/send-email': { windowMs: 10 * 60_000, maxRequests: 5 },
   '/api/wallet-agent/parse': { windowMs: 60_000, maxRequests: 12 },
   '/api/nft/mint': { windowMs: 60_000, maxRequests: 3 },
