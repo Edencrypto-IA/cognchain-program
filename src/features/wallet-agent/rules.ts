@@ -28,9 +28,16 @@ function createDefaultNotificationPreferences(now = new Date()): WalletAgentLoca
   return {
     chatEnabled: true,
     emailPrepared: true,
+    emailAddress: null,
+    emailVerifiedLocally: false,
     walletApprovalEnabled: true,
     updatedAt: now.toISOString(),
   };
+}
+
+export function isWalletAgentNotificationEmailValid(email: string) {
+  const normalized = email.trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalized);
 }
 
 export function readWalletAgentNotificationPreferences(): WalletAgentLocalNotificationPreferences {
@@ -45,6 +52,12 @@ export function readWalletAgentNotificationPreferences(): WalletAgentLocalNotifi
     return {
       chatEnabled: typeof parsed?.chatEnabled === 'boolean' ? parsed.chatEnabled : defaults.chatEnabled,
       emailPrepared: typeof parsed?.emailPrepared === 'boolean' ? parsed.emailPrepared : defaults.emailPrepared,
+      emailAddress: typeof parsed?.emailAddress === 'string' && parsed.emailAddress.trim()
+        ? parsed.emailAddress.trim()
+        : defaults.emailAddress,
+      emailVerifiedLocally: typeof parsed?.emailAddress === 'string'
+        ? isWalletAgentNotificationEmailValid(parsed.emailAddress)
+        : defaults.emailVerifiedLocally,
       walletApprovalEnabled: typeof parsed?.walletApprovalEnabled === 'boolean'
         ? parsed.walletApprovalEnabled
         : defaults.walletApprovalEnabled,
@@ -64,8 +77,14 @@ export function saveWalletAgentNotificationPreferences(
     ...current,
     ...preferences,
     chatEnabled: preferences.chatEnabled ?? current.chatEnabled,
+    emailAddress: typeof preferences.emailAddress === 'string'
+      ? preferences.emailAddress.trim() || null
+      : preferences.emailAddress === null
+        ? null
+        : current.emailAddress,
     updatedAt: now.toISOString(),
   };
+  next.emailVerifiedLocally = !!next.emailAddress && isWalletAgentNotificationEmailValid(next.emailAddress);
 
   if (canUseLocalStorage()) {
     window.localStorage.setItem(WALLET_AGENT_NOTIFICATION_PREFERENCES_KEY, JSON.stringify(next));
@@ -361,8 +380,11 @@ export function createWalletAgentLocalNotificationDraft(
   if (channels.length === 0) channels.push('congchain_chat');
 
   const chatText = preferences.chatEnabled ? 'avisaria no chat' : 'guardaria um rascunho local';
+  const emailReady = preferences.emailPrepared && preferences.emailVerifiedLocally && !!preferences.emailAddress;
   const emailText = preferences.emailPrepared
-    ? `${preferences.chatEnabled ? ' e' : ' e'} prepararia um email`
+    ? emailReady
+      ? `${preferences.chatEnabled ? ' e' : ' e'} prepararia um email para ${preferences.emailAddress}`
+      : `${preferences.chatEnabled ? ' e' : ' e'} deixaria o email pendente de verificacao local`
     : '';
   const walletText = walletActionRequired && preferences.walletApprovalEnabled
     ? ' Se houver acao de valor, a carteira seria usada apenas para uma aprovacao futura e explicita.'
@@ -381,13 +403,17 @@ export function createWalletAgentLocalNotificationDraft(
     message: rule.status === 'paused'
       ? `A regra "${rule.trigger.label}" esta pausada. A CONGCHAIN nao avisaria nada ate voce reativar.`
       : `A CONGCHAIN ${chatText}${emailText} quando a regra "${rule.trigger.label}" precisar de revisao manual.${walletText}`,
+    emailAddress: emailReady ? preferences.emailAddress : null,
+    emailVerifiedLocally: emailReady,
     walletActionRequired,
     deliveryPlan: [
       preferences.chatEnabled
         ? 'Mostrar primeiro no chat CongChain.'
         : 'Manter apenas como rascunho local porque o chat esta desativado nas preferencias.',
       preferences.emailPrepared
-        ? 'Preparar copia por email para um usuario autenticado quando o canal de email estiver conectado.'
+        ? emailReady
+          ? `Preparar copia por email para ${preferences.emailAddress}.`
+          : 'Email pendente: informe um endereco valido antes de conectar envio real.'
         : 'Nao preparar email porque o canal esta desativado nas preferencias locais.',
       walletActionRequired
         ? preferences.walletApprovalEnabled

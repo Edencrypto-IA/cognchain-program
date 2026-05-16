@@ -502,3 +502,23 @@ It still cannot:
 - create a backend notification subscription;
 - open wallet approvals from a notification draft;
 - execute, sign, submit, buy, sell, or pay from notification preferences.
+
+## Phase 5.9 local alert email target
+
+Wallet Agent can now store a local email target for future alert drafts.
+
+It can:
+
+- collect an alert email inside the local review panel;
+- validate the email format in the browser;
+- store the email target in `localStorage`;
+- show whether the email is locally valid or pending;
+- include the email target in copied drafts and chat summaries.
+
+It still cannot:
+
+- verify email ownership through a magic link;
+- create an authenticated account session;
+- send email automatically;
+- connect SMTP or an email provider;
+- schedule, sign, submit, buy, sell, or pay from email settings.

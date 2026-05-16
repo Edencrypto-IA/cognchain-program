@@ -61,6 +61,7 @@ export {
   canCreateWalletAgentLocalRule,
   createWalletAgentLocalNotificationDraft,
   createWalletAgentRuleReviewContext,
+  isWalletAgentNotificationEmailValid,
   createWalletAgentLocalRule,
   readWalletAgentLocalRules,
   readWalletAgentNotificationPreferences,

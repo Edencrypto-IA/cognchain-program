@@ -202,6 +202,8 @@ export type WalletAgentLocalNotificationChannel = 'congchain_chat' | 'email' | '
 export type WalletAgentLocalNotificationPreferences = {
   chatEnabled: boolean;
   emailPrepared: boolean;
+  emailAddress: string | null;
+  emailVerifiedLocally: boolean;
   walletApprovalEnabled: boolean;
   updatedAt: string;
 };
@@ -213,6 +215,8 @@ export type WalletAgentLocalNotificationDraft = {
   channels: WalletAgentLocalNotificationChannel[];
   title: string;
   message: string;
+  emailAddress: string | null;
+  emailVerifiedLocally: boolean;
   walletActionRequired: boolean;
   deliveryPlan: string[];
   blockedActions: string[];

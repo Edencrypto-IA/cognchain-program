@@ -36,6 +36,7 @@ import { readWalletAgentDevnetReceipts } from '../receipts';
 import {
   createWalletAgentLocalNotificationDraft,
   createWalletAgentRuleReviewContext,
+  isWalletAgentNotificationEmailValid,
   readWalletAgentLocalRules,
   readWalletAgentNotificationPreferences,
   removeWalletAgentLocalRule,
@@ -332,6 +333,7 @@ function buildNotificationDraftSummary(draft: WalletAgentLocalNotificationDraft)
     `Rule ID: ${draft.ruleId}`,
     `Status: ${draft.status}`,
     `Channels: ${draft.channels.join(', ')}`,
+    `Email: ${draft.emailVerifiedLocally ? draft.emailAddress : 'pending local verification'}`,
     `Wallet action required: ${draft.walletActionRequired ? 'yes' : 'no'}`,
     `Created at: ${draft.createdAt}`,
     '',
@@ -459,10 +461,13 @@ function LocalRulesHistory({
   const [notificationPreferences, setNotificationPreferences] = useState<WalletAgentLocalNotificationPreferences>(() => (
     readWalletAgentNotificationPreferences()
   ));
+  const [emailInput, setEmailInput] = useState(() => readWalletAgentNotificationPreferences().emailAddress ?? '');
 
   useEffect(() => {
     setRules(readWalletAgentLocalRules());
-    setNotificationPreferences(readWalletAgentNotificationPreferences());
+    const preferences = readWalletAgentNotificationPreferences();
+    setNotificationPreferences(preferences);
+    setEmailInput(preferences.emailAddress ?? '');
     setActiveContext(null);
     setActiveSimulation(null);
     setActiveNotificationDraft(null);
@@ -524,6 +529,20 @@ function LocalRulesHistory({
   ) {
     const next = saveWalletAgentNotificationPreferences({ [key]: value });
     setNotificationPreferences(next);
+    setActiveNotificationDraft(null);
+    setSentNotificationId(null);
+  }
+
+  function saveNotificationEmail() {
+    const normalized = emailInput.trim();
+    if (normalized && !isWalletAgentNotificationEmailValid(normalized)) return;
+
+    const next = saveWalletAgentNotificationPreferences({
+      emailAddress: normalized || null,
+      emailPrepared: normalized ? notificationPreferences.emailPrepared : false,
+    });
+    setNotificationPreferences(next);
+    setEmailInput(next.emailAddress ?? '');
     setActiveNotificationDraft(null);
     setSentNotificationId(null);
   }
@@ -604,6 +623,46 @@ function LocalRulesHistory({
               {notificationPreferences.walletApprovalEnabled ? 'Aprovacao futura mantida.' : 'Aprovacao oculta do alerta.'}
             </span>
           </button>
+        </div>
+        <div className="mt-3 rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/42">
+              <Mail className="h-3.5 w-3.5 text-[#7DE3FF]" />
+              Email para alertas
+            </span>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+              notificationPreferences.emailVerifiedLocally
+                ? 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+                : 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+            }`}>
+              {notificationPreferences.emailVerifiedLocally ? 'validado local' : 'pendente'}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={emailInput}
+              onChange={event => setEmailInput(event.target.value)}
+              onBlur={saveNotificationEmail}
+              placeholder="seu@email.com"
+              inputMode="email"
+              className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2 text-xs text-white/72 outline-none transition-colors placeholder:text-white/26 focus:border-[#00D1FF]/28"
+            />
+            <button
+              type="button"
+              onClick={saveNotificationEmail}
+              disabled={!!emailInput.trim() && !isWalletAgentNotificationEmailValid(emailInput)}
+              className="rounded-xl border border-[#00D1FF]/16 bg-[#00D1FF]/[0.06] px-3 py-2 text-[11px] font-semibold text-[#7DE3FF] transition-colors hover:bg-[#00D1FF]/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Salvar email
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-white/34">
+            {emailInput.trim() && !isWalletAgentNotificationEmailValid(emailInput)
+              ? 'Formato invalido. Use um email como nome@dominio.com.'
+              : notificationPreferences.emailVerifiedLocally
+                ? `Rascunhos podem mencionar ${notificationPreferences.emailAddress}. Envio real ainda nao existe.`
+                : 'Informe um email para os rascunhos mostrarem o destino futuro.'}
+          </p>
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-white/32">
           Preferencias ficam neste navegador. Nenhum email, push ou assinatura e disparado automaticamente.
@@ -782,6 +841,7 @@ function LocalRulesHistory({
 
                   <div className="grid gap-2 text-[11px] leading-relaxed text-white/46 sm:grid-cols-2">
                     <p>Canais: {activeNotificationDraft.channels.map(formatNotificationChannel).join(' + ')}</p>
+                    <p>Email: {activeNotificationDraft.emailVerifiedLocally ? activeNotificationDraft.emailAddress : 'pendente de verificacao local'}</p>
                     <p>Carteira: {activeNotificationDraft.walletActionRequired ? 'aprovacao futura' : 'nao precisa'}</p>
                   </div>
 
