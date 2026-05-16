@@ -18,10 +18,12 @@ import type {
   WalletAgentCoreResult,
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
+  WalletAgentLocalRule,
   WalletAgentReviewItem,
 } from '../types';
 import { canConfirmWalletAgentIntent } from '../confirmation';
 import { readWalletAgentDevnetReceipts } from '../receipts';
+import { readWalletAgentLocalRules } from '../rules';
 
 type WalletAgentReviewPanelProps = {
   result: WalletAgentCoreResult;
@@ -229,6 +231,32 @@ function buildReceiptSummary(receipt: WalletAgentDevnetReceipt) {
   ].filter(Boolean).join('\n');
 }
 
+function buildRuleSummary(rule: WalletAgentLocalRule) {
+  return [
+    'CONGCHAIN Wallet Agent Local Rule',
+    '',
+    `Rule ID: ${rule.id}`,
+    `Intent ID: ${rule.intentId}`,
+    `Type: ${rule.type}`,
+    `Status: ${rule.status}`,
+    `Network: ${rule.network}`,
+    `Wallet: ${rule.walletAddress ?? 'not connected'}`,
+    `Trigger: ${rule.trigger.label}`,
+    `Trigger kind: ${rule.trigger.kind}`,
+    `Action: ${rule.action.label}`,
+    `Action kind: ${rule.action.kind}`,
+    `Requires wallet signature: ${rule.safety.requiresWalletSignature ? 'yes' : 'no'}`,
+    `Can auto execute: ${rule.safety.canAutoExecute ? 'yes' : 'no'}`,
+    rule.confirmationId ? `Confirmation ID: ${rule.confirmationId}` : null,
+    `Created at: ${rule.createdAt}`,
+    `Updated at: ${rule.updatedAt}`,
+    '',
+    `Summary: ${rule.summary}`,
+    '',
+    'Safety: local manual-review rule only. It cannot sign, submit, buy, sell, or pay by itself.',
+  ].filter(Boolean).join('\n');
+}
+
 function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [receipts, setReceipts] = useState<WalletAgentDevnetReceipt[]>([]);
   const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
@@ -307,6 +335,80 @@ function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   );
 }
 
+function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
+  const [rules, setRules] = useState<WalletAgentLocalRule[]>([]);
+  const [copiedRuleId, setCopiedRuleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRules(readWalletAgentLocalRules());
+  }, [refreshKey]);
+
+  function copyRule(rule: WalletAgentLocalRule) {
+    navigator.clipboard?.writeText(buildRuleSummary(rule)).then(() => {
+      setCopiedRuleId(rule.id);
+      window.setTimeout(() => setCopiedRuleId(null), 1600);
+    }).catch(() => {});
+  }
+
+  return (
+    <div className="rounded-2xl border border-[#9945FF]/16 bg-[#9945FF]/[0.045] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-[#B58CFF]" />
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C4B5FD]/85">Regras locais salvas</p>
+        </div>
+        <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
+          manual
+        </span>
+      </div>
+
+      {rules.length === 0 ? (
+        <p className="text-sm leading-relaxed text-white/38">
+          Nenhuma regra local salva ainda. Confirme um alerta, agendamento, payroll ou checagem de risco para criar uma regra de revisao manual.
+        </p>
+      ) : (
+        <div className="space-y-2.5">
+          {rules.slice(0, 5).map(rule => (
+            <div key={rule.id} className="rounded-xl border border-white/[0.07] bg-black/24 p-3">
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-white/68">{rule.type.replaceAll('_', ' ')}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-white/42">{rule.trigger.label}</p>
+                </div>
+                <span className="shrink-0 rounded-full border border-[#9945FF]/20 bg-[#9945FF]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#C4B5FD]">
+                  {rule.status.replaceAll('_', ' ')}
+                </span>
+              </div>
+
+              <div className="grid gap-2 text-[11px] leading-relaxed text-white/42 sm:grid-cols-2">
+                <p>Acao: {rule.action.kind.replaceAll('_', ' ')}</p>
+                <p>Criada: {formatReceiptDate(rule.createdAt)}</p>
+                <p className="truncate">Carteira: {rule.walletAddress ?? 'n/a'}</p>
+                <p>Assinatura futura: {rule.safety.requiresWalletSignature ? 'sim' : 'nao'}</p>
+              </div>
+
+              <div className="mt-3 rounded-xl border border-[#F5A524]/14 bg-[#F5A524]/[0.045] p-3">
+                <p className="text-[11px] leading-relaxed text-white/46">
+                  Esta regra nao executa automaticamente. Ela apenas guarda contexto para uma revisao manual futura.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => copyRule(rule)}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {copiedRuleId === rule.id ? 'Regra copiada' : 'Copiar regra'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WalletAgentReviewPanel({
   result,
   onClose,
@@ -326,6 +428,7 @@ export function WalletAgentReviewPanel({
   const signedTransaction = draft.signedTransaction;
   const submittedTransaction = draft.submittedTransaction;
   const receiptsRefreshKey = `${submittedTransaction?.signature ?? 'none'}:${submittedTransaction?.confirmationStatus ?? 'none'}:${submittedTransaction?.slot ?? 'none'}`;
+  const rulesRefreshKey = `${draft.id}:${draft.internalConfirmation?.confirmationId ?? 'none'}:${draft.type}`;
   const canPrepareTransaction = !!proposal
     && proposal.status === 'ready_for_wallet_signature'
     && !preparedTransaction
@@ -660,6 +763,8 @@ export function WalletAgentReviewPanel({
               </div>
 
               <DevnetReceiptsHistory refreshKey={receiptsRefreshKey} />
+
+              <LocalRulesHistory refreshKey={rulesRefreshKey} />
             </div>
           </div>
         </div>

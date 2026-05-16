@@ -370,3 +370,21 @@ It still cannot:
 - sign, submit, buy, sell, or pay from a rule;
 - create mainnet automation;
 - bypass a future explicit wallet approval.
+
+## Phase 5.2 local rule visibility
+
+Wallet Agent now shows locally saved manual-review rules inside the review panel.
+
+It can:
+
+- list recent local rules with type, trigger, action mode, wallet, creation time, and signature requirement;
+- copy a clean rule summary to the clipboard;
+- explain that rules are context records for future manual review only;
+- refresh the visible list after the current intent is confirmed.
+
+It still cannot:
+
+- run rules in the background;
+- trigger notifications by itself;
+- prepare, sign, submit, buy, sell, or pay from the rule list;
+- treat local rules as backend scheduler jobs.
