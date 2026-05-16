@@ -23,6 +23,7 @@ import {
 import type {
   WalletAgentAlertDelivery,
   WalletAgentAlertDeliveryReceipt,
+  WalletAgentAlertPersistenceRecord,
   WalletAgentCoreResult,
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
@@ -616,6 +617,8 @@ function LocalRulesHistory({
   const [emailSendLoading, setEmailSendLoading] = useState(false);
   const [emailSendMessage, setEmailSendMessage] = useState('');
   const [alertReceiptsRefreshKey, setAlertReceiptsRefreshKey] = useState('initial');
+  const [activeAlertRecord, setActiveAlertRecord] = useState<WalletAgentAlertPersistenceRecord | null>(null);
+  const [alertRecordMessage, setAlertRecordMessage] = useState('');
   const [notificationPreferences, setNotificationPreferences] = useState<WalletAgentLocalNotificationPreferences>(() => (
     readWalletAgentNotificationPreferences()
   ));
@@ -632,6 +635,8 @@ function LocalRulesHistory({
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
     setEmailSendMessage('');
+    setActiveAlertRecord(null);
+    setAlertRecordMessage('');
     setSentNotificationId(null);
   }, [refreshKey]);
 
@@ -654,6 +659,8 @@ function LocalRulesHistory({
         setActiveNotificationDraft(null);
         setActiveAlertDelivery(null);
         setEmailSendMessage('');
+        setActiveAlertRecord(null);
+        setAlertRecordMessage('');
         setSentNotificationId(null);
       })
       .catch(() => {});
@@ -682,6 +689,8 @@ function LocalRulesHistory({
     setActiveNotificationDraft(current => current?.ruleId === rule.id ? null : current);
     setActiveAlertDelivery(current => current?.ruleId === rule.id ? null : current);
     setEmailSendMessage('');
+    setActiveAlertRecord(null);
+    setAlertRecordMessage('');
   }
 
   function showReviewContext(rule: WalletAgentLocalRule) {
@@ -714,6 +723,8 @@ function LocalRulesHistory({
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
     setEmailSendMessage('');
+    setActiveAlertRecord(null);
+    setAlertRecordMessage('');
     setSentNotificationId(null);
   }
 
@@ -727,6 +738,8 @@ function LocalRulesHistory({
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
     setEmailSendMessage('');
+    setActiveAlertRecord(null);
+    setAlertRecordMessage('');
     setSentNotificationId(null);
   }
 
@@ -746,6 +759,8 @@ function LocalRulesHistory({
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
     setEmailSendMessage('');
+    setActiveAlertRecord(null);
+    setAlertRecordMessage('');
     setSentNotificationId(null);
   }
 
@@ -767,6 +782,8 @@ function LocalRulesHistory({
     setAlertDeliveryLoading(true);
     setAlertDeliveryError('');
     setEmailSendMessage('');
+    setActiveAlertRecord(null);
+    setAlertRecordMessage('');
 
     try {
       const response = await fetch('/api/wallet-agent/alerts', {
@@ -789,6 +806,32 @@ function LocalRulesHistory({
     }
   }
 
+  async function prepareAccountAlertRecord(
+    delivery: WalletAgentAlertDelivery,
+    receipt: WalletAgentAlertDeliveryReceipt | null
+  ) {
+    setAlertRecordMessage('');
+
+    try {
+      const response = await fetch('/api/wallet-agent/alert-records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delivery, receipt }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data?.record) {
+        setAlertRecordMessage(data?.error || 'Nao foi possivel preparar o historico da conta.');
+        return;
+      }
+
+      setActiveAlertRecord(data.record);
+      setAlertRecordMessage(data?.message || 'Contrato de historico da conta preparado.');
+    } catch {
+      setAlertRecordMessage('Nao foi possivel preparar o historico da conta agora.');
+    }
+  }
+
   async function sendAlertEmail(delivery: WalletAgentAlertDelivery) {
     setEmailSendLoading(true);
     setEmailSendMessage('');
@@ -805,6 +848,7 @@ function LocalRulesHistory({
         const errorMessage = data?.error || 'Nao foi possivel enviar o email agora.';
         const receipt = saveWalletAgentAlertDeliveryFailureReceipt(delivery, errorMessage, data?.provider || 'resend');
         if (receipt) setAlertReceiptsRefreshKey(receipt.updatedAt);
+        await prepareAccountAlertRecord(delivery, receipt);
         setEmailSendMessage(errorMessage);
         return;
       }
@@ -812,6 +856,7 @@ function LocalRulesHistory({
       setActiveAlertDelivery(data.delivery);
       const receipt = saveWalletAgentAlertDeliveryReceipt(data.delivery, data?.provider || 'resend');
       if (receipt) setAlertReceiptsRefreshKey(receipt.updatedAt);
+      await prepareAccountAlertRecord(data.delivery, receipt);
       setEmailSendMessage(data?.message || 'Email enviado manualmente.');
     } catch {
       setEmailSendMessage('Nao foi possivel enviar o email agora.');
@@ -1186,6 +1231,31 @@ function LocalRulesHistory({
                         <p className={`mt-2 text-[11px] leading-relaxed ${activeAlertDelivery.status === 'sent' ? 'text-[#14F195]/82' : 'text-[#F5A524]/82'}`}>
                           {emailSendMessage}
                         </p>
+                      )}
+                      {(activeAlertRecord || alertRecordMessage) && (
+                        <div className="mt-3 rounded-xl border border-[#9945FF]/14 bg-[#9945FF]/[0.045] p-2.5">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#C4B5FD]/85">
+                              Historico da conta
+                            </p>
+                            {activeAlertRecord && (
+                              <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/42">
+                                {activeAlertRecord.persistence.mode}
+                              </span>
+                            )}
+                          </div>
+                          {activeAlertRecord && (
+                            <div className="grid gap-1 text-[11px] leading-relaxed text-white/46 sm:grid-cols-2">
+                              <p>Status: {activeAlertRecord.status}</p>
+                              <p>Email: {activeAlertRecord.userEmail ?? 'sem conta conectada'}</p>
+                              <p>Verificado: {activeAlertRecord.userVerified ? 'sim' : 'nao'}</p>
+                              <p>Persistido: {activeAlertRecord.persistence.persisted ? 'sim' : 'nao'}</p>
+                            </div>
+                          )}
+                          {alertRecordMessage && (
+                            <p className="mt-2 text-[11px] leading-relaxed text-white/42">{alertRecordMessage}</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}

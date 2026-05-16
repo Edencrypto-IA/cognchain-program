@@ -769,3 +769,23 @@ It still cannot:
 - use persistence to send or retry emails;
 - schedule future alerts;
 - store secrets, wallet keys, signed payloads, or execute transactions.
+
+## Phase 8.2 user-owned alert record handoff
+
+Wallet Agent now connects manual alert email results to the account-owned persistence contract.
+
+It can:
+
+- call `POST /api/wallet-agent/alert-records` after a manual email send succeeds or fails;
+- attach the local sent/failed receipt to the backend persistence contract;
+- show whether the record is linked to the current `cog_user` email identity;
+- show whether the account email is verified;
+- explain whether the response is still `contract_only` instead of durable storage.
+
+It still cannot:
+
+- write account alert history to a database;
+- recover local receipts from another device;
+- resend failed emails automatically;
+- schedule future alerts;
+- use account history to request wallet signatures or execute transactions.
