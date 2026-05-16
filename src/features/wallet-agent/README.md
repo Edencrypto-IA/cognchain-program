@@ -849,3 +849,23 @@ It still cannot:
 - show account history to unverified email identities;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from history;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 8.6 alert history audit bundle
+
+Wallet Agent now lets operators copy a clean alert history audit bundle.
+
+It can:
+
+- copy a full account alert history summary when verified email history is available;
+- copy a local browser alert history summary when account history is unavailable;
+- include sent totals, failure totals, unique targets, providers, recent receipts, timestamps, and storage notes;
+- preserve the same metadata-only safety boundary as the history APIs;
+- make support and audit review easier without adding new execution powers.
+
+It still cannot:
+
+- provide durable database history;
+- prove inbox opens or provider-side delivery beyond stored receipt metadata;
+- sync local fallback history across devices;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from copied history;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.

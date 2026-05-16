@@ -419,6 +419,69 @@ function buildServerAlertReceiptSummary(receipt: WalletAgentAlertServerReceipt) 
   ].join('\n');
 }
 
+function buildLocalAlertHistorySummary(
+  receipts: WalletAgentAlertDeliveryReceipt[],
+  stats: ReturnType<typeof summarizeWalletAgentAlertDeliveryReceipts>
+) {
+  return [
+    'CONGCHAIN Wallet Agent Local Alert History',
+    '',
+    'Source: local browser receipts',
+    `Generated at: ${new Date().toISOString()}`,
+    `Sent: ${stats.totalSent}`,
+    `Failed: ${stats.totalFailed}`,
+    `Unique targets: ${stats.uniqueTargets}`,
+    `Providers: ${stats.providers.join(', ') || 'n/a'}`,
+    stats.lastSentAt ? `Latest sent: ${stats.lastSentAt}` : null,
+    stats.lastFailedAt ? `Latest failure: ${stats.lastFailedAt}` : null,
+    '',
+    'Recent receipts:',
+    ...receipts.slice(0, 5).map((receipt, index) => [
+      `${index + 1}. ${receipt.title}`,
+      `   Receipt ID: ${receipt.id}`,
+      `   Target: ${receipt.target}`,
+      `   Provider: ${receipt.provider}`,
+      `   Status: ${receipt.status}`,
+      receipt.sentAt ? `   Sent at: ${receipt.sentAt}` : null,
+      receipt.failedAt ? `   Failed at: ${receipt.failedAt}` : null,
+      receipt.failureReason ? `   Failure reason: ${receipt.failureReason}` : null,
+    ].filter(Boolean).join('\n')),
+    '',
+    'Safety: local receipt history is metadata-only. It cannot resend email, schedule jobs, request wallet signatures, or execute transactions.',
+  ].filter(Boolean).join('\n');
+}
+
+function buildServerAlertHistorySummary(history: WalletAgentAlertServerHistory) {
+  return [
+    'CONGCHAIN Wallet Agent Account Alert History',
+    '',
+    `Owner email: ${history.ownerEmail}`,
+    `Generated at: ${new Date().toISOString()}`,
+    `Storage: ${history.storage.reason}`,
+    `Total: ${history.total}`,
+    `Sent: ${history.sent}`,
+    `Failed: ${history.failed}`,
+    `Unique targets: ${history.uniqueTargets}`,
+    `Providers: ${history.providers.join(', ') || 'n/a'}`,
+    history.latestSentAt ? `Latest sent: ${history.latestSentAt}` : null,
+    history.latestFailedAt ? `Latest failure: ${history.latestFailedAt}` : null,
+    '',
+    'Recent account receipts:',
+    ...history.recentReceipts.slice(0, 5).map((receipt, index) => [
+      `${index + 1}. ${receipt.title}`,
+      `   Server receipt ID: ${receipt.id}`,
+      `   Local receipt ID: ${receipt.receiptId}`,
+      `   Target: ${receipt.target}`,
+      `   Provider: ${receipt.provider}`,
+      `   Status: ${receipt.receiptStatus}`,
+      `   Event at: ${receipt.eventAt}`,
+    ].join('\n')),
+    '',
+    'Safety notes:',
+    ...history.safety.notes.map(item => `- ${item}`),
+  ].filter(Boolean).join('\n');
+}
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -534,6 +597,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [receipts, setReceipts] = useState<WalletAgentAlertDeliveryReceipt[]>([]);
   const [serverHistory, setServerHistory] = useState<WalletAgentAlertServerHistory | null>(null);
   const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
+  const [copiedHistory, setCopiedHistory] = useState(false);
   const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
   const stats = serverHistory ? {
     totalSent: serverHistory.sent,
@@ -585,6 +649,17 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
     }).catch(() => {});
   }
 
+  function copyHistorySummary() {
+    const summary = serverHistory
+      ? buildServerAlertHistorySummary(serverHistory)
+      : buildLocalAlertHistorySummary(receipts, localStats);
+
+    navigator.clipboard?.writeText(summary).then(() => {
+      setCopiedHistory(true);
+      window.setTimeout(() => setCopiedHistory(false), 1600);
+    }).catch(() => {});
+  }
+
   const hasReceipts = serverHistory ? serverReceipts.length > 0 : receipts.length > 0;
 
   return (
@@ -594,9 +669,21 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
           <Mail className="h-3.5 w-3.5 text-[#7DE3FF]" />
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Emails de alerta</p>
         </div>
-        <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
-          {serverHistory ? 'conta' : 'local'}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {hasReceipts && (
+            <button
+              type="button"
+              onClick={copyHistorySummary}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#00D1FF]/14 bg-[#00D1FF]/[0.06] px-2.5 py-1 text-[10px] font-semibold text-[#7DE3FF]/80 transition-colors hover:bg-[#00D1FF]/10 hover:text-[#B7F3FF]"
+            >
+              <Copy className="h-3 w-3" />
+              {copiedHistory ? 'Historico copiado' : 'Copiar historico'}
+            </button>
+          )}
+          <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
+            {serverHistory ? 'conta' : 'local'}
+          </span>
+        </div>
       </div>
 
       <p className="mb-3 text-[10px] leading-relaxed text-white/34">
