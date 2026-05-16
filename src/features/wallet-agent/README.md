@@ -406,3 +406,21 @@ It still cannot:
 - schedule background jobs;
 - sign or submit transactions from rule controls;
 - recover a removed local rule unless the user recreates it from a new confirmed intent.
+
+## Phase 5.4 rule review context
+
+Wallet Agent now generates a safe operational review context for local rules.
+
+It can:
+
+- open a rule context panel with trigger, action mode, wallet, and operator summary;
+- list required manual review checks before any future action;
+- list blocked actions that cannot happen from the local rule;
+- copy the full review context to the clipboard.
+
+It still cannot:
+
+- turn a rule context into execution;
+- prepare, sign, submit, buy, sell, or pay from the context panel;
+- bypass paused status or wallet approval;
+- treat local context as backend automation.

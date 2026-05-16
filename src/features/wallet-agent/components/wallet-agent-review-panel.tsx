@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   Copy,
+  Eye,
   FileCheck2,
   LockKeyhole,
   PauseCircle,
@@ -22,11 +23,13 @@ import type {
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
   WalletAgentLocalRule,
+  WalletAgentLocalRuleReviewContext,
   WalletAgentReviewItem,
 } from '../types';
 import { canConfirmWalletAgentIntent } from '../confirmation';
 import { readWalletAgentDevnetReceipts } from '../receipts';
 import {
+  createWalletAgentRuleReviewContext,
   readWalletAgentLocalRules,
   removeWalletAgentLocalRule,
   setWalletAgentLocalRuleStatus,
@@ -264,6 +267,31 @@ function buildRuleSummary(rule: WalletAgentLocalRule) {
   ].filter(Boolean).join('\n');
 }
 
+function buildRuleReviewContextSummary(context: WalletAgentLocalRuleReviewContext) {
+  return [
+    'CONGCHAIN Wallet Agent Rule Review Context',
+    '',
+    `Rule ID: ${context.ruleId}`,
+    `Title: ${context.title}`,
+    `Status: ${context.status}`,
+    `Trigger: ${context.triggerLabel}`,
+    `Action: ${context.actionLabel}`,
+    `Generated at: ${context.generatedAt}`,
+    '',
+    'Operator summary:',
+    context.operatorSummary,
+    '',
+    'Required review:',
+    ...context.requiredReview.map(item => `- ${item}`),
+    '',
+    'Blocked actions:',
+    ...context.blockedActions.map(item => `- ${item}`),
+    '',
+    'Safety notes:',
+    ...context.safetyNotes.map(item => `- ${item}`),
+  ].join('\n');
+}
+
 function getRuleStatusClassName(status: WalletAgentLocalRule['status']) {
   if (status === 'paused') {
     return 'border-[#F5A524]/22 bg-[#F5A524]/10 text-[#F5A524]';
@@ -353,9 +381,12 @@ function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
 function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
   const [rules, setRules] = useState<WalletAgentLocalRule[]>([]);
   const [copiedRuleId, setCopiedRuleId] = useState<string | null>(null);
+  const [activeContext, setActiveContext] = useState<WalletAgentLocalRuleReviewContext | null>(null);
+  const [copiedContextId, setCopiedContextId] = useState<string | null>(null);
 
   useEffect(() => {
     setRules(readWalletAgentLocalRules());
+    setActiveContext(null);
   }, [refreshKey]);
 
   function copyRule(rule: WalletAgentLocalRule) {
@@ -372,6 +403,21 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
 
   function removeRule(rule: WalletAgentLocalRule) {
     setRules(removeWalletAgentLocalRule(rule.id));
+    setActiveContext(current => current?.ruleId === rule.id ? null : current);
+  }
+
+  function showReviewContext(rule: WalletAgentLocalRule) {
+    setActiveContext(current => current?.ruleId === rule.id
+      ? null
+      : createWalletAgentRuleReviewContext(rule)
+    );
+  }
+
+  function copyReviewContext(context: WalletAgentLocalRuleReviewContext) {
+    navigator.clipboard?.writeText(buildRuleReviewContextSummary(context)).then(() => {
+      setCopiedContextId(context.ruleId);
+      window.setTimeout(() => setCopiedContextId(null), 1600);
+    }).catch(() => {});
   }
 
   return (
@@ -428,6 +474,14 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => showReviewContext(rule)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#5AD7FF]/16 bg-[#5AD7FF]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#7DE3FF] transition-colors hover:bg-[#5AD7FF]/10"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  {activeContext?.ruleId === rule.id ? 'Ocultar contexto' : 'Contexto'}
+                </button>
+                <button
+                  type="button"
                   onClick={() => toggleRuleStatus(rule)}
                   className="inline-flex items-center gap-1.5 rounded-full border border-[#F5A524]/16 bg-[#F5A524]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#F5A524] transition-colors hover:bg-[#F5A524]/10"
                 >
@@ -443,6 +497,42 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                   Remover
                 </button>
               </div>
+
+              {activeContext?.ruleId === rule.id && (
+                <div className="mt-3 rounded-2xl border border-[#5AD7FF]/16 bg-[#5AD7FF]/[0.045] p-3">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Contexto de revisao</p>
+                      <p className="mt-1 text-xs leading-relaxed text-white/54">{activeContext.operatorSummary}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyReviewContext(activeContext)}
+                      className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                    >
+                      {copiedContextId === activeContext.ruleId ? 'Copiado' : 'Copiar'}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/34">Revisar antes de agir</p>
+                      <div className="space-y-1.5">
+                        {activeContext.requiredReview.map(item => (
+                          <p key={item} className="text-[11px] leading-relaxed text-white/48">- {item}</p>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[#FF5C7A]/14 bg-[#FF5C7A]/[0.04] p-2.5">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#FF8A9E]/80">Bloqueado nesta fase</p>
+                      <div className="space-y-1.5">
+                        {activeContext.blockedActions.map(item => (
+                          <p key={item} className="text-[11px] leading-relaxed text-white/46">- {item}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

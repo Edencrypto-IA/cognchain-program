@@ -168,6 +168,19 @@ export type WalletAgentLocalRule = {
   confirmationId?: string;
 };
 
+export type WalletAgentLocalRuleReviewContext = {
+  ruleId: string;
+  title: string;
+  status: WalletAgentLocalRuleStatus;
+  triggerLabel: string;
+  actionLabel: string;
+  operatorSummary: string;
+  requiredReview: string[];
+  blockedActions: string[];
+  safetyNotes: string[];
+  generatedAt: string;
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

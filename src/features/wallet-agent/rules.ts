@@ -2,6 +2,7 @@ import type {
   WalletAgentCoreResult,
   WalletAgentIntentType,
   WalletAgentLocalRule,
+  WalletAgentLocalRuleReviewContext,
   WalletAgentLocalRuleTrigger,
 } from './types';
 
@@ -172,6 +173,45 @@ export function removeWalletAgentLocalRule(ruleId: string): WalletAgentLocalRule
   const next = readWalletAgentLocalRules().filter(rule => rule.id !== ruleId);
   window.localStorage.setItem(WALLET_AGENT_RULES_KEY, JSON.stringify(next));
   return next;
+}
+
+export function createWalletAgentRuleReviewContext(
+  rule: WalletAgentLocalRule,
+  now = new Date()
+): WalletAgentLocalRuleReviewContext {
+  const valueAction = rule.safety.requiresWalletSignature;
+
+  return {
+    ruleId: rule.id,
+    title: `${rule.type.replaceAll('_', ' ')} review context`,
+    status: rule.status,
+    triggerLabel: rule.trigger.label,
+    actionLabel: rule.action.label,
+    operatorSummary: [
+      rule.summary,
+      `Trigger: ${rule.trigger.label}.`,
+      `Action mode: ${rule.action.kind.replaceAll('_', ' ')}.`,
+      rule.walletAddress ? `Wallet: ${rule.walletAddress}.` : 'Wallet: not connected.',
+    ].join(' '),
+    requiredReview: [
+      'Confirm that the user still wants this rule active.',
+      'Check that the trigger data is still correct and current.',
+      valueAction
+        ? 'Require a fresh wallet review and signature before any value-moving action.'
+        : 'Confirm this remains notify-only before using it for an operational update.',
+      rule.status === 'paused'
+        ? 'Reactivate the rule only if the user explicitly chooses to continue watching it.'
+        : 'Keep the rule in manual review until the user approves a future step.',
+    ],
+    blockedActions: [
+      'Do not sign from this context.',
+      'Do not submit a transaction from this context.',
+      'Do not run a background scheduler from this context.',
+      'Do not treat this local rule as a backend automation job.',
+    ],
+    safetyNotes: rule.safety.notes,
+    generatedAt: now.toISOString(),
+  };
 }
 
 export function saveWalletAgentLocalRule(result: WalletAgentCoreResult): WalletAgentLocalRule | null {

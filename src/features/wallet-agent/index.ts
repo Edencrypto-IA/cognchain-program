@@ -12,6 +12,7 @@ export type {
   WalletAgentIntentType,
   WalletAgentLanguageHint,
   WalletAgentLocalRule,
+  WalletAgentLocalRuleReviewContext,
   WalletAgentLocalRuleStatus,
   WalletAgentLocalRuleTrigger,
   WalletAgentParsedIntent,
@@ -53,6 +54,7 @@ export {
 } from './receipts';
 export {
   canCreateWalletAgentLocalRule,
+  createWalletAgentRuleReviewContext,
   createWalletAgentLocalRule,
   readWalletAgentLocalRules,
   removeWalletAgentLocalRule,
