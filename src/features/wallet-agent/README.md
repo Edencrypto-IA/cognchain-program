@@ -749,3 +749,23 @@ It still cannot:
 - create backend delivery analytics;
 - retry failed emails automatically;
 - schedule, sign, submit, buy, sell, or pay from alert status.
+
+## Phase 8.1 backend persistence contract
+
+Wallet Agent now has a backend persistence contract for future account-owned alert records.
+
+It can:
+
+- create a typed `WalletAgentAlertPersistenceRecord`;
+- accept a delivery contract and optional local receipt through `POST /api/wallet-agent/alert-records`;
+- attach the current `cog_user` email identity as metadata when available;
+- report whether a future persistence backend is configured;
+- return `contract_only` mode when no database adapter is enabled.
+
+It still cannot:
+
+- write alert records to a real database;
+- sync local receipts across devices;
+- use persistence to send or retry emails;
+- schedule future alerts;
+- store secrets, wallet keys, signed payloads, or execute transactions.

@@ -17,6 +17,9 @@ export type {
   WalletAgentAlertDeliveryChannelStatus,
   WalletAgentAlertDeliveryReceiptStats,
   WalletAgentAlertDeliveryStatus,
+  WalletAgentAlertPersistenceMode,
+  WalletAgentAlertPersistenceRecord,
+  WalletAgentAlertPersistenceRecordStatus,
   WalletAgentLocalNotificationChannel,
   WalletAgentLocalNotificationDraft,
   WalletAgentLocalNotificationPreferences,
@@ -72,6 +75,10 @@ export {
   summarizeWalletAgentAlertDeliveryReceipts,
   upsertWalletAgentAlertDeliveryReceipt,
 } from './alert-receipts';
+export {
+  createWalletAgentAlertPersistenceRecordContract,
+  isWalletAgentAlertPersistenceBackendConfigured,
+} from './alert-records';
 export {
   createWalletAgentAlertDeliveryContract,
 } from './alerts';

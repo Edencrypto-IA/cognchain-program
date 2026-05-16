@@ -287,6 +287,38 @@ export type WalletAgentAlertDeliveryReceiptStats = {
   lastFailedAt: string | null;
 };
 
+export type WalletAgentAlertPersistenceMode = 'contract_only' | 'database';
+
+export type WalletAgentAlertPersistenceRecordStatus = 'prepared' | 'persisted' | 'blocked';
+
+export type WalletAgentAlertPersistenceRecord = {
+  id: string;
+  deliveryId: string;
+  ruleId: string;
+  draftId: string;
+  userEmail: string | null;
+  userVerified: boolean;
+  status: WalletAgentAlertPersistenceRecordStatus;
+  createdAt: string;
+  updatedAt: string;
+  delivery: WalletAgentAlertDelivery;
+  receipt: WalletAgentAlertDeliveryReceipt | null;
+  persistence: {
+    mode: WalletAgentAlertPersistenceMode;
+    persisted: boolean;
+    backendConfigured: boolean;
+    reason: string;
+  };
+  safety: {
+    canPersistMetadata: boolean;
+    canStoreSecrets: false;
+    canExecuteTransaction: false;
+    canSchedule: false;
+    notes: string[];
+  };
+  blockedActions: string[];
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];
