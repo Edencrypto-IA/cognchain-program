@@ -10,6 +10,7 @@ import {
   Eye,
   FileCheck2,
   LockKeyhole,
+  Mail,
   PauseCircle,
   PlayCircle,
   Send,
@@ -24,6 +25,7 @@ import type {
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
   WalletAgentLocalNotificationDraft,
+  WalletAgentLocalNotificationPreferences,
   WalletAgentLocalRule,
   WalletAgentLocalRuleReviewContext,
   WalletAgentLocalRuleSimulation,
@@ -35,7 +37,9 @@ import {
   createWalletAgentLocalNotificationDraft,
   createWalletAgentRuleReviewContext,
   readWalletAgentLocalRules,
+  readWalletAgentNotificationPreferences,
   removeWalletAgentLocalRule,
+  saveWalletAgentNotificationPreferences,
   setWalletAgentLocalRuleStatus,
   simulateWalletAgentLocalRule,
 } from '../rules';
@@ -452,9 +456,13 @@ function LocalRulesHistory({
   const [activeNotificationDraft, setActiveNotificationDraft] = useState<WalletAgentLocalNotificationDraft | null>(null);
   const [copiedNotificationId, setCopiedNotificationId] = useState<string | null>(null);
   const [sentNotificationId, setSentNotificationId] = useState<string | null>(null);
+  const [notificationPreferences, setNotificationPreferences] = useState<WalletAgentLocalNotificationPreferences>(() => (
+    readWalletAgentNotificationPreferences()
+  ));
 
   useEffect(() => {
     setRules(readWalletAgentLocalRules());
+    setNotificationPreferences(readWalletAgentNotificationPreferences());
     setActiveContext(null);
     setActiveSimulation(null);
     setActiveNotificationDraft(null);
@@ -506,7 +514,17 @@ function LocalRulesHistory({
   }
 
   function prepareNotificationDraft(rule: WalletAgentLocalRule) {
-    setActiveNotificationDraft(createWalletAgentLocalNotificationDraft(rule));
+    setActiveNotificationDraft(createWalletAgentLocalNotificationDraft(rule, new Date(), notificationPreferences));
+    setSentNotificationId(null);
+  }
+
+  function updateNotificationPreference(
+    key: keyof Pick<WalletAgentLocalNotificationPreferences, 'chatEnabled' | 'emailPrepared' | 'walletApprovalEnabled'>,
+    value: boolean
+  ) {
+    const next = saveWalletAgentNotificationPreferences({ [key]: value });
+    setNotificationPreferences(next);
+    setActiveNotificationDraft(null);
     setSentNotificationId(null);
   }
 
@@ -534,6 +552,62 @@ function LocalRulesHistory({
         <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
           manual
         </span>
+      </div>
+
+      <div className="mb-3 rounded-2xl border border-[#00D1FF]/12 bg-black/20 p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Bell className="h-3.5 w-3.5 text-[#7DE3FF]" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/46">Preferencias de alerta</p>
+          </div>
+          <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/34">
+            local only
+          </span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => updateNotificationPreference('chatEnabled', !notificationPreferences.chatEnabled)}
+            className={`rounded-xl border px-3 py-2 text-left transition-colors ${notificationPreferences.chatEnabled ? 'border-[#14F195]/18 bg-[#14F195]/[0.07]' : 'border-white/[0.07] bg-white/[0.025]'}`}
+          >
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/68">
+              <Send className="h-3.5 w-3.5" />
+              Chat
+            </span>
+            <span className="mt-1 block text-[10px] leading-relaxed text-white/38">
+              {notificationPreferences.chatEnabled ? 'Mensagem local no CongChain.' : 'Oculto do rascunho.'}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateNotificationPreference('emailPrepared', !notificationPreferences.emailPrepared)}
+            className={`rounded-xl border px-3 py-2 text-left transition-colors ${notificationPreferences.emailPrepared ? 'border-[#00D1FF]/18 bg-[#00D1FF]/[0.07]' : 'border-white/[0.07] bg-white/[0.025]'}`}
+          >
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/68">
+              <Mail className="h-3.5 w-3.5" />
+              Email
+            </span>
+            <span className="mt-1 block text-[10px] leading-relaxed text-white/38">
+              {notificationPreferences.emailPrepared ? 'Preparado para email verificado.' : 'Email desativado.'}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateNotificationPreference('walletApprovalEnabled', !notificationPreferences.walletApprovalEnabled)}
+            className={`rounded-xl border px-3 py-2 text-left transition-colors ${notificationPreferences.walletApprovalEnabled ? 'border-[#9945FF]/20 bg-[#9945FF]/[0.08]' : 'border-white/[0.07] bg-white/[0.025]'}`}
+          >
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/68">
+              <Wallet className="h-3.5 w-3.5" />
+              Wallet
+            </span>
+            <span className="mt-1 block text-[10px] leading-relaxed text-white/38">
+              {notificationPreferences.walletApprovalEnabled ? 'Aprovacao futura mantida.' : 'Aprovacao oculta do alerta.'}
+            </span>
+          </button>
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-white/32">
+          Preferencias ficam neste navegador. Nenhum email, push ou assinatura e disparado automaticamente.
+        </p>
       </div>
 
       {rules.length === 0 ? (

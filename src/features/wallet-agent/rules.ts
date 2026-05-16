@@ -2,6 +2,7 @@ import type {
   WalletAgentCoreResult,
   WalletAgentIntentType,
   WalletAgentLocalNotificationDraft,
+  WalletAgentLocalNotificationPreferences,
   WalletAgentLocalRule,
   WalletAgentLocalRuleReviewContext,
   WalletAgentLocalRuleSimulation,
@@ -9,6 +10,7 @@ import type {
 } from './types';
 
 const WALLET_AGENT_RULES_KEY = 'congchain.walletAgent.localRules.v1';
+const WALLET_AGENT_NOTIFICATION_PREFERENCES_KEY = 'congchain.walletAgent.notificationPreferences.v1';
 const MAX_RULES = 40;
 
 const RULE_ELIGIBLE_INTENTS = new Set<WalletAgentIntentType>([
@@ -20,6 +22,56 @@ const RULE_ELIGIBLE_INTENTS = new Set<WalletAgentIntentType>([
 
 function canUseLocalStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+function createDefaultNotificationPreferences(now = new Date()): WalletAgentLocalNotificationPreferences {
+  return {
+    chatEnabled: true,
+    emailPrepared: true,
+    walletApprovalEnabled: true,
+    updatedAt: now.toISOString(),
+  };
+}
+
+export function readWalletAgentNotificationPreferences(): WalletAgentLocalNotificationPreferences {
+  const defaults = createDefaultNotificationPreferences();
+  if (!canUseLocalStorage()) return defaults;
+
+  try {
+    const raw = window.localStorage.getItem(WALLET_AGENT_NOTIFICATION_PREFERENCES_KEY);
+    if (!raw) return defaults;
+
+    const parsed = JSON.parse(raw);
+    return {
+      chatEnabled: typeof parsed?.chatEnabled === 'boolean' ? parsed.chatEnabled : defaults.chatEnabled,
+      emailPrepared: typeof parsed?.emailPrepared === 'boolean' ? parsed.emailPrepared : defaults.emailPrepared,
+      walletApprovalEnabled: typeof parsed?.walletApprovalEnabled === 'boolean'
+        ? parsed.walletApprovalEnabled
+        : defaults.walletApprovalEnabled,
+      updatedAt: typeof parsed?.updatedAt === 'string' ? parsed.updatedAt : defaults.updatedAt,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+export function saveWalletAgentNotificationPreferences(
+  preferences: Partial<Omit<WalletAgentLocalNotificationPreferences, 'updatedAt'>>,
+  now = new Date()
+): WalletAgentLocalNotificationPreferences {
+  const current = readWalletAgentNotificationPreferences();
+  const next: WalletAgentLocalNotificationPreferences = {
+    ...current,
+    ...preferences,
+    chatEnabled: preferences.chatEnabled ?? current.chatEnabled,
+    updatedAt: now.toISOString(),
+  };
+
+  if (canUseLocalStorage()) {
+    window.localStorage.setItem(WALLET_AGENT_NOTIFICATION_PREFERENCES_KEY, JSON.stringify(next));
+  }
+
+  return next;
 }
 
 export function canCreateWalletAgentLocalRule(result: WalletAgentCoreResult) {
@@ -296,12 +348,27 @@ export function simulateWalletAgentLocalRule(
 
 export function createWalletAgentLocalNotificationDraft(
   rule: WalletAgentLocalRule,
-  now = new Date()
+  now = new Date(),
+  preferences = readWalletAgentNotificationPreferences()
 ): WalletAgentLocalNotificationDraft {
   const walletActionRequired = rule.safety.requiresWalletSignature;
-  const channels: WalletAgentLocalNotificationDraft['channels'] = walletActionRequired
-    ? ['congchain_chat', 'email', 'wallet']
-    : ['congchain_chat', 'email'];
+  const channels: WalletAgentLocalNotificationDraft['channels'] = [];
+
+  if (preferences.chatEnabled) channels.push('congchain_chat');
+  if (preferences.emailPrepared) channels.push('email');
+  if (walletActionRequired && preferences.walletApprovalEnabled) channels.push('wallet');
+
+  if (channels.length === 0) channels.push('congchain_chat');
+
+  const chatText = preferences.chatEnabled ? 'avisaria no chat' : 'guardaria um rascunho local';
+  const emailText = preferences.emailPrepared
+    ? `${preferences.chatEnabled ? ' e' : ' e'} prepararia um email`
+    : '';
+  const walletText = walletActionRequired && preferences.walletApprovalEnabled
+    ? ' Se houver acao de valor, a carteira seria usada apenas para uma aprovacao futura e explicita.'
+    : walletActionRequired
+      ? ' A regra exige valor, mas o canal de carteira esta desativado nas preferencias locais.'
+      : '';
 
   return {
     id: `wanotif_${rule.id}_${now.getTime()}`,
@@ -313,13 +380,19 @@ export function createWalletAgentLocalNotificationDraft(
       : `Alerta preparado: ${rule.type.replaceAll('_', ' ')}`,
     message: rule.status === 'paused'
       ? `A regra "${rule.trigger.label}" esta pausada. A CONGCHAIN nao avisaria nada ate voce reativar.`
-      : `A CONGCHAIN avisaria no chat e prepararia um email quando a regra "${rule.trigger.label}" precisar de revisao manual.${walletActionRequired ? ' Se houver acao de valor, a carteira seria usada apenas para uma aprovacao futura e explicita.' : ''}`,
+      : `A CONGCHAIN ${chatText}${emailText} quando a regra "${rule.trigger.label}" precisar de revisao manual.${walletText}`,
     walletActionRequired,
     deliveryPlan: [
-      'Mostrar primeiro no chat CongChain.',
-      'Preparar copia por email para um usuario autenticado quando o canal de email estiver conectado.',
+      preferences.chatEnabled
+        ? 'Mostrar primeiro no chat CongChain.'
+        : 'Manter apenas como rascunho local porque o chat esta desativado nas preferencias.',
+      preferences.emailPrepared
+        ? 'Preparar copia por email para um usuario autenticado quando o canal de email estiver conectado.'
+        : 'Nao preparar email porque o canal esta desativado nas preferencias locais.',
       walletActionRequired
-        ? 'Abrir solicitacao de carteira somente se o usuario escolher revisar e assinar no futuro.'
+        ? preferences.walletApprovalEnabled
+          ? 'Abrir solicitacao de carteira somente se o usuario escolher revisar e assinar no futuro.'
+          : 'Nao abrir carteira porque aprovacoes por wallet estao desativadas nas preferencias locais.'
         : 'Nao abrir carteira para regra somente leitura.',
       'Nao enviar Telegram, browser push ou qualquer canal externo nao conectado.',
     ],

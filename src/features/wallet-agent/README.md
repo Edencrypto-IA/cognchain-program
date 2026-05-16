@@ -482,3 +482,23 @@ It still cannot:
 - send emails automatically;
 - schedule future alerts;
 - execute, sign, submit, buy, sell, or pay from the alert.
+
+## Phase 5.8 local notification preferences
+
+Wallet Agent now stores local notification preferences for alert drafts.
+
+It can:
+
+- enable or disable CongChain chat in notification drafts;
+- enable or disable prepared email copies;
+- enable or disable wallet approval visibility for future value-moving reviews;
+- save those preferences in `localStorage` for this browser;
+- regenerate alert drafts using the selected local channels.
+
+It still cannot:
+
+- send email automatically;
+- verify an email address;
+- create a backend notification subscription;
+- open wallet approvals from a notification draft;
+- execute, sign, submit, buy, sell, or pay from notification preferences.

@@ -166,6 +166,9 @@ function formatWalletAgentNotificationChatMessage(
       return 'carteira';
     })
     .join(' + ');
+  const emailNote = draft.channels.includes('email')
+    ? '- Email: preparado apenas para um usuario autenticado; nenhum email foi enviado nesta etapa.'
+    : '- Email: desativado nas preferencias locais deste alerta.';
 
   return [
     '### Alerta preparado no CongChain',
@@ -176,7 +179,7 @@ function formatWalletAgentNotificationChatMessage(
     `- Status da regra: ${rule.status.replaceAll('_', ' ')}`,
     `- Gatilho: ${rule.trigger.label}`,
     `- Canal: ${channels}`,
-    '- Email: preparado apenas para um usuario autenticado; nenhum email foi enviado nesta etapa.',
+    emailNote,
     `- Carteira: ${draft.walletActionRequired ? 'sera necessaria apenas se voce aprovar uma etapa futura' : 'nao necessaria para este alerta'}`,
     '',
     '**O que revisar agora**',

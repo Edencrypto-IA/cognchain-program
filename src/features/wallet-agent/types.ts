@@ -199,6 +199,13 @@ export type WalletAgentLocalRuleSimulation = {
 
 export type WalletAgentLocalNotificationChannel = 'congchain_chat' | 'email' | 'wallet';
 
+export type WalletAgentLocalNotificationPreferences = {
+  chatEnabled: boolean;
+  emailPrepared: boolean;
+  walletApprovalEnabled: boolean;
+  updatedAt: string;
+};
+
 export type WalletAgentLocalNotificationDraft = {
   id: string;
   ruleId: string;
