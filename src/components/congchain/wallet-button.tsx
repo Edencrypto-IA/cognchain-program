@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
-import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift, FlaskConical } from 'lucide-react';
+import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift, FlaskConical, Mail, UserCheck } from 'lucide-react';
 
 const WALLET_OPTIONS = [
   {
@@ -42,6 +42,14 @@ type DevnetWalletCreatedDetail = {
   airdropStatus: 'success' | 'pending' | 'failed';
 };
 
+type EmailIdentitySession = {
+  email: string;
+  authLevel: 'email_local';
+  verified: false;
+  createdAt: string;
+  expiresAt: string;
+};
+
 function isMobileBrowser() {
   if (typeof navigator === 'undefined') return false;
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
@@ -60,6 +68,10 @@ export default function WalletButton() {
   const [airdropMessage, setAirdropMessage] = useState('');
   const [airdropTx, setAirdropTx] = useState('');
   const [devnetWallet, setDevnetWallet] = useState<DevnetWalletSnapshot | null>(null);
+  const [emailSession, setEmailSession] = useState<EmailIdentitySession | null>(null);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailMessage, setEmailMessage] = useState('');
   const walletButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -80,6 +92,18 @@ export default function WalletButton() {
     } catch {
       window.localStorage.removeItem(DEVNET_WALLET_STORAGE_KEY);
     }
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/auth/email/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.authenticated && data.user?.email) {
+          setEmailSession(data.user);
+          setEmailInput(data.user.email);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const fetchBalance = useCallback(async () => {
@@ -273,6 +297,39 @@ export default function WalletButton() {
     }
   }
 
+  async function connectEmailIdentity() {
+    const email = emailInput.trim();
+    if (!email) {
+      setEmailMessage('Informe um email para continuar.');
+      return;
+    }
+
+    setEmailLoading(true);
+    setEmailMessage('');
+
+    try {
+      const res = await fetch('/api/auth/email/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setEmailMessage(data.error || 'Nao foi possivel conectar este email.');
+        return;
+      }
+
+      setEmailSession(data.user);
+      setEmailInput(data.user.email);
+      setEmailMessage('Email conectado como identidade local. Nenhum email foi enviado.');
+    } catch {
+      setEmailMessage('Nao foi possivel conectar este email agora.');
+    } finally {
+      setEmailLoading(false);
+    }
+  }
+
   function openConnectedMenu() {
     const rect = walletButtonRef.current?.getBoundingClientRect();
     if (!rect || typeof window === 'undefined') {
@@ -404,6 +461,50 @@ export default function WalletButton() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-[#9945FF]/18 bg-[#9945FF]/[0.06] p-2.5">
+                  <div className="mb-2 flex items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#9945FF]/20 bg-[#9945FF]/10">
+                      <Mail className="h-4 w-4 text-[#B58CFF]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B58CFF]/85">Email Identity</p>
+                        <span className="rounded-full bg-[#00D1FF]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#7DE3FF]/75">
+                          conta local
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-relaxed text-white/38">
+                        Use email para identidade, preferencias e alertas futuros. Nao substitui a wallet e ainda nao envia email real.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={emailInput}
+                      onChange={event => setEmailInput(event.target.value)}
+                      placeholder="seu@email.com"
+                      inputMode="email"
+                      className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-black/24 px-3 py-2 text-xs text-white/72 outline-none transition-colors placeholder:text-white/25 focus:border-[#9945FF]/35"
+                    />
+                    <button
+                      type="button"
+                      onClick={connectEmailIdentity}
+                      disabled={emailLoading}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#9945FF]/22 bg-[#9945FF]/10 px-3 py-2 text-xs font-semibold text-[#C4B5FD] transition-colors hover:bg-[#9945FF]/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {emailLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
+                      {emailSession ? 'Atualizar' : 'Entrar'}
+                    </button>
+                  </div>
+
+                  {(emailSession || emailMessage) && (
+                    <p className={`mt-2 text-[11px] leading-relaxed ${emailSession ? 'text-[#14F195]/70' : 'text-white/42'}`}>
+                      {emailMessage || `Conectado como ${emailSession?.email}`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-start gap-3 rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/7 p-2.5">

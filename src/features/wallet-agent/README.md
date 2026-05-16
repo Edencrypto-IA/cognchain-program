@@ -522,3 +522,24 @@ It still cannot:
 - send email automatically;
 - connect SMTP or an email provider;
 - schedule, sign, submit, buy, sell, or pay from email settings.
+
+## Phase 6.1 email identity layer
+
+CONGCHAIN now has a separate user email identity layer alongside Phantom, Solflare, Devnet Sandbox, and Admin login.
+
+It can:
+
+- create a local email identity session through `/api/auth/email/start`;
+- read the current email identity through `/api/auth/email/me`;
+- clear the email identity through `/api/auth/email/logout`;
+- store the session in a separate signed `cog_user` cookie;
+- show Email Identity as an option in the wallet/connect modal;
+- keep Admin auth isolated in `cog_admin`.
+
+It still cannot:
+
+- verify email ownership with a magic link;
+- send real emails;
+- replace Phantom, Solflare, or Devnet Sandbox;
+- sign wallet actions;
+- recover accounts across devices without a future email delivery provider.

@@ -32,6 +32,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/score': { windowMs: 60_000, maxRequests: 30 },
   '/api/blockchain/store': { windowMs: 60_000, maxRequests: 5 },
   '/api/blockchain/verify': { windowMs: 60_000, maxRequests: 10 },
+  '/api/auth/email/start': { windowMs: 10 * 60_000, maxRequests: 8 },
   '/api/wallet/connect': { windowMs: 60_000, maxRequests: 10 },
   '/api/wallet/airdrop': { windowMs: 10 * 60_000, maxRequests: 3 },
   '/api/wallet/sign': { windowMs: 60_000, maxRequests: 20 },
