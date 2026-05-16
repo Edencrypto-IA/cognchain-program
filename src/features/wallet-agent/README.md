@@ -584,3 +584,28 @@ It still cannot:
 - replace Phantom, Solflare, Devnet Sandbox, or wallet signatures;
 - sync alert rules to a backend account database;
 - authorize financial actions from email identity alone.
+
+## Phase 6.4 email provider readiness
+
+CONGCHAIN now exposes provider readiness for real magic link delivery.
+
+It can:
+
+- report Resend configuration through `/api/auth/email/provider`;
+- show whether real email delivery is ready inside the connect modal;
+- keep magic link generation working even when delivery is not configured;
+- send real magic links when `RESEND_API_KEY` and `AUTH_EMAIL_FROM` or `EMAIL_FROM` exist;
+- mask the sender address in the public provider status response.
+
+Required Railway variables for real delivery:
+
+- `RESEND_API_KEY`
+- `AUTH_EMAIL_FROM` or `EMAIL_FROM`
+- optional: `USER_SESSION_SECRET`
+
+It still cannot:
+
+- send email without a configured provider;
+- verify email ownership without the user clicking a valid magic link;
+- use email to authorize wallet signatures or value movement;
+- replace Phantom, Solflare, or Devnet Sandbox.

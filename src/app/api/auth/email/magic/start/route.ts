@@ -80,6 +80,10 @@ export async function POST(req: NextRequest) {
     ok: true,
     email,
     delivery: delivery.sent ? 'email_sent' : delivery.reason,
+    provider: {
+      name: 'resend',
+      configured: delivery.reason !== 'email_provider_not_configured',
+    },
     expiresAt: new Date(link.expiresAt).toISOString(),
     magicUrl: includeDevelopmentLink ? magicUrl : undefined,
     message: delivery.sent

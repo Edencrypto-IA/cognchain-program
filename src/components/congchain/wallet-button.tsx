@@ -50,6 +50,13 @@ type EmailIdentitySession = {
   expiresAt: string;
 };
 
+type EmailProviderStatus = {
+  configured: boolean;
+  provider: string;
+  mode: 'email_delivery_ready' | 'setup_required';
+  from: string | null;
+};
+
 function isMobileBrowser() {
   if (typeof navigator === 'undefined') return false;
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
@@ -73,6 +80,7 @@ export default function WalletButton() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [emailMessage, setEmailMessage] = useState('');
+  const [emailProvider, setEmailProvider] = useState<EmailProviderStatus | null>(null);
   const walletButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -102,6 +110,22 @@ export default function WalletButton() {
         if (data?.authenticated && data.user?.email) {
           setEmailSession(data.user);
           setEmailInput(data.user.email);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/auth/email/provider')
+      .then(res => res.json())
+      .then(data => {
+        if (typeof data?.configured === 'boolean') {
+          setEmailProvider({
+            configured: data.configured,
+            provider: data.provider || 'resend',
+            mode: data.mode === 'email_delivery_ready' ? 'email_delivery_ready' : 'setup_required',
+            from: data.from ?? null,
+          });
         }
       })
       .catch(() => {});
@@ -356,7 +380,7 @@ export default function WalletButton() {
 
       setEmailMessage(data.delivery === 'email_sent'
         ? 'Link magico enviado. Confira seu email.'
-        : 'Link magico preparado. Configure RESEND_API_KEY para envio real.'
+        : 'Link magico preparado. Configure RESEND_API_KEY e AUTH_EMAIL_FROM para envio real.'
       );
     } catch {
       setEmailMessage('Nao foi possivel preparar o link magico agora.');
@@ -549,6 +573,15 @@ export default function WalletButton() {
                       {emailMessage || `Conectado como ${emailSession?.email}${emailSession?.verified ? ' (verificado)' : ' (local)'}`}
                     </p>
                   )}
+                  <div className={`mt-2 rounded-xl border px-3 py-2 text-[10px] leading-relaxed ${
+                    emailProvider?.configured
+                      ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]/70'
+                      : 'border-[#F5A524]/14 bg-[#F5A524]/[0.045] text-[#F5A524]/72'
+                  }`}>
+                    {emailProvider?.configured
+                      ? `Envio real pronto via ${emailProvider.provider}${emailProvider.from ? ` (${emailProvider.from})` : ''}.`
+                      : 'Envio real pendente: configure RESEND_API_KEY e AUTH_EMAIL_FROM no Railway.'}
+                  </div>
                 </div>
 
                 <div className="flex items-start gap-3 rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/7 p-2.5">
