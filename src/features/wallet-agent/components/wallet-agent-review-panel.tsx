@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Bell,
   CheckCircle2,
   Clock3,
   Copy,
@@ -22,6 +23,7 @@ import type {
   WalletAgentCoreResult,
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
+  WalletAgentLocalNotificationDraft,
   WalletAgentLocalRule,
   WalletAgentLocalRuleReviewContext,
   WalletAgentLocalRuleSimulation,
@@ -30,6 +32,7 @@ import type {
 import { canConfirmWalletAgentIntent } from '../confirmation';
 import { readWalletAgentDevnetReceipts } from '../receipts';
 import {
+  createWalletAgentLocalNotificationDraft,
   createWalletAgentRuleReviewContext,
   readWalletAgentLocalRules,
   removeWalletAgentLocalRule,
@@ -316,6 +319,30 @@ function buildRuleSimulationSummary(simulation: WalletAgentLocalRuleSimulation) 
   ].join('\n');
 }
 
+function buildNotificationDraftSummary(draft: WalletAgentLocalNotificationDraft) {
+  return [
+    'CONGCHAIN Wallet Agent Notification Draft',
+    '',
+    `Draft ID: ${draft.id}`,
+    `Rule ID: ${draft.ruleId}`,
+    `Status: ${draft.status}`,
+    `Channels: ${draft.channels.join(', ')}`,
+    `Wallet action required: ${draft.walletActionRequired ? 'yes' : 'no'}`,
+    `Created at: ${draft.createdAt}`,
+    '',
+    `Title: ${draft.title}`,
+    '',
+    'Message:',
+    draft.message,
+    '',
+    'Delivery plan:',
+    ...draft.deliveryPlan.map(item => `- ${item}`),
+    '',
+    'Blocked actions:',
+    ...draft.blockedActions.map(item => `- ${item}`),
+  ].join('\n');
+}
+
 function getRuleStatusClassName(status: WalletAgentLocalRule['status']) {
   if (status === 'paused') {
     return 'border-[#F5A524]/22 bg-[#F5A524]/10 text-[#F5A524]';
@@ -409,11 +436,14 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
   const [copiedContextId, setCopiedContextId] = useState<string | null>(null);
   const [activeSimulation, setActiveSimulation] = useState<WalletAgentLocalRuleSimulation | null>(null);
   const [copiedSimulationId, setCopiedSimulationId] = useState<string | null>(null);
+  const [activeNotificationDraft, setActiveNotificationDraft] = useState<WalletAgentLocalNotificationDraft | null>(null);
+  const [copiedNotificationId, setCopiedNotificationId] = useState<string | null>(null);
 
   useEffect(() => {
     setRules(readWalletAgentLocalRules());
     setActiveContext(null);
     setActiveSimulation(null);
+    setActiveNotificationDraft(null);
   }, [refreshKey]);
 
   function copyRule(rule: WalletAgentLocalRule) {
@@ -432,6 +462,7 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
     setRules(removeWalletAgentLocalRule(rule.id));
     setActiveContext(current => current?.ruleId === rule.id ? null : current);
     setActiveSimulation(current => current?.ruleId === rule.id ? null : current);
+    setActiveNotificationDraft(current => current?.ruleId === rule.id ? null : current);
   }
 
   function showReviewContext(rule: WalletAgentLocalRule) {
@@ -456,6 +487,17 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
     navigator.clipboard?.writeText(buildRuleSimulationSummary(simulation)).then(() => {
       setCopiedSimulationId(simulation.ruleId);
       window.setTimeout(() => setCopiedSimulationId(null), 1600);
+    }).catch(() => {});
+  }
+
+  function prepareNotificationDraft(rule: WalletAgentLocalRule) {
+    setActiveNotificationDraft(createWalletAgentLocalNotificationDraft(rule));
+  }
+
+  function copyNotificationDraft(draft: WalletAgentLocalNotificationDraft) {
+    navigator.clipboard?.writeText(buildNotificationDraftSummary(draft)).then(() => {
+      setCopiedNotificationId(draft.id);
+      window.setTimeout(() => setCopiedNotificationId(null), 1600);
     }).catch(() => {});
   }
 
@@ -526,6 +568,14 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                 >
                   <Zap className="h-3.5 w-3.5" />
                   Simular agora
+                </button>
+                <button
+                  type="button"
+                  onClick={() => prepareNotificationDraft(rule)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#00D1FF]/16 bg-[#00D1FF]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#7DE3FF] transition-colors hover:bg-[#00D1FF]/10"
+                >
+                  <Bell className="h-3.5 w-3.5" />
+                  Preparar alerta
                 </button>
                 <button
                   type="button"
@@ -616,6 +666,44 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                   >
                     <Copy className="h-3.5 w-3.5" />
                     {copiedSimulationId === activeSimulation.ruleId ? 'Simulacao copiada' : 'Copiar simulacao'}
+                  </button>
+                </div>
+              )}
+
+              {activeNotificationDraft?.ruleId === rule.id && (
+                <div className="mt-3 rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/[0.045] p-3">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Rascunho de alerta</p>
+                      <p className="mt-1 text-xs font-semibold text-white/68">{activeNotificationDraft.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-white/48">{activeNotificationDraft.message}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-[#00D1FF]/18 bg-[#00D1FF]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#7DE3FF]">
+                      draft only
+                    </span>
+                  </div>
+
+                  <div className="grid gap-2 text-[11px] leading-relaxed text-white/46 sm:grid-cols-2">
+                    <p>Canais: {activeNotificationDraft.channels.map(channel => channel === 'congchain_chat' ? 'chat CongChain' : 'carteira').join(' + ')}</p>
+                    <p>Carteira: {activeNotificationDraft.walletActionRequired ? 'aprovacao futura' : 'nao precisa'}</p>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-white/[0.07] bg-black/20 p-2.5">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/34">Plano de entrega</p>
+                    <div className="space-y-1.5">
+                      {activeNotificationDraft.deliveryPlan.map(item => (
+                        <p key={item} className="text-[11px] leading-relaxed text-white/48">- {item}</p>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => copyNotificationDraft(activeNotificationDraft)}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copiedNotificationId === activeNotificationDraft.id ? 'Alerta copiado' : 'Copiar alerta'}
                   </button>
                 </div>
               )}

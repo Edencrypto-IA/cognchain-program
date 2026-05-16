@@ -11,6 +11,8 @@ export type {
   WalletAgentIntentDraft,
   WalletAgentIntentType,
   WalletAgentLanguageHint,
+  WalletAgentLocalNotificationChannel,
+  WalletAgentLocalNotificationDraft,
   WalletAgentLocalRule,
   WalletAgentLocalRuleReviewContext,
   WalletAgentLocalRuleSimulation,
@@ -56,6 +58,7 @@ export {
 } from './receipts';
 export {
   canCreateWalletAgentLocalRule,
+  createWalletAgentLocalNotificationDraft,
   createWalletAgentRuleReviewContext,
   createWalletAgentLocalRule,
   readWalletAgentLocalRules,

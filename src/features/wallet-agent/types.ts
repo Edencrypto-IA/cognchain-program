@@ -197,6 +197,21 @@ export type WalletAgentLocalRuleSimulation = {
   simulatedAt: string;
 };
 
+export type WalletAgentLocalNotificationChannel = 'congchain_chat' | 'wallet';
+
+export type WalletAgentLocalNotificationDraft = {
+  id: string;
+  ruleId: string;
+  status: 'draft_only';
+  channels: WalletAgentLocalNotificationChannel[];
+  title: string;
+  message: string;
+  walletActionRequired: boolean;
+  deliveryPlan: string[];
+  blockedActions: string[];
+  createdAt: string;
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

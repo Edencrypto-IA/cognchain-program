@@ -442,3 +442,21 @@ It still cannot:
 - match real-time trigger conditions;
 - prepare, sign, submit, buy, sell, pay, or notify automatically;
 - replace explicit future user review.
+
+## Phase 5.6 local notification drafts
+
+Wallet Agent now prepares local notification drafts for rules using only CongChain chat and wallet approval channels.
+
+It can:
+
+- create a `draft_only` alert for a local rule;
+- plan delivery first inside CongChain chat;
+- include wallet as a future approval channel only when a rule may require a signature;
+- copy the notification draft for review.
+
+It still cannot:
+
+- send notifications automatically;
+- use Telegram, email, browser push, or external channels;
+- request a wallet signature from a draft;
+- execute or submit transactions from notification drafts.
