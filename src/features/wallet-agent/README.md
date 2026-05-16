@@ -628,3 +628,24 @@ It still cannot:
 - use wallet disconnect to remove the email identity;
 - authorize financial actions through email identity;
 - sync account preferences to backend storage.
+
+## Phase 7.1 alert delivery contract
+
+Wallet Agent now has a typed delivery contract for future real alerts.
+
+It can:
+
+- convert a notification draft into a `WalletAgentAlertDelivery`;
+- represent delivery status as `draft`, `queued`, `sent`, `failed`, or `cancelled`;
+- evaluate chat, email, and wallet channels separately;
+- mark email as ready only when a valid email target exists;
+- keep wallet approval as pending/blocked and never as an executable alert action;
+- declare hard safety flags: no transaction execution and no scheduling in this phase.
+
+It still cannot:
+
+- create alert records through an API;
+- send email;
+- queue background jobs;
+- request wallet signatures from alerts;
+- execute, sign, submit, buy, sell, or pay from alerts.

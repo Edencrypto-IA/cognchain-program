@@ -11,6 +11,10 @@ export type {
   WalletAgentIntentDraft,
   WalletAgentIntentType,
   WalletAgentLanguageHint,
+  WalletAgentAlertDelivery,
+  WalletAgentAlertDeliveryChannel,
+  WalletAgentAlertDeliveryChannelStatus,
+  WalletAgentAlertDeliveryStatus,
   WalletAgentLocalNotificationChannel,
   WalletAgentLocalNotificationDraft,
   WalletAgentLocalNotificationPreferences,
@@ -57,6 +61,9 @@ export {
   saveWalletAgentDevnetReceipt,
   upsertWalletAgentDevnetReceipt,
 } from './receipts';
+export {
+  createWalletAgentAlertDeliveryContract,
+} from './alerts';
 export {
   canCreateWalletAgentLocalRule,
   createWalletAgentLocalNotificationDraft,

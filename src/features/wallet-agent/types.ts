@@ -227,6 +227,38 @@ export type WalletAgentLocalNotificationDraft = {
   createdAt: string;
 };
 
+export type WalletAgentAlertDeliveryStatus = 'draft' | 'queued' | 'sent' | 'failed' | 'cancelled';
+
+export type WalletAgentAlertDeliveryChannelStatus = 'ready' | 'blocked' | 'pending';
+
+export type WalletAgentAlertDeliveryChannel = {
+  channel: WalletAgentLocalNotificationChannel;
+  status: WalletAgentAlertDeliveryChannelStatus;
+  target: string | null;
+  reason: string;
+};
+
+export type WalletAgentAlertDelivery = {
+  id: string;
+  draftId: string;
+  ruleId: string;
+  status: WalletAgentAlertDeliveryStatus;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  message: string;
+  channels: WalletAgentAlertDeliveryChannel[];
+  safety: {
+    canSendEmail: boolean;
+    canNotifyChat: boolean;
+    canRequestWalletApproval: boolean;
+    canExecuteTransaction: false;
+    canSchedule: false;
+    notes: string[];
+  };
+  blockedActions: string[];
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];
