@@ -24,6 +24,8 @@ import type {
   WalletAgentAlertDelivery,
   WalletAgentAlertDeliveryReceipt,
   WalletAgentAlertPersistenceRecord,
+  WalletAgentAlertServerHistory,
+  WalletAgentAlertServerReceipt,
   WalletAgentCoreResult,
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
@@ -388,6 +390,35 @@ function buildAlertDeliveryReceiptSummary(receipt: WalletAgentAlertDeliveryRecei
   ].filter(Boolean).join('\n');
 }
 
+function buildServerAlertReceiptSummary(receipt: WalletAgentAlertServerReceipt) {
+  return [
+    'CONGCHAIN Wallet Agent Account Alert Receipt',
+    '',
+    `Server receipt ID: ${receipt.id}`,
+    `Local receipt ID: ${receipt.receiptId}`,
+    `Record ID: ${receipt.recordId}`,
+    `Delivery ID: ${receipt.deliveryId}`,
+    `Rule ID: ${receipt.ruleId}`,
+    `Draft ID: ${receipt.draftId}`,
+    `Owner email: ${receipt.ownerEmail}`,
+    `Provider: ${receipt.provider}`,
+    `Target: ${receipt.target}`,
+    `Status: ${receipt.receiptStatus}`,
+    `Event at: ${receipt.eventAt}`,
+    `Stored at: ${receipt.createdAt}`,
+    '',
+    `Title: ${receipt.title}`,
+    '',
+    'Message:',
+    receipt.message,
+    '',
+    `Storage: ${receipt.storage.reason}`,
+    '',
+    'Safety notes:',
+    ...receipt.safety.notes.map(item => `- ${item}`),
+  ].join('\n');
+}
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -501,11 +532,43 @@ function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
 
 function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [receipts, setReceipts] = useState<WalletAgentAlertDeliveryReceipt[]>([]);
+  const [serverHistory, setServerHistory] = useState<WalletAgentAlertServerHistory | null>(null);
   const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
-  const stats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
+  const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
+  const stats = serverHistory ? {
+    totalSent: serverHistory.sent,
+    totalFailed: serverHistory.failed,
+    uniqueTargets: serverHistory.uniqueTargets,
+    providers: serverHistory.providers,
+    lastSentAt: serverHistory.latestSentAt,
+    lastFailedAt: serverHistory.latestFailedAt,
+  } : localStats;
+  const serverReceipts = serverHistory?.recentReceipts ?? [];
 
   useEffect(() => {
+    let cancelled = false;
+
     setReceipts(readWalletAgentAlertDeliveryReceipts());
+
+    fetch('/api/wallet-agent/alert-records/history?limit=3')
+      .then(async response => {
+        if (!response.ok) {
+          if (!cancelled) setServerHistory(null);
+          return;
+        }
+
+        const data = await response.json();
+        if (!cancelled) {
+          setServerHistory(data?.history ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setServerHistory(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey]);
 
   function copyReceipt(receipt: WalletAgentAlertDeliveryReceipt) {
@@ -515,6 +578,15 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
     }).catch(() => {});
   }
 
+  function copyServerReceipt(receipt: WalletAgentAlertServerReceipt) {
+    navigator.clipboard?.writeText(buildServerAlertReceiptSummary(receipt)).then(() => {
+      setCopiedReceiptId(receipt.id);
+      window.setTimeout(() => setCopiedReceiptId(null), 1600);
+    }).catch(() => {});
+  }
+
+  const hasReceipts = serverHistory ? serverReceipts.length > 0 : receipts.length > 0;
+
   return (
     <div className="mb-3 rounded-2xl border border-[#00D1FF]/12 bg-[#00D1FF]/[0.035] p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -523,13 +595,19 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Emails de alerta</p>
         </div>
         <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
-          local
+          {serverHistory ? 'conta' : 'local'}
         </span>
       </div>
 
-      {receipts.length === 0 ? (
+      <p className="mb-3 text-[10px] leading-relaxed text-white/34">
+        {serverHistory
+          ? 'Historico da conta verificada. Ainda e memoria do servidor, nao banco duravel.'
+          : 'Fallback local deste navegador ate a conta por email estar verificada.'}
+      </p>
+
+      {!hasReceipts ? (
         <p className="text-[11px] leading-relaxed text-white/38">
-          Nenhum email de alerta enviado neste navegador ainda.
+          Nenhum email de alerta registrado ainda.
         </p>
       ) : (
         <div className="space-y-2">
@@ -551,44 +629,76 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
               <p className="mt-1 truncate text-sm font-semibold text-white/78">{stats.providers.join(', ') || 'n/a'}</p>
             </div>
           </div>
-          {receipts.slice(0, 3).map(receipt => (
-            <div key={receipt.id} className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
-              <div className="mb-2 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[11px] font-semibold text-white/68">{receipt.title}</p>
-                  <p className="mt-1 truncate text-[10px] text-white/38">{receipt.target}</p>
+          {serverHistory ? (
+            serverReceipts.map(receipt => (
+              <div key={receipt.id} className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-semibold text-white/68">{receipt.title}</p>
+                    <p className="mt-1 truncate text-[10px] text-white/38">{receipt.target}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                    receipt.receiptStatus === 'sent'
+                      ? 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+                      : 'border-[#FF5C7A]/18 bg-[#FF5C7A]/10 text-[#FF8A9E]'
+                  }`}>
+                    {receipt.receiptStatus}
+                  </span>
                 </div>
-                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
-                  receipt.status === 'sent'
-                    ? 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
-                    : 'border-[#FF5C7A]/18 bg-[#FF5C7A]/10 text-[#FF8A9E]'
-                }`}>
-                  {receipt.status}
-                </span>
+                <div className="grid gap-1 text-[10px] leading-relaxed text-white/38 sm:grid-cols-2">
+                  <p>Provider: {receipt.provider}</p>
+                  <p>{receipt.receiptStatus === 'sent' ? 'Enviado' : 'Falhou'}: {formatReceiptDate(receipt.eventAt)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyServerReceipt(receipt)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                >
+                  <Copy className="h-3 w-3" />
+                  {copiedReceiptId === receipt.id ? 'Recibo copiado' : 'Copiar recibo'}
+                </button>
               </div>
-              <div className="grid gap-1 text-[10px] leading-relaxed text-white/38 sm:grid-cols-2">
-                <p>Provider: {receipt.provider}</p>
-                <p>
-                  {receipt.status === 'sent' && receipt.sentAt
-                    ? `Enviado: ${formatReceiptDate(receipt.sentAt)}`
-                    : `Falhou: ${receipt.failedAt ? formatReceiptDate(receipt.failedAt) : 'n/a'}`}
-                </p>
+            ))
+          ) : (
+            receipts.slice(0, 3).map(receipt => (
+              <div key={receipt.id} className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-semibold text-white/68">{receipt.title}</p>
+                    <p className="mt-1 truncate text-[10px] text-white/38">{receipt.target}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                    receipt.status === 'sent'
+                      ? 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+                      : 'border-[#FF5C7A]/18 bg-[#FF5C7A]/10 text-[#FF8A9E]'
+                  }`}>
+                    {receipt.status}
+                  </span>
+                </div>
+                <div className="grid gap-1 text-[10px] leading-relaxed text-white/38 sm:grid-cols-2">
+                  <p>Provider: {receipt.provider}</p>
+                  <p>
+                    {receipt.status === 'sent' && receipt.sentAt
+                      ? `Enviado: ${formatReceiptDate(receipt.sentAt)}`
+                      : `Falhou: ${receipt.failedAt ? formatReceiptDate(receipt.failedAt) : 'n/a'}`}
+                  </p>
+                </div>
+                {receipt.failureReason && (
+                  <p className="mt-1 text-[10px] leading-relaxed text-[#FF8A9E]/75">
+                    {receipt.failureReason}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => copyReceipt(receipt)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                >
+                  <Copy className="h-3 w-3" />
+                  {copiedReceiptId === receipt.id ? 'Recibo copiado' : 'Copiar recibo'}
+                </button>
               </div>
-              {receipt.failureReason && (
-                <p className="mt-1 text-[10px] leading-relaxed text-[#FF8A9E]/75">
-                  {receipt.failureReason}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => copyReceipt(receipt)}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
-              >
-                <Copy className="h-3 w-3" />
-                {copiedReceiptId === receipt.id ? 'Recibo copiado' : 'Copiar recibo'}
-              </button>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       )}
     </div>
@@ -826,7 +936,25 @@ function LocalRulesHistory({
       }
 
       setActiveAlertRecord(data.record);
-      setAlertRecordMessage(data?.message || 'Contrato de historico da conta preparado.');
+      let nextMessage = data?.message || 'Contrato de historico da conta preparado.';
+
+      if (receipt && data.record.userVerified) {
+        const serverResponse = await fetch('/api/wallet-agent/alert-records/receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ record: data.record }),
+        });
+        const serverData = await serverResponse.json();
+
+        if (serverResponse.ok && serverData?.receipt) {
+          setAlertReceiptsRefreshKey(serverData.receipt.updatedAt || String(Date.now()));
+          nextMessage = serverData?.message || 'Recibo da conta salvo em memoria do servidor.';
+        } else if (serverResponse.status !== 401 && serverResponse.status !== 403) {
+          nextMessage = serverData?.error || nextMessage;
+        }
+      }
+
+      setAlertRecordMessage(nextMessage);
     } catch {
       setAlertRecordMessage('Nao foi possivel preparar o historico da conta agora.');
     }

@@ -829,3 +829,23 @@ It still cannot:
 - expose history to unverified email identities;
 - modify, retry, resend, schedule, sign, submit, buy, sell, or pay from history;
 - store or return wallet secrets, seed phrases, or signed transaction payloads.
+
+## Phase 8.5 account alert history UI
+
+Wallet Agent now shows account-owned alert history when a verified email session is available.
+
+It can:
+
+- load summarized account history from `GET /api/wallet-agent/alert-records/history`;
+- fall back to local browser receipts when the user has no verified email session;
+- write sent and failed email receipts to the server-side memory receipt API after the account record contract is prepared;
+- show whether the receipt panel is using account history or local fallback;
+- copy either account receipts or local receipts for operator review.
+
+It still cannot:
+
+- provide durable database history;
+- sync history after server restarts;
+- show account history to unverified email identities;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from history;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.
