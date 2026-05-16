@@ -389,6 +389,18 @@ export default function WalletButton() {
     }
   }
 
+  async function logoutEmailIdentity() {
+    try {
+      await fetch('/api/auth/email/logout', { method: 'POST' });
+    } catch {
+      // Keep logout local even if the network request fails.
+    } finally {
+      setEmailSession(null);
+      setEmailInput('');
+      setEmailMessage('Email desconectado desta sessao.');
+    }
+  }
+
   function openConnectedMenu() {
     const rect = walletButtonRef.current?.getBoundingClientRect();
     if (!rect || typeof window === 'undefined') {
@@ -573,6 +585,16 @@ export default function WalletButton() {
                       {emailMessage || `Conectado como ${emailSession?.email}${emailSession?.verified ? ' (verificado)' : ' (local)'}`}
                     </p>
                   )}
+                  {emailSession && (
+                    <button
+                      type="button"
+                      onClick={logoutEmailIdentity}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-semibold text-red-300/62 transition-colors hover:bg-red-500/5 hover:text-red-300"
+                    >
+                      <LogOut className="h-3 w-3" />
+                      Sair do email
+                    </button>
+                  )}
                   <div className={`mt-2 rounded-xl border px-3 py-2 text-[10px] leading-relaxed ${
                     emailProvider?.configured
                       ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]/70'
@@ -727,6 +749,50 @@ export default function WalletButton() {
             )}
 
             <div className="p-2">
+              <div className="mb-2 rounded-xl border border-[#9945FF]/16 bg-[#9945FF]/[0.055] p-3">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-[#C4B5FD]/85">CongChain Account</p>
+                    <p className="mt-0.5 text-[10px] leading-relaxed text-white/30">
+                      Email guarda identidade e alertas. Wallet guarda assinaturas e fundos.
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                    emailSession?.verified
+                      ? 'bg-[#14F195]/10 text-[#14F195]/75'
+                      : emailSession
+                        ? 'bg-[#00D1FF]/10 text-[#7DE3FF]/75'
+                        : 'bg-white/[0.055] text-white/32'
+                  }`}>
+                    {emailSession?.verified ? 'verified' : emailSession ? 'local' : 'offline'}
+                  </span>
+                </div>
+
+                {emailSession ? (
+                  <div className="space-y-2">
+                    <div className="rounded-lg border border-white/[0.06] bg-black/18 px-2.5 py-2">
+                      <p className="text-[10px] uppercase tracking-wider text-white/28">Email</p>
+                      <p className="mt-0.5 truncate text-[11px] font-semibold text-white/62">{emailSession.email}</p>
+                      <p className="mt-1 text-[10px] leading-relaxed text-white/32">
+                        {emailSession.verified ? 'Verificado por magic link.' : 'Sessao local. Use magic link para verificar.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={logoutEmailIdentity}
+                      className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-red-300/62 transition-colors hover:bg-red-500/5 hover:text-red-300"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      Sair apenas do email
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[10px] leading-relaxed text-white/34">
+                    Nenhum email conectado. Abra Conectar Carteira para adicionar Email Identity.
+                  </p>
+                )}
+              </div>
+
               <div className="mb-2 rounded-xl border border-[#14F195]/16 bg-[#14F195]/7 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div>

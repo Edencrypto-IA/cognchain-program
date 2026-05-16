@@ -609,3 +609,22 @@ It still cannot:
 - verify email ownership without the user clicking a valid magic link;
 - use email to authorize wallet signatures or value movement;
 - replace Phantom, Solflare, or Devnet Sandbox.
+
+## Phase 6.5 account panel
+
+CONGCHAIN now separates account identity from wallet custody in the wallet menu.
+
+It can:
+
+- show the connected email identity inside the wallet dropdown;
+- show whether the email is local or verified by magic link;
+- let the user disconnect only the email session through `/api/auth/email/logout`;
+- keep wallet disconnect separate from email logout;
+- explain that email handles identity/alerts while wallets handle signatures/funds.
+
+It still cannot:
+
+- use email logout to disconnect Phantom, Solflare, or Devnet Sandbox;
+- use wallet disconnect to remove the email identity;
+- authorize financial actions through email identity;
+- sync account preferences to backend storage.
