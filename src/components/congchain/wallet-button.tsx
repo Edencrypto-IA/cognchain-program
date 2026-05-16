@@ -44,8 +44,8 @@ type DevnetWalletCreatedDetail = {
 
 type EmailIdentitySession = {
   email: string;
-  authLevel: 'email_local';
-  verified: false;
+  authLevel: 'email_local' | 'email_magic';
+  verified: boolean;
   createdAt: string;
   expiresAt: string;
 };
@@ -71,6 +71,7 @@ export default function WalletButton() {
   const [emailSession, setEmailSession] = useState<EmailIdentitySession | null>(null);
   const [emailInput, setEmailInput] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
+  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [emailMessage, setEmailMessage] = useState('');
   const walletButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -330,6 +331,40 @@ export default function WalletButton() {
     }
   }
 
+  async function requestMagicLink() {
+    const email = emailInput.trim();
+    if (!email) {
+      setEmailMessage('Informe um email para enviar o link.');
+      return;
+    }
+
+    setMagicLinkLoading(true);
+    setEmailMessage('');
+
+    try {
+      const res = await fetch('/api/auth/email/magic/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setEmailMessage(data.error || 'Nao foi possivel preparar o link magico.');
+        return;
+      }
+
+      setEmailMessage(data.delivery === 'email_sent'
+        ? 'Link magico enviado. Confira seu email.'
+        : 'Link magico preparado. Configure RESEND_API_KEY para envio real.'
+      );
+    } catch {
+      setEmailMessage('Nao foi possivel preparar o link magico agora.');
+    } finally {
+      setMagicLinkLoading(false);
+    }
+  }
+
   function openConnectedMenu() {
     const rect = walletButtonRef.current?.getBoundingClientRect();
     if (!rect || typeof window === 'undefined') {
@@ -472,11 +507,11 @@ export default function WalletButton() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B58CFF]/85">Email Identity</p>
                         <span className="rounded-full bg-[#00D1FF]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#7DE3FF]/75">
-                          conta local
+                          {emailSession?.verified ? 'verificado' : 'conta local'}
                         </span>
                       </div>
                       <p className="mt-1 text-[11px] leading-relaxed text-white/38">
-                        Use email para identidade, preferencias e alertas futuros. Nao substitui a wallet e ainda nao envia email real.
+                        Use email para identidade, preferencias e alertas futuros. Nao substitui a wallet.
                       </p>
                     </div>
                   </div>
@@ -492,17 +527,26 @@ export default function WalletButton() {
                     <button
                       type="button"
                       onClick={connectEmailIdentity}
-                      disabled={emailLoading}
+                      disabled={emailLoading || magicLinkLoading}
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#9945FF]/22 bg-[#9945FF]/10 px-3 py-2 text-xs font-semibold text-[#C4B5FD] transition-colors hover:bg-[#9945FF]/15 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {emailLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
                       {emailSession ? 'Atualizar' : 'Entrar'}
                     </button>
+                    <button
+                      type="button"
+                      onClick={requestMagicLink}
+                      disabled={emailLoading || magicLinkLoading}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#00D1FF]/18 bg-[#00D1FF]/[0.06] px-3 py-2 text-xs font-semibold text-[#7DE3FF] transition-colors hover:bg-[#00D1FF]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {magicLinkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                      Link magico
+                    </button>
                   </div>
 
                   {(emailSession || emailMessage) && (
                     <p className={`mt-2 text-[11px] leading-relaxed ${emailSession ? 'text-[#14F195]/70' : 'text-white/42'}`}>
-                      {emailMessage || `Conectado como ${emailSession?.email}`}
+                      {emailMessage || `Conectado como ${emailSession?.email}${emailSession?.verified ? ' (verificado)' : ' (local)'}`}
                     </p>
                   )}
                 </div>

@@ -543,3 +543,24 @@ It still cannot:
 - replace Phantom, Solflare, or Devnet Sandbox;
 - sign wallet actions;
 - recover accounts across devices without a future email delivery provider.
+
+## Phase 6.2 magic link foundation
+
+CONGCHAIN now has an isolated magic link flow for email identity.
+
+It can:
+
+- request a signed magic link through `/api/auth/email/magic/start`;
+- verify a magic link through `/api/auth/email/magic/verify`;
+- promote the email identity session to `authLevel: email_magic`;
+- mark the email session as verified after a valid magic link;
+- optionally send the email through Resend when `RESEND_API_KEY` and `AUTH_EMAIL_FROM` or `EMAIL_FROM` are configured;
+- keep the existing local email identity flow untouched.
+
+It still cannot:
+
+- require magic link verification for all product access;
+- recover historical data across devices automatically;
+- send emails without a configured provider;
+- connect Phantom embedded wallets;
+- move funds, sign transactions, or authorize wallet actions from email alone.
