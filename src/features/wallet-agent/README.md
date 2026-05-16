@@ -669,3 +669,23 @@ It still cannot:
 - queue or schedule a background job;
 - request wallet signatures from alerts;
 - execute, sign, submit, buy, sell, or pay from alerts.
+
+## Phase 7.3 manual email delivery
+
+Wallet Agent can now send an alert email only after the user explicitly clicks the manual send button.
+
+It can:
+
+- call `POST /api/wallet-agent/alerts/send-email` with an existing safe delivery contract;
+- require an email channel with `ready` status and a valid target;
+- require `RESEND_API_KEY` and `AUTH_EMAIL_FROM` or `EMAIL_FROM` before real delivery;
+- return the delivery contract as `sent` after the provider accepts the email;
+- show success or provider configuration errors inside the review panel.
+
+It still cannot:
+
+- send email automatically from a rule or draft;
+- queue or schedule future emails;
+- request wallet approvals from email delivery;
+- execute, sign, submit, buy, sell, or pay from alerts;
+- persist alert delivery records to backend storage.

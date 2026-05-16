@@ -483,6 +483,8 @@ function LocalRulesHistory({
   const [activeAlertDelivery, setActiveAlertDelivery] = useState<WalletAgentAlertDelivery | null>(null);
   const [alertDeliveryLoading, setAlertDeliveryLoading] = useState(false);
   const [alertDeliveryError, setAlertDeliveryError] = useState('');
+  const [emailSendLoading, setEmailSendLoading] = useState(false);
+  const [emailSendMessage, setEmailSendMessage] = useState('');
   const [notificationPreferences, setNotificationPreferences] = useState<WalletAgentLocalNotificationPreferences>(() => (
     readWalletAgentNotificationPreferences()
   ));
@@ -498,6 +500,7 @@ function LocalRulesHistory({
     setActiveNotificationDraft(null);
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
+    setEmailSendMessage('');
     setSentNotificationId(null);
   }, [refreshKey]);
 
@@ -518,6 +521,8 @@ function LocalRulesHistory({
         setNotificationPreferences(next);
         setEmailInput(next.emailAddress ?? '');
         setActiveNotificationDraft(null);
+        setActiveAlertDelivery(null);
+        setEmailSendMessage('');
         setSentNotificationId(null);
       })
       .catch(() => {});
@@ -545,6 +550,7 @@ function LocalRulesHistory({
     setActiveSimulation(current => current?.ruleId === rule.id ? null : current);
     setActiveNotificationDraft(current => current?.ruleId === rule.id ? null : current);
     setActiveAlertDelivery(current => current?.ruleId === rule.id ? null : current);
+    setEmailSendMessage('');
   }
 
   function showReviewContext(rule: WalletAgentLocalRule) {
@@ -576,6 +582,7 @@ function LocalRulesHistory({
     setActiveNotificationDraft(createWalletAgentLocalNotificationDraft(rule, new Date(), notificationPreferences));
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
+    setEmailSendMessage('');
     setSentNotificationId(null);
   }
 
@@ -588,6 +595,7 @@ function LocalRulesHistory({
     setActiveNotificationDraft(null);
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
+    setEmailSendMessage('');
     setSentNotificationId(null);
   }
 
@@ -606,6 +614,7 @@ function LocalRulesHistory({
     setActiveNotificationDraft(null);
     setActiveAlertDelivery(null);
     setAlertDeliveryError('');
+    setEmailSendMessage('');
     setSentNotificationId(null);
   }
 
@@ -626,6 +635,7 @@ function LocalRulesHistory({
   async function createAlertDelivery(draft: WalletAgentLocalNotificationDraft, rule: WalletAgentLocalRule) {
     setAlertDeliveryLoading(true);
     setAlertDeliveryError('');
+    setEmailSendMessage('');
 
     try {
       const response = await fetch('/api/wallet-agent/alerts', {
@@ -645,6 +655,32 @@ function LocalRulesHistory({
       setAlertDeliveryError('Nao foi possivel criar a entrega segura agora.');
     } finally {
       setAlertDeliveryLoading(false);
+    }
+  }
+
+  async function sendAlertEmail(delivery: WalletAgentAlertDelivery) {
+    setEmailSendLoading(true);
+    setEmailSendMessage('');
+
+    try {
+      const response = await fetch('/api/wallet-agent/alerts/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delivery }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data?.delivery) {
+        setEmailSendMessage(data?.error || 'Nao foi possivel enviar o email agora.');
+        return;
+      }
+
+      setActiveAlertDelivery(data.delivery);
+      setEmailSendMessage(data?.message || 'Email enviado manualmente.');
+    } catch {
+      setEmailSendMessage('Nao foi possivel enviar o email agora.');
+    } finally {
+      setEmailSendLoading(false);
     }
   }
 
@@ -986,9 +1022,33 @@ function LocalRulesHistory({
                       </div>
                       <div className="mt-2 rounded-xl border border-white/[0.07] bg-black/20 p-2.5">
                         <p className="text-[11px] leading-relaxed text-white/46">
-                          Seguro: sem scheduler, sem assinatura de wallet e sem transacao. Email real continua dependendo de uma acao explicita futura.
+                          Seguro: sem scheduler, sem assinatura de wallet e sem transacao. Email real so dispara por clique manual.
                         </p>
                       </div>
+                      {activeAlertDelivery.safety.canSendEmail ? (
+                        <button
+                          type="button"
+                          onClick={() => sendAlertEmail(activeAlertDelivery)}
+                          disabled={emailSendLoading || activeAlertDelivery.status === 'sent'}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#00D1FF]/16 bg-[#00D1FF]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#7DE3FF] transition-colors hover:bg-[#00D1FF]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                          {activeAlertDelivery.status === 'sent'
+                            ? 'Email enviado'
+                            : emailSendLoading
+                              ? 'Enviando...'
+                              : 'Enviar email agora'}
+                        </button>
+                      ) : (
+                        <p className="mt-2 text-[11px] leading-relaxed text-[#F5A524]/80">
+                          Email ainda nao esta pronto. Conecte ou valide um email antes de enviar.
+                        </p>
+                      )}
+                      {emailSendMessage && (
+                        <p className={`mt-2 text-[11px] leading-relaxed ${activeAlertDelivery.status === 'sent' ? 'text-[#14F195]/82' : 'text-[#F5A524]/82'}`}>
+                          {emailSendMessage}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
