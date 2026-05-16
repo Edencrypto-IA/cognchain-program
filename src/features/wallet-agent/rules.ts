@@ -149,6 +149,31 @@ export function upsertWalletAgentLocalRule(rule: WalletAgentLocalRule): WalletAg
   return next;
 }
 
+export function setWalletAgentLocalRuleStatus(
+  ruleId: string,
+  status: WalletAgentLocalRule['status'],
+  now = new Date()
+): WalletAgentLocalRule[] {
+  if (!canUseLocalStorage()) return [];
+
+  const current = readWalletAgentLocalRules();
+  const next = current.map(rule => rule.id === ruleId
+    ? { ...rule, status, updatedAt: now.toISOString() }
+    : rule
+  );
+
+  window.localStorage.setItem(WALLET_AGENT_RULES_KEY, JSON.stringify(next));
+  return next;
+}
+
+export function removeWalletAgentLocalRule(ruleId: string): WalletAgentLocalRule[] {
+  if (!canUseLocalStorage()) return [];
+
+  const next = readWalletAgentLocalRules().filter(rule => rule.id !== ruleId);
+  window.localStorage.setItem(WALLET_AGENT_RULES_KEY, JSON.stringify(next));
+  return next;
+}
+
 export function saveWalletAgentLocalRule(result: WalletAgentCoreResult): WalletAgentLocalRule | null {
   const rule = createWalletAgentLocalRule(result);
   if (!rule) return null;

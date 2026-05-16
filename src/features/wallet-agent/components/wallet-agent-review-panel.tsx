@@ -8,8 +8,11 @@ import {
   Copy,
   FileCheck2,
   LockKeyhole,
+  PauseCircle,
+  PlayCircle,
   Send,
   ShieldCheck,
+  Trash2,
   Wallet,
   Zap,
   X,
@@ -23,7 +26,11 @@ import type {
 } from '../types';
 import { canConfirmWalletAgentIntent } from '../confirmation';
 import { readWalletAgentDevnetReceipts } from '../receipts';
-import { readWalletAgentLocalRules } from '../rules';
+import {
+  readWalletAgentLocalRules,
+  removeWalletAgentLocalRule,
+  setWalletAgentLocalRuleStatus,
+} from '../rules';
 
 type WalletAgentReviewPanelProps = {
   result: WalletAgentCoreResult;
@@ -257,6 +264,14 @@ function buildRuleSummary(rule: WalletAgentLocalRule) {
   ].filter(Boolean).join('\n');
 }
 
+function getRuleStatusClassName(status: WalletAgentLocalRule['status']) {
+  if (status === 'paused') {
+    return 'border-[#F5A524]/22 bg-[#F5A524]/10 text-[#F5A524]';
+  }
+
+  return 'border-[#9945FF]/20 bg-[#9945FF]/10 text-[#C4B5FD]';
+}
+
 function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [receipts, setReceipts] = useState<WalletAgentDevnetReceipt[]>([]);
   const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
@@ -350,6 +365,15 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
     }).catch(() => {});
   }
 
+  function toggleRuleStatus(rule: WalletAgentLocalRule) {
+    const nextStatus = rule.status === 'paused' ? 'manual_review' : 'paused';
+    setRules(setWalletAgentLocalRuleStatus(rule.id, nextStatus));
+  }
+
+  function removeRule(rule: WalletAgentLocalRule) {
+    setRules(removeWalletAgentLocalRule(rule.id));
+  }
+
   return (
     <div className="rounded-2xl border border-[#9945FF]/16 bg-[#9945FF]/[0.045] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -375,7 +399,7 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                   <p className="truncate text-xs font-semibold text-white/68">{rule.type.replaceAll('_', ' ')}</p>
                   <p className="mt-1 text-[11px] leading-relaxed text-white/42">{rule.trigger.label}</p>
                 </div>
-                <span className="shrink-0 rounded-full border border-[#9945FF]/20 bg-[#9945FF]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#C4B5FD]">
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${getRuleStatusClassName(rule.status)}`}>
                   {rule.status.replaceAll('_', ' ')}
                 </span>
               </div>
@@ -393,14 +417,32 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => copyRule(rule)}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                {copiedRuleId === rule.id ? 'Regra copiada' : 'Copiar regra'}
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyRule(rule)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {copiedRuleId === rule.id ? 'Regra copiada' : 'Copiar regra'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleRuleStatus(rule)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#F5A524]/16 bg-[#F5A524]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#F5A524] transition-colors hover:bg-[#F5A524]/10"
+                >
+                  {rule.status === 'paused' ? <PlayCircle className="h-3.5 w-3.5" /> : <PauseCircle className="h-3.5 w-3.5" />}
+                  {rule.status === 'paused' ? 'Reativar' : 'Pausar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeRule(rule)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#FF5C7A]/16 bg-[#FF5C7A]/[0.055] px-3 py-1.5 text-[11px] font-semibold text-[#FF8A9E] transition-colors hover:bg-[#FF5C7A]/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Remover
+                </button>
+              </div>
             </div>
           ))}
         </div>

@@ -388,3 +388,21 @@ It still cannot:
 - trigger notifications by itself;
 - prepare, sign, submit, buy, sell, or pay from the rule list;
 - treat local rules as backend scheduler jobs.
+
+## Phase 5.3 local rule controls
+
+Wallet Agent now lets the user manage local manual-review rules safely.
+
+It can:
+
+- pause and reactivate a local rule by changing only its browser status;
+- remove a local rule from `localStorage`;
+- copy the rule summary before making manual decisions;
+- keep all rule actions local and reversible except deletion.
+
+It still cannot:
+
+- execute paused or active rules;
+- schedule background jobs;
+- sign or submit transactions from rule controls;
+- recover a removed local rule unless the user recreates it from a new confirmed intent.

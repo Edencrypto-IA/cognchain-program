@@ -55,7 +55,9 @@ export {
   canCreateWalletAgentLocalRule,
   createWalletAgentLocalRule,
   readWalletAgentLocalRules,
+  removeWalletAgentLocalRule,
   saveWalletAgentLocalRule,
+  setWalletAgentLocalRuleStatus,
   upsertWalletAgentLocalRule,
 } from './rules';
 export { readWalletAgentWalletSnapshot } from './wallet-snapshot';

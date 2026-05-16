@@ -119,7 +119,7 @@ export type WalletAgentDevnetReceipt = {
   summary: string;
 };
 
-export type WalletAgentLocalRuleStatus = 'manual_review';
+export type WalletAgentLocalRuleStatus = 'manual_review' | 'paused';
 
 export type WalletAgentLocalRuleTrigger =
   | {
