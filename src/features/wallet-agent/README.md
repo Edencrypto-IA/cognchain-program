@@ -460,3 +460,21 @@ It still cannot:
 - use Telegram, email, browser push, or external channels;
 - request a wallet signature from a draft;
 - execute or submit transactions from notification drafts.
+
+## Phase 5.7 send alert to CongChain chat
+
+Wallet Agent can now send a prepared notification draft into the current CongChain chat.
+
+It can:
+
+- create a local assistant message from a notification draft;
+- show rule status, trigger, planned channel, and manual review steps;
+- explain when wallet approval would be needed in a future phase;
+- keep the alert inside the existing chat history.
+
+It still cannot:
+
+- open the wallet automatically;
+- send alerts outside CongChain chat;
+- schedule future alerts;
+- execute, sign, submit, buy, sell, or pay from the alert.

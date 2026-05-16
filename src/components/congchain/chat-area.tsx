@@ -32,6 +32,8 @@ import {
   upsertWalletAgentHistory,
   type WalletAgentCoreResult,
   type WalletAgentHistoryEntry,
+  type WalletAgentLocalNotificationDraft,
+  type WalletAgentLocalRule,
   type WalletAgentParsedIntent,
 } from '@/features/wallet-agent';
 import dynamic from 'next/dynamic';
@@ -151,6 +153,34 @@ function formatWalletAgentChatUpdate(result: WalletAgentCoreResult, stage: 'revi
   lines.push('');
   lines.push('Nada acontece sem sua aprovacao visivel. Mainnet continua bloqueada neste fluxo.');
   return lines.join('\n');
+}
+
+function formatWalletAgentNotificationChatMessage(
+  draft: WalletAgentLocalNotificationDraft,
+  rule: WalletAgentLocalRule
+) {
+  const channels = draft.channels
+    .map(channel => channel === 'congchain_chat' ? 'chat CongChain' : 'carteira')
+    .join(' + ');
+
+  return [
+    '### Alerta preparado no CongChain',
+    '',
+    draft.message,
+    '',
+    `- Regra: ${rule.type.replaceAll('_', ' ')}`,
+    `- Status da regra: ${rule.status.replaceAll('_', ' ')}`,
+    `- Gatilho: ${rule.trigger.label}`,
+    `- Canal: ${channels}`,
+    `- Carteira: ${draft.walletActionRequired ? 'sera necessaria apenas se voce aprovar uma etapa futura' : 'nao necessaria para este alerta'}`,
+    '',
+    '**O que revisar agora**',
+    '- Confirme se a regra ainda faz sentido.',
+    '- Confira se o gatilho esta correto.',
+    '- Se envolver valor, uma assinatura nova da carteira sera obrigatoria no futuro.',
+    '',
+    'Nenhuma transacao foi executada. Nenhuma assinatura foi solicitada. Nenhum alerta externo foi enviado.',
+  ].join('\n');
 }
 
 type DevnetWalletCreatedEvent = CustomEvent<{
@@ -2189,6 +2219,24 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     }
   }, [connection, recordWalletAgentHistory, toast]);
 
+  const handleWalletAgentSendNotificationDraft = useCallback((
+    draft: WalletAgentLocalNotificationDraft,
+    rule: WalletAgentLocalRule
+  ) => {
+    setMessages(prev => [...prev, {
+      id: `wallet-agent-alert-${Date.now()}`,
+      role: 'assistant',
+      content: formatWalletAgentNotificationChatMessage(draft, rule),
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      orbMode: 'idle',
+      model: 'wallet-agent',
+    }]);
+    toast({
+      title: 'Alerta enviado ao chat',
+      description: 'Mensagem local criada no CongChain. Nenhuma carteira foi aberta e nada foi executado.',
+    });
+  }, [toast]);
+
   const parseWalletAgentIntent = useCallback(async (prompt: string): Promise<WalletAgentParsedIntent | undefined> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -3387,6 +3435,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           onSignTransaction={handleWalletAgentSignTransaction}
           onSubmitTransaction={handleWalletAgentSubmitTransaction}
           onConfirmTransaction={handleWalletAgentConfirmTransaction}
+          onSendNotificationDraft={handleWalletAgentSendNotificationDraft}
           history={walletAgentHistory}
         />
       )}

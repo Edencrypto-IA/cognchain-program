@@ -48,6 +48,7 @@ type WalletAgentReviewPanelProps = {
   onSignTransaction?: (result: WalletAgentCoreResult) => void;
   onSubmitTransaction?: (result: WalletAgentCoreResult) => void;
   onConfirmTransaction?: (result: WalletAgentCoreResult) => void;
+  onSendNotificationDraft?: (draft: WalletAgentLocalNotificationDraft, rule: WalletAgentLocalRule) => void;
   history?: WalletAgentHistoryEntry[];
 };
 
@@ -429,7 +430,13 @@ function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   );
 }
 
-function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
+function LocalRulesHistory({
+  refreshKey,
+  onSendNotificationDraft,
+}: {
+  refreshKey: string;
+  onSendNotificationDraft?: (draft: WalletAgentLocalNotificationDraft, rule: WalletAgentLocalRule) => void;
+}) {
   const [rules, setRules] = useState<WalletAgentLocalRule[]>([]);
   const [copiedRuleId, setCopiedRuleId] = useState<string | null>(null);
   const [activeContext, setActiveContext] = useState<WalletAgentLocalRuleReviewContext | null>(null);
@@ -438,12 +445,14 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
   const [copiedSimulationId, setCopiedSimulationId] = useState<string | null>(null);
   const [activeNotificationDraft, setActiveNotificationDraft] = useState<WalletAgentLocalNotificationDraft | null>(null);
   const [copiedNotificationId, setCopiedNotificationId] = useState<string | null>(null);
+  const [sentNotificationId, setSentNotificationId] = useState<string | null>(null);
 
   useEffect(() => {
     setRules(readWalletAgentLocalRules());
     setActiveContext(null);
     setActiveSimulation(null);
     setActiveNotificationDraft(null);
+    setSentNotificationId(null);
   }, [refreshKey]);
 
   function copyRule(rule: WalletAgentLocalRule) {
@@ -492,6 +501,7 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
 
   function prepareNotificationDraft(rule: WalletAgentLocalRule) {
     setActiveNotificationDraft(createWalletAgentLocalNotificationDraft(rule));
+    setSentNotificationId(null);
   }
 
   function copyNotificationDraft(draft: WalletAgentLocalNotificationDraft) {
@@ -499,6 +509,13 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
       setCopiedNotificationId(draft.id);
       window.setTimeout(() => setCopiedNotificationId(null), 1600);
     }).catch(() => {});
+  }
+
+  function sendNotificationDraftToChat(draft: WalletAgentLocalNotificationDraft, rule: WalletAgentLocalRule) {
+    if (!onSendNotificationDraft) return;
+
+    onSendNotificationDraft(draft, rule);
+    setSentNotificationId(draft.id);
   }
 
   return (
@@ -705,6 +722,16 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                     <Copy className="h-3.5 w-3.5" />
                     {copiedNotificationId === activeNotificationDraft.id ? 'Alerta copiado' : 'Copiar alerta'}
                   </button>
+                  {onSendNotificationDraft && (
+                    <button
+                      type="button"
+                      onClick={() => sendNotificationDraftToChat(activeNotificationDraft, rule)}
+                      className="ml-2 mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#00D1FF]/16 bg-[#00D1FF]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#7DE3FF] transition-colors hover:bg-[#00D1FF]/10"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {sentNotificationId === activeNotificationDraft.id ? 'Enviado ao chat' : 'Enviar ao chat'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -723,6 +750,7 @@ export function WalletAgentReviewPanel({
   onSignTransaction,
   onSubmitTransaction,
   onConfirmTransaction,
+  onSendNotificationDraft,
   history = [],
 }: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
@@ -1070,7 +1098,10 @@ export function WalletAgentReviewPanel({
 
               <DevnetReceiptsHistory refreshKey={receiptsRefreshKey} />
 
-              <LocalRulesHistory refreshKey={rulesRefreshKey} />
+              <LocalRulesHistory
+                refreshKey={rulesRefreshKey}
+                onSendNotificationDraft={onSendNotificationDraft}
+              />
             </div>
           </div>
         </div>
