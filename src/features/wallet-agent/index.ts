@@ -20,6 +20,7 @@ export type {
   WalletAgentAlertPersistenceMode,
   WalletAgentAlertPersistenceRecord,
   WalletAgentAlertPersistenceRecordStatus,
+  WalletAgentAlertServerHistory,
   WalletAgentAlertServerReceipt,
   WalletAgentLocalNotificationChannel,
   WalletAgentLocalNotificationDraft,
@@ -77,6 +78,7 @@ export {
   upsertWalletAgentAlertDeliveryReceipt,
 } from './alert-receipts';
 export {
+  createWalletAgentAlertServerHistory,
   createWalletAgentAlertServerReceipt,
   readWalletAgentAlertServerReceipts,
   upsertWalletAgentAlertServerReceipt,

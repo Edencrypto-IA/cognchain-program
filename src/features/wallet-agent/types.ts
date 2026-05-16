@@ -350,6 +350,31 @@ export type WalletAgentAlertServerReceipt = {
   };
 };
 
+export type WalletAgentAlertServerHistory = {
+  ownerEmail: string;
+  total: number;
+  sent: number;
+  failed: number;
+  uniqueTargets: number;
+  providers: string[];
+  latestEventAt: string | null;
+  latestSentAt: string | null;
+  latestFailedAt: string | null;
+  recentReceipts: WalletAgentAlertServerReceipt[];
+  storage: {
+    mode: 'memory';
+    durable: false;
+    reason: string;
+  };
+  safety: {
+    metadataOnly: true;
+    canStoreSecrets: false;
+    canExecuteTransaction: false;
+    canSchedule: false;
+    notes: string[];
+  };
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

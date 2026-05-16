@@ -809,3 +809,23 @@ It still cannot:
 - write receipts for unverified email identities;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from server receipts;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 8.4 account alert history API
+
+Wallet Agent now has a read-only account alert history API.
+
+It can:
+
+- read summarized history through `GET /api/wallet-agent/alert-records/history`;
+- require a verified `cog_user` email identity;
+- return totals for sent and failed alert receipts;
+- return unique targets, providers, latest event timestamps, and recent receipts;
+- keep history derived only from metadata receipts in bounded server memory.
+
+It still cannot:
+
+- provide durable database history;
+- sync history after server restarts;
+- expose history to unverified email identities;
+- modify, retry, resend, schedule, sign, submit, buy, sell, or pay from history;
+- store or return wallet secrets, seed phrases, or signed transaction payloads.
