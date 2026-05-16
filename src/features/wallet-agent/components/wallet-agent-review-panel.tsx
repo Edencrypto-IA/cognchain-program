@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import type {
+  WalletAgentAlertDelivery,
   WalletAgentCoreResult,
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
@@ -479,6 +480,9 @@ function LocalRulesHistory({
   const [activeNotificationDraft, setActiveNotificationDraft] = useState<WalletAgentLocalNotificationDraft | null>(null);
   const [copiedNotificationId, setCopiedNotificationId] = useState<string | null>(null);
   const [sentNotificationId, setSentNotificationId] = useState<string | null>(null);
+  const [activeAlertDelivery, setActiveAlertDelivery] = useState<WalletAgentAlertDelivery | null>(null);
+  const [alertDeliveryLoading, setAlertDeliveryLoading] = useState(false);
+  const [alertDeliveryError, setAlertDeliveryError] = useState('');
   const [notificationPreferences, setNotificationPreferences] = useState<WalletAgentLocalNotificationPreferences>(() => (
     readWalletAgentNotificationPreferences()
   ));
@@ -492,6 +496,8 @@ function LocalRulesHistory({
     setActiveContext(null);
     setActiveSimulation(null);
     setActiveNotificationDraft(null);
+    setActiveAlertDelivery(null);
+    setAlertDeliveryError('');
     setSentNotificationId(null);
   }, [refreshKey]);
 
@@ -538,6 +544,7 @@ function LocalRulesHistory({
     setActiveContext(current => current?.ruleId === rule.id ? null : current);
     setActiveSimulation(current => current?.ruleId === rule.id ? null : current);
     setActiveNotificationDraft(current => current?.ruleId === rule.id ? null : current);
+    setActiveAlertDelivery(current => current?.ruleId === rule.id ? null : current);
   }
 
   function showReviewContext(rule: WalletAgentLocalRule) {
@@ -567,6 +574,8 @@ function LocalRulesHistory({
 
   function prepareNotificationDraft(rule: WalletAgentLocalRule) {
     setActiveNotificationDraft(createWalletAgentLocalNotificationDraft(rule, new Date(), notificationPreferences));
+    setActiveAlertDelivery(null);
+    setAlertDeliveryError('');
     setSentNotificationId(null);
   }
 
@@ -577,6 +586,8 @@ function LocalRulesHistory({
     const next = saveWalletAgentNotificationPreferences({ [key]: value });
     setNotificationPreferences(next);
     setActiveNotificationDraft(null);
+    setActiveAlertDelivery(null);
+    setAlertDeliveryError('');
     setSentNotificationId(null);
   }
 
@@ -593,6 +604,8 @@ function LocalRulesHistory({
     setNotificationPreferences(next);
     setEmailInput(next.emailAddress ?? '');
     setActiveNotificationDraft(null);
+    setActiveAlertDelivery(null);
+    setAlertDeliveryError('');
     setSentNotificationId(null);
   }
 
@@ -608,6 +621,31 @@ function LocalRulesHistory({
 
     onSendNotificationDraft(draft, rule);
     setSentNotificationId(draft.id);
+  }
+
+  async function createAlertDelivery(draft: WalletAgentLocalNotificationDraft, rule: WalletAgentLocalRule) {
+    setAlertDeliveryLoading(true);
+    setAlertDeliveryError('');
+
+    try {
+      const response = await fetch('/api/wallet-agent/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft, rule }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data?.delivery) {
+        setAlertDeliveryError(data?.error || 'Nao foi possivel criar a entrega segura.');
+        return;
+      }
+
+      setActiveAlertDelivery(data.delivery);
+    } catch {
+      setAlertDeliveryError('Nao foi possivel criar a entrega segura agora.');
+    } finally {
+      setAlertDeliveryLoading(false);
+    }
   }
 
   return (
@@ -918,6 +956,40 @@ function LocalRulesHistory({
                       <Send className="h-3.5 w-3.5" />
                       {sentNotificationId === activeNotificationDraft.id ? 'Enviado ao chat' : 'Enviar ao chat'}
                     </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => createAlertDelivery(activeNotificationDraft, rule)}
+                    disabled={alertDeliveryLoading}
+                    className="ml-2 mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#14F195]/16 bg-[#14F195]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {alertDeliveryLoading ? 'Criando...' : 'Criar entrega segura'}
+                  </button>
+                  {alertDeliveryError && (
+                    <p className="mt-2 text-[11px] leading-relaxed text-[#FF8A9E]/80">{alertDeliveryError}</p>
+                  )}
+                  {activeAlertDelivery?.draftId === activeNotificationDraft.id && (
+                    <div className="mt-3 rounded-2xl border border-[#14F195]/16 bg-[#14F195]/[0.045] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#14F195]/85">Contrato de entrega</p>
+                        <span className="rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]">
+                          {activeAlertDelivery.status}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {activeAlertDelivery.channels.map(channel => (
+                          <p key={channel.channel} className="text-[11px] leading-relaxed text-white/48">
+                            - {formatNotificationChannel(channel.channel)}: {channel.status} {channel.target ? `(${channel.target})` : ''} - {channel.reason}
+                          </p>
+                        ))}
+                      </div>
+                      <div className="mt-2 rounded-xl border border-white/[0.07] bg-black/20 p-2.5">
+                        <p className="text-[11px] leading-relaxed text-white/46">
+                          Seguro: sem scheduler, sem assinatura de wallet e sem transacao. Email real continua dependendo de uma acao explicita futura.
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

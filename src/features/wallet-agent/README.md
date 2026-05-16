@@ -649,3 +649,23 @@ It still cannot:
 - queue background jobs;
 - request wallet signatures from alerts;
 - execute, sign, submit, buy, sell, or pay from alerts.
+
+## Phase 7.2 alert delivery API
+
+Wallet Agent now has a safe API for creating alert delivery contracts from approved local drafts.
+
+It can:
+
+- accept a notification draft and local rule through `POST /api/wallet-agent/alerts`;
+- validate that the draft belongs to the rule;
+- return a `WalletAgentAlertDelivery` contract with channel readiness;
+- show that contract in the review panel;
+- rate limit alert contract creation.
+
+It still cannot:
+
+- persist alert delivery records;
+- send email;
+- queue or schedule a background job;
+- request wallet signatures from alerts;
+- execute, sign, submit, buy, sell, or pay from alerts.
