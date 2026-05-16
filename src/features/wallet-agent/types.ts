@@ -267,10 +267,12 @@ export type WalletAgentAlertDeliveryReceipt = {
   channel: 'email';
   provider: string;
   target: string;
-  status: 'sent';
+  status: 'sent' | 'failed';
   title: string;
   message: string;
-  sentAt: string;
+  sentAt: string | null;
+  failedAt?: string;
+  failureReason?: string;
   savedAt: string;
   updatedAt: string;
   safetyNotes: string[];
@@ -278,9 +280,11 @@ export type WalletAgentAlertDeliveryReceipt = {
 
 export type WalletAgentAlertDeliveryReceiptStats = {
   totalSent: number;
+  totalFailed: number;
   uniqueTargets: number;
   providers: string[];
   lastSentAt: string | null;
+  lastFailedAt: string | null;
 };
 
 export type WalletAgentWalletSnapshot = {

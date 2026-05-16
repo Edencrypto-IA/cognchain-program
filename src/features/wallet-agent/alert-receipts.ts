@@ -48,6 +48,40 @@ export function createWalletAgentAlertDeliveryReceipt(
   };
 }
 
+export function createWalletAgentAlertDeliveryFailureReceipt(
+  delivery: WalletAgentAlertDelivery,
+  reason: string,
+  provider = 'resend',
+  now = new Date()
+): WalletAgentAlertDeliveryReceipt | null {
+  const target = getEmailTarget(delivery);
+  if (!target) return null;
+
+  return {
+    id: `waer_failed_${delivery.id}_${now.getTime()}`,
+    deliveryId: delivery.id,
+    draftId: delivery.draftId,
+    ruleId: delivery.ruleId,
+    channel: 'email',
+    provider,
+    target,
+    status: 'failed',
+    title: delivery.title,
+    message: delivery.message,
+    sentAt: null,
+    failedAt: now.toISOString(),
+    failureReason: reason,
+    savedAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    safetyNotes: [
+      'Email send failed after explicit user action.',
+      'No automatic retry was scheduled.',
+      'No wallet signature was requested.',
+      'No transaction was prepared, signed, or submitted.',
+    ],
+  };
+}
+
 export function readWalletAgentAlertDeliveryReceipts(): WalletAgentAlertDeliveryReceipt[] {
   if (!canUseLocalStorage()) return [];
 
@@ -64,7 +98,7 @@ export function readWalletAgentAlertDeliveryReceipts(): WalletAgentAlertDelivery
         && typeof item.id === 'string'
         && typeof item.deliveryId === 'string'
         && item.channel === 'email'
-        && item.status === 'sent'
+        && (item.status === 'sent' || item.status === 'failed')
       ))
       .slice(0, MAX_ALERT_RECEIPTS);
   } catch {
@@ -82,12 +116,19 @@ export function summarizeWalletAgentAlertDeliveryReceipts(
     .filter(Boolean)
     .sort()
     .at(-1) ?? null;
+  const lastFailedAt = receipts
+    .map(receipt => receipt.failedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null;
 
   return {
-    totalSent: receipts.length,
+    totalSent: receipts.filter(receipt => receipt.status === 'sent').length,
+    totalFailed: receipts.filter(receipt => receipt.status === 'failed').length,
     uniqueTargets: targets.size,
     providers,
     lastSentAt,
+    lastFailedAt,
   };
 }
 
@@ -115,6 +156,18 @@ export function saveWalletAgentAlertDeliveryReceipt(
   provider = 'resend'
 ): WalletAgentAlertDeliveryReceipt | null {
   const receipt = createWalletAgentAlertDeliveryReceipt(delivery, provider);
+  if (!receipt) return null;
+
+  upsertWalletAgentAlertDeliveryReceipt(receipt);
+  return receipt;
+}
+
+export function saveWalletAgentAlertDeliveryFailureReceipt(
+  delivery: WalletAgentAlertDelivery,
+  reason: string,
+  provider = 'resend'
+): WalletAgentAlertDeliveryReceipt | null {
+  const receipt = createWalletAgentAlertDeliveryFailureReceipt(delivery, reason, provider);
   if (!receipt) return null;
 
   upsertWalletAgentAlertDeliveryReceipt(receipt);

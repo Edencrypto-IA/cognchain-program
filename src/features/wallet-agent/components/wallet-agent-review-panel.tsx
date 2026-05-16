@@ -36,6 +36,7 @@ import type {
 import { canConfirmWalletAgentIntent } from '../confirmation';
 import {
   readWalletAgentAlertDeliveryReceipts,
+  saveWalletAgentAlertDeliveryFailureReceipt,
   saveWalletAgentAlertDeliveryReceipt,
   summarizeWalletAgentAlertDeliveryReceipts,
 } from '../alert-receipts';
@@ -371,7 +372,9 @@ function buildAlertDeliveryReceiptSummary(receipt: WalletAgentAlertDeliveryRecei
     `Provider: ${receipt.provider}`,
     `Target: ${receipt.target}`,
     `Status: ${receipt.status}`,
-    `Sent at: ${receipt.sentAt}`,
+    receipt.sentAt ? `Sent at: ${receipt.sentAt}` : null,
+    receipt.failedAt ? `Failed at: ${receipt.failedAt}` : null,
+    receipt.failureReason ? `Failure reason: ${receipt.failureReason}` : null,
     `Saved locally at: ${receipt.savedAt}`,
     '',
     `Title: ${receipt.title}`,
@@ -381,7 +384,7 @@ function buildAlertDeliveryReceiptSummary(receipt: WalletAgentAlertDeliveryRecei
     '',
     'Safety notes:',
     ...receipt.safetyNotes.map(item => `- ${item}`),
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
@@ -516,7 +519,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Mail className="h-3.5 w-3.5 text-[#7DE3FF]" />
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Emails enviados</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Emails de alerta</p>
         </div>
         <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
           local
@@ -535,18 +538,16 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
               <p className="mt-1 text-sm font-semibold text-white/78">{stats.totalSent}</p>
             </div>
             <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Falhas</p>
+              <p className="mt-1 text-sm font-semibold text-white/78">{stats.totalFailed}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
               <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Destinos</p>
               <p className="mt-1 text-sm font-semibold text-white/78">{stats.uniqueTargets}</p>
             </div>
             <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
               <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Provider</p>
               <p className="mt-1 truncate text-sm font-semibold text-white/78">{stats.providers.join(', ') || 'n/a'}</p>
-            </div>
-            <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Ultimo</p>
-              <p className="mt-1 truncate text-sm font-semibold text-white/78">
-                {stats.lastSentAt ? formatReceiptDate(stats.lastSentAt) : 'n/a'}
-              </p>
             </div>
           </div>
           {receipts.slice(0, 3).map(receipt => (
@@ -556,14 +557,27 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
                   <p className="truncate text-[11px] font-semibold text-white/68">{receipt.title}</p>
                   <p className="mt-1 truncate text-[10px] text-white/38">{receipt.target}</p>
                 </div>
-                <span className="shrink-0 rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]">
-                  sent
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                  receipt.status === 'sent'
+                    ? 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+                    : 'border-[#FF5C7A]/18 bg-[#FF5C7A]/10 text-[#FF8A9E]'
+                }`}>
+                  {receipt.status}
                 </span>
               </div>
               <div className="grid gap-1 text-[10px] leading-relaxed text-white/38 sm:grid-cols-2">
                 <p>Provider: {receipt.provider}</p>
-                <p>Enviado: {formatReceiptDate(receipt.sentAt)}</p>
+                <p>
+                  {receipt.status === 'sent' && receipt.sentAt
+                    ? `Enviado: ${formatReceiptDate(receipt.sentAt)}`
+                    : `Falhou: ${receipt.failedAt ? formatReceiptDate(receipt.failedAt) : 'n/a'}`}
+                </p>
               </div>
+              {receipt.failureReason && (
+                <p className="mt-1 text-[10px] leading-relaxed text-[#FF8A9E]/75">
+                  {receipt.failureReason}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => copyReceipt(receipt)}
@@ -788,7 +802,10 @@ function LocalRulesHistory({
       const data = await response.json();
 
       if (!response.ok || !data?.delivery) {
-        setEmailSendMessage(data?.error || 'Nao foi possivel enviar o email agora.');
+        const errorMessage = data?.error || 'Nao foi possivel enviar o email agora.';
+        const receipt = saveWalletAgentAlertDeliveryFailureReceipt(delivery, errorMessage, data?.provider || 'resend');
+        if (receipt) setAlertReceiptsRefreshKey(receipt.updatedAt);
+        setEmailSendMessage(errorMessage);
         return;
       }
 

@@ -65,7 +65,9 @@ export {
 } from './receipts';
 export {
   createWalletAgentAlertDeliveryReceipt,
+  createWalletAgentAlertDeliveryFailureReceipt,
   readWalletAgentAlertDeliveryReceipts,
+  saveWalletAgentAlertDeliveryFailureReceipt,
   saveWalletAgentAlertDeliveryReceipt,
   summarizeWalletAgentAlertDeliveryReceipts,
   upsertWalletAgentAlertDeliveryReceipt,

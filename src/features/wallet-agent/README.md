@@ -710,6 +710,26 @@ It still cannot:
 - schedule future alerts;
 - request wallet approvals or execute transactions from receipts.
 
+## Phase 7.5 local alert failure receipts
+
+Wallet Agent now records local receipts when manual alert email delivery fails.
+
+It can:
+
+- save a local failed receipt when the email provider is missing or rejects the send;
+- store the attempted target, provider, rule ID, delivery ID, title, message, failure reason, and timestamp;
+- show failed attempts beside successful email receipts;
+- copy a failed delivery receipt for support or operator review;
+- avoid silent failures in the review panel.
+
+It still cannot:
+
+- retry failed emails automatically;
+- prove provider-side delivery after a failure;
+- schedule a retry;
+- send fallback notifications through another channel;
+- request wallet approvals or execute transactions from failed receipts.
+
 ## Phase 7.6 local alert status center
 
 Wallet Agent now summarizes local alert email delivery history inside the review panel.
