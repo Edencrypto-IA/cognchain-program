@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type {
   WalletAgentAlertDelivery,
+  WalletAgentAlertDeliveryReceipt,
   WalletAgentCoreResult,
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
@@ -33,6 +34,10 @@ import type {
   WalletAgentReviewItem,
 } from '../types';
 import { canConfirmWalletAgentIntent } from '../confirmation';
+import {
+  readWalletAgentAlertDeliveryReceipts,
+  saveWalletAgentAlertDeliveryReceipt,
+} from '../alert-receipts';
 import { readWalletAgentDevnetReceipts } from '../receipts';
 import {
   createWalletAgentLocalNotificationDraft,
@@ -353,6 +358,31 @@ function buildNotificationDraftSummary(draft: WalletAgentLocalNotificationDraft)
   ].join('\n');
 }
 
+function buildAlertDeliveryReceiptSummary(receipt: WalletAgentAlertDeliveryReceipt) {
+  return [
+    'CONGCHAIN Wallet Agent Alert Email Receipt',
+    '',
+    `Receipt ID: ${receipt.id}`,
+    `Delivery ID: ${receipt.deliveryId}`,
+    `Rule ID: ${receipt.ruleId}`,
+    `Draft ID: ${receipt.draftId}`,
+    `Channel: ${receipt.channel}`,
+    `Provider: ${receipt.provider}`,
+    `Target: ${receipt.target}`,
+    `Status: ${receipt.status}`,
+    `Sent at: ${receipt.sentAt}`,
+    `Saved locally at: ${receipt.savedAt}`,
+    '',
+    `Title: ${receipt.title}`,
+    '',
+    'Message:',
+    receipt.message,
+    '',
+    'Safety notes:',
+    ...receipt.safetyNotes.map(item => `- ${item}`),
+  ].join('\n');
+}
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -464,6 +494,70 @@ function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   );
 }
 
+function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
+  const [receipts, setReceipts] = useState<WalletAgentAlertDeliveryReceipt[]>([]);
+  const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setReceipts(readWalletAgentAlertDeliveryReceipts());
+  }, [refreshKey]);
+
+  function copyReceipt(receipt: WalletAgentAlertDeliveryReceipt) {
+    navigator.clipboard?.writeText(buildAlertDeliveryReceiptSummary(receipt)).then(() => {
+      setCopiedReceiptId(receipt.id);
+      window.setTimeout(() => setCopiedReceiptId(null), 1600);
+    }).catch(() => {});
+  }
+
+  return (
+    <div className="mb-3 rounded-2xl border border-[#00D1FF]/12 bg-[#00D1FF]/[0.035] p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Mail className="h-3.5 w-3.5 text-[#7DE3FF]" />
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Emails enviados</p>
+        </div>
+        <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
+          local
+        </span>
+      </div>
+
+      {receipts.length === 0 ? (
+        <p className="text-[11px] leading-relaxed text-white/38">
+          Nenhum email de alerta enviado neste navegador ainda.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {receipts.slice(0, 3).map(receipt => (
+            <div key={receipt.id} className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-semibold text-white/68">{receipt.title}</p>
+                  <p className="mt-1 truncate text-[10px] text-white/38">{receipt.target}</p>
+                </div>
+                <span className="shrink-0 rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]">
+                  sent
+                </span>
+              </div>
+              <div className="grid gap-1 text-[10px] leading-relaxed text-white/38 sm:grid-cols-2">
+                <p>Provider: {receipt.provider}</p>
+                <p>Enviado: {formatReceiptDate(receipt.sentAt)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => copyReceipt(receipt)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+              >
+                <Copy className="h-3 w-3" />
+                {copiedReceiptId === receipt.id ? 'Recibo copiado' : 'Copiar recibo'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LocalRulesHistory({
   refreshKey,
   onSendNotificationDraft,
@@ -485,6 +579,7 @@ function LocalRulesHistory({
   const [alertDeliveryError, setAlertDeliveryError] = useState('');
   const [emailSendLoading, setEmailSendLoading] = useState(false);
   const [emailSendMessage, setEmailSendMessage] = useState('');
+  const [alertReceiptsRefreshKey, setAlertReceiptsRefreshKey] = useState('initial');
   const [notificationPreferences, setNotificationPreferences] = useState<WalletAgentLocalNotificationPreferences>(() => (
     readWalletAgentNotificationPreferences()
   ));
@@ -676,6 +771,8 @@ function LocalRulesHistory({
       }
 
       setActiveAlertDelivery(data.delivery);
+      const receipt = saveWalletAgentAlertDeliveryReceipt(data.delivery, data?.provider || 'resend');
+      if (receipt) setAlertReceiptsRefreshKey(receipt.updatedAt);
       setEmailSendMessage(data?.message || 'Email enviado manualmente.');
     } catch {
       setEmailSendMessage('Nao foi possivel enviar o email agora.');
@@ -789,6 +886,8 @@ function LocalRulesHistory({
           Preferencias ficam neste navegador. Nenhum email, push ou assinatura e disparado automaticamente.
         </p>
       </div>
+
+      <AlertDeliveryReceiptsHistory refreshKey={alertReceiptsRefreshKey} />
 
       {rules.length === 0 ? (
         <p className="text-sm leading-relaxed text-white/38">

@@ -689,3 +689,23 @@ It still cannot:
 - request wallet approvals from email delivery;
 - execute, sign, submit, buy, sell, or pay from alerts;
 - persist alert delivery records to backend storage.
+
+## Phase 7.4 local alert email receipts
+
+Wallet Agent now saves local receipts after a manual alert email is sent.
+
+It can:
+
+- create a local browser receipt from a sent `WalletAgentAlertDelivery`;
+- store delivery ID, rule ID, draft ID, target email, provider, title, message, and timestamps;
+- show recent alert email receipts inside the review panel;
+- copy a clean receipt summary to the clipboard;
+- keep receipts bounded in `localStorage`.
+
+It still cannot:
+
+- prove email delivery outside the provider response;
+- sync alert receipts across devices;
+- persist alert delivery records to backend storage;
+- schedule future alerts;
+- request wallet approvals or execute transactions from receipts.

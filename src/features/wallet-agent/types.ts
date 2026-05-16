@@ -259,6 +259,23 @@ export type WalletAgentAlertDelivery = {
   blockedActions: string[];
 };
 
+export type WalletAgentAlertDeliveryReceipt = {
+  id: string;
+  deliveryId: string;
+  draftId: string;
+  ruleId: string;
+  channel: 'email';
+  provider: string;
+  target: string;
+  status: 'sent';
+  title: string;
+  message: string;
+  sentAt: string;
+  savedAt: string;
+  updatedAt: string;
+  safetyNotes: string[];
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

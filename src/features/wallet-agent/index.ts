@@ -1,6 +1,7 @@
 export type {
   WalletAgentApprovalStep,
   WalletAgentCommandInput,
+  WalletAgentAlertDeliveryReceipt,
   WalletAgentCoreResult,
   WalletAgentDevnetReceipt,
   WalletAgentHistoryEntry,
@@ -61,6 +62,12 @@ export {
   saveWalletAgentDevnetReceipt,
   upsertWalletAgentDevnetReceipt,
 } from './receipts';
+export {
+  createWalletAgentAlertDeliveryReceipt,
+  readWalletAgentAlertDeliveryReceipts,
+  saveWalletAgentAlertDeliveryReceipt,
+  upsertWalletAgentAlertDeliveryReceipt,
+} from './alert-receipts';
 export {
   createWalletAgentAlertDeliveryContract,
 } from './alerts';
