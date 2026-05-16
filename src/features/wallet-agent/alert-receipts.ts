@@ -1,6 +1,7 @@
 import type {
   WalletAgentAlertDelivery,
   WalletAgentAlertDeliveryReceipt,
+  WalletAgentAlertDeliveryReceiptStats,
 } from './types';
 
 const WALLET_AGENT_ALERT_RECEIPTS_KEY = 'congchain.walletAgent.alertReceipts.v1';
@@ -69,6 +70,25 @@ export function readWalletAgentAlertDeliveryReceipts(): WalletAgentAlertDelivery
   } catch {
     return [];
   }
+}
+
+export function summarizeWalletAgentAlertDeliveryReceipts(
+  receipts: WalletAgentAlertDeliveryReceipt[]
+): WalletAgentAlertDeliveryReceiptStats {
+  const providers = Array.from(new Set(receipts.map(receipt => receipt.provider))).sort();
+  const targets = new Set(receipts.map(receipt => receipt.target.toLowerCase()));
+  const lastSentAt = receipts
+    .map(receipt => receipt.sentAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null;
+
+  return {
+    totalSent: receipts.length,
+    uniqueTargets: targets.size,
+    providers,
+    lastSentAt,
+  };
 }
 
 export function upsertWalletAgentAlertDeliveryReceipt(

@@ -276,6 +276,13 @@ export type WalletAgentAlertDeliveryReceipt = {
   safetyNotes: string[];
 };
 
+export type WalletAgentAlertDeliveryReceiptStats = {
+  totalSent: number;
+  uniqueTargets: number;
+  providers: string[];
+  lastSentAt: string | null;
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

@@ -37,6 +37,7 @@ import { canConfirmWalletAgentIntent } from '../confirmation';
 import {
   readWalletAgentAlertDeliveryReceipts,
   saveWalletAgentAlertDeliveryReceipt,
+  summarizeWalletAgentAlertDeliveryReceipts,
 } from '../alert-receipts';
 import { readWalletAgentDevnetReceipts } from '../receipts';
 import {
@@ -497,6 +498,7 @@ function DevnetReceiptsHistory({ refreshKey }: { refreshKey: string }) {
 function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [receipts, setReceipts] = useState<WalletAgentAlertDeliveryReceipt[]>([]);
   const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
+  const stats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
 
   useEffect(() => {
     setReceipts(readWalletAgentAlertDeliveryReceipts());
@@ -527,6 +529,26 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
         </p>
       ) : (
         <div className="space-y-2">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Enviados</p>
+              <p className="mt-1 text-sm font-semibold text-white/78">{stats.totalSent}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Destinos</p>
+              <p className="mt-1 text-sm font-semibold text-white/78">{stats.uniqueTargets}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Provider</p>
+              <p className="mt-1 truncate text-sm font-semibold text-white/78">{stats.providers.join(', ') || 'n/a'}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">Ultimo</p>
+              <p className="mt-1 truncate text-sm font-semibold text-white/78">
+                {stats.lastSentAt ? formatReceiptDate(stats.lastSentAt) : 'n/a'}
+              </p>
+            </div>
+          </div>
           {receipts.slice(0, 3).map(receipt => (
             <div key={receipt.id} className="rounded-xl border border-white/[0.07] bg-black/22 p-2.5">
               <div className="mb-2 flex items-start justify-between gap-3">

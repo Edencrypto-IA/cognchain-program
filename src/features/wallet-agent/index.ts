@@ -15,6 +15,7 @@ export type {
   WalletAgentAlertDelivery,
   WalletAgentAlertDeliveryChannel,
   WalletAgentAlertDeliveryChannelStatus,
+  WalletAgentAlertDeliveryReceiptStats,
   WalletAgentAlertDeliveryStatus,
   WalletAgentLocalNotificationChannel,
   WalletAgentLocalNotificationDraft,
@@ -66,6 +67,7 @@ export {
   createWalletAgentAlertDeliveryReceipt,
   readWalletAgentAlertDeliveryReceipts,
   saveWalletAgentAlertDeliveryReceipt,
+  summarizeWalletAgentAlertDeliveryReceipts,
   upsertWalletAgentAlertDeliveryReceipt,
 } from './alert-receipts';
 export {

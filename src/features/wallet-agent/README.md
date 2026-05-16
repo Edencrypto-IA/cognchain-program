@@ -709,3 +709,23 @@ It still cannot:
 - persist alert delivery records to backend storage;
 - schedule future alerts;
 - request wallet approvals or execute transactions from receipts.
+
+## Phase 7.6 local alert status center
+
+Wallet Agent now summarizes local alert email delivery history inside the review panel.
+
+It can:
+
+- count manual alert emails sent in this browser;
+- count unique email targets;
+- show which provider accepted the sent alerts;
+- show the latest local send timestamp;
+- keep the status center derived only from local receipts.
+
+It still cannot:
+
+- prove inbox delivery or email opens;
+- sync delivery status across devices;
+- create backend delivery analytics;
+- retry failed emails automatically;
+- schedule, sign, submit, buy, sell, or pay from alert status.
