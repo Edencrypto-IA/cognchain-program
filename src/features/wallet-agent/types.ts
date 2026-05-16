@@ -181,6 +181,22 @@ export type WalletAgentLocalRuleReviewContext = {
   generatedAt: string;
 };
 
+export type WalletAgentLocalRuleSimulationStatus =
+  | 'paused'
+  | 'needs_more_data'
+  | 'manual_review_required';
+
+export type WalletAgentLocalRuleSimulation = {
+  ruleId: string;
+  status: WalletAgentLocalRuleSimulationStatus;
+  title: string;
+  summary: string;
+  observations: string[];
+  nextManualStep: string;
+  blockedActions: string[];
+  simulatedAt: string;
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

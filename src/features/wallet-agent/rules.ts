@@ -3,6 +3,7 @@ import type {
   WalletAgentIntentType,
   WalletAgentLocalRule,
   WalletAgentLocalRuleReviewContext,
+  WalletAgentLocalRuleSimulation,
   WalletAgentLocalRuleTrigger,
 } from './types';
 
@@ -211,6 +212,84 @@ export function createWalletAgentRuleReviewContext(
     ],
     safetyNotes: rule.safety.notes,
     generatedAt: now.toISOString(),
+  };
+}
+
+export function simulateWalletAgentLocalRule(
+  rule: WalletAgentLocalRule,
+  now = new Date()
+): WalletAgentLocalRuleSimulation {
+  const blockedActions = [
+    'No wallet signature can be requested by this simulation.',
+    'No transaction can be prepared or submitted by this simulation.',
+    'No background job or notification is scheduled by this simulation.',
+  ];
+
+  if (rule.status === 'paused') {
+    return {
+      ruleId: rule.id,
+      status: 'paused',
+      title: 'Rule is paused',
+      summary: 'This rule is stored locally but currently paused. It would not be considered for any future manual review until reactivated.',
+      observations: [
+        `Trigger retained: ${rule.trigger.label}`,
+        'User must reactivate the rule before using it operationally.',
+      ],
+      nextManualStep: 'Reactivate the rule only if the user still wants to monitor it.',
+      blockedActions,
+      simulatedAt: now.toISOString(),
+    };
+  }
+
+  if (rule.trigger.kind === 'price' && !rule.trigger.targetPriceUsd) {
+    return {
+      ruleId: rule.id,
+      status: 'needs_more_data',
+      title: 'Price target is incomplete',
+      summary: 'The rule can be reviewed, but it does not include a target price yet.',
+      observations: [
+        `Token watch: ${rule.trigger.tokenSymbol ?? 'unknown token'}`,
+        'A real market check would require a target price and a trusted data source.',
+      ],
+      nextManualStep: 'Ask the user for the target price before connecting live market evaluation.',
+      blockedActions,
+      simulatedAt: now.toISOString(),
+    };
+  }
+
+  if ((rule.trigger.kind === 'time' || rule.trigger.kind === 'batch_review') && !rule.trigger.scheduledFor) {
+    return {
+      ruleId: rule.id,
+      status: 'needs_more_data',
+      title: 'Schedule is incomplete',
+      summary: 'The rule needs a date and time before it can become useful for future reminders.',
+      observations: [
+        `Trigger type: ${rule.trigger.kind.replaceAll('_', ' ')}`,
+        'No local or backend scheduler is active in this phase.',
+      ],
+      nextManualStep: 'Ask the user for the exact date, time, and timezone.',
+      blockedActions,
+      simulatedAt: now.toISOString(),
+    };
+  }
+
+  return {
+    ruleId: rule.id,
+    status: 'manual_review_required',
+    title: 'Manual review would be required',
+    summary: 'The rule has enough local context to be reviewed, but it still cannot execute anything by itself.',
+    observations: [
+      `Trigger: ${rule.trigger.label}`,
+      `Action mode: ${rule.action.kind.replaceAll('_', ' ')}`,
+      rule.safety.requiresWalletSignature
+        ? 'A fresh wallet signature would be required before any value-moving action.'
+        : 'This remains a notify-only rule unless a future phase connects notifications.',
+    ],
+    nextManualStep: rule.safety.requiresWalletSignature
+      ? 'Open a fresh review flow and require explicit wallet approval.'
+      : 'Use this as a local reminder context for the next user-facing update.',
+    blockedActions,
+    simulatedAt: now.toISOString(),
   };
 }
 

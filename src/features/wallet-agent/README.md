@@ -424,3 +424,21 @@ It still cannot:
 - prepare, sign, submit, buy, sell, or pay from the context panel;
 - bypass paused status or wallet approval;
 - treat local context as backend automation.
+
+## Phase 5.5 local rule simulation
+
+Wallet Agent now simulates what a local rule would require if reviewed now.
+
+It can:
+
+- simulate paused, incomplete, and manual-review-ready rule states;
+- explain missing data such as target price or schedule time;
+- show observations and the next manual step;
+- copy a local simulation report.
+
+It still cannot:
+
+- call live market, scheduler, or wallet APIs from the simulation;
+- match real-time trigger conditions;
+- prepare, sign, submit, buy, sell, pay, or notify automatically;
+- replace explicit future user review.

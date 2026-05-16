@@ -13,6 +13,8 @@ export type {
   WalletAgentLanguageHint,
   WalletAgentLocalRule,
   WalletAgentLocalRuleReviewContext,
+  WalletAgentLocalRuleSimulation,
+  WalletAgentLocalRuleSimulationStatus,
   WalletAgentLocalRuleStatus,
   WalletAgentLocalRuleTrigger,
   WalletAgentParsedIntent,
@@ -60,6 +62,7 @@ export {
   removeWalletAgentLocalRule,
   saveWalletAgentLocalRule,
   setWalletAgentLocalRuleStatus,
+  simulateWalletAgentLocalRule,
   upsertWalletAgentLocalRule,
 } from './rules';
 export { readWalletAgentWalletSnapshot } from './wallet-snapshot';

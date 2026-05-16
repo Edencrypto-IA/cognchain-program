@@ -24,6 +24,7 @@ import type {
   WalletAgentHistoryEntry,
   WalletAgentLocalRule,
   WalletAgentLocalRuleReviewContext,
+  WalletAgentLocalRuleSimulation,
   WalletAgentReviewItem,
 } from '../types';
 import { canConfirmWalletAgentIntent } from '../confirmation';
@@ -33,6 +34,7 @@ import {
   readWalletAgentLocalRules,
   removeWalletAgentLocalRule,
   setWalletAgentLocalRuleStatus,
+  simulateWalletAgentLocalRule,
 } from '../rules';
 
 type WalletAgentReviewPanelProps = {
@@ -292,6 +294,28 @@ function buildRuleReviewContextSummary(context: WalletAgentLocalRuleReviewContex
   ].join('\n');
 }
 
+function buildRuleSimulationSummary(simulation: WalletAgentLocalRuleSimulation) {
+  return [
+    'CONGCHAIN Wallet Agent Rule Simulation',
+    '',
+    `Rule ID: ${simulation.ruleId}`,
+    `Status: ${simulation.status}`,
+    `Title: ${simulation.title}`,
+    `Simulated at: ${simulation.simulatedAt}`,
+    '',
+    'Summary:',
+    simulation.summary,
+    '',
+    'Observations:',
+    ...simulation.observations.map(item => `- ${item}`),
+    '',
+    `Next manual step: ${simulation.nextManualStep}`,
+    '',
+    'Blocked actions:',
+    ...simulation.blockedActions.map(item => `- ${item}`),
+  ].join('\n');
+}
+
 function getRuleStatusClassName(status: WalletAgentLocalRule['status']) {
   if (status === 'paused') {
     return 'border-[#F5A524]/22 bg-[#F5A524]/10 text-[#F5A524]';
@@ -383,10 +407,13 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
   const [copiedRuleId, setCopiedRuleId] = useState<string | null>(null);
   const [activeContext, setActiveContext] = useState<WalletAgentLocalRuleReviewContext | null>(null);
   const [copiedContextId, setCopiedContextId] = useState<string | null>(null);
+  const [activeSimulation, setActiveSimulation] = useState<WalletAgentLocalRuleSimulation | null>(null);
+  const [copiedSimulationId, setCopiedSimulationId] = useState<string | null>(null);
 
   useEffect(() => {
     setRules(readWalletAgentLocalRules());
     setActiveContext(null);
+    setActiveSimulation(null);
   }, [refreshKey]);
 
   function copyRule(rule: WalletAgentLocalRule) {
@@ -404,6 +431,7 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
   function removeRule(rule: WalletAgentLocalRule) {
     setRules(removeWalletAgentLocalRule(rule.id));
     setActiveContext(current => current?.ruleId === rule.id ? null : current);
+    setActiveSimulation(current => current?.ruleId === rule.id ? null : current);
   }
 
   function showReviewContext(rule: WalletAgentLocalRule) {
@@ -417,6 +445,17 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
     navigator.clipboard?.writeText(buildRuleReviewContextSummary(context)).then(() => {
       setCopiedContextId(context.ruleId);
       window.setTimeout(() => setCopiedContextId(null), 1600);
+    }).catch(() => {});
+  }
+
+  function simulateRule(rule: WalletAgentLocalRule) {
+    setActiveSimulation(simulateWalletAgentLocalRule(rule));
+  }
+
+  function copySimulation(simulation: WalletAgentLocalRuleSimulation) {
+    navigator.clipboard?.writeText(buildRuleSimulationSummary(simulation)).then(() => {
+      setCopiedSimulationId(simulation.ruleId);
+      window.setTimeout(() => setCopiedSimulationId(null), 1600);
     }).catch(() => {});
   }
 
@@ -482,6 +521,14 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => simulateRule(rule)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#14F195]/16 bg-[#14F195]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/10"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  Simular agora
+                </button>
+                <button
+                  type="button"
                   onClick={() => toggleRuleStatus(rule)}
                   className="inline-flex items-center gap-1.5 rounded-full border border-[#F5A524]/16 bg-[#F5A524]/[0.06] px-3 py-1.5 text-[11px] font-semibold text-[#F5A524] transition-colors hover:bg-[#F5A524]/10"
                 >
@@ -531,6 +578,45 @@ function LocalRulesHistory({ refreshKey }: { refreshKey: string }) {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeSimulation?.ruleId === rule.id && (
+                <div className="mt-3 rounded-2xl border border-[#14F195]/16 bg-[#14F195]/[0.045] p-3">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#14F195]/85">Simulacao local</p>
+                      <p className="mt-1 text-xs font-semibold text-white/68">{activeSimulation.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-white/48">{activeSimulation.summary}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]">
+                      {activeSimulation.status.replaceAll('_', ' ')}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/34">Observacoes</p>
+                      <div className="space-y-1.5">
+                        {activeSimulation.observations.map(item => (
+                          <p key={item} className="text-[11px] leading-relaxed text-white/48">- {item}</p>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.07] bg-black/20 p-2.5">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/34">Proximo passo manual</p>
+                      <p className="text-[11px] leading-relaxed text-white/50">{activeSimulation.nextManualStep}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => copySimulation(activeSimulation)}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-[11px] font-semibold text-white/56 transition-colors hover:bg-white/[0.06] hover:text-white/82"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copiedSimulationId === activeSimulation.ruleId ? 'Simulacao copiada' : 'Copiar simulacao'}
+                  </button>
                 </div>
               )}
             </div>
