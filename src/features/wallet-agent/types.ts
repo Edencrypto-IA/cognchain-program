@@ -197,7 +197,7 @@ export type WalletAgentLocalRuleSimulation = {
   simulatedAt: string;
 };
 
-export type WalletAgentLocalNotificationChannel = 'congchain_chat' | 'wallet';
+export type WalletAgentLocalNotificationChannel = 'congchain_chat' | 'email' | 'wallet';
 
 export type WalletAgentLocalNotificationDraft = {
   id: string;

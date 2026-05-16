@@ -344,6 +344,12 @@ function buildNotificationDraftSummary(draft: WalletAgentLocalNotificationDraft)
   ].join('\n');
 }
 
+function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
+  if (channel === 'congchain_chat') return 'chat CongChain';
+  if (channel === 'email') return 'email';
+  return 'carteira';
+}
+
 function getRuleStatusClassName(status: WalletAgentLocalRule['status']) {
   if (status === 'paused') {
     return 'border-[#F5A524]/22 bg-[#F5A524]/10 text-[#F5A524]';
@@ -701,7 +707,7 @@ function LocalRulesHistory({
                   </div>
 
                   <div className="grid gap-2 text-[11px] leading-relaxed text-white/46 sm:grid-cols-2">
-                    <p>Canais: {activeNotificationDraft.channels.map(channel => channel === 'congchain_chat' ? 'chat CongChain' : 'carteira').join(' + ')}</p>
+                    <p>Canais: {activeNotificationDraft.channels.map(formatNotificationChannel).join(' + ')}</p>
                     <p>Carteira: {activeNotificationDraft.walletActionRequired ? 'aprovacao futura' : 'nao precisa'}</p>
                   </div>
 

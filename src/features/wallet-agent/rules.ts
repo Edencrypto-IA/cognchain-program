@@ -300,8 +300,8 @@ export function createWalletAgentLocalNotificationDraft(
 ): WalletAgentLocalNotificationDraft {
   const walletActionRequired = rule.safety.requiresWalletSignature;
   const channels: WalletAgentLocalNotificationDraft['channels'] = walletActionRequired
-    ? ['congchain_chat', 'wallet']
-    : ['congchain_chat'];
+    ? ['congchain_chat', 'email', 'wallet']
+    : ['congchain_chat', 'email'];
 
   return {
     id: `wanotif_${rule.id}_${now.getTime()}`,
@@ -313,20 +313,22 @@ export function createWalletAgentLocalNotificationDraft(
       : `Alerta preparado: ${rule.type.replaceAll('_', ' ')}`,
     message: rule.status === 'paused'
       ? `A regra "${rule.trigger.label}" esta pausada. A CONGCHAIN nao avisaria nada ate voce reativar.`
-      : `A CONGCHAIN avisaria no chat quando a regra "${rule.trigger.label}" precisar de revisao manual.${walletActionRequired ? ' Se houver acao de valor, a carteira seria usada apenas para uma aprovacao futura e explicita.' : ''}`,
+      : `A CONGCHAIN avisaria no chat e prepararia um email quando a regra "${rule.trigger.label}" precisar de revisao manual.${walletActionRequired ? ' Se houver acao de valor, a carteira seria usada apenas para uma aprovacao futura e explicita.' : ''}`,
     walletActionRequired,
     deliveryPlan: [
       'Mostrar primeiro no chat CongChain.',
+      'Preparar copia por email para um usuario autenticado quando o canal de email estiver conectado.',
       walletActionRequired
         ? 'Abrir solicitacao de carteira somente se o usuario escolher revisar e assinar no futuro.'
         : 'Nao abrir carteira para regra somente leitura.',
-      'Nao enviar para Telegram, email, browser push ou qualquer canal externo.',
+      'Nao enviar Telegram, browser push ou qualquer canal externo nao conectado.',
     ],
     blockedActions: [
       'Do not send this draft automatically.',
       'Do not request a wallet signature from this draft.',
       'Do not submit transactions from this draft.',
-      'Do not use any notification channel outside CongChain chat and wallet approval.',
+      'Do not send email until an authenticated email channel exists.',
+      'Do not use any notification channel outside CongChain chat, authenticated email, and wallet approval.',
     ],
     createdAt: now.toISOString(),
   };

@@ -160,7 +160,11 @@ function formatWalletAgentNotificationChatMessage(
   rule: WalletAgentLocalRule
 ) {
   const channels = draft.channels
-    .map(channel => channel === 'congchain_chat' ? 'chat CongChain' : 'carteira')
+    .map(channel => {
+      if (channel === 'congchain_chat') return 'chat CongChain';
+      if (channel === 'email') return 'email';
+      return 'carteira';
+    })
     .join(' + ');
 
   return [
@@ -172,6 +176,7 @@ function formatWalletAgentNotificationChatMessage(
     `- Status da regra: ${rule.status.replaceAll('_', ' ')}`,
     `- Gatilho: ${rule.trigger.label}`,
     `- Canal: ${channels}`,
+    '- Email: preparado apenas para um usuario autenticado; nenhum email foi enviado nesta etapa.',
     `- Carteira: ${draft.walletActionRequired ? 'sera necessaria apenas se voce aprovar uma etapa futura' : 'nao necessaria para este alerta'}`,
     '',
     '**O que revisar agora**',
@@ -179,7 +184,7 @@ function formatWalletAgentNotificationChatMessage(
     '- Confira se o gatilho esta correto.',
     '- Se envolver valor, uma assinatura nova da carteira sera obrigatoria no futuro.',
     '',
-    'Nenhuma transacao foi executada. Nenhuma assinatura foi solicitada. Nenhum alerta externo foi enviado.',
+    'Nenhuma transacao foi executada. Nenhuma assinatura foi solicitada. Nenhum email ou alerta externo foi enviado.',
   ].join('\n');
 }
 
