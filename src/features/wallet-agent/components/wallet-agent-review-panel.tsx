@@ -14,6 +14,7 @@ import {
   Mail,
   PauseCircle,
   PlayCircle,
+  RefreshCw,
   Send,
   ShieldCheck,
   Trash2,
@@ -718,6 +719,8 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [auditEvents, setAuditEvents] = useState<WalletAgentAlertHistoryAuditEvent[]>([]);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [historyRefreshTick, setHistoryRefreshTick] = useState(0);
+  const [historyRefreshing, setHistoryRefreshing] = useState(false);
   const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
   const stats = serverHistory ? {
     totalSent: serverHistory.sent,
@@ -734,9 +737,10 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   useEffect(() => {
     let cancelled = false;
 
+    setHistoryRefreshing(true);
     setReceipts(readWalletAgentAlertDeliveryReceipts());
 
-    fetch('/api/wallet-agent/alert-records/history?limit=3')
+    const historyRequest = fetch('/api/wallet-agent/alert-records/history?limit=3')
       .then(async response => {
         if (!response.ok) {
           if (!cancelled) setServerHistory(null);
@@ -752,7 +756,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
         if (!cancelled) setServerHistory(null);
       });
 
-    fetch('/api/wallet-agent/alert-records/history/audit?limit=4')
+    const auditRequest = fetch('/api/wallet-agent/alert-records/history/audit?limit=4')
       .then(async response => {
         if (!response.ok) {
           if (!cancelled) setAuditEvents([]);
@@ -772,10 +776,21 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
         }
       });
 
+    Promise.allSettled([historyRequest, auditRequest]).finally(() => {
+      if (!cancelled) setHistoryRefreshing(false);
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, historyRefreshTick]);
+
+  function refreshAlertHistory() {
+    setExportError(null);
+    setDeleteError(null);
+    setAuditError(null);
+    setHistoryRefreshTick(current => current + 1);
+  }
 
   function copyReceipt(receipt: WalletAgentAlertDeliveryReceipt) {
     navigator.clipboard?.writeText(buildAlertDeliveryReceiptSummary(receipt)).then(() => {
@@ -897,6 +912,15 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE3FF]/85">Emails de alerta</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={refreshAlertHistory}
+            disabled={historyRefreshing}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1 text-[10px] font-semibold text-white/54 transition-colors hover:border-[#00D1FF]/18 hover:bg-[#00D1FF]/[0.06] hover:text-[#B7F3FF] disabled:cursor-wait disabled:text-white/28"
+          >
+            <RefreshCw className={`h-3 w-3 ${historyRefreshing ? 'animate-spin' : ''}`} />
+            {historyRefreshing ? 'Atualizando' : 'Atualizar'}
+          </button>
           {hasReceipts && (
             <>
               <button

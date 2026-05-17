@@ -1369,3 +1369,23 @@ It still cannot:
 - persist audit events durably;
 - run automatic retention purges;
 - sign, submit, buy, sell, pay, schedule, or resend anything from the health summary.
+
+## Phase 10.6 manual account history refresh
+
+Wallet Agent now has a safe manual refresh control for alert history inside the review panel.
+
+It can:
+
+- reload local alert receipts from the browser;
+- reload account-owned alert history from the server;
+- reload recent metadata-only audit events;
+- show an inline updating state while history and audit requests are running;
+- clear stale export/delete/audit error messages before a manual refresh.
+
+It still cannot:
+
+- refresh another account's history;
+- bypass verified email identity;
+- retry or resend failed alert emails;
+- trigger notification delivery from the refresh button;
+- sign, submit, buy, sell, pay, schedule, or resend anything from history refresh.
