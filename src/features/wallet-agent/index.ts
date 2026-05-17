@@ -80,8 +80,10 @@ export {
 export {
   createWalletAgentAlertServerHistory,
   createWalletAgentAlertServerReceipt,
+  getWalletAgentAlertHistoryStorageAdapter,
   readWalletAgentAlertServerReceipts,
   upsertWalletAgentAlertServerReceipt,
+  type WalletAgentAlertHistoryStorageAdapter,
 } from './alert-record-store';
 export {
   createWalletAgentAlertPersistenceRecordContract,

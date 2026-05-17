@@ -319,6 +319,8 @@ export type WalletAgentAlertPersistenceRecord = {
   blockedActions: string[];
 };
 
+export type WalletAgentAlertHistoryStorageMode = 'memory' | 'database';
+
 export type WalletAgentAlertServerReceipt = {
   id: string;
   ownerEmail: string;
@@ -336,8 +338,8 @@ export type WalletAgentAlertServerReceipt = {
   createdAt: string;
   updatedAt: string;
   storage: {
-    mode: 'memory';
-    durable: false;
+    mode: WalletAgentAlertHistoryStorageMode;
+    durable: boolean;
     persisted: true;
     reason: string;
   };
@@ -362,8 +364,8 @@ export type WalletAgentAlertServerHistory = {
   latestFailedAt: string | null;
   recentReceipts: WalletAgentAlertServerReceipt[];
   storage: {
-    mode: 'memory';
-    durable: false;
+    mode: WalletAgentAlertHistoryStorageMode;
+    durable: boolean;
     reason: string;
   };
   safety: {

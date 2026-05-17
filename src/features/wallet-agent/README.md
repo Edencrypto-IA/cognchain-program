@@ -949,3 +949,24 @@ It still cannot:
 - sync local fallback history across devices;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from history;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 9.1 alert history storage adapter contract
+
+Wallet Agent now has a storage adapter contract for account alert history.
+
+It can:
+
+- route alert receipt reads, writes, and history summaries through a typed storage adapter;
+- keep the current bounded memory implementation as the default adapter;
+- expose adapter metadata such as storage mode and durability;
+- prepare the code path for a future database adapter without changing API contracts;
+- keep existing receipt and history endpoints backward compatible.
+
+It still cannot:
+
+- write alert history to a durable database;
+- configure a production database adapter through environment variables;
+- migrate old memory receipts into persistent storage;
+- recover server-memory receipts after restart;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from storage records;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.

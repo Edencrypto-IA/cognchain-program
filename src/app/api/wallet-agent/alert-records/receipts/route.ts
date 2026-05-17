@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   const { session, response } = getVerifiedSession(req);
   if (!session) return response;
 
-  const receipts = readWalletAgentAlertServerReceipts(session.email);
+  const receipts = await readWalletAgentAlertServerReceipts(session.email);
   return NextResponse.json({
     ok: true,
     receipts,
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nao foi possivel criar recibo server-side.' }, { status: 400 });
   }
 
-  const receipts = upsertWalletAgentAlertServerReceipt(receipt);
+  const receipts = await upsertWalletAgentAlertServerReceipt(receipt);
   return NextResponse.json({
     ok: true,
     receipt,

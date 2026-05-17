@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Email identity precisa estar verificada por magic link.' }, { status: 403 });
   }
 
-  const history = createWalletAgentAlertServerHistory(session.email, getLimit(req));
+  const history = await createWalletAgentAlertServerHistory(session.email, getLimit(req));
   return NextResponse.json({
     ok: true,
     history,
