@@ -612,6 +612,15 @@ const ALERT_HISTORY_PRIVACY_ITEMS = [
   { label: 'Conta', value: 'email verificado' },
 ] as const;
 
+const ALERT_HISTORY_READINESS_ITEMS = [
+  'Copiar resumo',
+  'Exportar dados',
+  'Atualizar estado',
+  'Ver auditoria',
+  'Apagar metadata',
+  'Entender limites',
+] as const;
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -1080,6 +1089,29 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-white/34">
           O historico serve para auditoria e continuidade. Ele nao tem permissao para assinar transacoes, movimentar fundos ou acessar segredos da carteira.
+        </p>
+      </div>
+
+      <div className="mb-3 rounded-2xl border border-white/[0.07] bg-black/22 p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FileCheck2 className="h-3.5 w-3.5 text-[#7DE3FF]" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/48">Pronto para revisao</p>
+          </div>
+          <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/38">
+            fase 10
+          </span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {ALERT_HISTORY_READINESS_ITEMS.map(item => (
+            <div key={item} className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-2 text-[10px] font-semibold text-white/56">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#14F195]" />
+              <span className="truncate">{item}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-white/34">
+          Este bloco fecha a camada de governanca do historico: visibilidade, controle e prova operacional sem permissao de execucao financeira.
         </p>
       </div>
 

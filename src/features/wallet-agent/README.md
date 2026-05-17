@@ -1446,3 +1446,21 @@ It still cannot:
 - inspect wallet secrets;
 - sign or submit transactions;
 - buy, sell, pay, schedule, retry, resend, or move funds from history controls.
+
+## Phase 10.10 account history governance closeout
+
+Wallet Agent now shows a compact readiness checklist for alert history governance inside the review panel.
+
+It can:
+
+- summarize that the user can copy, export, refresh, audit, delete, and understand alert history limits;
+- make the Phase 10 governance surface easier to scan;
+- keep the closeout checklist metadata-only and read-only;
+- clarify that the history layer is operational evidence, not a financial execution layer.
+
+It still cannot:
+
+- trigger notifications from the checklist;
+- change retention, storage, or account settings from the checklist;
+- sign or submit transactions;
+- buy, sell, pay, schedule, retry, resend, or move funds from history controls.
