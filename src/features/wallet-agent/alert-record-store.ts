@@ -4,6 +4,7 @@ import type {
   WalletAgentAlertServerHistory,
   WalletAgentAlertServerReceipt,
 } from './types';
+import { db } from '@/lib/db';
 
 const MAX_SERVER_RECEIPTS_PER_USER = 100;
 const serverReceiptStore = new Map<string, WalletAgentAlertServerReceipt[]>();
@@ -47,12 +48,16 @@ function getRequestedStorageMode(): WalletAgentAlertHistoryStorageMode {
     : 'memory';
 }
 
+function isDatabaseAdapterEnabled() {
+  return process.env.WALLET_AGENT_ALERT_DATABASE_ADAPTER === 'enabled';
+}
+
 export function getWalletAgentAlertHistoryStorageConfig(): WalletAgentAlertHistoryStorageConfig {
   const requestedMode = getRequestedStorageMode();
   const databaseUrl = process.env.WALLET_AGENT_ALERTS_DATABASE_URL || process.env.DATABASE_URL;
   const databaseRequested = requestedMode === 'database';
   const databaseConfigured = databaseRequested && isPostgresUrl(databaseUrl);
-  const databaseAdapterReady = false;
+  const databaseAdapterReady = databaseConfigured && isDatabaseAdapterEnabled();
 
   if (!databaseRequested) {
     return {
@@ -80,12 +85,14 @@ export function getWalletAgentAlertHistoryStorageConfig(): WalletAgentAlertHisto
 
   return {
     requestedMode,
-    activeMode: 'memory',
+    activeMode: databaseAdapterReady ? 'database' : 'memory',
     databaseRequested,
     databaseConfigured,
     databaseAdapterReady,
-    durable: false,
-    reason: 'Database storage is configured, but the Prisma adapter is not enabled in this phase. Falling back to bounded memory.',
+    durable: databaseAdapterReady,
+    reason: databaseAdapterReady
+      ? 'Database storage is configured and the Prisma adapter is enabled. Alert history is durable metadata storage.'
+      : 'Database storage is configured, but the Prisma adapter is not enabled. Falling back to bounded memory.',
   };
 }
 
@@ -134,6 +141,114 @@ function createHistoryFromReceipts(
   };
 }
 
+function createServerReceiptFromRecord(
+  record: WalletAgentAlertPersistenceRecord,
+  ownerEmail: string,
+  storage: WalletAgentAlertServerReceipt['storage'],
+  now = new Date()
+): WalletAgentAlertServerReceipt | null {
+  if (!record.receipt) return null;
+
+  const timestamp = now.toISOString();
+  const eventAt = record.receipt.sentAt ?? record.receipt.failedAt ?? record.receipt.updatedAt;
+
+  return {
+    id: `wasr_${record.receipt.id}`,
+    ownerEmail: normalizeEmail(ownerEmail),
+    recordId: record.id,
+    deliveryId: record.deliveryId,
+    ruleId: record.ruleId,
+    draftId: record.draftId,
+    receiptId: record.receipt.id,
+    receiptStatus: record.receipt.status,
+    target: record.receipt.target,
+    provider: record.receipt.provider,
+    title: record.receipt.title,
+    message: record.receipt.message,
+    eventAt,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    storage,
+    safety: {
+      metadataOnly: true,
+      canStoreSecrets: false,
+      canExecuteTransaction: false,
+      canSchedule: false,
+      notes: [
+        'Server receipt storage contains alert metadata only.',
+        'No wallet keys, seed phrases, signed payloads, or private transaction data are stored.',
+        'Stored receipts cannot resend email, schedule jobs, request wallet signatures, or execute transactions.',
+      ],
+    },
+  };
+}
+
+type WalletAgentAlertReceiptRow = {
+  id: string;
+  ownerEmail: string;
+  recordId: string;
+  deliveryId: string;
+  ruleId: string;
+  draftId: string;
+  receiptId: string;
+  receiptStatus: string;
+  target: string;
+  provider: string;
+  title: string;
+  message: string;
+  eventAt: Date;
+  storageMode: string;
+  storageReason: string;
+  safetyNotes: unknown;
+  metadataOnly: boolean;
+  canStoreSecrets: boolean;
+  canExecuteTransaction: boolean;
+  canSchedule: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function toServerReceipt(row: WalletAgentAlertReceiptRow): WalletAgentAlertServerReceipt {
+  const safetyNotes = Array.isArray(row.safetyNotes)
+    ? row.safetyNotes.filter((note): note is string => typeof note === 'string')
+    : [];
+
+  return {
+    id: row.id,
+    ownerEmail: row.ownerEmail,
+    recordId: row.recordId,
+    deliveryId: row.deliveryId,
+    ruleId: row.ruleId,
+    draftId: row.draftId,
+    receiptId: row.receiptId,
+    receiptStatus: row.receiptStatus === 'failed' ? 'failed' : 'sent',
+    target: row.target,
+    provider: row.provider,
+    title: row.title,
+    message: row.message,
+    eventAt: row.eventAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    storage: {
+      mode: row.storageMode === 'database' ? 'database' : 'memory',
+      durable: row.storageMode === 'database',
+      persisted: true,
+      reason: row.storageReason,
+    },
+    safety: {
+      metadataOnly: true,
+      canStoreSecrets: false,
+      canExecuteTransaction: false,
+      canSchedule: false,
+      notes: safetyNotes.length > 0 ? safetyNotes : [
+        'Database receipt storage contains alert metadata only.',
+        'No wallet keys, seed phrases, signed payloads, or private transaction data are stored.',
+        'Stored receipts cannot resend email, schedule jobs, request wallet signatures, or execute transactions.',
+      ],
+    },
+  };
+}
+
 const memoryAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter = {
   id: 'memory',
   durable: false,
@@ -142,45 +257,12 @@ const memoryAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter = 
     ownerEmail: string,
     now = new Date()
   ) {
-    if (!record.receipt) return null;
-
-    const timestamp = now.toISOString();
-    const eventAt = record.receipt.sentAt ?? record.receipt.failedAt ?? record.receipt.updatedAt;
-
-    return {
-      id: `wasr_${record.receipt.id}`,
-      ownerEmail: normalizeEmail(ownerEmail),
-      recordId: record.id,
-      deliveryId: record.deliveryId,
-      ruleId: record.ruleId,
-      draftId: record.draftId,
-      receiptId: record.receipt.id,
-      receiptStatus: record.receipt.status,
-      target: record.receipt.target,
-      provider: record.receipt.provider,
-      title: record.receipt.title,
-      message: record.receipt.message,
-      eventAt,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      storage: {
-        mode: 'memory',
-        durable: false,
-        persisted: true,
-        reason: 'Stored in bounded server memory only. This is not durable database persistence.',
-      },
-      safety: {
-        metadataOnly: true,
-        canStoreSecrets: false,
-        canExecuteTransaction: false,
-        canSchedule: false,
-        notes: [
-          'Server receipt storage contains alert metadata only.',
-          'No wallet keys, seed phrases, signed payloads, or private transaction data are stored.',
-          'Stored receipts cannot resend email, schedule jobs, request wallet signatures, or execute transactions.',
-        ],
-      },
-    };
+    return createServerReceiptFromRecord(record, ownerEmail, {
+      mode: 'memory',
+      durable: false,
+      persisted: true,
+      reason: 'Stored in bounded server memory only. This is not durable database persistence.',
+    }, now);
   },
   async readReceipts(ownerEmail: string) {
     return [...(serverReceiptStore.get(normalizeEmail(ownerEmail)) ?? [])];
@@ -211,11 +293,100 @@ const memoryAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter = 
   },
 };
 
+const databaseAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter = {
+  id: 'database',
+  durable: true,
+  createReceipt(
+    record: WalletAgentAlertPersistenceRecord,
+    ownerEmail: string,
+    now = new Date()
+  ) {
+    return createServerReceiptFromRecord(record, ownerEmail, {
+      mode: 'database',
+      durable: true,
+      persisted: true,
+      reason: 'Stored in durable Postgres metadata storage through the Prisma adapter.',
+    }, now);
+  },
+  async readReceipts(ownerEmail: string) {
+    const rows = await db.walletAgentAlertReceipt.findMany({
+      where: { ownerEmail: normalizeEmail(ownerEmail) },
+      orderBy: { eventAt: 'desc' },
+      take: MAX_SERVER_RECEIPTS_PER_USER,
+    });
+
+    return rows.map(toServerReceipt);
+  },
+  async upsertReceipt(receipt: WalletAgentAlertServerReceipt) {
+    await db.walletAgentAlertReceipt.upsert({
+      where: {
+        ownerEmail_receiptId: {
+          ownerEmail: normalizeEmail(receipt.ownerEmail),
+          receiptId: receipt.receiptId,
+        },
+      },
+      create: {
+        id: receipt.id,
+        ownerEmail: normalizeEmail(receipt.ownerEmail),
+        recordId: receipt.recordId,
+        deliveryId: receipt.deliveryId,
+        ruleId: receipt.ruleId,
+        draftId: receipt.draftId,
+        receiptId: receipt.receiptId,
+        receiptStatus: receipt.receiptStatus,
+        target: receipt.target,
+        provider: receipt.provider,
+        title: receipt.title,
+        message: receipt.message,
+        eventAt: new Date(receipt.eventAt),
+        storageMode: 'database',
+        storageReason: receipt.storage.reason,
+        safetyNotes: receipt.safety.notes,
+        metadataOnly: true,
+        canStoreSecrets: false,
+        canExecuteTransaction: false,
+        canSchedule: false,
+        createdAt: new Date(receipt.createdAt),
+      },
+      update: {
+        recordId: receipt.recordId,
+        deliveryId: receipt.deliveryId,
+        ruleId: receipt.ruleId,
+        draftId: receipt.draftId,
+        receiptStatus: receipt.receiptStatus,
+        target: receipt.target,
+        provider: receipt.provider,
+        title: receipt.title,
+        message: receipt.message,
+        eventAt: new Date(receipt.eventAt),
+        storageMode: 'database',
+        storageReason: receipt.storage.reason,
+        safetyNotes: receipt.safety.notes,
+        metadataOnly: true,
+        canStoreSecrets: false,
+        canExecuteTransaction: false,
+        canSchedule: false,
+      },
+    });
+
+    return this.readReceipts(receipt.ownerEmail);
+  },
+  async createHistory(ownerEmail: string, limit = 20) {
+    const receipts = await this.readReceipts(ownerEmail);
+
+    return createHistoryFromReceipts(ownerEmail, receipts, limit, {
+      mode: 'database',
+      durable: true,
+      reason: 'History is derived from durable Postgres metadata storage through the Prisma adapter.',
+    });
+  },
+};
+
 export function getWalletAgentAlertHistoryStorageAdapter() {
   const config = getWalletAgentAlertHistoryStorageConfig();
   if (config.activeMode === 'memory') return memoryAlertHistoryStorageAdapter;
 
-  return memoryAlertHistoryStorageAdapter;
+  return databaseAlertHistoryStorageAdapter;
 }
 
 export function createWalletAgentAlertServerReceipt(

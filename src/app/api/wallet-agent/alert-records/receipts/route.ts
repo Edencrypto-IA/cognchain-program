@@ -93,6 +93,8 @@ export async function POST(req: NextRequest) {
     receipt,
     receipts,
     storage: receipt.storage,
-    message: 'Recibo server-side salvo em memoria. Ainda nao e persistencia duravel de banco.',
+    message: receipt.storage.durable
+      ? 'Recibo server-side salvo em banco duravel.'
+      : 'Recibo server-side salvo em memoria. Ainda nao e persistencia duravel de banco.',
   });
 }

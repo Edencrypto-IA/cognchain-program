@@ -1011,3 +1011,24 @@ It still cannot:
 - migrate memory receipts into durable storage;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from storage config;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 9.4 alert history database write path
+
+Wallet Agent now has a gated Prisma write adapter for account alert receipts.
+
+It can:
+
+- enable durable writes only when database storage is requested, a valid Postgres URL exists, and `WALLET_AGENT_ALERT_DATABASE_ADAPTER=enabled`;
+- upsert metadata-only alert receipts into `WalletAgentAlertReceipt`;
+- preserve the existing API response shape while switching storage metadata from memory to database;
+- read back the latest account receipts from the database after a write;
+- fall back to bounded memory whenever the database adapter gate is not fully enabled.
+
+It still cannot:
+
+- run migrations automatically in this phase;
+- migrate existing memory receipts into the database;
+- retry failed database writes with a queue;
+- expose durable deletion or retention policies;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from database rows;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.
