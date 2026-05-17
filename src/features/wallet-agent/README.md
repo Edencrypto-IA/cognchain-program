@@ -1329,3 +1329,23 @@ It still cannot:
 - bypass verified email identity;
 - run automatic retention purges;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from the deletion control.
+
+## Phase 10.4 account audit trail viewer
+
+Wallet Agent now shows recent account audit events inside the existing alert history card.
+
+It can:
+
+- call `GET /api/wallet-agent/alert-records/history/audit?limit=4`;
+- show recent metadata-only retention/deletion audit events;
+- display completed and rejected deletion attempts with safe labels;
+- update the audit list immediately after a successful account history deletion;
+- show an inline fallback when audit events cannot be loaded.
+
+It still cannot:
+
+- persist audit events durably;
+- show audit events from another account;
+- store or display IP addresses;
+- expose wallet keys, seed phrases, signed payloads, private transaction data, or payroll secrets;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from audit events.

@@ -24,6 +24,7 @@ import {
 import type {
   WalletAgentAlertDelivery,
   WalletAgentAlertDeliveryReceipt,
+  WalletAgentAlertHistoryAuditEvent,
   WalletAgentAlertHistoryExportBundle,
   WalletAgentAlertPersistenceRecord,
   WalletAgentAlertServerHistory,
@@ -502,6 +503,19 @@ function downloadTextFile(content: string, filename: string, type = 'text/plain;
 
 const ALERT_HISTORY_DELETE_CONFIRMATION = 'DELETE ALERT HISTORY';
 
+function getAuditEventLabel(event: WalletAgentAlertHistoryAuditEvent) {
+  if (event.action === 'delete_history_completed') return 'Historico apagado';
+  return 'Tentativa bloqueada';
+}
+
+function getAuditEventClass(event: WalletAgentAlertHistoryAuditEvent) {
+  if (event.status === 'completed') {
+    return 'border-[#14F195]/16 bg-[#14F195]/[0.055] text-[#14F195]';
+  }
+
+  return 'border-[#FF5C7A]/16 bg-[#FF5C7A]/[0.055] text-[#FF8A9E]';
+}
+
 function getAlertHistorySyncState(history: WalletAgentAlertServerHistory | null) {
   if (!history) {
     return {
@@ -658,6 +672,8 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [deletingHistory, setDeletingHistory] = useState(false);
   const [deletedHistory, setDeletedHistory] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [auditEvents, setAuditEvents] = useState<WalletAgentAlertHistoryAuditEvent[]>([]);
+  const [auditError, setAuditError] = useState<string | null>(null);
   const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
   const stats = serverHistory ? {
     totalSent: serverHistory.sent,
@@ -689,6 +705,26 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
       })
       .catch(() => {
         if (!cancelled) setServerHistory(null);
+      });
+
+    fetch('/api/wallet-agent/alert-records/history/audit?limit=4')
+      .then(async response => {
+        if (!response.ok) {
+          if (!cancelled) setAuditEvents([]);
+          return;
+        }
+
+        const data = await response.json();
+        if (!cancelled) {
+          setAuditEvents(Array.isArray(data?.events) ? data.events : []);
+          setAuditError(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAuditEvents([]);
+          setAuditError('Nao foi possivel carregar a auditoria da conta.');
+        }
       });
 
     return () => {
@@ -774,6 +810,10 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
 
       if (!response.ok || !data?.ok) {
         throw new Error(data?.error || 'Nao foi possivel apagar o historico da conta.');
+      }
+
+      if (data?.auditEvent) {
+        setAuditEvents(current => [data.auditEvent as WalletAgentAlertHistoryAuditEvent, ...current].slice(0, 4));
       }
 
       setServerHistory({
@@ -911,6 +951,48 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
             <p className="mt-2 text-[10px] leading-relaxed text-[#14F195]">
               Historico da conta apagado. A auditoria metadata-only registrou essa acao.
             </p>
+          )}
+        </div>
+      )}
+
+      {serverHistory && (
+        <div className="mb-3 rounded-2xl border border-white/[0.07] bg-black/22 p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/48">Auditoria da conta</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/36">
+                Eventos metadata-only de exportacao/delecao. Nao inclui IP, carteira, payload assinado ou dados privados.
+              </p>
+            </div>
+            <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/38">
+              {auditEvents.length} eventos
+            </span>
+          </div>
+
+          {auditError ? (
+            <p className="text-[10px] leading-relaxed text-[#FF8A9E]">{auditError}</p>
+          ) : auditEvents.length === 0 ? (
+            <p className="text-[10px] leading-relaxed text-white/34">Nenhum evento de auditoria recente nesta sessao.</p>
+          ) : (
+            <div className="space-y-2">
+              {auditEvents.slice(0, 4).map(event => (
+                <div key={event.id} className={`rounded-xl border p-2.5 ${getAuditEventClass(event)}`}>
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em]">{getAuditEventLabel(event)}</p>
+                    <span className="rounded-full border border-white/[0.08] bg-black/20 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-white/46">
+                      {event.status}
+                    </span>
+                  </div>
+                  <p className="text-[10px] leading-relaxed text-white/44">{event.reason}</p>
+                  <div className="mt-2 grid gap-1 text-[9px] leading-relaxed text-white/34 sm:grid-cols-2">
+                    <p>{formatReceiptDate(event.createdAt)}</p>
+                    <p>{event.storageMode ? `Storage: ${event.storageMode}` : 'Storage: n/a'}</p>
+                    {typeof event.deletedCount === 'number' && <p>Registros apagados: {event.deletedCount}</p>}
+                    <p className="truncate">Evento: {event.id}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
