@@ -149,9 +149,11 @@ export {
 } from './security-policy';
 export {
   createWalletAgentFeatureFlagSnapshot,
+  createWalletAgentProductionMonitoringStatus,
   createWalletAgentProductionReadinessAudit,
   type WalletAgentFeatureFlag,
   type WalletAgentFeatureFlagSnapshot,
   type WalletAgentProductionAudit,
   type WalletAgentProductionAuditItem,
+  type WalletAgentProductionMonitoringStatus,
 } from './production-readiness';

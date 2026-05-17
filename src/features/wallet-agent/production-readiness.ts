@@ -58,6 +58,28 @@ export type WalletAgentFeatureFlagSnapshot = {
   };
 };
 
+export type WalletAgentProductionMonitoringStatus = {
+  generatedAt: string;
+  mode: 'read_only';
+  health: 'ready' | 'attention_required' | 'unsafe';
+  audit: WalletAgentProductionAudit;
+  featureFlags: WalletAgentFeatureFlagSnapshot;
+  operations: {
+    durableHistoryReady: boolean;
+    emailReady: boolean;
+    sessionSecretReady: boolean;
+    devnetConfigured: boolean;
+    criticalFlagsEnabled: number;
+  };
+  safety: {
+    adminOnlyRecommended: true;
+    secretsRedacted: true;
+    canExecuteTransactions: false;
+    canSendFunds: false;
+    notes: string[];
+  };
+};
+
 type WalletAgentProductionAuditEnv = Record<string, string | undefined>;
 
 function isEnabled(value: string | undefined) {
@@ -345,6 +367,47 @@ export function createWalletAgentProductionReadinessAudit(
         'Environment audit returns presence and mode information only.',
         'No secret values, private keys, seed phrases, wallet signatures, or database URLs are exposed.',
         'The audit cannot buy, sell, pay, schedule, sign, submit, or move funds.',
+      ],
+    },
+  };
+}
+
+export function createWalletAgentProductionMonitoringStatus(
+  env: WalletAgentProductionAuditEnv = process.env,
+  now: Date = new Date()
+): WalletAgentProductionMonitoringStatus {
+  const audit = createWalletAgentProductionReadinessAudit(env, now);
+  const featureFlags = createWalletAgentFeatureFlagSnapshot(env, now);
+  const getAuditItem = (id: string) => audit.items.find(item => item.id === id);
+  const criticalFlagsEnabled = featureFlags.summary.criticalEnabled;
+  const health = criticalFlagsEnabled > 0
+    ? 'unsafe'
+    : audit.readyForProduction
+      ? 'ready'
+      : 'attention_required';
+
+  return {
+    generatedAt: now.toISOString(),
+    mode: 'read_only',
+    health,
+    audit,
+    featureFlags,
+    operations: {
+      durableHistoryReady: getAuditItem('database-history')?.status === 'ready',
+      emailReady: getAuditItem('email-provider')?.status === 'ready',
+      sessionSecretReady: getAuditItem('email-session-secret')?.status === 'ready',
+      devnetConfigured: getAuditItem('devnet-rpc')?.configured === true,
+      criticalFlagsEnabled,
+    },
+    safety: {
+      adminOnlyRecommended: true,
+      secretsRedacted: true,
+      canExecuteTransactions: false,
+      canSendFunds: false,
+      notes: [
+        'Monitoring status is read-only and redacted.',
+        'It is intended for admin/deployment checks, not public user display.',
+        'It cannot change feature flags, send email, run migrations, sign, submit, buy, sell, pay, schedule, or move funds.',
       ],
     },
   };

@@ -1542,3 +1542,24 @@ It still cannot:
 - enable scheduled value-moving actions safely without future audited phases;
 - enable mainnet execution safely without future audited phases;
 - buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 11.4 production monitoring surface
+
+Wallet Agent now has an admin-gated read-only production monitoring surface.
+
+It can:
+
+- expose `GET /api/wallet-agent/production/status` for admin checks;
+- return the redacted production readiness audit from Phase 11.2;
+- return the redacted feature flag snapshot from Phase 11.3;
+- summarize durable history readiness, email readiness, session-secret readiness, Devnet RPC configuration, and critical feature flag exposure;
+- classify health as `ready`, `attention_required`, or `unsafe`;
+- rate-limit the endpoint and require a valid admin session/token.
+
+It still cannot:
+
+- expose secrets, env values, API keys, database URLs, RPC URLs, wallet keys, seed phrases, signatures, or signed payloads;
+- change feature flags or environment variables;
+- run migrations or provider connectivity tests;
+- enable mainnet execution;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
