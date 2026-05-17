@@ -500,6 +500,8 @@ function downloadTextFile(content: string, filename: string, type = 'text/plain;
   window.URL.revokeObjectURL(url);
 }
 
+const ALERT_HISTORY_DELETE_CONFIRMATION = 'DELETE ALERT HISTORY';
+
 function getAlertHistorySyncState(history: WalletAgentAlertServerHistory | null) {
   if (!history) {
     return {
@@ -652,6 +654,10 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [exportedHistory, setExportedHistory] = useState(false);
   const [exportingHistory, setExportingHistory] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingHistory, setDeletingHistory] = useState(false);
+  const [deletedHistory, setDeletedHistory] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
   const stats = serverHistory ? {
     totalSent: serverHistory.sent,
@@ -750,7 +756,53 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
     }
   }
 
+  async function deleteAccountHistory() {
+    if (!serverHistory || deleteConfirmation.trim() !== ALERT_HISTORY_DELETE_CONFIRMATION) return;
+
+    setDeleteError(null);
+    setDeletingHistory(true);
+    try {
+      const response = await fetch('/api/wallet-agent/alert-records/history/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerEmail: serverHistory.ownerEmail,
+          confirmation: ALERT_HISTORY_DELETE_CONFIRMATION,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || 'Nao foi possivel apagar o historico da conta.');
+      }
+
+      setServerHistory({
+        ...serverHistory,
+        total: 0,
+        sent: 0,
+        failed: 0,
+        uniqueTargets: 0,
+        providers: [],
+        latestEventAt: null,
+        latestSentAt: null,
+        latestFailedAt: null,
+        recentReceipts: [],
+      });
+      setDeleteConfirmation('');
+      setDeletedHistory(true);
+      window.setTimeout(() => setDeletedHistory(false), 2200);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Nao foi possivel apagar o historico da conta.');
+    } finally {
+      setDeletingHistory(false);
+    }
+  }
+
   const hasReceipts = serverHistory ? serverReceipts.length > 0 : receipts.length > 0;
+  const canDeleteAccountHistory = !!serverHistory
+    && serverHistory.total > 0
+    && deleteConfirmation.trim() === ALERT_HISTORY_DELETE_CONFIRMATION
+    && !deletingHistory;
 
   return (
     <div className="mb-3 rounded-2xl border border-[#00D1FF]/12 bg-[#00D1FF]/[0.035] p-3">
@@ -816,6 +868,50 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
       {exportError && (
         <div className="mb-3 rounded-2xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055] p-3">
           <p className="text-[11px] leading-relaxed text-[#FF8A9E]">{exportError}</p>
+        </div>
+      )}
+
+      {serverHistory && (
+        <div className="mb-3 rounded-2xl border border-[#FF5C7A]/12 bg-[#FF5C7A]/[0.035] p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#FF8A9E]/85">Controle de dados da conta</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/42">
+                Apaga apenas metadata de alertas deste email. Nao remove carteira, regras, recibos locais ou transacoes.
+              </p>
+            </div>
+            <span className="rounded-full border border-[#FF5C7A]/18 bg-[#FF5C7A]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#FF8A9E]">
+              {serverHistory.total} registros
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={deleteConfirmation}
+              onChange={event => setDeleteConfirmation(event.target.value)}
+              placeholder={ALERT_HISTORY_DELETE_CONFIRMATION}
+              className="min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-black/28 px-3 py-2 text-[11px] font-semibold text-white/70 outline-none transition-colors placeholder:text-white/24 focus:border-[#FF5C7A]/35"
+              disabled={deletingHistory || serverHistory.total === 0}
+            />
+            <button
+              type="button"
+              onClick={deleteAccountHistory}
+              disabled={!canDeleteAccountHistory}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/10 px-3 py-2 text-[10px] font-semibold text-[#FF8A9E] transition-colors hover:bg-[#FF5C7A]/14 disabled:cursor-not-allowed disabled:border-white/[0.06] disabled:bg-white/[0.025] disabled:text-white/26"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deletingHistory ? 'Apagando...' : deletedHistory ? 'Historico apagado' : 'Apagar historico'}
+            </button>
+          </div>
+
+          {deleteError && (
+            <p className="mt-2 text-[10px] leading-relaxed text-[#FF8A9E]">{deleteError}</p>
+          )}
+          {deletedHistory && !deleteError && (
+            <p className="mt-2 text-[10px] leading-relaxed text-[#14F195]">
+              Historico da conta apagado. A auditoria metadata-only registrou essa acao.
+            </p>
+          )}
         </div>
       )}
 

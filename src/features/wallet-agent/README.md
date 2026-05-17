@@ -1307,3 +1307,25 @@ It still cannot:
 - export another account's history;
 - export wallet keys, seed phrases, signed payloads, private transaction data, or payroll secrets;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from the export control.
+
+## Phase 10.3 account history deletion control
+
+Wallet Agent now exposes the verified deletion endpoint through the existing alert history card.
+
+It can:
+
+- show account data controls only when account history is active;
+- require the exact confirmation phrase `DELETE ALERT HISTORY`;
+- call `POST /api/wallet-agent/alert-records/history/delete` for the verified account;
+- clear the visible account history after deletion succeeds;
+- show safe loading, success, and error states;
+- remind the user that deletion affects only alert metadata for the verified email.
+
+It still cannot:
+
+- delete local browser receipts;
+- delete wallets, keys, seed phrases, signed payloads, rules, schedules, or transactions;
+- delete another account's history;
+- bypass verified email identity;
+- run automatic retention purges;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from the deletion control.
