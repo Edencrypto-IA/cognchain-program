@@ -24,6 +24,7 @@ import {
 import type {
   WalletAgentAlertDelivery,
   WalletAgentAlertDeliveryReceipt,
+  WalletAgentAlertHistoryExportBundle,
   WalletAgentAlertPersistenceRecord,
   WalletAgentAlertServerHistory,
   WalletAgentAlertServerReceipt,
@@ -483,9 +484,20 @@ function buildServerAlertHistorySummary(history: WalletAgentAlertServerHistory) 
   ].filter(Boolean).join('\n');
 }
 
-function createAlertHistoryExportFilename(source: 'account' | 'local') {
+function createAlertHistoryExportFilename(source: 'account' | 'local', extension: 'json' | 'txt' = 'txt') {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `congchain-wallet-agent-${source}-alert-history-${timestamp}.txt`;
+  return `congchain-wallet-agent-${source}-alert-history-${timestamp}.${extension}`;
+}
+
+function downloadTextFile(content: string, filename: string, type = 'text/plain;charset=utf-8') {
+  const blob = new Blob([content], { type });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
 }
 
 function getAlertHistorySyncState(history: WalletAgentAlertServerHistory | null) {
@@ -638,6 +650,8 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
   const [copiedHistory, setCopiedHistory] = useState(false);
   const [exportedHistory, setExportedHistory] = useState(false);
+  const [exportingHistory, setExportingHistory] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
   const stats = serverHistory ? {
     totalSent: serverHistory.sent,
@@ -701,22 +715,39 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
     }).catch(() => {});
   }
 
-  function exportHistorySummary() {
-    const source = serverHistory ? 'account' : 'local';
-    const summary = serverHistory
-      ? buildServerAlertHistorySummary(serverHistory)
-      : buildLocalAlertHistorySummary(receipts, localStats);
-    const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+  async function exportHistorySummary() {
+    setExportError(null);
 
-    link.href = url;
-    link.download = createAlertHistoryExportFilename(source);
-    link.click();
-    window.URL.revokeObjectURL(url);
+    if (!serverHistory) {
+      const summary = buildLocalAlertHistorySummary(receipts, localStats);
+      downloadTextFile(summary, createAlertHistoryExportFilename('local'));
+      setExportedHistory(true);
+      window.setTimeout(() => setExportedHistory(false), 1600);
+      return;
+    }
 
-    setExportedHistory(true);
-    window.setTimeout(() => setExportedHistory(false), 1600);
+    setExportingHistory(true);
+    try {
+      const response = await fetch('/api/wallet-agent/alert-records/history/export');
+      const data = await response.json().catch(() => null);
+      const bundle = data?.bundle as WalletAgentAlertHistoryExportBundle | undefined;
+
+      if (!response.ok || !bundle) {
+        throw new Error(data?.error || 'Nao foi possivel exportar o historico da conta.');
+      }
+
+      downloadTextFile(
+        JSON.stringify(bundle, null, 2),
+        createAlertHistoryExportFilename('account', 'json'),
+        'application/json;charset=utf-8'
+      );
+      setExportedHistory(true);
+      window.setTimeout(() => setExportedHistory(false), 1600);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Nao foi possivel exportar o historico da conta.');
+    } finally {
+      setExportingHistory(false);
+    }
   }
 
   const hasReceipts = serverHistory ? serverReceipts.length > 0 : receipts.length > 0;
@@ -742,10 +773,11 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
               <button
                 type="button"
                 onClick={exportHistorySummary}
+                disabled={exportingHistory}
                 className="inline-flex items-center gap-1.5 rounded-full border border-[#14F195]/14 bg-[#14F195]/[0.06] px-2.5 py-1 text-[10px] font-semibold text-[#14F195]/80 transition-colors hover:bg-[#14F195]/10 hover:text-[#8FFFE0]"
               >
                 <Download className="h-3 w-3" />
-                {exportedHistory ? 'Exportado' : 'Exportar'}
+                {exportingHistory ? 'Exportando...' : exportedHistory ? 'Exportado' : serverHistory ? 'Exportar JSON' : 'Exportar'}
               </button>
             </>
           )}
@@ -780,6 +812,12 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
           </div>
         </div>
       </div>
+
+      {exportError && (
+        <div className="mb-3 rounded-2xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055] p-3">
+          <p className="text-[11px] leading-relaxed text-[#FF8A9E]">{exportError}</p>
+        </div>
+      )}
 
       {!hasReceipts ? (
         <p className="text-[11px] leading-relaxed text-white/38">

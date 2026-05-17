@@ -1286,3 +1286,24 @@ It still cannot:
 - backfill old memory receipts into database;
 - delete account identity;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from exports.
+
+## Phase 10.2 account history export control
+
+Wallet Agent now exposes the Phase 10.1 export API through the existing review panel.
+
+It can:
+
+- keep local fallback export as a `.txt` file when no verified account history is available;
+- call `GET /api/wallet-agent/alert-records/history/export` when account history is active;
+- download the account-owned export bundle as JSON;
+- show a loading state while export is being prepared;
+- show a safe inline error if the account export fails;
+- keep export behavior inside the existing alert history card without changing transaction flows.
+
+It still cannot:
+
+- export durable audit rows, because audit remains memory-bound;
+- let the user choose custom export fields;
+- export another account's history;
+- export wallet keys, seed phrases, signed payloads, private transaction data, or payroll secrets;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from the export control.
