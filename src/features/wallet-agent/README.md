@@ -1501,3 +1501,23 @@ It still cannot:
 - run database migrations automatically;
 - send production funds;
 - buy, sell, pay, schedule, sign, or submit transactions without future audited execution phases.
+
+## Phase 11.2 safe environment audit
+
+Wallet Agent now has a server-safe production readiness audit helper.
+
+It can:
+
+- inspect whether production-critical environment variables are present without exposing their values;
+- report readiness for durable alert history, email delivery, verified email sessions, Devnet RPC, retention policy, and mainnet execution gates;
+- distinguish `ready`, `action_required`, `warning`, and `safe_default` states;
+- return a redacted summary that can be used by future admin UI or deployment checks;
+- keep production execution disabled by default.
+
+It still cannot:
+
+- expose API keys, database URLs, RPC URLs, session secrets, private keys, seed phrases, signatures, or signed payloads;
+- run migrations or test provider connectivity;
+- change environment variables;
+- enable mainnet execution;
+- buy, sell, pay, schedule, sign, submit, or move funds.

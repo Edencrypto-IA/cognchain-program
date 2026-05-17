@@ -147,3 +147,8 @@ export {
   getRequiredApprovalSteps,
   isValueMovingIntent,
 } from './security-policy';
+export {
+  createWalletAgentProductionReadinessAudit,
+  type WalletAgentProductionAudit,
+  type WalletAgentProductionAuditItem,
+} from './production-readiness';
