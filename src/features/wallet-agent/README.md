@@ -1657,3 +1657,21 @@ It still cannot:
 - change feature flags or environment variables;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds;
 - bypass the existing admin-gated API check.
+
+## Phase 12.3 production brief copy
+
+Wallet Agent now lets admins copy a redacted production brief from the status panel.
+
+It can:
+
+- generate a plain-text production brief from the current read-only status snapshot;
+- include health, mode, operation readiness, readiness audit items, critical flags, and safety notes;
+- copy the brief for deployment review, internal tickets, or operator handoff;
+- avoid secret values and keep the report safe for operational discussion.
+
+It still cannot:
+
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- change feature flags or environment variables;
+- send the report to any external service by itself;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
