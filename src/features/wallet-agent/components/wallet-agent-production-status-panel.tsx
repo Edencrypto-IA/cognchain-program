@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -26,6 +26,16 @@ type WalletAgentProductionStatusPanelProps = {
   onRefresh?: () => void;
   refreshing?: boolean;
 };
+
+type ProductionStatusAuditEvent = {
+  id: string;
+  action: 'status_loaded' | 'refresh_requested' | 'brief_copied';
+  label: string;
+  createdAt: string;
+  health: WalletAgentProductionMonitoringStatus['health'];
+};
+
+const MAX_AUDIT_EVENTS = 4;
 
 const HEALTH_STYLES: Record<WalletAgentProductionMonitoringStatus['health'], {
   label: string;
@@ -138,16 +148,49 @@ export function WalletAgentProductionStatusPanel({
   refreshing = false,
 }: WalletAgentProductionStatusPanelProps) {
   const [copied, setCopied] = useState(false);
+  const [auditEvents, setAuditEvents] = useState<ProductionStatusAuditEvent[]>([]);
   const health = HEALTH_STYLES[status.health];
   const HealthIcon = health.icon;
   const criticalFlags = status.featureFlags.flags.filter(flag => flag.productionRisk === 'critical');
   const productionBrief = useMemo(() => buildProductionBrief(status), [status]);
 
+  function recordAuditEvent(action: ProductionStatusAuditEvent['action'], label: string) {
+    setAuditEvents(current => [
+      {
+        id: `${action}-${Date.now()}`,
+        action,
+        label,
+        createdAt: new Date().toISOString(),
+        health: status.health,
+      },
+      ...current,
+    ].slice(0, MAX_AUDIT_EVENTS));
+  }
+
+  useEffect(() => {
+    setAuditEvents(current => [
+      {
+        id: `status_loaded-${Date.now()}`,
+        action: 'status_loaded',
+        label: `Status loaded as ${status.health}`,
+        createdAt: new Date().toISOString(),
+        health: status.health,
+      },
+      ...current,
+    ].slice(0, MAX_AUDIT_EVENTS));
+  }, [status.generatedAt, status.health]);
+
   function copyProductionBrief() {
     navigator.clipboard?.writeText(productionBrief).then(() => {
       setCopied(true);
+      recordAuditEvent('brief_copied', 'Redacted production brief copied');
       window.setTimeout(() => setCopied(false), 1600);
     }).catch(() => {});
+  }
+
+  function requestRefresh() {
+    recordAuditEvent('refresh_requested', 'Manual status refresh requested');
+    onRefresh?.();
   }
 
   return (
@@ -184,7 +227,7 @@ export function WalletAgentProductionStatusPanel({
               {onRefresh && (
                 <button
                   type="button"
-                  onClick={onRefresh}
+                  onClick={requestRefresh}
                   disabled={refreshing}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs font-semibold text-white/52 transition-colors hover:bg-white/[0.06] hover:text-white/78 disabled:cursor-wait disabled:opacity-60"
                 >
@@ -232,6 +275,28 @@ export function WalletAgentProductionStatusPanel({
             <div className="space-y-1.5">
               {status.safety.notes.slice(0, 3).map(note => (
                 <p key={note} className="text-xs leading-relaxed text-white/42">{note}</p>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/48">Operator activity</p>
+              <span className="rounded-full border border-white/[0.07] bg-white/[0.035] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/34">
+                local
+              </span>
+            </div>
+            <div className="space-y-2">
+              {auditEvents.map(event => (
+                <div key={event.id} className="rounded-lg border border-white/[0.055] bg-white/[0.025] px-2.5 py-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-white/48">{event.action.replaceAll('_', ' ')}</p>
+                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em] text-white/28">
+                      {formatDate(event.createdAt)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-white/42">{event.label}</p>
+                </div>
               ))}
             </div>
           </div>

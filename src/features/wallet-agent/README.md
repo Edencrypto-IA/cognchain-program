@@ -1694,3 +1694,22 @@ It still cannot:
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - change feature flags or environment variables;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.5 local operator activity log
+
+Wallet Agent now shows a small local operator activity log inside the admin production status panel.
+
+It can:
+
+- record when the redacted production status snapshot is loaded;
+- record when an admin requests a manual refresh;
+- record when the redacted production brief is copied;
+- keep only a short in-browser activity trail for operator context.
+
+It still cannot:
+
+- persist operator activity to the server;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- change feature flags or environment variables;
+- send the activity log to external services;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
