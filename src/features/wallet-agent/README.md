@@ -869,3 +869,23 @@ It still cannot:
 - sync local fallback history across devices;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from copied history;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 8.7 alert history file export
+
+Wallet Agent now lets operators export the alert history audit bundle as a local text file.
+
+It can:
+
+- download the account alert history bundle as `.txt` when verified email history is available;
+- download the local browser fallback bundle as `.txt` when account history is unavailable;
+- include timestamps in export filenames for support and audit workflows;
+- reuse the same metadata-only content as the copy history action;
+- keep export generation fully client-side without adding new backend powers.
+
+It still cannot:
+
+- export durable database history;
+- prove inbox opens or provider-side delivery beyond stored receipt metadata;
+- sync local fallback exports across devices;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from exported files;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.

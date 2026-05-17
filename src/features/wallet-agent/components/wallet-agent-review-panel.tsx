@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock3,
   Copy,
+  Download,
   Eye,
   FileCheck2,
   LockKeyhole,
@@ -482,6 +483,11 @@ function buildServerAlertHistorySummary(history: WalletAgentAlertServerHistory) 
   ].filter(Boolean).join('\n');
 }
 
+function createAlertHistoryExportFilename(source: 'account' | 'local') {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `congchain-wallet-agent-${source}-alert-history-${timestamp}.txt`;
+}
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -598,6 +604,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [serverHistory, setServerHistory] = useState<WalletAgentAlertServerHistory | null>(null);
   const [copiedReceiptId, setCopiedReceiptId] = useState<string | null>(null);
   const [copiedHistory, setCopiedHistory] = useState(false);
+  const [exportedHistory, setExportedHistory] = useState(false);
   const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
   const stats = serverHistory ? {
     totalSent: serverHistory.sent,
@@ -660,6 +667,24 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
     }).catch(() => {});
   }
 
+  function exportHistorySummary() {
+    const source = serverHistory ? 'account' : 'local';
+    const summary = serverHistory
+      ? buildServerAlertHistorySummary(serverHistory)
+      : buildLocalAlertHistorySummary(receipts, localStats);
+    const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = createAlertHistoryExportFilename(source);
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    setExportedHistory(true);
+    window.setTimeout(() => setExportedHistory(false), 1600);
+  }
+
   const hasReceipts = serverHistory ? serverReceipts.length > 0 : receipts.length > 0;
 
   return (
@@ -671,14 +696,24 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {hasReceipts && (
-            <button
-              type="button"
-              onClick={copyHistorySummary}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#00D1FF]/14 bg-[#00D1FF]/[0.06] px-2.5 py-1 text-[10px] font-semibold text-[#7DE3FF]/80 transition-colors hover:bg-[#00D1FF]/10 hover:text-[#B7F3FF]"
-            >
-              <Copy className="h-3 w-3" />
-              {copiedHistory ? 'Historico copiado' : 'Copiar historico'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={copyHistorySummary}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#00D1FF]/14 bg-[#00D1FF]/[0.06] px-2.5 py-1 text-[10px] font-semibold text-[#7DE3FF]/80 transition-colors hover:bg-[#00D1FF]/10 hover:text-[#B7F3FF]"
+              >
+                <Copy className="h-3 w-3" />
+                {copiedHistory ? 'Historico copiado' : 'Copiar historico'}
+              </button>
+              <button
+                type="button"
+                onClick={exportHistorySummary}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#14F195]/14 bg-[#14F195]/[0.06] px-2.5 py-1 text-[10px] font-semibold text-[#14F195]/80 transition-colors hover:bg-[#14F195]/10 hover:text-[#8FFFE0]"
+              >
+                <Download className="h-3 w-3" />
+                {exportedHistory ? 'Exportado' : 'Exportar'}
+              </button>
+            </>
           )}
           <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/40">
             {serverHistory ? 'conta' : 'local'}
