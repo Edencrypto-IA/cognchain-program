@@ -40,6 +40,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/wallet-agent/alerts': { windowMs: 60_000, maxRequests: 12 },
   '/api/wallet-agent/alert-records': { windowMs: 60_000, maxRequests: 12 },
   '/api/wallet-agent/alert-records/history': { windowMs: 60_000, maxRequests: 20 },
+  '/api/wallet-agent/alert-records/history/delete': { windowMs: 10 * 60_000, maxRequests: 3 },
   '/api/wallet-agent/alert-records/receipts': { windowMs: 60_000, maxRequests: 20 },
   '/api/wallet-agent/alerts/send-email': { windowMs: 10 * 60_000, maxRequests: 5 },
   '/api/wallet-agent/parse': { windowMs: 60_000, maxRequests: 12 },

@@ -372,8 +372,28 @@ export type WalletAgentAlertServerHistory = {
     retentionDays: number;
     maxReceiptsPerUser: number;
     automaticDeletionEnabled: false;
-    manualDeletionEnabled: false;
+    manualDeletionEnabled: boolean;
     deletionRequiresVerifiedEmail: true;
+    reason: string;
+  };
+  safety: {
+    metadataOnly: true;
+    canStoreSecrets: false;
+    canExecuteTransaction: false;
+    canSchedule: false;
+    notes: string[];
+  };
+};
+
+export type WalletAgentAlertHistoryDeletionResult = {
+  ownerEmail: string;
+  deletedCount: number;
+  deletedAt: string;
+  confirmationRequired: true;
+  confirmationPhrase: string;
+  storage: {
+    mode: WalletAgentAlertHistoryStorageMode;
+    durable: boolean;
     reason: string;
   };
   safety: {

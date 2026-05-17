@@ -1,5 +1,6 @@
 import type {
   WalletAgentAlertHistoryStorageMode,
+  WalletAgentAlertHistoryDeletionResult,
   WalletAgentAlertPersistenceRecord,
   WalletAgentAlertServerHistory,
   WalletAgentAlertServerReceipt,
@@ -7,6 +8,7 @@ import type {
 import { db } from '@/lib/db';
 
 const MAX_SERVER_RECEIPTS_PER_USER = 100;
+export const WALLET_AGENT_ALERT_HISTORY_DELETE_CONFIRMATION = 'DELETE ALERT HISTORY';
 const serverReceiptStore = new Map<string, WalletAgentAlertServerReceipt[]>();
 
 export type WalletAgentAlertHistoryStorageConfig = {
@@ -29,6 +31,7 @@ export type WalletAgentAlertHistoryStorageAdapter = {
     ownerEmail: string,
     now?: Date
   ) => WalletAgentAlertServerReceipt | null;
+  deleteHistory: (ownerEmail: string, now?: Date) => Promise<WalletAgentAlertHistoryDeletionResult>;
   readReceipts: (ownerEmail: string) => Promise<WalletAgentAlertServerReceipt[]>;
   upsertReceipt: (receipt: WalletAgentAlertServerReceipt) => Promise<WalletAgentAlertServerReceipt[]>;
   createHistory: (ownerEmail: string, limit?: number) => Promise<WalletAgentAlertServerHistory>;
@@ -49,9 +52,36 @@ export function getWalletAgentAlertHistoryRetentionPolicy(): WalletAgentAlertHis
     retentionDays: parseRetentionDays(process.env.WALLET_AGENT_ALERT_HISTORY_RETENTION_DAYS),
     maxReceiptsPerUser: MAX_SERVER_RECEIPTS_PER_USER,
     automaticDeletionEnabled: false,
-    manualDeletionEnabled: false,
+    manualDeletionEnabled: true,
     deletionRequiresVerifiedEmail: true,
-    reason: 'Retention policy is declared but deletion is disabled until the explicit deletion API phase.',
+    reason: 'Manual deletion is available only through the explicit verified-email deletion endpoint. Automatic deletion remains disabled.',
+  };
+}
+
+function createDeletionResult(input: {
+  ownerEmail: string;
+  deletedCount: number;
+  deletedAt: Date;
+  storage: WalletAgentAlertHistoryDeletionResult['storage'];
+}): WalletAgentAlertHistoryDeletionResult {
+  return {
+    ownerEmail: normalizeEmail(input.ownerEmail),
+    deletedCount: input.deletedCount,
+    deletedAt: input.deletedAt.toISOString(),
+    confirmationRequired: true,
+    confirmationPhrase: WALLET_AGENT_ALERT_HISTORY_DELETE_CONFIRMATION,
+    storage: input.storage,
+    safety: {
+      metadataOnly: true,
+      canStoreSecrets: false,
+      canExecuteTransaction: false,
+      canSchedule: false,
+      notes: [
+        'Only Wallet Agent alert history metadata for the verified email is deleted.',
+        'No wallet keys, seed phrases, signed payloads, transactions, rules, or scheduled jobs are deleted.',
+        'Deletion cannot send email, request wallet signatures, execute transactions, buy, sell, or pay.',
+      ],
+    },
   };
 }
 
@@ -327,6 +357,22 @@ const memoryAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter = 
   async readReceipts(ownerEmail: string) {
     return [...(serverReceiptStore.get(normalizeEmail(ownerEmail)) ?? [])];
   },
+  async deleteHistory(ownerEmail: string, now = new Date()) {
+    const normalizedEmail = normalizeEmail(ownerEmail);
+    const deletedCount = serverReceiptStore.get(normalizedEmail)?.length ?? 0;
+    serverReceiptStore.delete(normalizedEmail);
+
+    return createDeletionResult({
+      ownerEmail: normalizedEmail,
+      deletedCount,
+      deletedAt: now,
+      storage: {
+        mode: 'memory',
+        durable: false,
+        reason: 'Deleted from bounded server memory only. This does not affect durable database storage.',
+      },
+    });
+  },
   async upsertReceipt(receipt: WalletAgentAlertServerReceipt) {
     const ownerEmail = normalizeEmail(receipt.ownerEmail);
     const current = serverReceiptStore.get(ownerEmail) ?? [];
@@ -376,6 +422,22 @@ const databaseAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter 
     });
 
     return rows.map(toServerReceipt);
+  },
+  async deleteHistory(ownerEmail: string, now = new Date()) {
+    const result = await db.walletAgentAlertReceipt.deleteMany({
+      where: { ownerEmail: normalizeEmail(ownerEmail) },
+    });
+
+    return createDeletionResult({
+      ownerEmail,
+      deletedCount: result.count,
+      deletedAt: now,
+      storage: {
+        mode: 'database',
+        durable: true,
+        reason: 'Deleted from durable Postgres metadata storage through the Prisma adapter.',
+      },
+    });
   },
   async upsertReceipt(receipt: WalletAgentAlertServerReceipt) {
     await db.walletAgentAlertReceipt.upsert({
@@ -520,6 +582,13 @@ export async function readWalletAgentAlertServerReceipts(
   ownerEmail: string
 ): Promise<WalletAgentAlertServerReceipt[]> {
   return getWalletAgentAlertHistoryStorageAdapter().readReceipts(ownerEmail);
+}
+
+export async function deleteWalletAgentAlertServerHistory(
+  ownerEmail: string,
+  now = new Date()
+): Promise<WalletAgentAlertHistoryDeletionResult> {
+  return getWalletAgentAlertHistoryStorageAdapter().deleteHistory(ownerEmail, now);
 }
 
 export async function createWalletAgentAlertServerHistory(

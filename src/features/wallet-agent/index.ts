@@ -80,11 +80,13 @@ export {
 export {
   createWalletAgentAlertServerHistory,
   createWalletAgentAlertServerReceipt,
+  deleteWalletAgentAlertServerHistory,
   getWalletAgentAlertHistoryRetentionPolicy,
   getWalletAgentAlertHistoryStorageConfig,
   getWalletAgentAlertHistoryStorageAdapter,
   readWalletAgentAlertServerReceipts,
   upsertWalletAgentAlertServerReceipt,
+  WALLET_AGENT_ALERT_HISTORY_DELETE_CONFIRMATION,
   type WalletAgentAlertHistoryRetentionPolicy,
   type WalletAgentAlertHistoryStorageAdapter,
   type WalletAgentAlertHistoryStorageConfig,

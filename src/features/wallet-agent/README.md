@@ -1074,3 +1074,35 @@ It still cannot:
 - migrate existing memory receipts into a retention-managed store;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from retention policy;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 9.7 verified alert history deletion endpoint
+
+Wallet Agent now has an explicit deletion endpoint for account alert history metadata.
+
+Endpoint:
+
+- `POST /api/wallet-agent/alert-records/history/delete`
+
+It requires:
+
+- a verified email session;
+- the request to target only the current verified email;
+- the confirmation phrase `DELETE ALERT HISTORY`;
+- the endpoint-specific rate limit.
+
+It can:
+
+- delete bounded memory alert receipts for the verified email;
+- delete durable Postgres alert receipt rows for the verified email when the database adapter is active;
+- return a typed deletion receipt with `deletedCount`, storage mode, timestamp, confirmation phrase, and safety notes;
+- keep automatic deletion disabled while allowing explicit manual deletion;
+- reject cross-account deletion attempts.
+
+It still cannot:
+
+- delete wallet keys, seed phrases, signed payloads, transactions, local browser receipts, rules, or scheduled jobs;
+- delete another user's history;
+- run automatic retention purges;
+- perform account deletion;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from deletion requests;
+- bypass verified email identity or the confirmation phrase.
