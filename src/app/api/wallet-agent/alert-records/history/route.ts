@@ -39,6 +39,8 @@ export async function GET(req: NextRequest) {
     ok: true,
     history,
     mode: 'read_only',
-    message: 'Historico de alertas carregado em modo memoria. Ainda nao e banco duravel.',
+    message: history.storage.durable
+      ? 'Historico de alertas carregado do banco duravel.'
+      : 'Historico de alertas carregado em modo memoria. Ainda nao e banco duravel.',
   });
 }

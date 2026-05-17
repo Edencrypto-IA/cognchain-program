@@ -141,6 +141,45 @@ function createHistoryFromReceipts(
   };
 }
 
+function createHistoryFromMetrics(input: {
+  ownerEmail: string;
+  total: number;
+  sent: number;
+  failed: number;
+  uniqueTargets: number;
+  providers: string[];
+  latestEventAt: string | null;
+  latestSentAt: string | null;
+  latestFailedAt: string | null;
+  recentReceipts: WalletAgentAlertServerReceipt[];
+  storage: WalletAgentAlertServerHistory['storage'];
+}): WalletAgentAlertServerHistory {
+  return {
+    ownerEmail: normalizeEmail(input.ownerEmail),
+    total: input.total,
+    sent: input.sent,
+    failed: input.failed,
+    uniqueTargets: input.uniqueTargets,
+    providers: input.providers,
+    latestEventAt: input.latestEventAt,
+    latestSentAt: input.latestSentAt,
+    latestFailedAt: input.latestFailedAt,
+    recentReceipts: input.recentReceipts,
+    storage: input.storage,
+    safety: {
+      metadataOnly: true,
+      canStoreSecrets: false,
+      canExecuteTransaction: false,
+      canSchedule: false,
+      notes: [
+        'Alert history is a read-only summary of metadata receipts.',
+        'No wallet secrets, seed phrases, signed payloads, or private transaction data are returned.',
+        'History cannot resend email, schedule jobs, request wallet signatures, or execute transactions.',
+      ],
+    },
+  };
+}
+
 function createServerReceiptFromRecord(
   record: WalletAgentAlertPersistenceRecord,
   ownerEmail: string,
@@ -372,12 +411,71 @@ const databaseAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter 
     return this.readReceipts(receipt.ownerEmail);
   },
   async createHistory(ownerEmail: string, limit = 20) {
-    const receipts = await this.readReceipts(ownerEmail);
+    const normalizedEmail = normalizeEmail(ownerEmail);
+    const safeLimit = Math.max(1, Math.min(limit, MAX_SERVER_RECEIPTS_PER_USER));
+    const [
+      recentRows,
+      total,
+      sent,
+      failed,
+      providerRows,
+      targetRows,
+      latestEvent,
+      latestSent,
+      latestFailed,
+    ] = await Promise.all([
+      db.walletAgentAlertReceipt.findMany({
+        where: { ownerEmail: normalizedEmail },
+        orderBy: { eventAt: 'desc' },
+        take: safeLimit,
+      }),
+      db.walletAgentAlertReceipt.count({ where: { ownerEmail: normalizedEmail } }),
+      db.walletAgentAlertReceipt.count({ where: { ownerEmail: normalizedEmail, receiptStatus: 'sent' } }),
+      db.walletAgentAlertReceipt.count({ where: { ownerEmail: normalizedEmail, receiptStatus: 'failed' } }),
+      db.walletAgentAlertReceipt.findMany({
+        where: { ownerEmail: normalizedEmail },
+        distinct: ['provider'],
+        select: { provider: true },
+        orderBy: { provider: 'asc' },
+      }),
+      db.walletAgentAlertReceipt.findMany({
+        where: { ownerEmail: normalizedEmail },
+        distinct: ['target'],
+        select: { target: true },
+      }),
+      db.walletAgentAlertReceipt.findFirst({
+        where: { ownerEmail: normalizedEmail },
+        orderBy: { eventAt: 'desc' },
+        select: { eventAt: true },
+      }),
+      db.walletAgentAlertReceipt.findFirst({
+        where: { ownerEmail: normalizedEmail, receiptStatus: 'sent' },
+        orderBy: { eventAt: 'desc' },
+        select: { eventAt: true },
+      }),
+      db.walletAgentAlertReceipt.findFirst({
+        where: { ownerEmail: normalizedEmail, receiptStatus: 'failed' },
+        orderBy: { eventAt: 'desc' },
+        select: { eventAt: true },
+      }),
+    ]);
 
-    return createHistoryFromReceipts(ownerEmail, receipts, limit, {
+    return createHistoryFromMetrics({
+      ownerEmail: normalizedEmail,
+      total,
+      sent,
+      failed,
+      uniqueTargets: targetRows.length,
+      providers: providerRows.map(row => row.provider).sort(),
+      latestEventAt: latestEvent?.eventAt.toISOString() ?? null,
+      latestSentAt: latestSent?.eventAt.toISOString() ?? null,
+      latestFailedAt: latestFailed?.eventAt.toISOString() ?? null,
+      recentReceipts: recentRows.map(toServerReceipt),
+      storage: {
       mode: 'database',
       durable: true,
       reason: 'History is derived from durable Postgres metadata storage through the Prisma adapter.',
+      },
     });
   },
 };

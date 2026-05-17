@@ -1032,3 +1032,24 @@ It still cannot:
 - expose durable deletion or retention policies;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from database rows;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 9.5 alert history database read path
+
+Wallet Agent now has a database-native read path for durable account alert history.
+
+It can:
+
+- read recent account receipts from `WalletAgentAlertReceipt` when the Prisma adapter is active;
+- calculate total, sent, failed, provider, target, and latest-event metrics through database queries;
+- keep memory history behavior unchanged when the database adapter gate is disabled;
+- return storage-aware messages from the history API;
+- preserve the same read-only, metadata-only response contract.
+
+It still cannot:
+
+- run migrations automatically;
+- backfill database history from memory receipts;
+- paginate beyond the bounded API limit;
+- expose durable deletion or retention policies;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from database history;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.
