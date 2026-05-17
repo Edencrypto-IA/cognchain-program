@@ -605,6 +605,13 @@ function getAlertHistoryRetentionExpiry(history: WalletAgentAlertServerHistory |
   return expiresAt.toISOString();
 }
 
+const ALERT_HISTORY_PRIVACY_ITEMS = [
+  { label: 'Guarda', value: 'metadata de alerta' },
+  { label: 'Nao guarda', value: 'seed, chave ou assinatura' },
+  { label: 'Nao executa', value: 'pagamentos ou trades' },
+  { label: 'Conta', value: 'email verificado' },
+] as const;
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -1052,6 +1059,29 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
           <p className="mt-2 text-[10px] leading-relaxed text-white/34">{serverHistory.retention.reason}</p>
         </div>
       )}
+
+      <div className="mb-3 rounded-2xl border border-[#14F195]/12 bg-[#14F195]/[0.03] p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <LockKeyhole className="h-3.5 w-3.5 text-[#14F195]" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#14F195]/85">Limite de privacidade</p>
+          </div>
+          <span className="rounded-full border border-[#14F195]/16 bg-[#14F195]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]/80">
+            read-only
+          </span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-4">
+          {ALERT_HISTORY_PRIVACY_ITEMS.map(item => (
+            <div key={item.label} className="rounded-xl border border-white/[0.07] bg-black/20 p-2">
+              <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/26">{item.label}</p>
+              <p className="mt-1 truncate text-[10px] font-semibold text-white/62">{item.value}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-white/34">
+          O historico serve para auditoria e continuidade. Ele nao tem permissao para assinar transacoes, movimentar fundos ou acessar segredos da carteira.
+        </p>
+      </div>
 
       {exportError && (
         <div className="mb-3 rounded-2xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055] p-3">

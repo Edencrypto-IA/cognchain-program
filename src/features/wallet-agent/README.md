@@ -1427,3 +1427,22 @@ It still cannot:
 - change retention settings from the UI;
 - refresh another account's history;
 - trigger notifications, transactions, signatures, buys, sells, payments, or schedules.
+
+## Phase 10.9 account history privacy boundary
+
+Wallet Agent now shows a compact privacy boundary for alert history inside the review panel.
+
+It can:
+
+- explain that alert history stores metadata only;
+- state that seeds, private keys, signatures, and wallet secrets are not stored;
+- state that history controls cannot execute payments or trades;
+- remind users that account history is tied to a verified email identity;
+- keep the privacy boundary near retention, export, deletion, audit, and health controls.
+
+It still cannot:
+
+- audit external email provider internals;
+- inspect wallet secrets;
+- sign or submit transactions;
+- buy, sell, pay, schedule, retry, resend, or move funds from history controls.
