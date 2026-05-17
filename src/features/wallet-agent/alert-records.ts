@@ -3,6 +3,7 @@ import type {
   WalletAgentAlertDeliveryReceipt,
   WalletAgentAlertPersistenceRecord,
 } from './types';
+import { getWalletAgentAlertHistoryStorageConfig } from './alert-record-store';
 
 type AlertRecordUser = {
   email: string;
@@ -17,8 +18,7 @@ type CreateAlertRecordInput = {
 };
 
 export function isWalletAgentAlertPersistenceBackendConfigured() {
-  return !!process.env.WALLET_AGENT_ALERTS_DATABASE_URL
-    || process.env.WALLET_AGENT_ALERT_PERSISTENCE === 'enabled';
+  return getWalletAgentAlertHistoryStorageConfig().databaseConfigured;
 }
 
 export function createWalletAgentAlertPersistenceRecordContract({
@@ -28,6 +28,7 @@ export function createWalletAgentAlertPersistenceRecordContract({
   now = new Date(),
 }: CreateAlertRecordInput): WalletAgentAlertPersistenceRecord {
   const backendConfigured = isWalletAgentAlertPersistenceBackendConfigured();
+  const storageConfig = getWalletAgentAlertHistoryStorageConfig();
   const timestamp = now.toISOString();
   const canPersistMetadata = !!user?.email && user.verified && backendConfigured;
 
@@ -48,7 +49,7 @@ export function createWalletAgentAlertPersistenceRecordContract({
       persisted: false,
       backendConfigured,
       reason: backendConfigured
-        ? 'Persistence backend is configured, but write adapters are not enabled in this phase.'
+        ? storageConfig.reason
         : 'Persistence backend is not configured. This phase returns a safe contract only.',
     },
     safety: {

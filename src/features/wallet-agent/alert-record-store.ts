@@ -8,6 +8,16 @@ import type {
 const MAX_SERVER_RECEIPTS_PER_USER = 100;
 const serverReceiptStore = new Map<string, WalletAgentAlertServerReceipt[]>();
 
+export type WalletAgentAlertHistoryStorageConfig = {
+  requestedMode: WalletAgentAlertHistoryStorageMode;
+  activeMode: WalletAgentAlertHistoryStorageMode;
+  databaseRequested: boolean;
+  databaseConfigured: boolean;
+  databaseAdapterReady: boolean;
+  durable: boolean;
+  reason: string;
+};
+
 export type WalletAgentAlertHistoryStorageAdapter = {
   id: WalletAgentAlertHistoryStorageMode;
   durable: boolean;
@@ -23,6 +33,60 @@ export type WalletAgentAlertHistoryStorageAdapter = {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function isPostgresUrl(value: string | undefined) {
+  return !!value && (value.startsWith('postgresql://') || value.startsWith('postgres://'));
+}
+
+function getRequestedStorageMode(): WalletAgentAlertHistoryStorageMode {
+  return process.env.WALLET_AGENT_ALERT_HISTORY_STORAGE === 'database'
+    || process.env.WALLET_AGENT_ALERT_PERSISTENCE === 'enabled'
+    || !!process.env.WALLET_AGENT_ALERTS_DATABASE_URL
+    ? 'database'
+    : 'memory';
+}
+
+export function getWalletAgentAlertHistoryStorageConfig(): WalletAgentAlertHistoryStorageConfig {
+  const requestedMode = getRequestedStorageMode();
+  const databaseUrl = process.env.WALLET_AGENT_ALERTS_DATABASE_URL || process.env.DATABASE_URL;
+  const databaseRequested = requestedMode === 'database';
+  const databaseConfigured = databaseRequested && isPostgresUrl(databaseUrl);
+  const databaseAdapterReady = false;
+
+  if (!databaseRequested) {
+    return {
+      requestedMode,
+      activeMode: 'memory',
+      databaseRequested,
+      databaseConfigured: false,
+      databaseAdapterReady,
+      durable: false,
+      reason: 'Database storage was not requested. Wallet Agent alert history is using bounded memory.',
+    };
+  }
+
+  if (!databaseConfigured) {
+    return {
+      requestedMode,
+      activeMode: 'memory',
+      databaseRequested,
+      databaseConfigured,
+      databaseAdapterReady,
+      durable: false,
+      reason: 'Database storage was requested, but no valid Postgres URL is configured. Falling back to bounded memory.',
+    };
+  }
+
+  return {
+    requestedMode,
+    activeMode: 'memory',
+    databaseRequested,
+    databaseConfigured,
+    databaseAdapterReady,
+    durable: false,
+    reason: 'Database storage is configured, but the Prisma adapter is not enabled in this phase. Falling back to bounded memory.',
+  };
 }
 
 function latest(values: Array<string | null | undefined>) {
@@ -148,6 +212,9 @@ const memoryAlertHistoryStorageAdapter: WalletAgentAlertHistoryStorageAdapter = 
 };
 
 export function getWalletAgentAlertHistoryStorageAdapter() {
+  const config = getWalletAgentAlertHistoryStorageConfig();
+  if (config.activeMode === 'memory') return memoryAlertHistoryStorageAdapter;
+
   return memoryAlertHistoryStorageAdapter;
 }
 

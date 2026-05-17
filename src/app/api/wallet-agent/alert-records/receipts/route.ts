@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createWalletAgentAlertServerReceipt,
+  getWalletAgentAlertHistoryStorageConfig,
   readWalletAgentAlertServerReceipts,
   upsertWalletAgentAlertServerReceipt,
 } from '@/features/wallet-agent/alert-record-store';
@@ -48,13 +49,14 @@ export async function GET(req: NextRequest) {
   if (!session) return response;
 
   const receipts = await readWalletAgentAlertServerReceipts(session.email);
+  const storageConfig = getWalletAgentAlertHistoryStorageConfig();
   return NextResponse.json({
     ok: true,
     receipts,
     storage: {
-      mode: 'memory',
-      durable: false,
-      reason: 'Server receipts are currently stored in bounded memory only.',
+      mode: storageConfig.activeMode,
+      durable: storageConfig.durable,
+      reason: storageConfig.reason,
     },
   });
 }

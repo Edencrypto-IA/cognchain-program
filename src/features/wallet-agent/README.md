@@ -990,3 +990,24 @@ It still cannot:
 - make local browser fallback durable;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from database rows;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 9.3 alert history environment gate
+
+Wallet Agent now has a safe environment gate for future database alert history storage.
+
+It can:
+
+- detect whether database storage was requested through `WALLET_AGENT_ALERT_HISTORY_STORAGE=database`;
+- accept a dedicated `WALLET_AGENT_ALERTS_DATABASE_URL` or the shared `DATABASE_URL` when it is a Postgres URL;
+- keep bounded memory as the active adapter until the Prisma database adapter is enabled;
+- report whether database storage was requested, configured, adapter-ready, durable, or falling back to memory;
+- keep API contracts unchanged while exposing clearer storage reasons.
+
+It still cannot:
+
+- write alert history to the database;
+- enable the Prisma adapter automatically;
+- treat `WALLET_AGENT_ALERT_PERSISTENCE=enabled` as enough without a valid Postgres URL;
+- migrate memory receipts into durable storage;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from storage config;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.
