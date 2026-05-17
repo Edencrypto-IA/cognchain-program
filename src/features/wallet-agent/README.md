@@ -1675,3 +1675,22 @@ It still cannot:
 - change feature flags or environment variables;
 - send the report to any external service by itself;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.4 manual production status refresh
+
+Wallet Agent now lets admins manually refresh the production status panel while a review is open.
+
+It can:
+
+- re-fetch the admin-gated read-only status endpoint without closing the review modal;
+- show a refreshing state on the production panel action;
+- keep the copied brief aligned with the latest redacted status snapshot;
+- preserve the same admin-only and server-side authorization checks.
+
+It still cannot:
+
+- auto-enable production features;
+- bypass admin verification or rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- change feature flags or environment variables;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.

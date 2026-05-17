@@ -1919,6 +1919,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [walletAgentProductionStatus, setWalletAgentProductionStatus] = useState<WalletAgentProductionMonitoringStatus | null>(null);
   const [walletAgentProductionStatusLoading, setWalletAgentProductionStatusLoading] = useState(false);
   const [walletAgentProductionStatusError, setWalletAgentProductionStatusError] = useState<string | null>(null);
+  const [walletAgentProductionStatusRefreshTick, setWalletAgentProductionStatusRefreshTick] = useState(0);
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const streamWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2008,7 +2009,11 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     return () => {
       cancelled = true;
     };
-  }, [isWalletAgentAdmin, walletAgentReview]);
+  }, [isWalletAgentAdmin, walletAgentReview, walletAgentProductionStatusRefreshTick]);
+
+  const refreshWalletAgentProductionStatus = useCallback(() => {
+    setWalletAgentProductionStatusRefreshTick(current => current + 1);
+  }, []);
 
   useEffect(() => {
     const handleDevnetWalletCreated = (event: Event) => {
@@ -3509,6 +3514,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           productionStatus={walletAgentProductionStatus}
           productionStatusLoading={walletAgentProductionStatusLoading}
           productionStatusError={walletAgentProductionStatusError}
+          onRefreshProductionStatus={refreshWalletAgentProductionStatus}
         />
       )}
       <ScoreModal isOpen={showScoreModal} onClose={() => setShowScoreModal(false)} onSubmit={handleScoreSubmit} />

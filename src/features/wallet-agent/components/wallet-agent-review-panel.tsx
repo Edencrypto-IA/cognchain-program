@@ -75,6 +75,7 @@ type WalletAgentReviewPanelProps = {
   productionStatus?: WalletAgentProductionMonitoringStatus | null;
   productionStatusLoading?: boolean;
   productionStatusError?: string | null;
+  onRefreshProductionStatus?: () => void;
 };
 
 const STATUS_STYLES: Record<WalletAgentReviewItem['status'], { label: string; className: string }> = {
@@ -2017,6 +2018,7 @@ export function WalletAgentReviewPanel({
   productionStatus,
   productionStatusLoading = false,
   productionStatusError = null,
+  onRefreshProductionStatus,
 }: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
   const valueMoving = draft.requiresWalletSignature;
@@ -2103,7 +2105,11 @@ export function WalletAgentReviewPanel({
                   <p className="text-sm leading-relaxed text-white/52">{productionStatusError}</p>
                 </div>
               ) : productionStatus ? (
-                <WalletAgentProductionStatusPanel status={productionStatus} />
+                <WalletAgentProductionStatusPanel
+                  status={productionStatus}
+                  onRefresh={onRefreshProductionStatus}
+                  refreshing={productionStatusLoading}
+                />
               ) : null}
             </div>
           )}
