@@ -1138,3 +1138,58 @@ It still cannot:
 - perform automatic retention purges;
 - delete account identity;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from audit events.
+
+## Phase 9.9 operational runbook for alert history storage
+
+Wallet Agent now has an operational checklist for running alert history safely in production.
+
+Default safe mode:
+
+- `WALLET_AGENT_ALERT_HISTORY_STORAGE=memory`
+- `WALLET_AGENT_ALERT_DATABASE_ADAPTER=disabled`
+- no durable database writes are attempted;
+- alert receipts disappear when the server restarts;
+- this is the safest mode for local development, demos, and UI validation.
+
+Durable metadata mode:
+
+- set `WALLET_AGENT_ALERT_HISTORY_STORAGE=database`;
+- set `WALLET_AGENT_ALERT_DATABASE_ADAPTER=enabled`;
+- configure either `WALLET_AGENT_ALERTS_DATABASE_URL` or a shared Postgres `DATABASE_URL`;
+- run the Prisma migration/deploy process before enabling the adapter in Railway;
+- keep `WALLET_AGENT_ALERT_HISTORY_RETENTION_DAYS` between 7 and 3650 days.
+
+Railway deployment checklist:
+
+- confirm the service has a valid Postgres URL before switching from memory to database;
+- confirm Prisma generated client includes `WalletAgentAlertReceipt`;
+- deploy with database storage disabled first if the database migration has not been applied;
+- enable `WALLET_AGENT_ALERT_DATABASE_ADAPTER=enabled` only after the schema exists;
+- call `GET /api/wallet-agent/alert-records/history` with a verified email session and confirm `history.storage.durable`;
+- create one test email alert receipt and confirm it appears in the history response;
+- call `GET /api/wallet-agent/alert-records/history/audit` and confirm only metadata audit events are returned;
+- test deletion only with the confirmation phrase `DELETE ALERT HISTORY`.
+
+Rollback plan:
+
+- set `WALLET_AGENT_ALERT_DATABASE_ADAPTER=disabled`;
+- keep `WALLET_AGENT_ALERT_HISTORY_STORAGE=database` if you want to preserve the requested mode while falling back safely;
+- redeploy the service;
+- verify history responses report memory fallback and do not attempt database writes;
+- do not drop database tables during rollback unless a separate data-retention decision has been approved.
+
+Safety guarantees:
+
+- history stores alert metadata only;
+- deletion affects only the verified email's alert receipt metadata;
+- audit events are bounded memory metadata in this phase;
+- no wallet keys, seed phrases, signed transactions, private payloads, payroll secrets, or user funds are stored;
+- none of the history, deletion, or audit APIs can buy, sell, pay, sign, schedule, resend, or submit transactions.
+
+Known production gaps:
+
+- audit events are not durable yet;
+- automatic retention purge is not implemented yet;
+- no backfill exists from memory storage into database storage;
+- no admin observability dashboard exists yet;
+- no export endpoint exists for account-owned alert history.
