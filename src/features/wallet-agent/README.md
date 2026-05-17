@@ -1464,3 +1464,40 @@ It still cannot:
 - change retention, storage, or account settings from the checklist;
 - sign or submit transactions;
 - buy, sell, pay, schedule, retry, resend, or move funds from history controls.
+
+## Phase 11.1 production readiness checklist
+
+Wallet Agent now has a production readiness checklist for moving from controlled sandbox features toward a real operational deployment.
+
+Before enabling production behavior, confirm:
+
+- `DATABASE_URL` points to a managed Postgres instance with backups enabled;
+- database migrations for wallet-agent alert history have been applied and verified;
+- `WALLET_AGENT_ALERT_HISTORY_STORAGE=database` is set only after the database path is ready;
+- `WALLET_AGENT_ALERT_DATABASE_ADAPTER=enabled` is set only when durable writes are expected;
+- alert email delivery has a real provider, verified sender domain, bounce handling, and rate limits;
+- email login and notification identity use the same verified account boundary;
+- Devnet flows stay clearly labeled as sandbox and never accept real funds;
+- mainnet transaction execution remains disabled until proposal, review, approval, signing, submission, and rollback policies are audited;
+- every value-moving action has explicit user approval and wallet-side confirmation;
+- logs avoid wallet secrets, seed phrases, private keys, signed payloads, and private transaction data;
+- support has a documented way to export, delete, and explain alert history metadata for a verified account;
+- deployment has rollback instructions for disabling database history, email delivery, and wallet-agent execution flags.
+
+Minimum smoke test before production:
+
+- verify email login works for a real account;
+- trigger a safe alert notification and confirm chat/email/wallet copy;
+- confirm the alert receipt appears in local and account history where expected;
+- export account history JSON;
+- refresh account history and audit trail;
+- delete account history with the required confirmation phrase;
+- confirm no wallet transaction is signed or submitted during history, notification, or audit flows.
+
+It still cannot:
+
+- enable production execution by itself;
+- guarantee external provider uptime;
+- run database migrations automatically;
+- send production funds;
+- buy, sell, pay, schedule, sign, or submit transactions without future audited execution phases.
