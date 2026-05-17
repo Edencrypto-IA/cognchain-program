@@ -2,6 +2,7 @@ import type {
   WalletAgentAlertHistoryAuditAction,
   WalletAgentAlertHistoryAuditEvent,
   WalletAgentAlertHistoryAuditStatus,
+  WalletAgentAlertHistoryExportBundle,
   WalletAgentAlertHistoryStorageMode,
   WalletAgentAlertHistoryDeletionResult,
   WalletAgentAlertPersistenceRecord,
@@ -656,6 +657,35 @@ export async function createWalletAgentAlertServerHistory(
   limit = 20
 ): Promise<WalletAgentAlertServerHistory> {
   return getWalletAgentAlertHistoryStorageAdapter().createHistory(ownerEmail, limit);
+}
+
+export async function createWalletAgentAlertHistoryExportBundle(
+  ownerEmail: string,
+  now = new Date()
+): Promise<WalletAgentAlertHistoryExportBundle> {
+  const history = await createWalletAgentAlertServerHistory(ownerEmail, MAX_SERVER_RECEIPTS_PER_USER);
+  const auditEvents = readWalletAgentAlertHistoryAuditEvents(ownerEmail, MAX_AUDIT_EVENTS_PER_USER);
+
+  return {
+    id: createEventId('waahex'),
+    ownerEmail: normalizeEmail(ownerEmail),
+    exportedAt: now.toISOString(),
+    format: 'json',
+    history,
+    auditEvents,
+    retention: history.retention,
+    safety: {
+      metadataOnly: true,
+      canStoreSecrets: false,
+      canExecuteTransaction: false,
+      canSchedule: false,
+      notes: [
+        'Export bundle contains Wallet Agent alert history metadata only.',
+        'No wallet keys, seed phrases, signed transaction payloads, private wallet data, or payroll secrets are exported.',
+        'Export bundles cannot resend email, request wallet signatures, execute transactions, buy, sell, or pay.',
+      ],
+    },
+  };
 }
 
 export async function upsertWalletAgentAlertServerReceipt(

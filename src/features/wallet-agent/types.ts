@@ -431,6 +431,23 @@ export type WalletAgentAlertHistoryAuditEvent = {
   };
 };
 
+export type WalletAgentAlertHistoryExportBundle = {
+  id: string;
+  ownerEmail: string;
+  exportedAt: string;
+  format: 'json';
+  history: WalletAgentAlertServerHistory;
+  auditEvents: WalletAgentAlertHistoryAuditEvent[];
+  retention: WalletAgentAlertServerHistory['retention'];
+  safety: {
+    metadataOnly: true;
+    canStoreSecrets: false;
+    canExecuteTransaction: false;
+    canSchedule: false;
+    notes: string[];
+  };
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

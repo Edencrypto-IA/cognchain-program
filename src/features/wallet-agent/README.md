@@ -1238,3 +1238,51 @@ What remains for future phases:
 - controlled backfill from memory receipts to database receipts;
 - real user-facing controls for history export/deletion;
 - production monitoring around database adapter failures.
+
+## Phase 10.1 account-owned alert history export
+
+Wallet Agent Phase 10 starts with account-owned export for alert history metadata.
+
+Endpoint:
+
+- `GET /api/wallet-agent/alert-records/history/export`
+
+It requires:
+
+- verified email identity;
+- endpoint-specific rate limiting;
+- account-scoped access through the current verified session.
+
+It can:
+
+- return a JSON export bundle for the verified email;
+- include the account alert history summary;
+- include recent safe audit events;
+- include retention policy metadata;
+- preserve storage mode information from memory or database history;
+- keep the export contract typed through `WalletAgentAlertHistoryExportBundle`.
+
+It intentionally exports only:
+
+- alert receipt metadata;
+- safe history summary metrics;
+- retention settings;
+- bounded audit metadata.
+
+It does not export:
+
+- wallet private keys;
+- seed phrases;
+- signed transaction payloads;
+- transaction payloads;
+- payroll secrets;
+- private wallet data;
+- hidden prompt data.
+
+It still cannot:
+
+- generate downloadable files in the UI;
+- export durable audit rows, because audit is still memory-bound;
+- backfill old memory receipts into database;
+- delete account identity;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from exports.

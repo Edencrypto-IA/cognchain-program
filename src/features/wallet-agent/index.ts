@@ -21,6 +21,7 @@ export type {
   WalletAgentAlertHistoryAuditEvent,
   WalletAgentAlertHistoryAuditStatus,
   WalletAgentAlertHistoryDeletionResult,
+  WalletAgentAlertHistoryExportBundle,
   WalletAgentAlertPersistenceMode,
   WalletAgentAlertPersistenceRecord,
   WalletAgentAlertPersistenceRecordStatus,
@@ -84,6 +85,7 @@ export {
 export {
   createWalletAgentAlertServerHistory,
   createWalletAgentAlertServerReceipt,
+  createWalletAgentAlertHistoryExportBundle,
   deleteWalletAgentAlertServerHistory,
   getWalletAgentAlertHistoryRetentionPolicy,
   getWalletAgentAlertHistoryStorageConfig,
