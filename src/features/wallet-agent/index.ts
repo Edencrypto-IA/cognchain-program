@@ -148,7 +148,10 @@ export {
   isValueMovingIntent,
 } from './security-policy';
 export {
+  createWalletAgentFeatureFlagSnapshot,
   createWalletAgentProductionReadinessAudit,
+  type WalletAgentFeatureFlag,
+  type WalletAgentFeatureFlagSnapshot,
   type WalletAgentProductionAudit,
   type WalletAgentProductionAuditItem,
 } from './production-readiness';

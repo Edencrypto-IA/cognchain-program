@@ -1,4 +1,5 @@
 type WalletAgentProductionAuditStatus = 'ready' | 'action_required' | 'warning' | 'safe_default';
+type WalletAgentFeatureFlagStatus = 'enabled' | 'disabled' | 'safe_default';
 
 export type WalletAgentProductionAuditItem = {
   id: string;
@@ -29,6 +30,34 @@ export type WalletAgentProductionAudit = {
   };
 };
 
+export type WalletAgentFeatureFlag = {
+  id: string;
+  label: string;
+  status: WalletAgentFeatureFlagStatus;
+  envName: string;
+  defaultStatus: WalletAgentFeatureFlagStatus;
+  productionRisk: 'low' | 'medium' | 'high' | 'critical';
+  publicDetail: string;
+  safetyNotes: string[];
+};
+
+export type WalletAgentFeatureFlagSnapshot = {
+  generatedAt: string;
+  flags: WalletAgentFeatureFlag[];
+  summary: {
+    enabled: number;
+    disabled: number;
+    safeDefaults: number;
+    criticalEnabled: number;
+  };
+  safety: {
+    secretsRedacted: true;
+    canExecuteTransactions: false;
+    canSendFunds: false;
+    notes: string[];
+  };
+};
+
 type WalletAgentProductionAuditEnv = Record<string, string | undefined>;
 
 function isEnabled(value: string | undefined) {
@@ -49,8 +78,131 @@ function parseRetentionDays(value: string | undefined) {
   return parsed;
 }
 
+function getFlagStatus(value: string | undefined, defaultStatus: WalletAgentFeatureFlagStatus): WalletAgentFeatureFlagStatus {
+  if (isEnabled(value)) return 'enabled';
+  if (value === 'disabled' || value === 'false' || value === '0') return 'disabled';
+  return defaultStatus;
+}
+
 function createAuditItem(input: WalletAgentProductionAuditItem): WalletAgentProductionAuditItem {
   return input;
+}
+
+function createFeatureFlag(input: WalletAgentFeatureFlag): WalletAgentFeatureFlag {
+  return input;
+}
+
+export function createWalletAgentFeatureFlagSnapshot(
+  env: WalletAgentProductionAuditEnv = process.env,
+  now: Date = new Date()
+): WalletAgentFeatureFlagSnapshot {
+  const flags = [
+    createFeatureFlag({
+      id: 'email-alerts',
+      label: 'Email alerts',
+      status: getFlagStatus(env.WALLET_AGENT_FEATURE_EMAIL_ALERTS, 'safe_default'),
+      envName: 'WALLET_AGENT_FEATURE_EMAIL_ALERTS',
+      defaultStatus: 'safe_default',
+      productionRisk: 'medium',
+      publicDetail: 'Controls whether future production UI should expose email alert delivery controls.',
+      safetyNotes: [
+        'This flag does not expose email provider secrets.',
+        'Email delivery still requires provider configuration and rate limits.',
+      ],
+    }),
+    createFeatureFlag({
+      id: 'database-history',
+      label: 'Database alert history',
+      status: getFlagStatus(env.WALLET_AGENT_FEATURE_DATABASE_HISTORY, 'safe_default'),
+      envName: 'WALLET_AGENT_FEATURE_DATABASE_HISTORY',
+      defaultStatus: 'safe_default',
+      productionRisk: 'medium',
+      publicDetail: 'Controls whether future production UI should treat account alert history as durable.',
+      safetyNotes: [
+        'Durable writes still require database envs and adapter readiness.',
+        'History remains metadata-only.',
+      ],
+    }),
+    createFeatureFlag({
+      id: 'devnet-wallet',
+      label: 'Devnet wallet sandbox',
+      status: getFlagStatus(env.WALLET_AGENT_FEATURE_DEVNET_WALLET, 'safe_default'),
+      envName: 'WALLET_AGENT_FEATURE_DEVNET_WALLET',
+      defaultStatus: 'safe_default',
+      productionRisk: 'low',
+      publicDetail: 'Controls whether future production UI should expose Solana Devnet sandbox onboarding.',
+      safetyNotes: [
+        'Devnet is sandbox-only and must not receive real funds.',
+        'Airdrops must stay clearly labeled as test SOL.',
+      ],
+    }),
+    createFeatureFlag({
+      id: 'transaction-proposals',
+      label: 'Transaction proposals',
+      status: getFlagStatus(env.WALLET_AGENT_FEATURE_TRANSACTION_PROPOSALS, 'safe_default'),
+      envName: 'WALLET_AGENT_FEATURE_TRANSACTION_PROPOSALS',
+      defaultStatus: 'safe_default',
+      productionRisk: 'high',
+      publicDetail: 'Controls whether future production UI should expose transaction proposal surfaces.',
+      safetyNotes: [
+        'A proposal is not a signed transaction.',
+        'Every value-moving step must remain separately reviewed and approved.',
+      ],
+    }),
+    createFeatureFlag({
+      id: 'scheduled-actions',
+      label: 'Scheduled actions',
+      status: getFlagStatus(env.WALLET_AGENT_FEATURE_SCHEDULED_ACTIONS, 'disabled'),
+      envName: 'WALLET_AGENT_FEATURE_SCHEDULED_ACTIONS',
+      defaultStatus: 'disabled',
+      productionRisk: 'critical',
+      publicDetail: 'Controls whether future production UI should expose scheduled action orchestration.',
+      safetyNotes: [
+        'Scheduled value-moving actions must remain disabled until audited.',
+        'Future schedules must require user authentication and wallet approval at execution time.',
+      ],
+    }),
+    createFeatureFlag({
+      id: 'mainnet-execution',
+      label: 'Mainnet execution',
+      status: getFlagStatus(env.WALLET_AGENT_FEATURE_MAINNET_EXECUTION, 'disabled'),
+      envName: 'WALLET_AGENT_FEATURE_MAINNET_EXECUTION',
+      defaultStatus: 'disabled',
+      productionRisk: 'critical',
+      publicDetail: 'Controls whether future production code may expose mainnet execution paths.',
+      safetyNotes: [
+        'Mainnet execution must remain disabled until a full security review exists.',
+        'This flag snapshot cannot sign, submit, buy, sell, pay, or move funds.',
+      ],
+    }),
+  ];
+
+  const summary = flags.reduce(
+    (current, flag) => {
+      if (flag.status === 'enabled') current.enabled += 1;
+      if (flag.status === 'disabled') current.disabled += 1;
+      if (flag.status === 'safe_default') current.safeDefaults += 1;
+      if (flag.status === 'enabled' && flag.productionRisk === 'critical') current.criticalEnabled += 1;
+      return current;
+    },
+    { enabled: 0, disabled: 0, safeDefaults: 0, criticalEnabled: 0 }
+  );
+
+  return {
+    generatedAt: now.toISOString(),
+    flags,
+    summary,
+    safety: {
+      secretsRedacted: true,
+      canExecuteTransactions: false,
+      canSendFunds: false,
+      notes: [
+        'Feature flag snapshot reports requested exposure only.',
+        'It does not modify runtime behavior by itself.',
+        'It never returns secret values and cannot buy, sell, pay, schedule, sign, submit, or move funds.',
+      ],
+    },
+  };
 }
 
 export function createWalletAgentProductionReadinessAudit(

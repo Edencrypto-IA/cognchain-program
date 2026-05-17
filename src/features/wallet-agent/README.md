@@ -1521,3 +1521,24 @@ It still cannot:
 - change environment variables;
 - enable mainnet execution;
 - buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 11.3 safe feature flags
+
+Wallet Agent now has a typed feature flag snapshot for future production surfaces.
+
+It can:
+
+- report safe requested exposure for email alerts, database alert history, Devnet sandbox, transaction proposals, scheduled actions, and mainnet execution;
+- default critical features such as scheduled actions and mainnet execution to `disabled`;
+- distinguish `enabled`, `disabled`, and `safe_default` states;
+- count enabled, disabled, safe-default, and critical-enabled flags;
+- keep flags read-only and redacted so future UI/admin checks can inspect status safely.
+
+It still cannot:
+
+- change runtime behavior by itself;
+- bypass the existing database, email, session, or wallet safety checks;
+- expose secrets or environment values;
+- enable scheduled value-moving actions safely without future audited phases;
+- enable mainnet execution safely without future audited phases;
+- buy, sell, pay, schedule, sign, submit, or move funds.
