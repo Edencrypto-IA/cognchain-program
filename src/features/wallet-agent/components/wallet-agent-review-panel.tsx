@@ -721,6 +721,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [historyRefreshTick, setHistoryRefreshTick] = useState(0);
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
+  const [historyRefreshedAt, setHistoryRefreshedAt] = useState<string | null>(null);
   const localStats = useMemo(() => summarizeWalletAgentAlertDeliveryReceipts(receipts), [receipts]);
   const stats = serverHistory ? {
     totalSent: serverHistory.sent,
@@ -777,7 +778,10 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
       });
 
     Promise.allSettled([historyRequest, auditRequest]).finally(() => {
-      if (!cancelled) setHistoryRefreshing(false);
+      if (!cancelled) {
+        setHistoryRefreshedAt(new Date().toISOString());
+        setHistoryRefreshing(false);
+      }
     });
 
     return () => {
@@ -953,6 +957,13 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.16em]">{syncState.title}</p>
             <p className="mt-1 text-[10px] leading-relaxed text-white/42">{syncState.detail}</p>
+            <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/28">
+              {historyRefreshing
+                ? 'Atualizando agora'
+                : historyRefreshedAt
+                  ? `Atualizado: ${formatReceiptDate(historyRefreshedAt)}`
+                  : 'Aguardando primeira sincronizacao'}
+            </p>
           </div>
           <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/48">
             {syncState.source}

@@ -1389,3 +1389,21 @@ It still cannot:
 - retry or resend failed alert emails;
 - trigger notification delivery from the refresh button;
 - sign, submit, buy, sell, pay, schedule, or resend anything from history refresh.
+
+## Phase 10.7 account history freshness indicator
+
+Wallet Agent now shows when alert history was last refreshed inside the review panel.
+
+It can:
+
+- show an `Atualizando agora` state during manual or automatic refresh;
+- show the last successful UI refresh timestamp after history and audit requests settle;
+- show a first-sync waiting state before any history request completes;
+- keep the freshness indicator close to the account/local sync details.
+
+It still cannot:
+
+- prove server uptime or database latency;
+- guarantee that external email providers delivered messages after the stored receipt;
+- refresh another account's history;
+- trigger notifications, transactions, signatures, buys, sells, payments, or schedules.
