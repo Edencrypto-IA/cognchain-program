@@ -909,3 +909,43 @@ It still cannot:
 - turn server memory into permanent storage;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from sync status;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 8.9 alert history handoff review
+
+Wallet Agent now has a documented handoff from local alert receipts to account-owned alert history.
+
+Flow summary:
+
+1. A local rule creates a manual notification draft.
+2. The user reviews the draft and explicitly sends the alert email.
+3. The browser saves a local sent or failed receipt.
+4. `POST /api/wallet-agent/alert-records` prepares the account-owned persistence contract.
+5. When the user has a verified `cog_user` email session, `POST /api/wallet-agent/alert-records/receipts` stores metadata in bounded server memory.
+6. `GET /api/wallet-agent/alert-records/history` returns read-only account history for verified users.
+7. The review panel shows account history when available and falls back to local browser receipts otherwise.
+8. Operators can copy or export a metadata-only audit bundle.
+
+Safety guarantees:
+
+- alert history is metadata-only;
+- unverified email sessions cannot read or write account receipt history;
+- local fallback remains browser-only;
+- server memory is explicitly labeled as non-durable;
+- copied and exported bundles cannot trigger email delivery, wallet signing, scheduling, or transactions;
+- no wallet keys, seed phrases, signed payloads, private transaction data, or secrets are stored in alert history.
+
+Phase 9 handoff:
+
+- replace bounded server memory with durable account-scoped database storage;
+- add migration-safe storage adapters;
+- preserve the same metadata-only schema and verified-email access boundary;
+- keep local fallback for offline or unauthenticated users;
+- add retention, deletion, and account export policies before production persistence.
+
+It still cannot:
+
+- provide durable database history;
+- recover server-memory receipts after restart;
+- sync local fallback history across devices;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from history;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.
