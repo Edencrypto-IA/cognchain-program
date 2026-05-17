@@ -368,6 +368,14 @@ export type WalletAgentAlertServerHistory = {
     durable: boolean;
     reason: string;
   };
+  retention: {
+    retentionDays: number;
+    maxReceiptsPerUser: number;
+    automaticDeletionEnabled: false;
+    manualDeletionEnabled: false;
+    deletionRequiresVerifiedEmail: true;
+    reason: string;
+  };
   safety: {
     metadataOnly: true;
     canStoreSecrets: false;

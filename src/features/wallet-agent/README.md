@@ -1053,3 +1053,24 @@ It still cannot:
 - expose durable deletion or retention policies;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from database history;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 9.6 alert history retention policy
+
+Wallet Agent now declares a retention policy for account alert history.
+
+It can:
+
+- expose `retentionDays`, `maxReceiptsPerUser`, and deletion support flags in history responses;
+- configure the declared retention window through `WALLET_AGENT_ALERT_HISTORY_RETENTION_DAYS`;
+- clamp retention between 7 and 3650 days for safe configuration;
+- keep automatic and manual deletion disabled until the explicit deletion API phase;
+- make deletion requirements visible before durable storage becomes production-critical.
+
+It still cannot:
+
+- delete durable database rows;
+- automatically purge old receipts;
+- accept account deletion requests;
+- migrate existing memory receipts into a retention-managed store;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from retention policy;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.

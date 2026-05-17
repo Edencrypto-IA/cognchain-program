@@ -19,6 +19,8 @@ export type WalletAgentAlertHistoryStorageConfig = {
   reason: string;
 };
 
+export type WalletAgentAlertHistoryRetentionPolicy = WalletAgentAlertServerHistory['retention'];
+
 export type WalletAgentAlertHistoryStorageAdapter = {
   id: WalletAgentAlertHistoryStorageMode;
   durable: boolean;
@@ -34,6 +36,23 @@ export type WalletAgentAlertHistoryStorageAdapter = {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function parseRetentionDays(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  if (!Number.isFinite(parsed)) return 180;
+  return Math.max(7, Math.min(parsed, 3650));
+}
+
+export function getWalletAgentAlertHistoryRetentionPolicy(): WalletAgentAlertHistoryRetentionPolicy {
+  return {
+    retentionDays: parseRetentionDays(process.env.WALLET_AGENT_ALERT_HISTORY_RETENTION_DAYS),
+    maxReceiptsPerUser: MAX_SERVER_RECEIPTS_PER_USER,
+    automaticDeletionEnabled: false,
+    manualDeletionEnabled: false,
+    deletionRequiresVerifiedEmail: true,
+    reason: 'Retention policy is declared but deletion is disabled until the explicit deletion API phase.',
+  };
 }
 
 function isPostgresUrl(value: string | undefined) {
@@ -127,6 +146,7 @@ function createHistoryFromReceipts(
     latestFailedAt: latest(failedReceipts.map(receipt => receipt.eventAt)),
     recentReceipts: receipts.slice(0, Math.max(1, Math.min(limit, MAX_SERVER_RECEIPTS_PER_USER))),
     storage,
+    retention: getWalletAgentAlertHistoryRetentionPolicy(),
     safety: {
       metadataOnly: true,
       canStoreSecrets: false,
@@ -166,6 +186,7 @@ function createHistoryFromMetrics(input: {
     latestFailedAt: input.latestFailedAt,
     recentReceipts: input.recentReceipts,
     storage: input.storage,
+    retention: getWalletAgentAlertHistoryRetentionPolicy(),
     safety: {
       metadataOnly: true,
       canStoreSecrets: false,
