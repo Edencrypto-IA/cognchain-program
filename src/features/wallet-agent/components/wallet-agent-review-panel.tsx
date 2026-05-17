@@ -59,6 +59,8 @@ import {
   setWalletAgentLocalRuleStatus,
   simulateWalletAgentLocalRule,
 } from '../rules';
+import type { WalletAgentProductionMonitoringStatus } from '../production-readiness';
+import { WalletAgentProductionStatusPanel } from './wallet-agent-production-status-panel';
 
 type WalletAgentReviewPanelProps = {
   result: WalletAgentCoreResult;
@@ -70,6 +72,9 @@ type WalletAgentReviewPanelProps = {
   onConfirmTransaction?: (result: WalletAgentCoreResult) => void;
   onSendNotificationDraft?: (draft: WalletAgentLocalNotificationDraft, rule: WalletAgentLocalRule) => void;
   history?: WalletAgentHistoryEntry[];
+  productionStatus?: WalletAgentProductionMonitoringStatus | null;
+  productionStatusLoading?: boolean;
+  productionStatusError?: string | null;
 };
 
 const STATUS_STYLES: Record<WalletAgentReviewItem['status'], { label: string; className: string }> = {
@@ -2009,6 +2014,9 @@ export function WalletAgentReviewPanel({
   onConfirmTransaction,
   onSendNotificationDraft,
   history = [],
+  productionStatus,
+  productionStatusLoading = false,
+  productionStatusError = null,
 }: WalletAgentReviewPanelProps) {
   const { draft, safety, review } = result;
   const valueMoving = draft.requiresWalletSignature;
@@ -2074,6 +2082,32 @@ export function WalletAgentReviewPanel({
         </div>
 
         <div className="max-h-[calc(92vh-118px)] overflow-y-auto p-4 sm:p-5">
+          {(productionStatus || productionStatusLoading || productionStatusError) && (
+            <div className="mb-4">
+              {productionStatusLoading ? (
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin text-[#00D1FF]" />
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/48">Carregando status de producao</p>
+                  </div>
+                  <p className="text-sm leading-relaxed text-white/46">
+                    Consultando o monitor admin em modo read-only. Nenhuma transacao ou provider externo e acionado aqui.
+                  </p>
+                </div>
+              ) : productionStatusError ? (
+                <div className="rounded-2xl border border-[#F5A524]/18 bg-[#F5A524]/[0.055] p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-[#F5A524]" />
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#F5A524]/85">Status de producao indisponivel</p>
+                  </div>
+                  <p className="text-sm leading-relaxed text-white/52">{productionStatusError}</p>
+                </div>
+              ) : productionStatus ? (
+                <WalletAgentProductionStatusPanel status={productionStatus} />
+              ) : null}
+            </div>
+          )}
+
           <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-4">
               {valueMoving && <TransactionJourney result={result} />}

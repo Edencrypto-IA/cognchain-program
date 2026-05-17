@@ -35,6 +35,7 @@ import {
   type WalletAgentLocalNotificationDraft,
   type WalletAgentLocalRule,
   type WalletAgentParsedIntent,
+  type WalletAgentProductionMonitoringStatus,
 } from '@/features/wallet-agent';
 import dynamic from 'next/dynamic';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
@@ -1915,6 +1916,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const [streamedContent, setStreamedContent] = useState('');
   const [walletAgentReview, setWalletAgentReview] = useState<WalletAgentCoreResult | null>(null);
   const [walletAgentHistory, setWalletAgentHistory] = useState<WalletAgentHistoryEntry[]>([]);
+  const [walletAgentProductionStatus, setWalletAgentProductionStatus] = useState<WalletAgentProductionMonitoringStatus | null>(null);
+  const [walletAgentProductionStatusLoading, setWalletAgentProductionStatusLoading] = useState(false);
+  const [walletAgentProductionStatusError, setWalletAgentProductionStatusError] = useState<string | null>(null);
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const streamWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1925,6 +1929,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const [isWalletAgentAdmin, setIsWalletAgentAdmin] = useState(false);
 
   const scrollToBottom = useCallback(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, []);
   useEffect(() => { scrollToBottom(); }, [messages, isTyping, scrollToBottom]);
@@ -1950,6 +1955,60 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
   useEffect(() => {
     setWalletAgentHistory(readWalletAgentHistory());
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch('/api/auth/verify')
+      .then(response => response.json())
+      .then(data => {
+        if (!cancelled) setIsWalletAgentAdmin(!!data.admin);
+      })
+      .catch(() => {
+        if (!cancelled) setIsWalletAgentAdmin(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!walletAgentReview || !isWalletAgentAdmin) {
+      setWalletAgentProductionStatus(null);
+      setWalletAgentProductionStatusError(null);
+      setWalletAgentProductionStatusLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setWalletAgentProductionStatusLoading(true);
+    setWalletAgentProductionStatusError(null);
+
+    fetch('/api/wallet-agent/production/status', { credentials: 'include' })
+      .then(async response => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.status) {
+          throw new Error(data?.error || 'Status de producao indisponivel.');
+        }
+        if (!cancelled) {
+          setWalletAgentProductionStatus(data.status as WalletAgentProductionMonitoringStatus);
+        }
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setWalletAgentProductionStatus(null);
+          setWalletAgentProductionStatusError(error instanceof Error ? error.message : 'Nao foi possivel carregar o status de producao.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setWalletAgentProductionStatusLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isWalletAgentAdmin, walletAgentReview]);
 
   useEffect(() => {
     const handleDevnetWalletCreated = (event: Event) => {
@@ -3447,6 +3506,9 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
           onConfirmTransaction={handleWalletAgentConfirmTransaction}
           onSendNotificationDraft={handleWalletAgentSendNotificationDraft}
           history={walletAgentHistory}
+          productionStatus={walletAgentProductionStatus}
+          productionStatusLoading={walletAgentProductionStatusLoading}
+          productionStatusError={walletAgentProductionStatusError}
         />
       )}
       <ScoreModal isOpen={showScoreModal} onClose={() => setShowScoreModal(false)} onSubmit={handleScoreSubmit} />

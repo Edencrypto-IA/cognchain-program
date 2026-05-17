@@ -1637,3 +1637,23 @@ It still cannot:
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - change feature flags or environment variables;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.2 admin production status integration
+
+Wallet Agent now mounts the production status panel inside the existing review flow for admins only.
+
+It can:
+
+- verify the admin session before requesting the production monitoring endpoint;
+- fetch `GET /api/wallet-agent/production/status` only while a Wallet Agent review is open;
+- show loading, unavailable, and ready states inside the review modal;
+- keep the status panel read-only and redacted;
+- leave normal users, chat streaming, wallet connection, Devnet transactions, and review actions unchanged.
+
+It still cannot:
+
+- show production status to non-admin users;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- change feature flags or environment variables;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds;
+- bypass the existing admin-gated API check.
