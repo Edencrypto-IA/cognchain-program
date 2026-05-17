@@ -1349,3 +1349,23 @@ It still cannot:
 - store or display IP addresses;
 - expose wallet keys, seed phrases, signed payloads, private transaction data, or payroll secrets;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from audit events.
+
+## Phase 10.5 account history health summary
+
+Wallet Agent now shows a compact health summary for alert history inside the review panel.
+
+It can:
+
+- summarize whether history is local, server-memory, or durable database-backed;
+- show account export capability as local TXT or account JSON;
+- expose the active retention window when account history is available;
+- show recent audit count;
+- keep a clear metadata-only safety label close to export/deletion controls.
+
+It still cannot:
+
+- monitor database latency or uptime;
+- show production alerting metrics;
+- persist audit events durably;
+- run automatic retention purges;
+- sign, submit, buy, sell, pay, schedule, or resend anything from the health summary.

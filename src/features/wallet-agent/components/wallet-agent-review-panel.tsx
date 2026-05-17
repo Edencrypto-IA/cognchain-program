@@ -549,6 +549,50 @@ function getAlertHistorySyncState(history: WalletAgentAlertServerHistory | null)
   };
 }
 
+function getAlertHistoryHealthItems(
+  history: WalletAgentAlertServerHistory | null,
+  auditEvents: WalletAgentAlertHistoryAuditEvent[]
+) {
+  if (!history) {
+    return [
+      { label: 'Identidade', value: 'local only', tone: 'warn' },
+      { label: 'Export', value: 'TXT local', tone: 'info' },
+      { label: 'Delecao', value: 'n/a', tone: 'muted' },
+      { label: 'Auditoria', value: 'n/a', tone: 'muted' },
+    ] as const;
+  }
+
+  return [
+    {
+      label: 'Persistencia',
+      value: history.storage.durable ? 'duravel' : 'memoria',
+      tone: history.storage.durable ? 'ok' : 'info',
+    },
+    {
+      label: 'Retencao',
+      value: `${history.retention.retentionDays} dias`,
+      tone: 'info',
+    },
+    {
+      label: 'Export',
+      value: 'JSON conta',
+      tone: 'ok',
+    },
+    {
+      label: 'Auditoria',
+      value: `${auditEvents.length} recentes`,
+      tone: auditEvents.length > 0 ? 'ok' : 'muted',
+    },
+  ] as const;
+}
+
+function getAlertHistoryHealthClass(tone: 'ok' | 'info' | 'warn' | 'muted') {
+  if (tone === 'ok') return 'border-[#14F195]/16 bg-[#14F195]/[0.055] text-[#14F195]';
+  if (tone === 'info') return 'border-[#00D1FF]/16 bg-[#00D1FF]/[0.055] text-[#7DE3FF]';
+  if (tone === 'warn') return 'border-[#F5A524]/16 bg-[#F5A524]/[0.055] text-[#F5A524]';
+  return 'border-white/[0.07] bg-white/[0.025] text-white/42';
+}
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -685,6 +729,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   } : localStats;
   const serverReceipts = serverHistory?.recentReceipts ?? [];
   const syncState = getAlertHistorySyncState(serverHistory);
+  const healthItems = getAlertHistoryHealthItems(serverHistory, auditEvents);
 
   useEffect(() => {
     let cancelled = false;
@@ -903,6 +948,29 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
             <p className="mt-1 truncate text-[10px] font-semibold text-white/62">{syncState.identity}</p>
           </div>
         </div>
+      </div>
+
+      <div className="mb-3 rounded-2xl border border-white/[0.07] bg-black/22 p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-[#14F195]" />
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/48">Saude do historico</p>
+          </div>
+          <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/38">
+            metadata-only
+          </span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-4">
+          {healthItems.map(item => (
+            <div key={item.label} className={`rounded-xl border p-2 ${getAlertHistoryHealthClass(item.tone)}`}>
+              <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/34">{item.label}</p>
+              <p className="mt-1 truncate text-[10px] font-semibold">{item.value}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-white/34">
+          Esta camada organiza historico, exportacao, delecao e auditoria sem permissao para assinar, enviar, comprar, vender ou pagar.
+        </p>
       </div>
 
       {exportError && (
