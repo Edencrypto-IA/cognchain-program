@@ -594,6 +594,17 @@ function getAlertHistoryHealthClass(tone: 'ok' | 'info' | 'warn' | 'muted') {
   return 'border-white/[0.07] bg-white/[0.025] text-white/42';
 }
 
+function getAlertHistoryRetentionExpiry(history: WalletAgentAlertServerHistory | null) {
+  if (!history?.latestEventAt) return null;
+
+  const latest = new Date(history.latestEventAt);
+  if (Number.isNaN(latest.getTime())) return null;
+
+  const expiresAt = new Date(latest);
+  expiresAt.setDate(expiresAt.getDate() + history.retention.retentionDays);
+  return expiresAt.toISOString();
+}
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -734,6 +745,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
   const serverReceipts = serverHistory?.recentReceipts ?? [];
   const syncState = getAlertHistorySyncState(serverHistory);
   const healthItems = getAlertHistoryHealthItems(serverHistory, auditEvents);
+  const retentionExpiry = getAlertHistoryRetentionExpiry(serverHistory);
 
   useEffect(() => {
     let cancelled = false;
@@ -1007,6 +1019,39 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
           Esta camada organiza historico, exportacao, delecao e auditoria sem permissao para assinar, enviar, comprar, vender ou pagar.
         </p>
       </div>
+
+      {serverHistory && (
+        <div className="mb-3 rounded-2xl border border-[#F5A524]/12 bg-[#F5A524]/[0.035] p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Clock3 className="h-3.5 w-3.5 text-[#F5A524]" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#F5A524]/85">Politica de retencao</p>
+            </div>
+            <span className="rounded-full border border-[#F5A524]/16 bg-[#F5A524]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#F5A524]/85">
+              {serverHistory.retention.retentionDays} dias
+            </span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border border-white/[0.07] bg-black/20 p-2">
+              <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/26">Limite por conta</p>
+              <p className="mt-1 truncate text-[10px] font-semibold text-white/62">{serverHistory.retention.maxReceiptsPerUser} registros</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.07] bg-black/20 p-2">
+              <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/26">Delecao manual</p>
+              <p className="mt-1 truncate text-[10px] font-semibold text-white/62">
+                {serverHistory.retention.manualDeletionEnabled ? 'email verificado' : 'indisponivel'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/[0.07] bg-black/20 p-2">
+              <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/26">Expira estimado</p>
+              <p className="mt-1 truncate text-[10px] font-semibold text-white/62">
+                {retentionExpiry ? formatReceiptDate(retentionExpiry) : 'sem eventos'}
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-white/34">{serverHistory.retention.reason}</p>
+        </div>
+      )}
 
       {exportError && (
         <div className="mb-3 rounded-2xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055] p-3">

@@ -1407,3 +1407,23 @@ It still cannot:
 - guarantee that external email providers delivered messages after the stored receipt;
 - refresh another account's history;
 - trigger notifications, transactions, signatures, buys, sells, payments, or schedules.
+
+## Phase 10.8 account history retention visibility
+
+Wallet Agent now shows the account alert history retention policy inside the review panel.
+
+It can:
+
+- display the active retention window in days;
+- show the maximum stored alert receipt count per verified account;
+- show whether manual deletion is available for the verified email;
+- estimate the expiry point from the latest stored event;
+- keep the retention explanation near export, deletion, audit, and health controls.
+
+It still cannot:
+
+- run automatic retention purges;
+- prove that old records were physically purged by an external database;
+- change retention settings from the UI;
+- refresh another account's history;
+- trigger notifications, transactions, signatures, buys, sells, payments, or schedules.
