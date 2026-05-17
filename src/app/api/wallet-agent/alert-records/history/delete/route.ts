@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   deleteWalletAgentAlertServerHistory,
   getWalletAgentAlertHistoryRetentionPolicy,
+  recordWalletAgentAlertHistoryAuditEvent,
   WALLET_AGENT_ALERT_HISTORY_DELETE_CONFIRMATION,
 } from '@/features/wallet-agent/alert-record-store';
 import { checkRateLimit } from '@/lib/security';
@@ -36,10 +37,28 @@ export async function POST(req: NextRequest) {
   const sessionEmail = session.email.toLowerCase();
 
   if (requestedEmail && requestedEmail !== sessionEmail) {
+    recordWalletAgentAlertHistoryAuditEvent({
+      ownerEmail: sessionEmail,
+      actorEmail: sessionEmail,
+      action: 'delete_history_rejected',
+      status: 'rejected',
+      reason: 'Cross-account deletion attempt rejected.',
+      requestPath: '/api/wallet-agent/alert-records/history/delete',
+    });
+
     return NextResponse.json({ error: 'Voce so pode apagar o historico do email verificado atual.' }, { status: 403 });
   }
 
   if (confirmation !== WALLET_AGENT_ALERT_HISTORY_DELETE_CONFIRMATION) {
+    recordWalletAgentAlertHistoryAuditEvent({
+      ownerEmail: sessionEmail,
+      actorEmail: sessionEmail,
+      action: 'delete_history_rejected',
+      status: 'rejected',
+      reason: 'Required confirmation phrase was missing or invalid.',
+      requestPath: '/api/wallet-agent/alert-records/history/delete',
+    });
+
     return NextResponse.json({
       error: 'Confirmacao obrigatoria para apagar historico de alertas.',
       requiredConfirmation: WALLET_AGENT_ALERT_HISTORY_DELETE_CONFIRMATION,
@@ -54,9 +73,21 @@ export async function POST(req: NextRequest) {
   }
 
   const deletion = await deleteWalletAgentAlertServerHistory(session.email);
+  const auditEvent = recordWalletAgentAlertHistoryAuditEvent({
+    ownerEmail: sessionEmail,
+    actorEmail: sessionEmail,
+    action: 'delete_history_completed',
+    status: 'completed',
+    reason: 'Verified email manually deleted Wallet Agent alert history metadata.',
+    requestPath: '/api/wallet-agent/alert-records/history/delete',
+    deletedCount: deletion.deletedCount,
+    storageMode: deletion.storage.mode,
+  });
+
   return NextResponse.json({
     ok: true,
     deletion,
+    auditEvent,
     retention: getWalletAgentAlertHistoryRetentionPolicy(),
     message: deletion.storage.durable
       ? 'Historico de alertas apagado do banco duravel para o email verificado.'

@@ -405,6 +405,32 @@ export type WalletAgentAlertHistoryDeletionResult = {
   };
 };
 
+export type WalletAgentAlertHistoryAuditAction =
+  | 'delete_history_rejected'
+  | 'delete_history_completed';
+
+export type WalletAgentAlertHistoryAuditStatus = 'rejected' | 'completed';
+
+export type WalletAgentAlertHistoryAuditEvent = {
+  id: string;
+  ownerEmail: string;
+  actorEmail: string;
+  action: WalletAgentAlertHistoryAuditAction;
+  status: WalletAgentAlertHistoryAuditStatus;
+  reason: string;
+  createdAt: string;
+  requestPath: string;
+  deletedCount?: number;
+  storageMode?: WalletAgentAlertHistoryStorageMode;
+  safety: {
+    metadataOnly: true;
+    storesIpAddress: false;
+    storesSecrets: false;
+    canExecuteTransaction: false;
+    notes: string[];
+  };
+};
+
 export type WalletAgentWalletSnapshot = {
   address: string;
   network: WalletAgentIntentDraft['network'];

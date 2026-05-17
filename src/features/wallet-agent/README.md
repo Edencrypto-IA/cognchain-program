@@ -1106,3 +1106,35 @@ It still cannot:
 - perform account deletion;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from deletion requests;
 - bypass verified email identity or the confirmation phrase.
+
+## Phase 9.8 alert history retention audit trail
+
+Wallet Agent now records a bounded operational audit trail for alert history deletion actions.
+
+Endpoint:
+
+- `GET /api/wallet-agent/alert-records/history/audit`
+
+It can:
+
+- record rejected deletion attempts for invalid confirmation phrases;
+- record rejected cross-account deletion attempts;
+- record completed deletion actions with deleted count and storage mode;
+- expose recent audit events only to the verified email owner;
+- keep audit events metadata-only and bounded to 50 events per verified email.
+
+It intentionally does not store:
+
+- IP addresses;
+- wallet keys, seed phrases, or signed payloads;
+- transaction payloads;
+- alert body secrets;
+- private wallet data.
+
+It still cannot:
+
+- persist audit events durably in Postgres;
+- export audit events;
+- perform automatic retention purges;
+- delete account identity;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from audit events.

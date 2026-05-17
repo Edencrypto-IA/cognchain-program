@@ -1,4 +1,7 @@
 import type {
+  WalletAgentAlertHistoryAuditAction,
+  WalletAgentAlertHistoryAuditEvent,
+  WalletAgentAlertHistoryAuditStatus,
   WalletAgentAlertHistoryStorageMode,
   WalletAgentAlertHistoryDeletionResult,
   WalletAgentAlertPersistenceRecord,
@@ -8,8 +11,10 @@ import type {
 import { db } from '@/lib/db';
 
 const MAX_SERVER_RECEIPTS_PER_USER = 100;
+const MAX_AUDIT_EVENTS_PER_USER = 50;
 export const WALLET_AGENT_ALERT_HISTORY_DELETE_CONFIRMATION = 'DELETE ALERT HISTORY';
 const serverReceiptStore = new Map<string, WalletAgentAlertServerReceipt[]>();
+const alertHistoryAuditStore = new Map<string, WalletAgentAlertHistoryAuditEvent[]>();
 
 export type WalletAgentAlertHistoryStorageConfig = {
   requestedMode: WalletAgentAlertHistoryStorageMode;
@@ -39,6 +44,10 @@ export type WalletAgentAlertHistoryStorageAdapter = {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function createEventId(prefix: string) {
+  return `${prefix}_${crypto.randomUUID()}`;
 }
 
 function parseRetentionDays(value: string | undefined) {
@@ -83,6 +92,57 @@ function createDeletionResult(input: {
       ],
     },
   };
+}
+
+export function recordWalletAgentAlertHistoryAuditEvent(input: {
+  ownerEmail: string;
+  actorEmail: string;
+  action: WalletAgentAlertHistoryAuditAction;
+  status: WalletAgentAlertHistoryAuditStatus;
+  reason: string;
+  requestPath: string;
+  deletedCount?: number;
+  storageMode?: WalletAgentAlertHistoryStorageMode;
+  now?: Date;
+}): WalletAgentAlertHistoryAuditEvent {
+  const ownerEmail = normalizeEmail(input.ownerEmail);
+  const actorEmail = normalizeEmail(input.actorEmail);
+  const event: WalletAgentAlertHistoryAuditEvent = {
+    id: createEventId('waahe'),
+    ownerEmail,
+    actorEmail,
+    action: input.action,
+    status: input.status,
+    reason: input.reason,
+    createdAt: (input.now ?? new Date()).toISOString(),
+    requestPath: input.requestPath,
+    deletedCount: input.deletedCount,
+    storageMode: input.storageMode,
+    safety: {
+      metadataOnly: true,
+      storesIpAddress: false,
+      storesSecrets: false,
+      canExecuteTransaction: false,
+      notes: [
+        'Audit events store only retention/deletion metadata for the verified email.',
+        'No IP address, wallet key, seed phrase, signed payload, transaction payload, or alert body is stored.',
+        'Audit events cannot resend email, request wallet signatures, execute transactions, buy, sell, or pay.',
+      ],
+    },
+  };
+
+  const current = alertHistoryAuditStore.get(ownerEmail) ?? [];
+  alertHistoryAuditStore.set(ownerEmail, [event, ...current].slice(0, MAX_AUDIT_EVENTS_PER_USER));
+
+  return event;
+}
+
+export function readWalletAgentAlertHistoryAuditEvents(
+  ownerEmail: string,
+  limit = 20
+): WalletAgentAlertHistoryAuditEvent[] {
+  const safeLimit = Math.max(1, Math.min(limit, MAX_AUDIT_EVENTS_PER_USER));
+  return [...(alertHistoryAuditStore.get(normalizeEmail(ownerEmail)) ?? [])].slice(0, safeLimit);
 }
 
 function isPostgresUrl(value: string | undefined) {
