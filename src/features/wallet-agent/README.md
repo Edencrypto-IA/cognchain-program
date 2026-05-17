@@ -970,3 +970,23 @@ It still cannot:
 - recover server-memory receipts after restart;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from storage records;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 9.2 alert history database schema
+
+Wallet Agent now has a Prisma schema for durable account alert receipt storage.
+
+It can:
+
+- define `WalletAgentAlertReceipt` as metadata-only durable storage;
+- enforce one receipt per `ownerEmail` and `receiptId`;
+- index account history by owner email, event time, status, delivery ID, and rule ID;
+- store provider, target, title, message, event timestamp, storage metadata, and safety notes;
+- preserve explicit safety flags that block secrets, scheduling, and transaction execution.
+
+It still cannot:
+
+- write to the database until the database adapter is connected;
+- migrate existing in-memory receipts automatically;
+- make local browser fallback durable;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from database rows;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.

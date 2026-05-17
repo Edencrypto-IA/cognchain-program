@@ -156,6 +156,41 @@ model ResponseCache {
 // Solana Intent Queue — human-confirmed transaction pipeline
 // ============================================================
 
+// ============================================================
+// Wallet Agent Alert History - durable metadata receipts
+// ============================================================
+
+model WalletAgentAlertReceipt {
+  id                    String   @id @default(cuid())
+  ownerEmail            String
+  recordId              String
+  deliveryId            String
+  ruleId                String
+  draftId               String
+  receiptId             String
+  receiptStatus         String
+  target                String
+  provider              String
+  title                 String
+  message               String
+  eventAt               DateTime
+  storageMode           String   @default("database")
+  storageReason         String
+  safetyNotes           Json
+  metadataOnly          Boolean  @default(true)
+  canStoreSecrets       Boolean  @default(false)
+  canExecuteTransaction Boolean  @default(false)
+  canSchedule           Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([ownerEmail, receiptId])
+  @@index([ownerEmail, eventAt])
+  @@index([ownerEmail, receiptStatus])
+  @@index([deliveryId])
+  @@index([ruleId])
+}
+
 model SolanaIntent {
   id          String    @id @default(cuid())
   agentId     String
