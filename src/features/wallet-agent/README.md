@@ -1193,3 +1193,48 @@ Known production gaps:
 - no backfill exists from memory storage into database storage;
 - no admin observability dashboard exists yet;
 - no export endpoint exists for account-owned alert history.
+
+## Phase 9.10 final alert history hardening review
+
+Wallet Agent Phase 9 closes with alert history storage, retention, deletion, audit, and operations documented as a safe metadata-only layer.
+
+Completed in Phase 9:
+
+- storage adapter contract with memory as the safe default;
+- Prisma `WalletAgentAlertReceipt` schema for durable metadata storage;
+- environment gate for database mode;
+- gated database write path;
+- database-native read path;
+- retention policy declaration;
+- verified-email manual deletion endpoint;
+- bounded metadata audit trail;
+- operational runbook for Railway, rollback, and safety checks.
+
+Final safety posture:
+
+- default mode remains memory and non-durable unless database mode is explicitly enabled;
+- database writes require a valid Postgres URL and `WALLET_AGENT_ALERT_DATABASE_ADAPTER=enabled`;
+- history reads require verified email identity;
+- deletion requires verified email identity and the confirmation phrase `DELETE ALERT HISTORY`;
+- deletion is account-scoped and only removes alert receipt metadata for the verified email;
+- audit events do not store IP addresses, wallet secrets, signed payloads, transaction payloads, or private wallet data;
+- no Phase 9 API can execute financial actions.
+
+Validation checklist:
+
+- `npx prisma validate`;
+- `npx eslint src/features/wallet-agent src/app/api/wallet-agent/alert-records src/lib/security.ts --max-warnings 0`;
+- `npm run build`;
+- confirm `/api/wallet-agent/alert-records/history`;
+- confirm `/api/wallet-agent/alert-records/history/delete`;
+- confirm `/api/wallet-agent/alert-records/history/audit`.
+
+What remains for future phases:
+
+- durable audit storage;
+- automatic retention purge worker;
+- account-owned export endpoint;
+- admin observability dashboard;
+- controlled backfill from memory receipts to database receipts;
+- real user-facing controls for history export/deletion;
+- production monitoring around database adapter failures.
