@@ -889,3 +889,23 @@ It still cannot:
 - sync local fallback exports across devices;
 - resend, retry, schedule, sign, submit, buy, sell, or pay from exported files;
 - store secrets, wallet keys, seed phrases, or signed transaction payloads.
+
+## Phase 8.8 alert history sync status
+
+Wallet Agent now makes alert history storage status explicit in the review panel.
+
+It can:
+
+- show whether alert history is using local browser fallback, verified account memory, or future durable database mode;
+- display origin, persistence mode, and identity in a compact status card;
+- explain when server-side history is still bounded memory instead of durable storage;
+- keep the export and copy actions aligned with the visible storage source;
+- reduce operator confusion without changing alert, wallet, or transaction behavior.
+
+It still cannot:
+
+- provide durable database history until a database adapter is added;
+- sync local fallback history across devices;
+- turn server memory into permanent storage;
+- resend, retry, schedule, sign, submit, buy, sell, or pay from sync status;
+- store secrets, wallet keys, seed phrases, or signed transaction payloads.

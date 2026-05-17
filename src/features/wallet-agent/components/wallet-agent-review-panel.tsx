@@ -488,6 +488,39 @@ function createAlertHistoryExportFilename(source: 'account' | 'local') {
   return `congchain-wallet-agent-${source}-alert-history-${timestamp}.txt`;
 }
 
+function getAlertHistorySyncState(history: WalletAgentAlertServerHistory | null) {
+  if (!history) {
+    return {
+      source: 'local',
+      title: 'Local fallback',
+      detail: 'Dados deste navegador. Verifique seu email para ativar historico da conta.',
+      persistence: 'localStorage',
+      identity: 'sem conta verificada',
+      className: 'border-[#F5A524]/16 bg-[#F5A524]/[0.055] text-[#F5A524]',
+    };
+  }
+
+  if (history.storage.durable) {
+    return {
+      source: 'database',
+      title: 'Banco duravel',
+      detail: 'Historico conectado a conta verificada e salvo em backend duravel.',
+      persistence: 'duravel',
+      identity: history.ownerEmail,
+      className: 'border-[#14F195]/18 bg-[#14F195]/[0.07] text-[#14F195]',
+    };
+  }
+
+  return {
+    source: 'server-memory',
+    title: 'Conta verificada',
+    detail: 'Historico vinculado ao email, mas ainda em memoria do servidor.',
+    persistence: 'memoria servidor',
+    identity: history.ownerEmail,
+    className: 'border-[#00D1FF]/16 bg-[#00D1FF]/[0.06] text-[#7DE3FF]',
+  };
+}
+
 function formatNotificationChannel(channel: WalletAgentLocalNotificationDraft['channels'][number]) {
   if (channel === 'congchain_chat') return 'chat CongChain';
   if (channel === 'email') return 'email';
@@ -615,6 +648,7 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
     lastFailedAt: serverHistory.latestFailedAt,
   } : localStats;
   const serverReceipts = serverHistory?.recentReceipts ?? [];
+  const syncState = getAlertHistorySyncState(serverHistory);
 
   useEffect(() => {
     let cancelled = false;
@@ -721,11 +755,31 @@ function AlertDeliveryReceiptsHistory({ refreshKey }: { refreshKey: string }) {
         </div>
       </div>
 
-      <p className="mb-3 text-[10px] leading-relaxed text-white/34">
-        {serverHistory
-          ? 'Historico da conta verificada. Ainda e memoria do servidor, nao banco duravel.'
-          : 'Fallback local deste navegador ate a conta por email estar verificada.'}
-      </p>
+      <div className={`mb-3 rounded-2xl border p-3 ${syncState.className}`}>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em]">{syncState.title}</p>
+            <p className="mt-1 text-[10px] leading-relaxed text-white/42">{syncState.detail}</p>
+          </div>
+          <span className="rounded-full border border-white/[0.08] bg-black/24 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/48">
+            {syncState.source}
+          </span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/[0.07] bg-black/20 p-2">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/26">Origem</p>
+            <p className="mt-1 truncate text-[10px] font-semibold text-white/62">{serverHistory ? 'conta verificada' : 'navegador local'}</p>
+          </div>
+          <div className="rounded-xl border border-white/[0.07] bg-black/20 p-2">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/26">Persistencia</p>
+            <p className="mt-1 truncate text-[10px] font-semibold text-white/62">{syncState.persistence}</p>
+          </div>
+          <div className="rounded-xl border border-white/[0.07] bg-black/20 p-2">
+            <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/26">Identidade</p>
+            <p className="mt-1 truncate text-[10px] font-semibold text-white/62">{syncState.identity}</p>
+          </div>
+        </div>
+      </div>
 
       {!hasReceipts ? (
         <p className="text-[11px] leading-relaxed text-white/38">
