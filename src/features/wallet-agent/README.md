@@ -1616,3 +1616,24 @@ It still cannot:
 - verify external provider uptime automatically;
 - authorize emergency fund movement;
 - buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.1 read-only production status component
+
+Wallet Agent now has an isolated production status panel component for future admin UI integration.
+
+It can:
+
+- render a redacted `WalletAgentProductionMonitoringStatus` snapshot;
+- show health as `ready`, `attention_required`, or `unsafe`;
+- summarize durable history, email provider, session-secret, and critical-flag readiness;
+- display readiness audit items without exposing secrets;
+- highlight critical feature flags such as scheduled actions and mainnet execution;
+- explain that the surface is read-only and cannot execute financial operations.
+
+It still cannot:
+
+- fetch production status by itself;
+- appear in the app until a future integration phase mounts it;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- change feature flags or environment variables;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.

@@ -130,6 +130,7 @@ export {
 } from './ai-parser';
 export { createWalletAgentDemoPreview, WALLET_AGENT_DEMO_PROMPTS } from './demo';
 export { WalletAgentPreviewCard } from './components/wallet-agent-preview-card';
+export { WalletAgentProductionStatusPanel } from './components/wallet-agent-production-status-panel';
 export { WalletAgentReviewPanel } from './components/wallet-agent-review-panel';
 export {
   classifyWalletAgentIntent,
