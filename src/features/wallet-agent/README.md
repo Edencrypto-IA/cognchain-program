@@ -1563,3 +1563,56 @@ It still cannot:
 - run migrations or provider connectivity tests;
 - enable mainnet execution;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 11.5 production operations runbook
+
+Wallet Agent now has a production operations runbook for safe deployment, verification, and rollback.
+
+### Pre-deploy checklist
+
+- Confirm `npm run build` passes locally or in CI.
+- Confirm `npx eslint src/features/wallet-agent src/app/api/wallet-agent src/lib/security.ts --max-warnings 0` passes.
+- Confirm `npx prisma validate` passes with the production-like database URL shape.
+- Confirm database migrations are applied before enabling durable alert history.
+- Confirm `RESEND_API_KEY` and `AUTH_EMAIL_FROM` or `EMAIL_FROM` are configured before real email delivery.
+- Confirm `USER_SESSION_SECRET` or `ADMIN_SESSION_SECRET` is configured with a strong production value.
+- Confirm critical flags remain disabled:
+  - `WALLET_AGENT_FEATURE_SCHEDULED_ACTIONS=disabled`
+  - `WALLET_AGENT_FEATURE_MAINNET_EXECUTION=disabled`
+- Confirm Devnet UI copy still says sandbox/test SOL and never asks users to send real funds.
+
+### Safe rollout order
+
+1. Deploy with alert history still in memory/default mode.
+2. Verify `/api/wallet-agent/production/status` as admin and confirm no secrets are returned.
+3. Verify email login and magic-link flow with a real test inbox.
+4. Verify alert draft creation without delivery side effects.
+5. Enable email delivery only after sender/domain/rate limits are confirmed.
+6. Enable database history only after schema and backup posture are verified.
+7. Re-check `/api/wallet-agent/production/status` and confirm health is not `unsafe`.
+8. Run the smoke test from Phase 11.1.
+
+### Rollback order
+
+1. Disable email delivery provider keys or feature exposure if alert delivery misbehaves.
+2. Set `WALLET_AGENT_ALERT_DATABASE_ADAPTER=disabled` to fall back from database writes.
+3. Keep `WALLET_AGENT_ALERT_HISTORY_STORAGE=database` only if preserving requested mode is useful for diagnostics.
+4. Disable risky feature flags first, especially scheduled actions and mainnet execution.
+5. Redeploy the last known-good commit.
+6. Re-check admin monitoring status and confirm history controls remain metadata-only.
+
+### Production incident notes
+
+- Do not paste API keys, session secrets, database URLs, private keys, seed phrases, signatures, or signed payloads into chat, tickets, logs, screenshots, or support summaries.
+- Do not ask users to send real funds to Devnet wallets.
+- Do not manually run SQL deletion outside the documented account deletion path unless a separate data-retention incident process approves it.
+- Treat any enabled critical flag as a production incident until reviewed.
+- Treat unexpected wallet signature prompts as a production incident.
+
+It still cannot:
+
+- operate production by itself;
+- migrate, seed, or repair databases;
+- verify external provider uptime automatically;
+- authorize emergency fund movement;
+- buy, sell, pay, schedule, sign, submit, or move funds.
