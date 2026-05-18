@@ -115,6 +115,13 @@ type ProductionVerificationPacketItem = {
   detail: string;
 };
 
+type ProductionVerificationDecisionItem = {
+  id: string;
+  severity: 'blocker' | 'review' | 'safe';
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -342,11 +349,73 @@ function buildProductionVerificationPacket(
   ];
 }
 
+function buildProductionVerificationDecisionContext(status: WalletAgentProductionMonitoringStatus): ProductionVerificationDecisionItem[] {
+  const items: ProductionVerificationDecisionItem[] = [];
+
+  if (status.health === 'unsafe') {
+    items.push({
+      id: 'unsafe-health',
+      severity: 'blocker',
+      label: 'Unsafe health',
+      detail: 'Production status is unsafe and must be reviewed before any rollout discussion.',
+    });
+  }
+
+  if (status.featureFlags.summary.criticalEnabled > 0) {
+    items.push({
+      id: 'critical-flags-enabled',
+      severity: 'blocker',
+      label: 'Critical execution exposure',
+      detail: `${status.featureFlags.summary.criticalEnabled} critical execution flag(s) are enabled and require review.`,
+    });
+  }
+
+  if (status.audit.summary.actionRequired > 0) {
+    items.push({
+      id: 'required-audit-actions',
+      severity: 'blocker',
+      label: 'Required audit actions',
+      detail: `${status.audit.summary.actionRequired} readiness audit item(s) require action.`,
+    });
+  }
+
+  if (status.audit.summary.warning > 0) {
+    items.push({
+      id: 'audit-warnings',
+      severity: 'review',
+      label: 'Audit warnings',
+      detail: `${status.audit.summary.warning} readiness warning(s) should be reviewed by an operator.`,
+    });
+  }
+
+  const reviewFocusCount = buildProductionVerificationFocus(status).filter(item => item.severity === 'review').length;
+  if (reviewFocusCount > 0) {
+    items.push({
+      id: 'drill-review-focus',
+      severity: 'review',
+      label: 'Drill review focus',
+      detail: `${reviewFocusCount} verification drill item(s) need operator review.`,
+    });
+  }
+
+  if (items.length > 0) {
+    return items.slice(0, 6);
+  }
+
+  return [{
+    id: 'no-decision-blockers',
+    severity: 'safe',
+    label: 'No decision blockers in snapshot',
+    detail: 'The redacted snapshot reports no blockers or warnings, but rollout still requires a separate human approval process.',
+  }];
+}
+
 function buildProductionVerificationDrillReport(status: WalletAgentProductionMonitoringStatus) {
   const drillItems = buildProductionVerificationDrill(status);
   const focusItems = buildProductionVerificationFocus(status);
   const handoff = buildProductionVerificationHandoff(status);
   const packetItems = buildProductionVerificationPacket(status);
+  const decisionItems = buildProductionVerificationDecisionContext(status);
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
@@ -357,6 +426,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
   ));
   const packetLines = packetItems.map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
+  ));
+  const decisionLines = decisionItems.map(item => (
+    `- [${item.severity}] ${item.label}: ${item.detail}`
   ));
 
   return [
@@ -377,6 +449,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
     '',
     'Handoff packet',
     ...packetLines,
+    '',
+    'Decision context',
+    ...decisionLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -460,6 +535,9 @@ function buildProductionBrief(
   const verificationPacketLines = buildProductionVerificationPacket(status, auditEvents).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
+  const verificationDecisionLines = buildProductionVerificationDecisionContext(status).map(item => (
+    `- [${item.severity}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -505,6 +583,9 @@ function buildProductionBrief(
     '',
     'Phase 13.5 verification handoff packet',
     ...verificationPacketLines,
+    '',
+    'Phase 13.6 verification decision context',
+    ...verificationDecisionLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -570,6 +651,9 @@ export function WalletAgentProductionStatusPanel({
     [auditEvents, status],
   );
   const productionVerificationPacketReviewCount = productionVerificationPacket.filter(item => !item.complete).length;
+  const productionVerificationDecisionContext = useMemo(() => buildProductionVerificationDecisionContext(status), [status]);
+  const productionVerificationDecisionReviewCount = productionVerificationDecisionContext
+    .filter(item => item.severity !== 'safe').length;
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -993,6 +1077,48 @@ export function WalletAgentProductionStatusPanel({
                     <div className="mb-1 flex items-center gap-2">
                       <PacketIcon className="h-3.5 w-3.5 shrink-0" />
                       <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/[0.06] bg-black/20 p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/52">Phase 13.6 decision context</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Signals behind the current handoff state.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationDecisionReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationDecisionReviewCount > 0 ? `${productionVerificationDecisionReviewCount} signal` : 'clear'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionVerificationDecisionContext.map(item => {
+                const DecisionIcon = item.severity === 'safe' ? CheckCircle2 : AlertTriangle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.severity === 'blocker'
+                        ? 'border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055] text-[#FF8A9E]'
+                        : item.severity === 'review'
+                          ? 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                          : 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <DecisionIcon className="h-3.5 w-3.5 shrink-0" />
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                      </div>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">{item.severity}</span>
                     </div>
                     <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
                   </div>

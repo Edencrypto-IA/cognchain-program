@@ -1918,3 +1918,25 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.6 verification decision context
+
+Wallet Agent now explains the signals behind the current production verification handoff state.
+
+It can:
+
+- summarize blockers such as unsafe health, required audit actions, and enabled critical execution flags;
+- summarize review signals such as audit warnings and drill focus items;
+- show a clear safe note when the redacted snapshot has no decision blockers;
+- include the decision context in the copied production brief;
+- include the same decision context in the copied drill report.
+
+It still cannot:
+
+- approve rollout or decide deployment readiness by itself;
+- change feature flags, environment variables, retention settings, or account settings;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- persist decision context to the server;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
