@@ -1940,3 +1940,26 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.7 local verification timeline
+
+Wallet Agent now summarizes browser-local admin verification activity for the current production status session.
+
+It can:
+
+- show whether status load, manual refresh, production brief copy, and drill report copy are present in the local activity trail;
+- mark missing local activity as pending context without blocking the verification drill itself;
+- include the local timeline in the copied production brief;
+- include the same timeline in the copied drill report;
+- keep the timeline derived only from redacted status context and bounded browser-local activity.
+
+It still cannot:
+
+- approve rollout or replace a human deployment decision;
+- persist timeline activity or packet state to the server;
+- prove activity from another browser, device, or admin session;
+- change feature flags, environment variables, retention settings, or account settings;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.

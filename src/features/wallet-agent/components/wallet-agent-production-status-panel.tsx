@@ -122,6 +122,13 @@ type ProductionVerificationDecisionItem = {
   detail: string;
 };
 
+type ProductionVerificationTimelineItem = {
+  id: string;
+  complete: boolean;
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -159,6 +166,13 @@ function formatDate(value: string) {
 
 function formatActivityAction(action: ProductionStatusAuditEvent['action']) {
   return action.replaceAll('_', ' ');
+}
+
+function hasAuditAction(
+  auditEvents: ProductionStatusAuditEvent[],
+  action: ProductionStatusAuditEvent['action'],
+) {
+  return auditEvents.some(event => event.action === action);
 }
 
 function buildPhase12CloseoutChecklist(status: WalletAgentProductionMonitoringStatus): Phase12CloseoutChecklistItem[] {
@@ -410,12 +424,55 @@ function buildProductionVerificationDecisionContext(status: WalletAgentProductio
   }];
 }
 
-function buildProductionVerificationDrillReport(status: WalletAgentProductionMonitoringStatus) {
+function buildProductionVerificationTimeline(
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionVerificationTimelineItem[] {
+  return [
+    {
+      id: 'status-loaded',
+      complete: hasAuditAction(auditEvents, 'status_loaded'),
+      label: 'Status loaded',
+      detail: hasAuditAction(auditEvents, 'status_loaded')
+        ? 'The current browser activity includes a redacted status load for this admin session.'
+        : 'No local status-load event is present in the bounded browser activity trail.',
+    },
+    {
+      id: 'manual-refresh',
+      complete: hasAuditAction(auditEvents, 'refresh_requested'),
+      label: 'Manual refresh',
+      detail: hasAuditAction(auditEvents, 'refresh_requested')
+        ? 'An admin requested a manual refresh before handoff.'
+        : 'Manual refresh has not been recorded in this local session yet.',
+    },
+    {
+      id: 'production-brief-copy',
+      complete: hasAuditAction(auditEvents, 'brief_copied'),
+      label: 'Production brief copy',
+      detail: hasAuditAction(auditEvents, 'brief_copied')
+        ? 'The redacted production brief was copied from this browser session.'
+        : 'The redacted production brief has not been copied in this browser session yet.',
+    },
+    {
+      id: 'drill-report-copy',
+      complete: hasAuditAction(auditEvents, 'drill_report_copied'),
+      label: 'Drill report copy',
+      detail: hasAuditAction(auditEvents, 'drill_report_copied')
+        ? 'The focused verification drill report was copied from this browser session.'
+        : 'The focused drill report has not been copied in this browser session yet.',
+    },
+  ];
+}
+
+function buildProductionVerificationDrillReport(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+) {
   const drillItems = buildProductionVerificationDrill(status);
   const focusItems = buildProductionVerificationFocus(status);
   const handoff = buildProductionVerificationHandoff(status);
-  const packetItems = buildProductionVerificationPacket(status);
+  const packetItems = buildProductionVerificationPacket(status, auditEvents);
   const decisionItems = buildProductionVerificationDecisionContext(status);
+  const timelineItems = buildProductionVerificationTimeline(auditEvents);
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
@@ -429,6 +486,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
   ));
   const decisionLines = decisionItems.map(item => (
     `- [${item.severity}] ${item.label}: ${item.detail}`
+  ));
+  const timelineLines = timelineItems.map(item => (
+    `- [${item.complete ? 'recorded' : 'pending'}] ${item.label}: ${item.detail}`
   ));
 
   return [
@@ -452,6 +512,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
     '',
     'Decision context',
     ...decisionLines,
+    '',
+    'Local verification timeline',
+    ...timelineLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -538,6 +601,9 @@ function buildProductionBrief(
   const verificationDecisionLines = buildProductionVerificationDecisionContext(status).map(item => (
     `- [${item.severity}] ${item.label}: ${item.detail}`
   ));
+  const verificationTimelineLines = buildProductionVerificationTimeline(auditEvents).map(item => (
+    `- [${item.complete ? 'recorded' : 'pending'}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -586,6 +652,9 @@ function buildProductionBrief(
     '',
     'Phase 13.6 verification decision context',
     ...verificationDecisionLines,
+    '',
+    'Phase 13.7 local verification timeline',
+    ...verificationTimelineLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -654,11 +723,19 @@ export function WalletAgentProductionStatusPanel({
   const productionVerificationDecisionContext = useMemo(() => buildProductionVerificationDecisionContext(status), [status]);
   const productionVerificationDecisionReviewCount = productionVerificationDecisionContext
     .filter(item => item.severity !== 'safe').length;
+  const productionVerificationTimeline = useMemo(
+    () => buildProductionVerificationTimeline(auditEvents),
+    [auditEvents],
+  );
+  const productionVerificationTimelinePendingCount = productionVerificationTimeline.filter(item => !item.complete).length;
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
   const productionBrief = useMemo(() => buildProductionBrief(status, auditEvents), [auditEvents, status]);
-  const productionVerificationDrillReport = useMemo(() => buildProductionVerificationDrillReport(status), [status]);
+  const productionVerificationDrillReport = useMemo(
+    () => buildProductionVerificationDrillReport(status, auditEvents),
+    [auditEvents, status],
+  );
 
   function recordAuditEvent(action: ProductionStatusAuditEvent['action'], label: string) {
     setAuditEvents(current => [
@@ -1119,6 +1196,48 @@ export function WalletAgentProductionStatusPanel({
                         <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
                       </div>
                       <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">{item.severity}</span>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#00D1FF]/14 bg-[#00D1FF]/[0.035] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7DE3FF]">Phase 13.7 local timeline</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Browser-local verification activity for this admin handoff.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationTimelinePendingCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationTimelinePendingCount > 0 ? `${productionVerificationTimelinePendingCount} pending` : 'recorded'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionVerificationTimeline.map(item => {
+                const TimelineIcon = item.complete ? CheckCircle2 : AlertTriangle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.complete
+                        ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                        : 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <TimelineIcon className="h-3.5 w-3.5 shrink-0" />
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                      </div>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">
+                        {item.complete ? 'recorded' : 'pending'}
+                      </span>
                     </div>
                     <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
                   </div>
