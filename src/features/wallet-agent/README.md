@@ -2245,3 +2245,212 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.1 production operator runbook summary
+
+Wallet Agent now starts Phase 15 with a final read-only operator runbook package for admins.
+
+It can:
+
+- summarize the scope of the production runbook inside the admin status panel;
+- connect rollout, rollback, incident, smoke, provider, database, and critical-flag context;
+- derive the runbook from the same redacted production snapshot and local admin activity;
+- keep the runbook visible beside Phase 14 observability context;
+- include the runbook summary in copied production handoff materials.
+
+It still cannot:
+
+- approve production rollout;
+- operate production by itself;
+- change feature flags, environment variables, retention settings, or account settings;
+- run provider tests, migrations, database writes, or background checks;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.2 safe rollout checklist
+
+Wallet Agent now derives a safe rollout checklist for human operators.
+
+It can:
+
+- show whether admin health blocks rollout discussion;
+- surface durable history readiness;
+- surface email provider readiness;
+- keep critical scheduled-action and mainnet-execution flags visible as rollout blockers when enabled;
+- include rollout checklist items in copied production materials.
+
+It still cannot:
+
+- deploy or approve a release;
+- enable email delivery or database history;
+- verify external provider uptime;
+- run real smoke tests or migrations;
+- change feature flags or environment variables;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.3 rollback checklist
+
+Wallet Agent now shows a compact rollback checklist for production operators.
+
+It can:
+
+- remind operators to disable risky critical exposure first;
+- show email delivery rollback context;
+- show database adapter fallback context;
+- preserve metadata-only safety boundaries during rollback discussion;
+- include rollback notes in copied handoff materials.
+
+It still cannot:
+
+- perform rollback actions;
+- remove provider keys;
+- disable database adapters automatically;
+- redeploy a previous commit;
+- change production configuration;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.4 incident response notes
+
+Wallet Agent now surfaces read-only incident response notes for production handoff.
+
+It can:
+
+- treat enabled critical execution flags as incident-level review signals;
+- surface required audit actions and warning counts;
+- remind operators not to paste secrets into chat, tickets, logs, or screenshots;
+- keep incident context redacted and metadata-only;
+- include incident notes in copied production materials.
+
+It still cannot:
+
+- declare or resolve incidents;
+- page operators or create external tickets;
+- inspect provider internals or logs;
+- modify production configuration;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.5 manual smoke checklist
+
+Wallet Agent now derives a manual smoke checklist for the current admin session.
+
+It can:
+
+- show whether a local manual status refresh was recorded;
+- show whether the production brief was copied;
+- show whether the focused drill report was copied;
+- keep the no-execution smoke boundary visible;
+- include smoke context in copied production handoff materials.
+
+It still cannot:
+
+- run real smoke tests;
+- verify inbox delivery, database writes, RPC health, or provider uptime;
+- prove handoff activity from another browser, device, or admin session;
+- sign, submit, buy, sell, pay, schedule, retry, resend, or move funds.
+
+## Phase 15.6 provider readiness context
+
+Wallet Agent now shows provider readiness context inside the operator runbook.
+
+It can:
+
+- summarize email provider readiness from the redacted status snapshot;
+- summarize session-secret readiness;
+- summarize Devnet RPC configuration;
+- state clearly that live provider uptime is not tested in this phase;
+- include provider context in copied handoff materials.
+
+It still cannot:
+
+- call provider health endpoints;
+- validate inbox delivery;
+- test Solana RPC latency or uptime;
+- reveal provider configuration values;
+- change provider settings;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.7 database migration safety checklist
+
+Wallet Agent now derives a database migration safety checklist for production handoff.
+
+It can:
+
+- remind operators to confirm Prisma schema and migrations before durable history;
+- show database adapter gate context;
+- surface retention policy review signals from redacted audit state;
+- keep database guidance metadata-only;
+- include migration checklist items in copied handoff materials.
+
+It still cannot:
+
+- run migrations;
+- validate database connectivity;
+- write, backfill, purge, or repair database rows;
+- change retention configuration;
+- expose database URLs or secrets;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.8 critical flag incident policy
+
+Wallet Agent now keeps critical execution flag policy visible in the final runbook.
+
+It can:
+
+- classify enabled critical flags as blocked runbook items;
+- keep scheduled-action policy visible;
+- keep mainnet-execution policy visible;
+- state that critical execution requires future audited phases;
+- include critical flag policy in copied production materials.
+
+It still cannot:
+
+- enable or disable feature flags;
+- treat disabled flags as production approval;
+- run scheduled actions;
+- execute mainnet workflows;
+- bypass wallet approval, admin checks, or endpoint rate limits;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.9 copied runbook packet
+
+Wallet Agent now includes the production operator runbook in copied handoff materials.
+
+It can:
+
+- add runbook summary, rollout, rollback, incident, smoke, provider, database, and critical flag sections to the copied production brief;
+- add the same runbook context to the focused drill report;
+- keep copied runbook content redacted and safe for internal review;
+- preserve the browser-local activity boundary;
+- keep copied runbook content aligned with the visible admin panel.
+
+It still cannot:
+
+- send copied runbook content to an external service by itself;
+- export runbook state as a durable server record;
+- prove handoff activity from another browser, device, or admin session;
+- change feature flags, environment variables, retention settings, or account settings;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 15.10 production operator runbook closeout
+
+Wallet Agent now closes the planned 15-phase Wallet Agent production handoff with a compact read-only runbook closeout.
+
+It can:
+
+- summarize that rollout, rollback, incident, smoke, provider, database, critical flag, copied packet, and closeout guidance are represented;
+- surface blocked or watch runbook items for human review;
+- state the final read-only boundary inside the admin panel;
+- include the runbook closeout in copied production materials;
+- make the 15-phase handoff package easier to review before real production operations work.
+
+It still cannot:
+
+- approve rollout or mark production as operationally approved;
+- replace deployment, security, compliance, incident response, or operations review;
+- persist runbook closeout state to the server;
+- run provider tests, delivery tests, database writes, migrations, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.

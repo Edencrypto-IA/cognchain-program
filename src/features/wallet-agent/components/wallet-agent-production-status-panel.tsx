@@ -159,6 +159,8 @@ type ProductionObservabilityItem = {
   detail: string;
 };
 
+type ProductionRunbookItem = ProductionObservabilityItem;
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -826,6 +828,304 @@ function buildProductionObservabilityCloseout(
   ];
 }
 
+function buildProductionRunbookSummary(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionRunbookItem[] {
+  const observabilityReviewCount = buildProductionObservabilityReviewQueue(status, auditEvents)
+    .filter(item => item.status !== 'ready').length;
+
+  return [
+    {
+      id: 'runbook-scope',
+      status: 'ready',
+      label: 'Operator runbook scope',
+      detail: 'Phase 15 packages rollout, rollback, incident, smoke, provider, database, and critical-flag guidance for admins.',
+    },
+    {
+      id: 'runbook-health',
+      status: status.health === 'unsafe' ? 'blocked' : status.health === 'attention_required' ? 'watch' : 'ready',
+      label: 'Current rollout posture',
+      detail: `The redacted production health is ${status.health}; operators still make the final deployment decision.`,
+    },
+    {
+      id: 'runbook-inputs',
+      status: observabilityReviewCount > 0 ? 'watch' : 'ready',
+      label: 'Runbook input signals',
+      detail: observabilityReviewCount > 0
+        ? `${observabilityReviewCount} observability review item(s) should be checked before using the runbook as a handoff.`
+        : 'Phase 14 observability has no open review queue in this browser session.',
+    },
+  ];
+}
+
+function buildProductionRolloutChecklist(status: WalletAgentProductionMonitoringStatus): ProductionRunbookItem[] {
+  return [
+    {
+      id: 'rollout-admin-status',
+      status: status.health === 'unsafe' ? 'blocked' : 'ready',
+      label: 'Admin status check',
+      detail: status.health === 'unsafe'
+        ? 'Do not proceed while admin status reports unsafe health.'
+        : 'Review the admin-gated redacted status before rollout discussion.',
+    },
+    {
+      id: 'rollout-durable-history',
+      status: status.operations.durableHistoryReady ? 'ready' : 'watch',
+      label: 'Durable history posture',
+      detail: status.operations.durableHistoryReady
+        ? 'Durable alert history readiness is reported as ready.'
+        : 'Durable history is not ready; keep storage fallback behavior visible before rollout.',
+    },
+    {
+      id: 'rollout-email',
+      status: status.operations.emailReady ? 'ready' : 'watch',
+      label: 'Email delivery posture',
+      detail: status.operations.emailReady
+        ? 'Email provider readiness is reported as ready.'
+        : 'Email provider readiness needs human review before enabling real delivery.',
+    },
+    {
+      id: 'rollout-critical-flags',
+      status: status.operations.criticalFlagsEnabled > 0 ? 'blocked' : 'ready',
+      label: 'Critical execution flags',
+      detail: status.operations.criticalFlagsEnabled > 0
+        ? `${status.operations.criticalFlagsEnabled} critical execution flag(s) are enabled; treat rollout as blocked.`
+        : 'Critical scheduled-action and mainnet execution exposure remains blocked.',
+    },
+  ];
+}
+
+function buildProductionRollbackChecklist(status: WalletAgentProductionMonitoringStatus): ProductionRunbookItem[] {
+  return [
+    {
+      id: 'rollback-critical-flags',
+      status: status.operations.criticalFlagsEnabled > 0 ? 'blocked' : 'ready',
+      label: 'Disable risky exposure first',
+      detail: status.operations.criticalFlagsEnabled > 0
+        ? 'Critical execution exposure is enabled; rollback notes should start with disabling risky flags.'
+        : 'Critical execution flags are already reported as blocked.',
+    },
+    {
+      id: 'rollback-email',
+      status: status.operations.emailReady ? 'watch' : 'ready',
+      label: 'Email delivery rollback',
+      detail: status.operations.emailReady
+        ? 'If alert delivery misbehaves, remove provider exposure before investigating non-critical UI issues.'
+        : 'Email delivery is not ready, so provider rollback remains a prepared checklist item.',
+    },
+    {
+      id: 'rollback-database',
+      status: status.operations.durableHistoryReady ? 'watch' : 'ready',
+      label: 'Database adapter fallback',
+      detail: status.operations.durableHistoryReady
+        ? 'If durable writes fail, disable the database adapter and preserve metadata-only safety boundaries.'
+        : 'Durable database history is not ready, so memory fallback remains the default safe posture.',
+    },
+  ];
+}
+
+function buildProductionIncidentNotes(status: WalletAgentProductionMonitoringStatus): ProductionRunbookItem[] {
+  const requiredAuditCount = status.audit.summary.actionRequired;
+  const warningCount = status.audit.summary.warnings;
+
+  return [
+    {
+      id: 'incident-critical-flags',
+      status: status.featureFlags.summary.criticalEnabled > 0 ? 'blocked' : 'ready',
+      label: 'Critical flag incident rule',
+      detail: status.featureFlags.summary.criticalEnabled > 0
+        ? 'Enabled critical execution flags should be treated as an incident until reviewed.'
+        : 'No critical execution flags are reported as enabled.',
+    },
+    {
+      id: 'incident-audit-actions',
+      status: requiredAuditCount > 0 ? 'blocked' : warningCount > 0 ? 'watch' : 'ready',
+      label: 'Audit escalation signals',
+      detail: requiredAuditCount > 0
+        ? `${requiredAuditCount} required audit action(s) need escalation before rollout.`
+        : warningCount > 0
+          ? `${warningCount} warning item(s) should remain in the incident handoff notes.`
+          : 'No required audit actions or warnings are reported.',
+    },
+    {
+      id: 'incident-secret-boundary',
+      status: 'ready',
+      label: 'Secret handling boundary',
+      detail: 'Do not paste API keys, session secrets, database URLs, wallet keys, signatures, or signed payloads into tickets or chat.',
+    },
+  ];
+}
+
+function buildProductionSmokeManualChecklist(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionRunbookItem[] {
+  return [
+    {
+      id: 'smoke-status-refresh',
+      status: hasAuditAction(auditEvents, 'refresh_requested') ? 'ready' : 'watch',
+      label: 'Manual status refresh',
+      detail: hasAuditAction(auditEvents, 'refresh_requested')
+        ? 'A manual refresh was recorded in this local admin session.'
+        : 'Refresh the redacted production status before final handoff.',
+    },
+    {
+      id: 'smoke-brief-copy',
+      status: hasAuditAction(auditEvents, 'brief_copied') ? 'ready' : 'watch',
+      label: 'Production brief copied',
+      detail: hasAuditAction(auditEvents, 'brief_copied')
+        ? 'The redacted production brief was copied locally.'
+        : 'Copy the production brief for deployment notes before handoff.',
+    },
+    {
+      id: 'smoke-drill-copy',
+      status: hasAuditAction(auditEvents, 'drill_report_copied') ? 'ready' : 'watch',
+      label: 'Drill report copied',
+      detail: hasAuditAction(auditEvents, 'drill_report_copied')
+        ? 'The focused drill report was copied locally.'
+        : 'Copy the focused drill report for operator review.',
+    },
+    {
+      id: 'smoke-no-execution',
+      status: status.operations.criticalFlagsEnabled > 0 ? 'blocked' : 'ready',
+      label: 'No execution smoke boundary',
+      detail: status.operations.criticalFlagsEnabled > 0
+        ? 'Critical execution exposure is enabled; do not treat smoke context as safe.'
+        : 'Smoke context remains read-only and cannot sign, submit, schedule, or move funds.',
+    },
+  ];
+}
+
+function buildProductionProviderCheckContext(status: WalletAgentProductionMonitoringStatus): ProductionRunbookItem[] {
+  return [
+    {
+      id: 'provider-email',
+      status: status.operations.emailReady ? 'ready' : 'watch',
+      label: 'Email provider check',
+      detail: status.operations.emailReady
+        ? 'Email provider readiness is reported as configured, but delivery uptime is not tested here.'
+        : 'Email provider readiness needs manual setup or review before real delivery.',
+    },
+    {
+      id: 'provider-session',
+      status: status.operations.sessionSecretReady ? 'ready' : 'blocked',
+      label: 'Session secret check',
+      detail: status.operations.sessionSecretReady
+        ? 'Session secret readiness is reported as ready.'
+        : 'Session secret readiness is missing and should block production rollout.',
+    },
+    {
+      id: 'provider-devnet-rpc',
+      status: status.operations.devnetConfigured ? 'ready' : 'watch',
+      label: 'Devnet RPC check',
+      detail: status.operations.devnetConfigured
+        ? 'Devnet RPC configuration is present; live RPC health is not tested by this panel.'
+        : 'Devnet RPC configuration is not reported as ready.',
+    },
+  ];
+}
+
+function buildProductionMigrationChecklist(status: WalletAgentProductionMonitoringStatus): ProductionRunbookItem[] {
+  return [
+    {
+      id: 'migration-prisma',
+      status: status.operations.durableHistoryReady ? 'ready' : 'watch',
+      label: 'Prisma migration confirmation',
+      detail: status.operations.durableHistoryReady
+        ? 'Durable history readiness implies schema and adapter posture have been prepared for operator review.'
+        : 'Confirm Prisma schema and migrations before enabling durable database history.',
+    },
+    {
+      id: 'migration-adapter-gate',
+      status: status.operations.durableHistoryReady ? 'ready' : 'watch',
+      label: 'Database adapter gate',
+      detail: status.operations.durableHistoryReady
+        ? 'Database adapter readiness is reported through the redacted production status.'
+        : 'Keep database adapter disabled or in fallback until schema and backups are verified.',
+    },
+    {
+      id: 'migration-retention',
+      status: status.audit.summary.actionRequired > 0 ? 'watch' : 'ready',
+      label: 'Retention policy review',
+      detail: status.audit.summary.actionRequired > 0
+        ? 'Required audit actions may include storage or retention work; review before rollout.'
+        : 'No required audit action is reported for the current retention and storage posture.',
+    },
+  ];
+}
+
+function buildProductionCriticalFlagPolicy(status: WalletAgentProductionMonitoringStatus): ProductionRunbookItem[] {
+  const criticalFlags = status.featureFlags.flags.filter(flag => flag.productionRisk === 'critical');
+  const enabledCriticalFlags = criticalFlags.filter(flag => flag.status === 'enabled');
+
+  return [
+    {
+      id: 'critical-flag-policy',
+      status: enabledCriticalFlags.length > 0 ? 'blocked' : 'ready',
+      label: 'Critical flag policy',
+      detail: enabledCriticalFlags.length > 0
+        ? `${enabledCriticalFlags.length} critical flag(s) are enabled; require incident-level human review.`
+        : 'Critical execution flags remain disabled or safe-default in the redacted snapshot.',
+    },
+    {
+      id: 'scheduled-actions-policy',
+      status: criticalFlags.some(flag => flag.id.includes('scheduled') && flag.status === 'enabled') ? 'blocked' : 'ready',
+      label: 'Scheduled actions policy',
+      detail: 'Scheduled value-moving actions must remain blocked until a future audited execution phase.',
+    },
+    {
+      id: 'mainnet-policy',
+      status: criticalFlags.some(flag => flag.id.includes('mainnet') && flag.status === 'enabled') ? 'blocked' : 'ready',
+      label: 'Mainnet execution policy',
+      detail: 'Mainnet execution must remain blocked until proposal, approval, signing, submission, and rollback policies are audited.',
+    },
+  ];
+}
+
+function buildProductionRunbookCloseout(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionRunbookItem[] {
+  const runbookItems = [
+    ...buildProductionRunbookSummary(status, auditEvents),
+    ...buildProductionRolloutChecklist(status),
+    ...buildProductionRollbackChecklist(status),
+    ...buildProductionIncidentNotes(status),
+    ...buildProductionSmokeManualChecklist(status, auditEvents),
+    ...buildProductionProviderCheckContext(status),
+    ...buildProductionMigrationChecklist(status),
+    ...buildProductionCriticalFlagPolicy(status),
+  ];
+  const blockedCount = runbookItems.filter(item => item.status === 'blocked').length;
+  const watchCount = runbookItems.filter(item => item.status === 'watch').length;
+
+  return [
+    {
+      id: 'runbook-coverage',
+      status: 'ready',
+      label: 'Runbook coverage',
+      detail: 'Rollout, rollback, incident, smoke, provider, database, critical flag, copied packet, and closeout guidance are represented.',
+    },
+    {
+      id: 'runbook-review-state',
+      status: blockedCount > 0 ? 'blocked' : watchCount > 0 ? 'watch' : 'ready',
+      label: 'Runbook review state',
+      detail: blockedCount > 0
+        ? `${blockedCount} blocked runbook item(s) require human review.`
+        : watchCount > 0
+          ? `${watchCount} watch item(s) remain visible for operator review.`
+          : 'No runbook watch or blocked items remain in the current redacted snapshot.',
+    },
+    {
+      id: 'runbook-final-boundary',
+      status: 'ready',
+      label: 'Final read-only boundary',
+      detail: 'Phase 15 closes the planned handoff package; it cannot approve rollout, change production, send alerts, sign, submit, schedule, or move funds.',
+    },
+  ];
+}
+
 function buildProductionVerificationDrillReport(
   status: WalletAgentProductionMonitoringStatus,
   auditEvents: ProductionStatusAuditEvent[] = [],
@@ -846,6 +1146,17 @@ function buildProductionVerificationDrillReport(
     ...buildProductionObservabilityHandoff(status, auditEvents),
     ...buildProductionObservabilityReviewQueue(status, auditEvents),
     ...buildProductionObservabilityCloseout(status, auditEvents),
+  ];
+  const runbookItems = [
+    ...buildProductionRunbookSummary(status, auditEvents),
+    ...buildProductionRolloutChecklist(status),
+    ...buildProductionRollbackChecklist(status),
+    ...buildProductionIncidentNotes(status),
+    ...buildProductionSmokeManualChecklist(status, auditEvents),
+    ...buildProductionProviderCheckContext(status),
+    ...buildProductionMigrationChecklist(status),
+    ...buildProductionCriticalFlagPolicy(status),
+    ...buildProductionRunbookCloseout(status, auditEvents),
   ];
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
@@ -874,6 +1185,9 @@ function buildProductionVerificationDrillReport(
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
   const observabilityLines = observabilityItems.map(item => (
+    `- [${item.status}] ${item.label}: ${item.detail}`
+  ));
+  const runbookLines = runbookItems.map(item => (
     `- [${item.status}] ${item.label}: ${item.detail}`
   ));
 
@@ -913,6 +1227,9 @@ function buildProductionVerificationDrillReport(
     '',
     'Phase 14 observability handoff',
     ...observabilityLines,
+    '',
+    'Phase 15 production operator runbook',
+    ...runbookLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -1021,6 +1338,19 @@ function buildProductionBrief(
   ].map(item => (
     `- [${item.status}] ${item.label}: ${item.detail}`
   ));
+  const runbookLines = [
+    ...buildProductionRunbookSummary(status, auditEvents),
+    ...buildProductionRolloutChecklist(status),
+    ...buildProductionRollbackChecklist(status),
+    ...buildProductionIncidentNotes(status),
+    ...buildProductionSmokeManualChecklist(status, auditEvents),
+    ...buildProductionProviderCheckContext(status),
+    ...buildProductionMigrationChecklist(status),
+    ...buildProductionCriticalFlagPolicy(status),
+    ...buildProductionRunbookCloseout(status, auditEvents),
+  ].map(item => (
+    `- [${item.status}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -1084,6 +1414,9 @@ function buildProductionBrief(
     '',
     'Phase 14 production observability handoff',
     ...observabilityLines,
+    '',
+    'Phase 15 production operator runbook',
+    ...runbookLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -1245,6 +1578,91 @@ export function WalletAgentProductionStatusPanel({
       eyebrow: 'Phase 14.9-14.10 closeout',
       title: 'Copied observability brief boundary',
       items: productionObservabilityCloseout,
+    },
+  ];
+  const productionRunbookSummary = useMemo(
+    () => buildProductionRunbookSummary(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionRolloutChecklist = useMemo(() => buildProductionRolloutChecklist(status), [status]);
+  const productionRollbackChecklist = useMemo(() => buildProductionRollbackChecklist(status), [status]);
+  const productionIncidentNotes = useMemo(() => buildProductionIncidentNotes(status), [status]);
+  const productionSmokeManualChecklist = useMemo(
+    () => buildProductionSmokeManualChecklist(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionProviderCheckContext = useMemo(() => buildProductionProviderCheckContext(status), [status]);
+  const productionMigrationChecklist = useMemo(() => buildProductionMigrationChecklist(status), [status]);
+  const productionCriticalFlagPolicy = useMemo(() => buildProductionCriticalFlagPolicy(status), [status]);
+  const productionRunbookCloseout = useMemo(
+    () => buildProductionRunbookCloseout(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionRunbookReviewCount = [
+    ...productionRunbookSummary,
+    ...productionRolloutChecklist,
+    ...productionRollbackChecklist,
+    ...productionIncidentNotes,
+    ...productionSmokeManualChecklist,
+    ...productionProviderCheckContext,
+    ...productionMigrationChecklist,
+    ...productionCriticalFlagPolicy,
+    ...productionRunbookCloseout,
+  ].filter(item => item.status !== 'ready').length;
+  const productionRunbookSections = [
+    {
+      id: 'summary',
+      eyebrow: 'Phase 15.1 summary',
+      title: 'Operator runbook package',
+      items: productionRunbookSummary,
+    },
+    {
+      id: 'rollout',
+      eyebrow: 'Phase 15.2 rollout',
+      title: 'Safe rollout checklist',
+      items: productionRolloutChecklist,
+    },
+    {
+      id: 'rollback',
+      eyebrow: 'Phase 15.3 rollback',
+      title: 'Rollback checklist',
+      items: productionRollbackChecklist,
+    },
+    {
+      id: 'incident',
+      eyebrow: 'Phase 15.4 incidents',
+      title: 'Incident response notes',
+      items: productionIncidentNotes,
+    },
+    {
+      id: 'smoke',
+      eyebrow: 'Phase 15.5 smoke',
+      title: 'Manual smoke checklist',
+      items: productionSmokeManualChecklist,
+    },
+    {
+      id: 'provider',
+      eyebrow: 'Phase 15.6 providers',
+      title: 'Provider readiness context',
+      items: productionProviderCheckContext,
+    },
+    {
+      id: 'migration',
+      eyebrow: 'Phase 15.7 database',
+      title: 'Migration safety checklist',
+      items: productionMigrationChecklist,
+    },
+    {
+      id: 'critical-flags',
+      eyebrow: 'Phase 15.8 flags',
+      title: 'Critical flag policy',
+      items: productionCriticalFlagPolicy,
+    },
+    {
+      id: 'closeout',
+      eyebrow: 'Phase 15.9-15.10 closeout',
+      title: 'Copied packet and final boundary',
+      items: productionRunbookCloseout,
     },
   ];
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
@@ -1920,6 +2338,49 @@ export function WalletAgentProductionStatusPanel({
                           <div className="mb-1 flex items-center justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-2">
                               <ObservabilityIcon className="h-3.5 w-3.5 shrink-0" />
+                              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                            </div>
+                            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">{item.status}</span>
+                          </div>
+                          <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#14F195]/14 bg-[#14F195]/[0.025] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#14F195]">Phase 15 production operator runbook</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Final read-only admin runbook for rollout, rollback, smoke, incidents, providers, database, and critical flags.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionRunbookReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionRunbookReviewCount > 0 ? `${productionRunbookReviewCount} review` : 'closed'}
+              </span>
+            </div>
+            <div className="grid gap-2 lg:grid-cols-3">
+              {productionRunbookSections.map(section => (
+                <div key={section.id} className="rounded-xl border border-white/[0.055] bg-black/20 p-2.5">
+                  <div className="mb-2 min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#14F195]/80">{section.eyebrow}</p>
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-white/64">{section.title}</p>
+                  </div>
+                  <div className="space-y-2">
+                    {section.items.map(item => {
+                      const RunbookIcon = getObservabilityIcon(item.status);
+                      return (
+                        <div key={item.id} className={`rounded-xl border p-2.5 ${getObservabilityClassName(item.status)}`}>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <RunbookIcon className="h-3.5 w-3.5 shrink-0" />
                               <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
                             </div>
                             <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">{item.status}</span>
