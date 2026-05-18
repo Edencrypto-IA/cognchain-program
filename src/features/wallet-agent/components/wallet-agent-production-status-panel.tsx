@@ -150,6 +150,15 @@ type ProductionVerificationCloseoutItem = {
   detail: string;
 };
 
+type ProductionObservabilityStatus = 'ready' | 'watch' | 'blocked';
+
+type ProductionObservabilityItem = {
+  id: string;
+  status: ProductionObservabilityStatus;
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -633,6 +642,190 @@ function buildProductionVerificationCloseout(
   ];
 }
 
+function buildProductionObservabilitySnapshot(status: WalletAgentProductionMonitoringStatus): ProductionObservabilityItem[] {
+  return [
+    {
+      id: 'health-state',
+      status: status.health === 'unsafe' ? 'blocked' : status.health === 'attention_required' ? 'watch' : 'ready',
+      label: 'Health state',
+      detail: `Current redacted health is ${status.health}.`,
+    },
+    {
+      id: 'readiness-distribution',
+      status: status.audit.summary.actionRequired > 0 ? 'blocked' : status.audit.summary.warnings > 0 ? 'watch' : 'ready',
+      label: 'Readiness distribution',
+      detail: `${status.audit.summary.ready} ready, ${status.audit.summary.actionRequired} required, ${status.audit.summary.warnings} warning, ${status.audit.summary.safeDefaults} safe-default item(s).`,
+    },
+    {
+      id: 'flag-distribution',
+      status: status.featureFlags.summary.criticalEnabled > 0 ? 'blocked' : status.featureFlags.summary.enabled > 0 ? 'watch' : 'ready',
+      label: 'Feature flag distribution',
+      detail: `${status.featureFlags.summary.enabled} enabled, ${status.featureFlags.summary.disabled} disabled, ${status.featureFlags.summary.safeDefaults} safe-default, ${status.featureFlags.summary.criticalEnabled} critical enabled.`,
+    },
+  ];
+}
+
+function buildProductionObservabilityMetrics(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionObservabilityItem[] {
+  const operationReadyCount = [
+    status.operations.durableHistoryReady,
+    status.operations.emailReady,
+    status.operations.sessionSecretReady,
+    status.operations.devnetConfigured,
+    status.operations.criticalFlagsEnabled === 0,
+  ].filter(Boolean).length;
+
+  return [
+    {
+      id: 'operation-readiness-score',
+      status: operationReadyCount >= 4 ? 'ready' : operationReadyCount >= 3 ? 'watch' : 'blocked',
+      label: 'Operation readiness score',
+      detail: `${operationReadyCount}/5 read-only operation signals are in the preferred state.`,
+    },
+    {
+      id: 'local-activity-count',
+      status: auditEvents.length > 0 ? 'ready' : 'watch',
+      label: 'Local activity count',
+      detail: `${auditEvents.length} browser-local admin activity event(s) are available in the bounded trail.`,
+    },
+    {
+      id: 'handoff-copy-count',
+      status: hasAuditAction(auditEvents, 'brief_copied') && hasAuditAction(auditEvents, 'drill_report_copied')
+        ? 'ready'
+        : 'watch',
+      label: 'Handoff copy count',
+      detail: `${[hasAuditAction(auditEvents, 'brief_copied'), hasAuditAction(auditEvents, 'drill_report_copied')].filter(Boolean).length}/2 handoff copy actions are recorded locally.`,
+    },
+  ];
+}
+
+function buildProductionObservabilityWatchlist(status: WalletAgentProductionMonitoringStatus): ProductionObservabilityItem[] {
+  const requiredCount = status.audit.summary.actionRequired;
+  const warningCount = status.audit.summary.warnings;
+  const criticalFlagCount = status.featureFlags.summary.criticalEnabled;
+
+  return [
+    {
+      id: 'required-audit-watch',
+      status: requiredCount > 0 ? 'blocked' : 'ready',
+      label: 'Required audit actions',
+      detail: requiredCount > 0
+        ? `${requiredCount} required audit item(s) need operator action.`
+        : 'No required audit actions are reported in the redacted snapshot.',
+    },
+    {
+      id: 'warning-audit-watch',
+      status: warningCount > 0 ? 'watch' : 'ready',
+      label: 'Audit warnings',
+      detail: warningCount > 0
+        ? `${warningCount} warning item(s) should remain visible in the handoff.`
+        : 'No warning items are reported in the redacted snapshot.',
+    },
+    {
+      id: 'critical-flag-watch',
+      status: criticalFlagCount > 0 ? 'blocked' : 'ready',
+      label: 'Critical execution flags',
+      detail: criticalFlagCount > 0
+        ? `${criticalFlagCount} critical execution flag(s) are enabled.`
+        : 'Critical execution flags are not reported as enabled.',
+    },
+  ];
+}
+
+function buildProductionObservabilityHandoff(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionObservabilityItem[] {
+  const closeoutReviewCount = buildProductionVerificationCloseout(status, auditEvents).filter(item => !item.complete).length;
+
+  return [
+    {
+      id: 'phase-13-closeout',
+      status: closeoutReviewCount > 0 ? 'watch' : 'ready',
+      label: 'Phase 13 closeout',
+      detail: closeoutReviewCount > 0
+        ? `${closeoutReviewCount} closeout item(s) remain in review.`
+        : 'Phase 13 closeout has no open local review items.',
+    },
+    {
+      id: 'copied-brief-presence',
+      status: hasAuditAction(auditEvents, 'brief_copied') ? 'ready' : 'watch',
+      label: 'Copied production brief',
+      detail: hasAuditAction(auditEvents, 'brief_copied')
+        ? 'A redacted production brief copy action is recorded locally.'
+        : 'The redacted production brief has not been copied in this browser session.',
+    },
+    {
+      id: 'copied-drill-presence',
+      status: hasAuditAction(auditEvents, 'drill_report_copied') ? 'ready' : 'watch',
+      label: 'Copied drill report',
+      detail: hasAuditAction(auditEvents, 'drill_report_copied')
+        ? 'A focused drill report copy action is recorded locally.'
+        : 'The focused drill report has not been copied in this browser session.',
+    },
+  ];
+}
+
+function buildProductionObservabilityReviewQueue(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionObservabilityItem[] {
+  const reviewSignals = [
+    ...buildProductionObservabilitySnapshot(status),
+    ...buildProductionObservabilityMetrics(status, auditEvents),
+    ...buildProductionObservabilityWatchlist(status),
+    ...buildProductionObservabilityHandoff(status, auditEvents),
+  ].filter(item => item.status !== 'ready');
+
+  if (reviewSignals.length === 0) {
+    return [{
+      id: 'no-observability-review',
+      status: 'ready',
+      label: 'No observability review queue',
+      detail: 'The current redacted snapshot and local activity do not create observability review items.',
+    }];
+  }
+
+  return reviewSignals.slice(0, 6).map(item => ({
+    id: `review-${item.id}`,
+    status: item.status,
+    label: item.label,
+    detail: item.detail,
+  }));
+}
+
+function buildProductionObservabilityCloseout(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionObservabilityItem[] {
+  const reviewQueue = buildProductionObservabilityReviewQueue(status, auditEvents).filter(item => item.status !== 'ready');
+
+  return [
+    {
+      id: 'observability-surfaces',
+      status: 'ready',
+      label: 'Observability surfaces',
+      detail: 'Snapshot, metrics, watchlist, handoff artifacts, review queue, copied brief context, and safety boundary are represented.',
+    },
+    {
+      id: 'observability-review-state',
+      status: reviewQueue.length > 0 ? 'watch' : 'ready',
+      label: 'Observability review state',
+      detail: reviewQueue.length > 0
+        ? `${reviewQueue.length} observability review item(s) remain visible for humans.`
+        : 'No observability review items remain in the current redacted snapshot.',
+    },
+    {
+      id: 'observability-safety',
+      status: 'ready',
+      label: 'Read-only observability',
+      detail: 'Phase 14 can summarize and copy redacted context only; it cannot monitor providers, change settings, sign, submit, schedule, or move funds.',
+    },
+  ];
+}
+
 function buildProductionVerificationDrillReport(
   status: WalletAgentProductionMonitoringStatus,
   auditEvents: ProductionStatusAuditEvent[] = [],
@@ -646,6 +839,14 @@ function buildProductionVerificationDrillReport(
   const smokeItems = buildProductionVerificationSmokeChecklist(status, auditEvents);
   const briefItems = buildProductionVerificationBriefChecklist(auditEvents);
   const closeoutItems = buildProductionVerificationCloseout(status, auditEvents);
+  const observabilityItems = [
+    ...buildProductionObservabilitySnapshot(status),
+    ...buildProductionObservabilityMetrics(status, auditEvents),
+    ...buildProductionObservabilityWatchlist(status),
+    ...buildProductionObservabilityHandoff(status, auditEvents),
+    ...buildProductionObservabilityReviewQueue(status, auditEvents),
+    ...buildProductionObservabilityCloseout(status, auditEvents),
+  ];
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
@@ -671,6 +872,9 @@ function buildProductionVerificationDrillReport(
   ));
   const closeoutLines = closeoutItems.map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
+  ));
+  const observabilityLines = observabilityItems.map(item => (
+    `- [${item.status}] ${item.label}: ${item.detail}`
   ));
 
   return [
@@ -706,6 +910,9 @@ function buildProductionVerificationDrillReport(
     '',
     'Phase 13 closeout',
     ...closeoutLines,
+    '',
+    'Phase 14 observability handoff',
+    ...observabilityLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -804,6 +1011,16 @@ function buildProductionBrief(
   const verificationCloseoutLines = buildProductionVerificationCloseout(status, auditEvents).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
+  const observabilityLines = [
+    ...buildProductionObservabilitySnapshot(status),
+    ...buildProductionObservabilityMetrics(status, auditEvents),
+    ...buildProductionObservabilityWatchlist(status),
+    ...buildProductionObservabilityHandoff(status, auditEvents),
+    ...buildProductionObservabilityReviewQueue(status, auditEvents),
+    ...buildProductionObservabilityCloseout(status, auditEvents),
+  ].map(item => (
+    `- [${item.status}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -865,6 +1082,9 @@ function buildProductionBrief(
     'Phase 13.10 verification closeout',
     ...verificationCloseoutLines,
     '',
+    'Phase 14 production observability handoff',
+    ...observabilityLines,
+    '',
     'Production issue checklist',
     ...productionIssueLines,
     '',
@@ -905,6 +1125,18 @@ function OperationTile({
       </p>
     </div>
   );
+}
+
+function getObservabilityClassName(status: ProductionObservabilityStatus) {
+  if (status === 'blocked') return 'border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055] text-[#FF8A9E]';
+  if (status === 'watch') return 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]';
+  return 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]';
+}
+
+function getObservabilityIcon(status: ProductionObservabilityStatus) {
+  if (status === 'blocked') return XCircle;
+  if (status === 'watch') return AlertTriangle;
+  return CheckCircle2;
 }
 
 export function WalletAgentProductionStatusPanel({
@@ -952,6 +1184,69 @@ export function WalletAgentProductionStatusPanel({
     [auditEvents, status],
   );
   const productionVerificationCloseoutReviewCount = productionVerificationCloseout.filter(item => !item.complete).length;
+  const productionObservabilitySnapshot = useMemo(() => buildProductionObservabilitySnapshot(status), [status]);
+  const productionObservabilityMetrics = useMemo(
+    () => buildProductionObservabilityMetrics(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionObservabilityWatchlist = useMemo(() => buildProductionObservabilityWatchlist(status), [status]);
+  const productionObservabilityHandoff = useMemo(
+    () => buildProductionObservabilityHandoff(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionObservabilityReviewQueue = useMemo(
+    () => buildProductionObservabilityReviewQueue(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionObservabilityCloseout = useMemo(
+    () => buildProductionObservabilityCloseout(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionObservabilityReviewCount = [
+    ...productionObservabilitySnapshot,
+    ...productionObservabilityMetrics,
+    ...productionObservabilityWatchlist,
+    ...productionObservabilityHandoff,
+    ...productionObservabilityCloseout,
+  ].filter(item => item.status !== 'ready').length;
+  const productionObservabilitySections = [
+    {
+      id: 'snapshot',
+      eyebrow: 'Phase 14.1 snapshot',
+      title: 'Redacted observability snapshot',
+      items: productionObservabilitySnapshot,
+    },
+    {
+      id: 'metrics',
+      eyebrow: 'Phase 14.2 metrics',
+      title: 'Read-only operation metrics',
+      items: productionObservabilityMetrics,
+    },
+    {
+      id: 'watchlist',
+      eyebrow: 'Phase 14.3-14.4 watchlist',
+      title: 'Audit and critical flag watchlist',
+      items: productionObservabilityWatchlist,
+    },
+    {
+      id: 'handoff',
+      eyebrow: 'Phase 14.5 handoff evidence',
+      title: 'Copied handoff artifacts',
+      items: productionObservabilityHandoff,
+    },
+    {
+      id: 'review-queue',
+      eyebrow: 'Phase 14.6-14.8 review queue',
+      title: 'Human review and escalation context',
+      items: productionObservabilityReviewQueue,
+    },
+    {
+      id: 'closeout',
+      eyebrow: 'Phase 14.9-14.10 closeout',
+      title: 'Copied observability brief boundary',
+      items: productionObservabilityCloseout,
+    },
+  ];
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -1593,6 +1888,49 @@ export function WalletAgentProductionStatusPanel({
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#7DE3FF]/14 bg-[#00D1FF]/[0.03] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7DE3FF]">Phase 14 production observability</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Read-only observability handoff for admin rollout review.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionObservabilityReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionObservabilityReviewCount > 0 ? `${productionObservabilityReviewCount} watch` : 'clear'}
+              </span>
+            </div>
+            <div className="grid gap-2 lg:grid-cols-2">
+              {productionObservabilitySections.map(section => (
+                <div key={section.id} className="rounded-xl border border-white/[0.055] bg-black/20 p-2.5">
+                  <div className="mb-2 min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[#7DE3FF]/80">{section.eyebrow}</p>
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-white/64">{section.title}</p>
+                  </div>
+                  <div className="space-y-2">
+                    {section.items.map(item => {
+                      const ObservabilityIcon = getObservabilityIcon(item.status);
+                      return (
+                        <div key={item.id} className={`rounded-xl border p-2.5 ${getObservabilityClassName(item.status)}`}>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <ObservabilityIcon className="h-3.5 w-3.5 shrink-0" />
+                              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                            </div>
+                            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">{item.status}</span>
+                          </div>
+                          <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

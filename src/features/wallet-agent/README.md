@@ -2034,3 +2034,214 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.1 production observability snapshot
+
+Wallet Agent now starts Phase 14 with a redacted observability snapshot for admins.
+
+It can:
+
+- summarize health state, readiness distribution, and feature flag distribution from the existing admin status snapshot;
+- classify observability items as ready, watch, or blocked;
+- show the snapshot inside the admin production status panel;
+- include the snapshot in the copied production brief;
+- include the same snapshot in the copied drill report.
+
+It still cannot:
+
+- monitor providers, databases, blockchains, wallets, or queues in real time;
+- approve rollout or replace human deployment review;
+- persist observability state to the server;
+- expose secrets, URLs, keys, signatures, seed phrases, or signed payloads;
+- change feature flags, environment variables, retention settings, or account settings;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.2 read-only operation metrics
+
+Wallet Agent now derives compact read-only operation metrics for admin handoff.
+
+It can:
+
+- calculate a local operation readiness score from durable history, email, session secret, Devnet RPC, and critical flag state;
+- count bounded browser-local operator activity;
+- count local handoff copy actions for the production brief and drill report;
+- show these metrics without storing them remotely;
+- include the metrics in copied handoff materials.
+
+It still cannot:
+
+- query provider latency, uptime, inbox delivery, database performance, or Solana RPC health;
+- write metrics to analytics, logs, dashboards, or databases;
+- prove activity from another browser, device, or admin session;
+- change feature flags, environment variables, retention settings, or account settings;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.3 audit and flag watchlist
+
+Wallet Agent now derives a focused observability watchlist from readiness audit and feature flag state.
+
+It can:
+
+- highlight required audit actions;
+- highlight audit warnings;
+- highlight enabled critical execution flags;
+- show safe notes when no required or critical items are present;
+- keep the watchlist redacted and read-only.
+
+It still cannot:
+
+- fix production configuration automatically;
+- disable critical flags or modify runtime behavior;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.4 critical execution observability
+
+Wallet Agent now keeps critical execution exposure visible inside the observability handoff.
+
+It can:
+
+- surface scheduled-actions and mainnet-execution exposure through the critical flag watch item;
+- classify enabled critical flags as blocked observability signals;
+- keep disabled critical flags visible as safe observability context;
+- include critical exposure in copied observability handoff text;
+- preserve the existing read-only flag snapshot behavior.
+
+It still cannot:
+
+- enable or disable critical execution flags;
+- treat observability as permission to run mainnet execution;
+- schedule actions or execute value-moving workflows;
+- bypass wallet approval, admin checks, or endpoint rate limits;
+- expose secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.5 handoff artifact observability
+
+Wallet Agent now observes whether local handoff artifacts were prepared in the current admin session.
+
+It can:
+
+- show whether the production brief was copied locally;
+- show whether the focused drill report was copied locally;
+- relate artifact readiness to the Phase 13 closeout state;
+- mark missing local copy activity as watch context;
+- keep artifact state browser-local and bounded.
+
+It still cannot:
+
+- send copied artifacts anywhere by itself;
+- persist artifact state to the server;
+- prove handoff activity from another browser, device, or admin session;
+- replace a human operator handoff decision;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.6 observability review queue
+
+Wallet Agent now derives a compact observability review queue for admins.
+
+It can:
+
+- gather non-ready observability signals from snapshot, metrics, watchlist, and handoff artifacts;
+- show a safe empty queue when no observability review items remain;
+- limit the visible queue to a concise set of review items;
+- include the queue in copied handoff materials;
+- keep the queue derived only from redacted status and local activity.
+
+It still cannot:
+
+- create tickets, alerts, incidents, or background jobs;
+- assign operators or notify external systems;
+- persist review queue state to the server;
+- run provider tests, delivery tests, database writes, migrations, or background checks;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.7 observability safety boundary
+
+Wallet Agent now states the production observability safety boundary inside the admin panel.
+
+It can:
+
+- explain that observability is read-only and redacted;
+- state that provider monitoring, database monitoring, and blockchain monitoring are not performed in this phase;
+- keep the boundary close to observability review items;
+- include the boundary in copied production handoff materials;
+- preserve the existing no-execution Wallet Agent safety contract.
+
+It still cannot:
+
+- act as a production monitoring system;
+- collect provider telemetry or uptime data;
+- inspect wallet secrets, private keys, seed phrases, signatures, or signed payloads;
+- change feature flags, environment variables, retention settings, or account settings;
+- bypass admin access checks or endpoint rate limits;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.8 escalation context
+
+Wallet Agent now provides read-only escalation context for observability review items.
+
+It can:
+
+- classify blocked observability items separately from watch items;
+- keep required audit actions and critical flag exposure visible for human escalation;
+- include escalation context in the copied production brief and drill report;
+- avoid creating incident records or outbound alerts;
+- keep escalation context redacted and metadata-only.
+
+It still cannot:
+
+- declare or resolve incidents;
+- page operators or create external tickets;
+- modify production configuration;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.9 copied observability handoff
+
+Wallet Agent now includes the observability handoff inside copied production materials.
+
+It can:
+
+- add observability snapshot, metrics, watchlist, handoff artifacts, review queue, and closeout items to the copied production brief;
+- add the same observability handoff to the focused drill report;
+- keep copied observability content redacted and safe for internal review;
+- preserve the browser-local activity boundary;
+- keep copied content aligned with the visible admin panel.
+
+It still cannot:
+
+- send copied observability content to an external service by itself;
+- export observability as a separate durable server record;
+- prove provider-side uptime or delivery;
+- change feature flags, environment variables, retention settings, or account settings;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 14.10 production observability closeout
+
+Wallet Agent now closes Phase 14 with a compact read-only observability closeout.
+
+It can:
+
+- summarize that snapshot, metrics, watchlist, handoff artifacts, review queue, copied observability context, escalation context, and safety boundary are represented;
+- surface remaining observability review items for human review;
+- show a safe closeout note when no observability review items remain;
+- include the closeout in copied production handoff materials;
+- keep Phase 14 as a redacted admin handoff layer only.
+
+It still cannot:
+
+- approve rollout or mark production as operationally monitored;
+- replace real monitoring, alerting, incident response, security review, or compliance review;
+- persist observability closeout state to the server;
+- run provider tests, delivery tests, database writes, migrations, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
