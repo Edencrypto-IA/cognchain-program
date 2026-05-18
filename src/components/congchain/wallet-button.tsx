@@ -252,7 +252,7 @@ export default function WalletButton() {
         });
       }
       setAirdropTx(data.signature || '');
-      setAirdropMessage(`+${data.amount || 1} Devnet SOL recebido.`);
+      setAirdropMessage(`+${data.amount || 0.5} Devnet SOL recebido.`);
       if (connected) void fetchBalance();
       else void fetchDevnetBalance(activeAddress);
     } catch {
@@ -299,7 +299,7 @@ export default function WalletButton() {
       };
       persistDevnetWallet(next);
       setAirdropTx(next.airdropTx || '');
-      setAirdropMessage(`+${data.amount || 1} Devnet SOL recebido.`);
+      setAirdropMessage(`+${data.amount || 0.5} Devnet SOL recebido.`);
       announceDevnetWallet({
         publicKey: next.publicKey,
         createdAt,
@@ -807,7 +807,7 @@ export default function WalletButton() {
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#14F195]/18 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/16 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {airdropLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Gift className="h-3.5 w-3.5" />}
-                  {airdropLoading ? 'Solicitando...' : 'Receber 1 Devnet SOL'}
+                  {airdropLoading ? 'Solicitando...' : 'Receber Devnet SOL'}
                 </button>
                 {airdropMessage && (
                   <p className="mt-2 text-[10px] leading-relaxed text-white/38">{airdropMessage}</p>

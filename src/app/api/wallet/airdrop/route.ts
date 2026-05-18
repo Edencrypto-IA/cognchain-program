@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, safeErrorMessage, validatePublicKey } from '@/lib/security';
 
-const DEVNET_RPC = 'https://api.devnet.solana.com';
-const AIRDROP_SOL = 1;
+const DEVNET_RPC = process.env.SOLANA_DEVNET_RPC_URL || process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+const AIRDROP_SOL = normalizeAirdropAmount(process.env.SOLANA_DEVNET_AIRDROP_SOL);
+const DEVNET_EXPLORER_CLUSTER = 'devnet';
+
+function normalizeAirdropAmount(value: string | undefined): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0.5;
+  return Math.min(parsed, 1);
+}
+
+function describeAirdropError(error: unknown): string {
+  const message = safeErrorMessage(error);
+  const lower = message.toLowerCase();
+
+  if (lower.includes('429') || lower.includes('too many') || lower.includes('rate limit')) {
+    return 'Faucet da Solana Devnet limitou os airdrops agora. Tente novamente em alguns minutos ou use um RPC Devnet dedicado.';
+  }
+
+  if (lower.includes('airdrop') || lower.includes('faucet') || lower.includes('insufficient')) {
+    return 'Faucet da Solana Devnet nao respondeu com SOL de teste agora. A carteira continua valida; tente novamente mais tarde.';
+  }
+
+  if (lower.includes('blockhash') || lower.includes('confirm')) {
+    return 'Airdrop enviado, mas a confirmacao da Devnet nao finalizou a tempo. Confira o saldo novamente em alguns segundos.';
+  }
+
+  return message || 'Nao foi possivel solicitar airdrop Devnet agora.';
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,9 +60,16 @@ export async function POST(req: NextRequest) {
       amount: AIRDROP_SOL,
       signature,
       balance: balance / LAMPORTS_PER_SOL,
-      explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+      explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=${DEVNET_EXPLORER_CLUSTER}`,
     });
   } catch (error) {
-    return NextResponse.json({ error: safeErrorMessage(error) }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: describeAirdropError(error),
+        network: 'solana-devnet',
+        retryable: true,
+      },
+      { status: 503 },
+    );
   }
 }
