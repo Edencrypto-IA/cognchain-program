@@ -1752,3 +1752,23 @@ It still cannot:
 - send the copied brief anywhere by itself;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.8 compact production status layout
+
+Wallet Agent now makes the admin production status panel easier to scan inside narrow review modals and mobile viewports.
+
+It can:
+
+- use denser spacing for the production monitoring panel on small screens;
+- keep refresh and copy actions stable in a compact two-button row;
+- show operation readiness tiles in a predictable compact grid;
+- constrain long checklist and critical-flag text so it does not overflow the modal;
+- preserve the same redacted, read-only production status data and checklist logic.
+
+It still cannot:
+
+- change feature flags or environment variables;
+- alter production readiness, issue checklist, or brief generation logic;
+- bypass the existing admin-only status endpoint;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
