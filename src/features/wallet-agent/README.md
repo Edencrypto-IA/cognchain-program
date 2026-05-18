@@ -1986,3 +1986,27 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.9 copied brief checklist
+
+Wallet Agent now summarizes whether the redacted production brief contains the expected handoff materials.
+
+It can:
+
+- show that the copied brief includes core status, readiness audit, critical flags, verification drill, review focus, handoff note, handoff packet, decision context, local timeline, smoke checklist, local activity, and safety notes;
+- mark missing local operator activity or missing brief-copy activity as review context;
+- include the copied brief checklist inside the copied production brief;
+- include the same checklist inside the copied drill report;
+- keep the checklist derived from redacted status context and bounded browser-local activity.
+
+It still cannot:
+
+- approve rollout or replace human deployment review;
+- send the copied brief to an external service by itself;
+- persist brief checklist state to the server;
+- prove activity from another browser, device, or admin session;
+- change feature flags, environment variables, retention settings, or account settings;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
