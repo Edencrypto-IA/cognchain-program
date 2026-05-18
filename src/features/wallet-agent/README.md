@@ -1963,3 +1963,26 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.8 pre-rollout smoke checklist
+
+Wallet Agent now derives a compact smoke checklist for production verification handoff.
+
+It can:
+
+- summarize admin status health, core readiness signals, critical execution flags, local refresh activity, copied handoff materials, and the read-only boundary;
+- mark smoke items as pass or review using only the redacted status snapshot and browser-local activity;
+- show pending local handoff steps without running provider tests or backend checks;
+- include the smoke checklist in the copied production brief;
+- include the same checklist in the copied drill report.
+
+It still cannot:
+
+- approve rollout or decide deployment readiness by itself;
+- run real smoke tests, migrations, provider connectivity checks, delivery tests, database writes, or background checks;
+- persist smoke checklist state to the server;
+- prove activity from another browser, device, or admin session;
+- change feature flags, environment variables, retention settings, or account settings;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.

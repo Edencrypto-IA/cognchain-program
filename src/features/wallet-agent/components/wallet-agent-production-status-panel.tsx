@@ -129,6 +129,13 @@ type ProductionVerificationTimelineItem = {
   detail: string;
 };
 
+type ProductionVerificationSmokeItem = {
+  id: string;
+  passed: boolean;
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -463,6 +470,67 @@ function buildProductionVerificationTimeline(
   ];
 }
 
+function buildProductionVerificationSmokeChecklist(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionVerificationSmokeItem[] {
+  const coreReadinessReady = status.operations.durableHistoryReady
+    && status.operations.emailReady
+    && status.operations.sessionSecretReady;
+  const criticalFlagsBlocked = status.featureFlags.summary.criticalEnabled === 0;
+  const copiedHandoffMaterials = hasAuditAction(auditEvents, 'brief_copied')
+    && hasAuditAction(auditEvents, 'drill_report_copied');
+
+  return [
+    {
+      id: 'admin-status-snapshot',
+      passed: status.health !== 'unsafe',
+      label: 'Admin status snapshot',
+      detail: status.health === 'unsafe'
+        ? 'The redacted production status is unsafe and needs review before smoke testing.'
+        : 'The redacted production status is available for a safe smoke test discussion.',
+    },
+    {
+      id: 'core-readiness',
+      passed: coreReadinessReady,
+      label: 'Core readiness signals',
+      detail: coreReadinessReady
+        ? 'Durable history, email provider, and session secret readiness are reported as ready.'
+        : 'One or more durable history, email provider, or session secret readiness signals need review.',
+    },
+    {
+      id: 'critical-flags-blocked',
+      passed: criticalFlagsBlocked,
+      label: 'Critical execution flags',
+      detail: criticalFlagsBlocked
+        ? 'Scheduled actions and mainnet execution are not reported as enabled.'
+        : 'At least one critical execution flag is enabled and must be reviewed before rollout.',
+    },
+    {
+      id: 'manual-refresh-recorded',
+      passed: hasAuditAction(auditEvents, 'refresh_requested'),
+      label: 'Manual refresh recorded',
+      detail: hasAuditAction(auditEvents, 'refresh_requested')
+        ? 'A local manual refresh was recorded before using the handoff materials.'
+        : 'Manual refresh is still pending in this browser-local smoke checklist.',
+    },
+    {
+      id: 'handoff-materials-copied',
+      passed: copiedHandoffMaterials,
+      label: 'Handoff materials copied',
+      detail: copiedHandoffMaterials
+        ? 'Both the production brief and focused drill report were copied in this local session.'
+        : 'Copy both the production brief and focused drill report before a rollout discussion.',
+    },
+    {
+      id: 'read-only-boundary',
+      passed: true,
+      label: 'Read-only safety boundary',
+      detail: 'The smoke checklist cannot run migrations, test providers, send email, sign, submit, schedule, or move funds.',
+    },
+  ];
+}
+
 function buildProductionVerificationDrillReport(
   status: WalletAgentProductionMonitoringStatus,
   auditEvents: ProductionStatusAuditEvent[] = [],
@@ -473,6 +541,7 @@ function buildProductionVerificationDrillReport(
   const packetItems = buildProductionVerificationPacket(status, auditEvents);
   const decisionItems = buildProductionVerificationDecisionContext(status);
   const timelineItems = buildProductionVerificationTimeline(auditEvents);
+  const smokeItems = buildProductionVerificationSmokeChecklist(status, auditEvents);
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
@@ -489,6 +558,9 @@ function buildProductionVerificationDrillReport(
   ));
   const timelineLines = timelineItems.map(item => (
     `- [${item.complete ? 'recorded' : 'pending'}] ${item.label}: ${item.detail}`
+  ));
+  const smokeLines = smokeItems.map(item => (
+    `- [${item.passed ? 'pass' : 'review'}] ${item.label}: ${item.detail}`
   ));
 
   return [
@@ -515,6 +587,9 @@ function buildProductionVerificationDrillReport(
     '',
     'Local verification timeline',
     ...timelineLines,
+    '',
+    'Smoke checklist',
+    ...smokeLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -604,6 +679,9 @@ function buildProductionBrief(
   const verificationTimelineLines = buildProductionVerificationTimeline(auditEvents).map(item => (
     `- [${item.complete ? 'recorded' : 'pending'}] ${item.label}: ${item.detail}`
   ));
+  const verificationSmokeLines = buildProductionVerificationSmokeChecklist(status, auditEvents).map(item => (
+    `- [${item.passed ? 'pass' : 'review'}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -655,6 +733,9 @@ function buildProductionBrief(
     '',
     'Phase 13.7 local verification timeline',
     ...verificationTimelineLines,
+    '',
+    'Phase 13.8 pre-rollout smoke checklist',
+    ...verificationSmokeLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -728,6 +809,11 @@ export function WalletAgentProductionStatusPanel({
     [auditEvents],
   );
   const productionVerificationTimelinePendingCount = productionVerificationTimeline.filter(item => !item.complete).length;
+  const productionVerificationSmokeChecklist = useMemo(
+    () => buildProductionVerificationSmokeChecklist(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionVerificationSmokeReviewCount = productionVerificationSmokeChecklist.filter(item => !item.passed).length;
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -1237,6 +1323,48 @@ export function WalletAgentProductionStatusPanel({
                       </div>
                       <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">
                         {item.complete ? 'recorded' : 'pending'}
+                      </span>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#14F195]/14 bg-[#14F195]/[0.035] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#14F195]">Phase 13.8 smoke checklist</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Read-only pre-rollout checks before operator discussion.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationSmokeReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationSmokeReviewCount > 0 ? `${productionVerificationSmokeReviewCount} review` : 'pass'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionVerificationSmokeChecklist.map(item => {
+                const SmokeIcon = item.passed ? CheckCircle2 : AlertTriangle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.passed
+                        ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                        : 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <SmokeIcon className="h-3.5 w-3.5 shrink-0" />
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                      </div>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">
+                        {item.passed ? 'pass' : 'review'}
                       </span>
                     </div>
                     <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
