@@ -95,6 +95,13 @@ type ProductionVerificationDrillItem = {
   detail: string;
 };
 
+type ProductionVerificationFocusItem = {
+  id: string;
+  severity: 'review' | 'safe';
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -230,12 +237,38 @@ function buildProductionVerificationDrill(status: WalletAgentProductionMonitorin
   ];
 }
 
+function buildProductionVerificationFocus(status: WalletAgentProductionMonitoringStatus): ProductionVerificationFocusItem[] {
+  const reviewItems = buildProductionVerificationDrill(status)
+    .filter(item => !item.passed)
+    .map(item => ({
+      id: `focus-${item.id}`,
+      severity: 'review' as const,
+      label: item.label,
+      detail: item.detail,
+    }));
+
+  if (reviewItems.length > 0) {
+    return reviewItems;
+  }
+
+  return [{
+    id: 'focus-no-open-review',
+    severity: 'safe',
+    label: 'No drill review items',
+    detail: 'The current redacted verification drill reports all checks as pass, but rollout approval still requires human review.',
+  }];
+}
+
 function buildProductionVerificationDrillReport(status: WalletAgentProductionMonitoringStatus) {
   const drillItems = buildProductionVerificationDrill(status);
+  const focusItems = buildProductionVerificationFocus(status);
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
     `- [${item.passed ? 'pass' : 'review'}] ${item.label}: ${item.detail}`
+  ));
+  const focusLines = focusItems.map(item => (
+    `- [${item.severity}] ${item.label}: ${item.detail}`
   ));
 
   return [
@@ -247,6 +280,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
     '',
     'Verification checks',
     ...drillLines,
+    '',
+    'Review focus',
+    ...focusLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -323,6 +359,9 @@ function buildProductionBrief(
   const drillLines = buildProductionVerificationDrill(status).map(item => (
     `- [${item.passed ? 'pass' : 'review'}] ${item.label}: ${item.detail}`
   ));
+  const verificationFocusLines = buildProductionVerificationFocus(status).map(item => (
+    `- [${item.severity}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -359,6 +398,9 @@ function buildProductionBrief(
     '',
     'Phase 13.1 production verification drill',
     ...drillLines,
+    '',
+    'Phase 13.3 verification review focus',
+    ...verificationFocusLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -417,6 +459,7 @@ export function WalletAgentProductionStatusPanel({
   const phase12ReviewCount = phase12Closeout.filter(item => !item.complete).length;
   const productionVerificationDrill = useMemo(() => buildProductionVerificationDrill(status), [status]);
   const productionVerificationReviewCount = productionVerificationDrill.filter(item => !item.passed).length;
+  const productionVerificationFocus = useMemo(() => buildProductionVerificationFocus(status), [status]);
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -731,6 +774,43 @@ export function WalletAgentProductionStatusPanel({
                   >
                     <div className="mb-1 flex items-center gap-2">
                       <DrillIcon className="h-3.5 w-3.5 shrink-0" />
+                      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#F5A524]/14 bg-[#F5A524]/[0.035] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#F5A524]">Phase 13.3 review focus</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Focused items from the verification drill for operator handoff.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationReviewCount > 0 ? `${productionVerificationReviewCount} focus` : 'no focus'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionVerificationFocus.map(item => {
+                const FocusIcon = item.severity === 'review' ? AlertTriangle : CheckCircle2;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.severity === 'review'
+                        ? 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                        : 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      <FocusIcon className="h-3.5 w-3.5 shrink-0" />
                       <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
                     </div>
                     <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>

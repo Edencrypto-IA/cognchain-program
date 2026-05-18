@@ -1854,3 +1854,24 @@ It still cannot:
 - run migrations, provider tests, delivery tests, or database writes;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.3 verification review focus
+
+Wallet Agent now derives a focused operator review list from the production verification drill.
+
+It can:
+
+- highlight only the drill checks that need review before rollout discussion;
+- show a safe all-pass note when no drill checks require attention;
+- include the focused review list in the copied production brief;
+- include the same focus list in the copied drill report;
+- keep the focus list derived entirely from the redacted admin status snapshot.
+
+It still cannot:
+
+- approve rollout or mark production as ready by itself;
+- change feature flags, environment variables, retention settings, or account settings;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
