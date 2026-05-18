@@ -1896,3 +1896,25 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.5 verification handoff packet
+
+Wallet Agent now summarizes the read-only materials included in the production verification handoff.
+
+It can:
+
+- show whether the verification drill, review focus, handoff note, local activity, and read-only boundary are represented;
+- mark missing local operator activity as a review item without blocking the drill itself;
+- include the handoff packet checklist in the copied production brief;
+- include the same packet checklist in the copied drill report;
+- keep the packet derived from redacted status and browser-local activity only.
+
+It still cannot:
+
+- approve rollout or replace a human deployment decision;
+- persist operator activity or packet state to the server;
+- change feature flags, environment variables, retention settings, or account settings;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.

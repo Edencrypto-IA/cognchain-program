@@ -108,6 +108,13 @@ type ProductionVerificationHandoff = {
   detail: string;
 };
 
+type ProductionVerificationPacketItem = {
+  id: string;
+  complete: boolean;
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -293,10 +300,53 @@ function buildProductionVerificationHandoff(status: WalletAgentProductionMonitor
   };
 }
 
+function buildProductionVerificationPacket(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionVerificationPacketItem[] {
+  const handoff = buildProductionVerificationHandoff(status);
+
+  return [
+    {
+      id: 'verification-drill',
+      complete: true,
+      label: 'Verification drill',
+      detail: 'Pass and review checks are derived from the current redacted admin status snapshot.',
+    },
+    {
+      id: 'review-focus',
+      complete: true,
+      label: 'Review focus',
+      detail: 'Operator focus items are included so handoff notes do not require scanning the full drill first.',
+    },
+    {
+      id: 'handoff-note',
+      complete: true,
+      label: 'Handoff note',
+      detail: `Current handoff classification is ${handoff.status.replaceAll('_', ' ')}.`,
+    },
+    {
+      id: 'local-activity',
+      complete: auditEvents.length > 0,
+      label: 'Local operator activity',
+      detail: auditEvents.length > 0
+        ? 'This browser session has local operator activity available for the copied production brief.'
+        : 'No local operator activity has been recorded in this browser session yet.',
+    },
+    {
+      id: 'read-only-boundary',
+      complete: true,
+      label: 'Read-only boundary',
+      detail: 'The packet cannot approve rollout, change configuration, run migrations, sign, submit, schedule, or move funds.',
+    },
+  ];
+}
+
 function buildProductionVerificationDrillReport(status: WalletAgentProductionMonitoringStatus) {
   const drillItems = buildProductionVerificationDrill(status);
   const focusItems = buildProductionVerificationFocus(status);
   const handoff = buildProductionVerificationHandoff(status);
+  const packetItems = buildProductionVerificationPacket(status);
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
@@ -304,6 +354,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
   ));
   const focusLines = focusItems.map(item => (
     `- [${item.severity}] ${item.label}: ${item.detail}`
+  ));
+  const packetLines = packetItems.map(item => (
+    `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
 
   return [
@@ -321,6 +374,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
     '',
     'Handoff note',
     `- [${handoff.status}] ${handoff.label}: ${handoff.detail}`,
+    '',
+    'Handoff packet',
+    ...packetLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -401,6 +457,9 @@ function buildProductionBrief(
     `- [${item.severity}] ${item.label}: ${item.detail}`
   ));
   const verificationHandoff = buildProductionVerificationHandoff(status);
+  const verificationPacketLines = buildProductionVerificationPacket(status, auditEvents).map(item => (
+    `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -443,6 +502,9 @@ function buildProductionBrief(
     '',
     'Phase 13.4 verification handoff note',
     `- [${verificationHandoff.status}] ${verificationHandoff.label}: ${verificationHandoff.detail}`,
+    '',
+    'Phase 13.5 verification handoff packet',
+    ...verificationPacketLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -503,6 +565,11 @@ export function WalletAgentProductionStatusPanel({
   const productionVerificationReviewCount = productionVerificationDrill.filter(item => !item.passed).length;
   const productionVerificationFocus = useMemo(() => buildProductionVerificationFocus(status), [status]);
   const productionVerificationHandoff = useMemo(() => buildProductionVerificationHandoff(status), [status]);
+  const productionVerificationPacket = useMemo(
+    () => buildProductionVerificationPacket(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionVerificationPacketReviewCount = productionVerificationPacket.filter(item => !item.complete).length;
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -894,6 +961,43 @@ export function WalletAgentProductionStatusPanel({
             <div className="rounded-xl border border-white/[0.055] bg-black/20 p-2.5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/58">{productionVerificationHandoff.label}</p>
               <p className="mt-1 text-[10px] leading-relaxed text-white/46">{productionVerificationHandoff.detail}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#9945FF]/14 bg-[#9945FF]/[0.04] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#C4A2FF]">Phase 13.5 handoff packet</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Read-only materials included in the verification handoff.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationPacketReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationPacketReviewCount > 0 ? `${productionVerificationPacketReviewCount} review` : 'complete'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionVerificationPacket.map(item => {
+                const PacketIcon = item.complete ? CheckCircle2 : AlertTriangle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.complete
+                        ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                        : 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      <PacketIcon className="h-3.5 w-3.5 shrink-0" />
+                      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
