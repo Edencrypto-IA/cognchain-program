@@ -1792,3 +1792,23 @@ It still cannot:
 - send the copied brief anywhere by itself;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - change feature flags, send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.10 admin production monitoring closeout
+
+Wallet Agent now closes Phase 12 with a compact read-only closeout summary inside the admin production status panel.
+
+It can:
+
+- summarize the completed admin production monitoring surface;
+- show that status, issue checklist, copied brief, local activity, and read-only safety boundaries are covered;
+- flag critical execution exposure as a review item when critical flags are enabled;
+- include the closeout checklist in the copied production brief;
+- make the Phase 12 admin monitoring package easier to hand off before Phase 13 verification work.
+
+It still cannot:
+
+- mark production as approved by itself;
+- change feature flags or environment variables;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.

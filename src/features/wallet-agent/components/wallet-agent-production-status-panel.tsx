@@ -81,6 +81,13 @@ type ProductionIssueChecklistItem = {
   detail: string;
 };
 
+type Phase12CloseoutChecklistItem = {
+  id: string;
+  complete: boolean;
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -118,6 +125,45 @@ function formatDate(value: string) {
 
 function formatActivityAction(action: ProductionStatusAuditEvent['action']) {
   return action.replaceAll('_', ' ');
+}
+
+function buildPhase12CloseoutChecklist(status: WalletAgentProductionMonitoringStatus): Phase12CloseoutChecklistItem[] {
+  const criticalFlagsBlocked = status.featureFlags.summary.criticalEnabled === 0;
+
+  return [
+    {
+      id: 'admin-status',
+      complete: true,
+      label: 'Admin status surface',
+      detail: 'Redacted production status is available only through the admin-gated review surface.',
+    },
+    {
+      id: 'issue-checklist',
+      complete: true,
+      label: 'Issue checklist',
+      detail: 'Required actions, warnings, and safe guardrails are derived from the current redacted snapshot.',
+    },
+    {
+      id: 'operator-handoff',
+      complete: true,
+      label: 'Operator handoff',
+      detail: 'The copied brief includes operations, audit items, critical flags, checklist, safety notes, and local activity.',
+    },
+    {
+      id: 'critical-execution',
+      complete: criticalFlagsBlocked,
+      label: 'Critical execution flags',
+      detail: criticalFlagsBlocked
+        ? 'Scheduled actions and mainnet execution are not reported as enabled.'
+        : 'At least one critical execution flag is enabled and must be reviewed before rollout.',
+    },
+    {
+      id: 'read-only-boundary',
+      complete: true,
+      label: 'Read-only boundary',
+      detail: 'The Phase 12 panel cannot change configuration, send email, run migrations, sign, submit, schedule, or move funds.',
+    },
+  ];
 }
 
 function buildProductionIssueChecklist(status: WalletAgentProductionMonitoringStatus): ProductionIssueChecklistItem[] {
@@ -186,6 +232,9 @@ function buildProductionBrief(
   status: WalletAgentProductionMonitoringStatus,
   auditEvents: ProductionStatusAuditEvent[] = [],
 ) {
+  const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
+    `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
+  ));
   const productionIssueLines = buildProductionIssueChecklist(status).map(item => (
     `- [${item.severity}] ${item.label}: ${item.detail}`
   ));
@@ -213,6 +262,9 @@ function buildProductionBrief(
     `- Session secret ready: ${status.operations.sessionSecretReady ? 'yes' : 'no'}`,
     `- Devnet configured: ${status.operations.devnetConfigured ? 'yes' : 'no'}`,
     `- Critical flags enabled: ${status.operations.criticalFlagsEnabled}`,
+    '',
+    'Phase 12 closeout',
+    ...closeoutLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -266,6 +318,8 @@ export function WalletAgentProductionStatusPanel({
   const health = HEALTH_STYLES[status.health];
   const HealthIcon = health.icon;
   const criticalFlags = status.featureFlags.flags.filter(flag => flag.productionRisk === 'critical');
+  const phase12Closeout = useMemo(() => buildPhase12CloseoutChecklist(status), [status]);
+  const phase12ReviewCount = phase12Closeout.filter(item => !item.complete).length;
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -493,6 +547,43 @@ export function WalletAgentProductionStatusPanel({
                   <p className="line-clamp-3 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{flag.publicDetail}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#14F195]/12 bg-[#14F195]/[0.035] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#14F195]/80">Phase 12 closeout</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Read-only admin monitoring package summary.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                phase12ReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {phase12ReviewCount > 0 ? `${phase12ReviewCount} review` : 'complete'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {phase12Closeout.map(item => {
+                const CloseoutIcon = item.complete ? CheckCircle2 : AlertTriangle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.complete
+                        ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                        : 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      <CloseoutIcon className="h-3.5 w-3.5 shrink-0" />
+                      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
