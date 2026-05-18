@@ -72,6 +72,37 @@ const FLAG_STATUS_STYLES: Record<WalletAgentFeatureFlag['status'], string> = {
   safe_default: 'border-[#00D1FF]/14 bg-[#00D1FF]/[0.045] text-[#7DE3FF]',
 };
 
+type ProductionIssueSeverity = 'required' | 'warning' | 'safe';
+
+type ProductionIssueChecklistItem = {
+  id: string;
+  severity: ProductionIssueSeverity;
+  label: string;
+  detail: string;
+};
+
+const ISSUE_STYLES: Record<ProductionIssueSeverity, {
+  label: string;
+  className: string;
+  icon: typeof CheckCircle2;
+}> = {
+  required: {
+    label: 'required',
+    className: 'border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055] text-[#FF8A9E]',
+    icon: XCircle,
+  },
+  warning: {
+    label: 'warning',
+    className: 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]',
+    icon: AlertTriangle,
+  },
+  safe: {
+    label: 'safe',
+    className: 'border-[#14F195]/16 bg-[#14F195]/[0.055] text-[#14F195]',
+    icon: CheckCircle2,
+  },
+};
+
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -83,6 +114,68 @@ function formatDate(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+function buildProductionIssueChecklist(status: WalletAgentProductionMonitoringStatus): ProductionIssueChecklistItem[] {
+  const requiredAuditItems = status.audit.items
+    .filter(item => item.status === 'action_required')
+    .map(item => ({
+      id: `audit-${item.id}`,
+      severity: 'required' as const,
+      label: item.label,
+      detail: item.publicDetail,
+    }));
+  const warningAuditItems = status.audit.items
+    .filter(item => item.status === 'warning')
+    .map(item => ({
+      id: `audit-${item.id}`,
+      severity: 'warning' as const,
+      label: item.label,
+      detail: item.publicDetail,
+    }));
+  const criticalFlagItems = status.featureFlags.flags
+    .filter(flag => flag.productionRisk === 'critical' && flag.status === 'enabled')
+    .map(flag => ({
+      id: `flag-${flag.id}`,
+      severity: 'required' as const,
+      label: flag.label,
+      detail: 'Critical production flag is enabled. Review immediately before any rollout.',
+    }));
+
+  const safeCriticalFlags = status.featureFlags.flags
+    .filter(flag => flag.productionRisk === 'critical' && flag.status !== 'enabled');
+  const safetyItems: ProductionIssueChecklistItem[] = [];
+
+  if (safeCriticalFlags.length > 0) {
+    safetyItems.push({
+      id: 'critical-flags-disabled',
+      severity: 'safe',
+      label: 'Critical execution flags',
+      detail: 'Scheduled actions and mainnet execution remain blocked unless explicitly enabled and audited.',
+    });
+  }
+
+  if (status.operations.durableHistoryReady && status.operations.emailReady && status.operations.sessionSecretReady) {
+    safetyItems.push({
+      id: 'core-ops-ready',
+      severity: 'safe',
+      label: 'Core production operations',
+      detail: 'Durable history, email provider, and session secret readiness are reported as ready.',
+    });
+  }
+
+  const issues = [...criticalFlagItems, ...requiredAuditItems, ...warningAuditItems, ...safetyItems];
+
+  if (issues.length === 0) {
+    return [{
+      id: 'no-open-issues',
+      severity: 'safe',
+      label: 'No open production blockers',
+      detail: 'The current redacted snapshot does not report required actions or warnings.',
+    }];
+  }
+
+  return issues.slice(0, 7);
 }
 
 function buildProductionBrief(status: WalletAgentProductionMonitoringStatus) {
@@ -152,6 +245,9 @@ export function WalletAgentProductionStatusPanel({
   const health = HEALTH_STYLES[status.health];
   const HealthIcon = health.icon;
   const criticalFlags = status.featureFlags.flags.filter(flag => flag.productionRisk === 'critical');
+  const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
+  const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
+  const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
   const productionBrief = useMemo(() => buildProductionBrief(status), [status]);
 
   function recordAuditEvent(action: ProductionStatusAuditEvent['action'], label: string) {
@@ -303,6 +399,42 @@ export function WalletAgentProductionStatusPanel({
         </div>
 
         <div className="space-y-3">
+          <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/48">Production issue checklist</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Next actions derived from the redacted status snapshot.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                requiredIssueCount > 0
+                  ? 'border-[#FF5C7A]/18 bg-[#FF5C7A]/10 text-[#FF8A9E]'
+                  : warningIssueCount > 0
+                    ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                    : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {requiredIssueCount} required / {warningIssueCount} warning
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionIssues.map(item => {
+                const style = ISSUE_STYLES[item.severity];
+                const IssueIcon = style.icon;
+                return (
+                  <div key={item.id} className={`rounded-xl border p-2.5 ${style.className}`}>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <IssueIcon className="h-3.5 w-3.5 shrink-0" />
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                      </div>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">{style.label}</span>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-white/46">{item.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/48">Readiness audit</p>

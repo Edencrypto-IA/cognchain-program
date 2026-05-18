@@ -1713,3 +1713,23 @@ It still cannot:
 - change feature flags or environment variables;
 - send the activity log to external services;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.6 production issue checklist
+
+Wallet Agent now derives an operator-facing production issue checklist from the redacted admin status snapshot.
+
+It can:
+
+- summarize required actions from readiness audit items;
+- highlight warning-level production concerns;
+- flag enabled critical execution features as required review items;
+- show safe guardrails when critical execution flags remain blocked;
+- give admins a faster "what needs attention next" view before deployment review.
+
+It still cannot:
+
+- change feature flags or environment variables;
+- fix production configuration automatically;
+- bypass the existing admin-only status endpoint;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
