@@ -1772,3 +1772,23 @@ It still cannot:
 - bypass the existing admin-only status endpoint;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.9 operator activity in copied brief
+
+Wallet Agent now includes the local operator activity trail in the copied admin production brief.
+
+It can:
+
+- add recent local status-load, manual-refresh, and brief-copy events to the plain-text production brief;
+- show event time, action, health state, and safe operator label;
+- keep copied deployment handoffs aligned with the visible local activity log;
+- include an explicit empty-state line when no local activity has been recorded yet;
+- keep the activity trail browser-local and metadata-only.
+
+It still cannot:
+
+- persist operator activity to the server;
+- export activity from another browser or admin session;
+- send the copied brief anywhere by itself;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- change feature flags, send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.

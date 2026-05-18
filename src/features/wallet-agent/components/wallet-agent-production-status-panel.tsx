@@ -116,6 +116,10 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function formatActivityAction(action: ProductionStatusAuditEvent['action']) {
+  return action.replaceAll('_', ' ');
+}
+
 function buildProductionIssueChecklist(status: WalletAgentProductionMonitoringStatus): ProductionIssueChecklistItem[] {
   const requiredAuditItems = status.audit.items
     .filter(item => item.status === 'action_required')
@@ -178,7 +182,10 @@ function buildProductionIssueChecklist(status: WalletAgentProductionMonitoringSt
   return issues.slice(0, 7);
 }
 
-function buildProductionBrief(status: WalletAgentProductionMonitoringStatus) {
+function buildProductionBrief(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+) {
   const productionIssueLines = buildProductionIssueChecklist(status).map(item => (
     `- [${item.severity}] ${item.label}: ${item.detail}`
   ));
@@ -188,6 +195,11 @@ function buildProductionBrief(status: WalletAgentProductionMonitoringStatus) {
   const criticalFlagLines = status.featureFlags.flags
     .filter(flag => flag.productionRisk === 'critical')
     .map(flag => `- ${flag.label}: ${flag.status} | ${flag.publicDetail}`);
+  const operatorActivityLines = auditEvents.length > 0
+    ? auditEvents.map(event => (
+      `- ${formatDate(event.createdAt)} | ${formatActivityAction(event.action)} | ${event.health} | ${event.label}`
+    ))
+    : ['- No local operator activity has been recorded in this browser session yet.'];
 
   return [
     'CongChain Wallet Agent - Production Brief',
@@ -210,6 +222,9 @@ function buildProductionBrief(status: WalletAgentProductionMonitoringStatus) {
     '',
     'Critical flags',
     ...criticalFlagLines,
+    '',
+    'Local operator activity',
+    ...operatorActivityLines,
     '',
     'Safety',
     '- Secrets are redacted.',
@@ -254,7 +269,7 @@ export function WalletAgentProductionStatusPanel({
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
-  const productionBrief = useMemo(() => buildProductionBrief(status), [status]);
+  const productionBrief = useMemo(() => buildProductionBrief(status, auditEvents), [auditEvents, status]);
 
   function recordAuditEvent(action: ProductionStatusAuditEvent['action'], label: string) {
     setAuditEvents(current => [
@@ -392,7 +407,7 @@ export function WalletAgentProductionStatusPanel({
               {auditEvents.map(event => (
                 <div key={event.id} className="rounded-lg border border-white/[0.055] bg-white/[0.025] px-2.5 py-2">
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-white/48">{event.action.replaceAll('_', ' ')}</p>
+                    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-white/48">{formatActivityAction(event.action)}</p>
                     <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em] text-white/28">
                       {formatDate(event.createdAt)}
                     </span>
