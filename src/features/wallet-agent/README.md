@@ -1833,3 +1833,24 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.2 copied verification drill report
+
+Wallet Agent now lets admins copy a focused production verification drill report from the Phase 13.1 panel.
+
+It can:
+
+- generate a plain-text drill report with health, mode, pass count, review count, and verification items;
+- copy only the drill-focused report without requiring the full production brief;
+- record the copy action in the local operator activity log;
+- keep the report redacted and safe for deployment tickets or handoff notes;
+- preserve the same pass/review logic shown in the visible drill panel.
+
+It still cannot:
+
+- send the report to an external service by itself;
+- persist drill copy activity to the server;
+- approve rollout, change feature flags, or change environment variables;
+- run migrations, provider tests, delivery tests, or database writes;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.

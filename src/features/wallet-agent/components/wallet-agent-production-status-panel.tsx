@@ -29,7 +29,7 @@ type WalletAgentProductionStatusPanelProps = {
 
 type ProductionStatusAuditEvent = {
   id: string;
-  action: 'status_loaded' | 'refresh_requested' | 'brief_copied';
+  action: 'status_loaded' | 'refresh_requested' | 'brief_copied' | 'drill_report_copied';
   label: string;
   createdAt: string;
   health: WalletAgentProductionMonitoringStatus['health'];
@@ -230,6 +230,30 @@ function buildProductionVerificationDrill(status: WalletAgentProductionMonitorin
   ];
 }
 
+function buildProductionVerificationDrillReport(status: WalletAgentProductionMonitoringStatus) {
+  const drillItems = buildProductionVerificationDrill(status);
+  const passedCount = drillItems.filter(item => item.passed).length;
+  const reviewCount = drillItems.length - passedCount;
+  const drillLines = drillItems.map(item => (
+    `- [${item.passed ? 'pass' : 'review'}] ${item.label}: ${item.detail}`
+  ));
+
+  return [
+    'CongChain Wallet Agent - Production Verification Drill',
+    `Generated: ${formatDate(status.generatedAt)}`,
+    `Health: ${status.health}`,
+    `Mode: ${status.mode}`,
+    `Result: ${passedCount} pass / ${reviewCount} review`,
+    '',
+    'Verification checks',
+    ...drillLines,
+    '',
+    'Safety',
+    '- This drill is read-only and redacted.',
+    '- It cannot approve rollout, change configuration, run migrations, send email, sign, submit, schedule, or move funds.',
+  ].join('\n');
+}
+
 function buildProductionIssueChecklist(status: WalletAgentProductionMonitoringStatus): ProductionIssueChecklistItem[] {
   const requiredAuditItems = status.audit.items
     .filter(item => item.status === 'action_required')
@@ -384,6 +408,7 @@ export function WalletAgentProductionStatusPanel({
   refreshing = false,
 }: WalletAgentProductionStatusPanelProps) {
   const [copied, setCopied] = useState(false);
+  const [drillCopied, setDrillCopied] = useState(false);
   const [auditEvents, setAuditEvents] = useState<ProductionStatusAuditEvent[]>([]);
   const health = HEALTH_STYLES[status.health];
   const HealthIcon = health.icon;
@@ -396,6 +421,7 @@ export function WalletAgentProductionStatusPanel({
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
   const productionBrief = useMemo(() => buildProductionBrief(status, auditEvents), [auditEvents, status]);
+  const productionVerificationDrillReport = useMemo(() => buildProductionVerificationDrillReport(status), [status]);
 
   function recordAuditEvent(action: ProductionStatusAuditEvent['action'], label: string) {
     setAuditEvents(current => [
@@ -428,6 +454,14 @@ export function WalletAgentProductionStatusPanel({
       setCopied(true);
       recordAuditEvent('brief_copied', 'Redacted production brief copied');
       window.setTimeout(() => setCopied(false), 1600);
+    }).catch(() => {});
+  }
+
+  function copyProductionVerificationDrillReport() {
+    navigator.clipboard?.writeText(productionVerificationDrillReport).then(() => {
+      setDrillCopied(true);
+      recordAuditEvent('drill_report_copied', 'Production verification drill report copied');
+      window.setTimeout(() => setDrillCopied(false), 1600);
     }).catch(() => {});
   }
 
@@ -665,13 +699,23 @@ export function WalletAgentProductionStatusPanel({
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7DE3FF]">Phase 13.1 verification drill</p>
                 <p className="mt-1 text-[11px] leading-relaxed text-white/34">Pre-rollout checks derived from the redacted status snapshot.</p>
               </div>
-              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
-                productionVerificationReviewCount > 0
-                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
-                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
-              }`}>
-                {productionVerificationReviewCount > 0 ? `${productionVerificationReviewCount} review` : 'all pass'}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                  productionVerificationReviewCount > 0
+                    ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                    : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+                }`}>
+                  {productionVerificationReviewCount > 0 ? `${productionVerificationReviewCount} review` : 'all pass'}
+                </span>
+                <button
+                  type="button"
+                  onClick={copyProductionVerificationDrillReport}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[#00D1FF]/16 bg-[#00D1FF]/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#7DE3FF] transition-colors hover:bg-[#00D1FF]/15"
+                >
+                  <Copy className="h-3 w-3" />
+                  {drillCopied ? 'copied' : 'copy drill'}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {productionVerificationDrill.map(item => {
