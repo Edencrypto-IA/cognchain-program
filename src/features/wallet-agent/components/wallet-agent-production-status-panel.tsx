@@ -179,6 +179,9 @@ function buildProductionIssueChecklist(status: WalletAgentProductionMonitoringSt
 }
 
 function buildProductionBrief(status: WalletAgentProductionMonitoringStatus) {
+  const productionIssueLines = buildProductionIssueChecklist(status).map(item => (
+    `- [${item.severity}] ${item.label}: ${item.detail}`
+  ));
   const auditLines = status.audit.items.map(item => (
     `- ${item.label}: ${item.status} | ${item.publicDetail}`
   ));
@@ -198,6 +201,9 @@ function buildProductionBrief(status: WalletAgentProductionMonitoringStatus) {
     `- Session secret ready: ${status.operations.sessionSecretReady ? 'yes' : 'no'}`,
     `- Devnet configured: ${status.operations.devnetConfigured ? 'yes' : 'no'}`,
     `- Critical flags enabled: ${status.operations.criticalFlagsEnabled}`,
+    '',
+    'Production issue checklist',
+    ...productionIssueLines,
     '',
     'Readiness audit',
     ...auditLines,

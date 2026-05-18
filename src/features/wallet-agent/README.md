@@ -1733,3 +1733,22 @@ It still cannot:
 - bypass the existing admin-only status endpoint;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 12.7 production checklist in copied brief
+
+Wallet Agent now includes the production issue checklist in the copied admin production brief.
+
+It can:
+
+- add required, warning, and safe checklist items to the plain-text production brief;
+- keep copied deployment handoffs aligned with the visible admin panel;
+- reuse the same redacted checklist logic already shown in the UI;
+- make internal review and support tickets more actionable without exposing secrets.
+
+It still cannot:
+
+- change feature flags or environment variables;
+- fix production configuration automatically;
+- send the copied brief anywhere by itself;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
