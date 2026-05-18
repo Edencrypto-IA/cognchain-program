@@ -143,6 +143,13 @@ type ProductionVerificationBriefItem = {
   detail: string;
 };
 
+type ProductionVerificationCloseoutItem = {
+  id: string;
+  complete: boolean;
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -585,6 +592,47 @@ function buildProductionVerificationBriefChecklist(
   ];
 }
 
+function buildProductionVerificationCloseout(
+  status: WalletAgentProductionMonitoringStatus,
+  auditEvents: ProductionStatusAuditEvent[] = [],
+): ProductionVerificationCloseoutItem[] {
+  const drillReviewCount = buildProductionVerificationDrill(status).filter(item => !item.passed).length;
+  const decisionReviewCount = buildProductionVerificationDecisionContext(status).filter(item => item.severity !== 'safe').length;
+  const smokeReviewCount = buildProductionVerificationSmokeChecklist(status, auditEvents).filter(item => !item.passed).length;
+  const briefReviewCount = buildProductionVerificationBriefChecklist(auditEvents).filter(item => !item.complete).length;
+
+  return [
+    {
+      id: 'verification-surfaces',
+      complete: true,
+      label: 'Verification surfaces covered',
+      detail: 'Drill, review focus, handoff note, packet, decision context, local timeline, smoke checklist, and copied brief checklist are represented.',
+    },
+    {
+      id: 'open-review-signals',
+      complete: drillReviewCount + decisionReviewCount + smokeReviewCount + briefReviewCount === 0,
+      label: 'Open review signals',
+      detail: drillReviewCount + decisionReviewCount + smokeReviewCount + briefReviewCount === 0
+        ? 'The current redacted snapshot and local activity show no Phase 13 review signals.'
+        : `${drillReviewCount + decisionReviewCount + smokeReviewCount + briefReviewCount} Phase 13 review signal(s) remain for human review.`,
+    },
+    {
+      id: 'handoff-materials',
+      complete: hasAuditAction(auditEvents, 'brief_copied') && hasAuditAction(auditEvents, 'drill_report_copied'),
+      label: 'Handoff materials copied',
+      detail: hasAuditAction(auditEvents, 'brief_copied') && hasAuditAction(auditEvents, 'drill_report_copied')
+        ? 'Both the production brief and focused drill report were copied in this browser session.'
+        : 'Copy the production brief and focused drill report before treating the handoff packet as complete.',
+    },
+    {
+      id: 'read-only-closeout',
+      complete: true,
+      label: 'Read-only closeout',
+      detail: 'Phase 13 closes verification context only; it cannot approve rollout, change configuration, run tests, sign, submit, schedule, or move funds.',
+    },
+  ];
+}
+
 function buildProductionVerificationDrillReport(
   status: WalletAgentProductionMonitoringStatus,
   auditEvents: ProductionStatusAuditEvent[] = [],
@@ -597,6 +645,7 @@ function buildProductionVerificationDrillReport(
   const timelineItems = buildProductionVerificationTimeline(auditEvents);
   const smokeItems = buildProductionVerificationSmokeChecklist(status, auditEvents);
   const briefItems = buildProductionVerificationBriefChecklist(auditEvents);
+  const closeoutItems = buildProductionVerificationCloseout(status, auditEvents);
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
@@ -618,6 +667,9 @@ function buildProductionVerificationDrillReport(
     `- [${item.passed ? 'pass' : 'review'}] ${item.label}: ${item.detail}`
   ));
   const briefLines = briefItems.map(item => (
+    `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
+  ));
+  const closeoutLines = closeoutItems.map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
 
@@ -651,6 +703,9 @@ function buildProductionVerificationDrillReport(
     '',
     'Copied brief checklist',
     ...briefLines,
+    '',
+    'Phase 13 closeout',
+    ...closeoutLines,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -746,6 +801,9 @@ function buildProductionBrief(
   const verificationBriefLines = buildProductionVerificationBriefChecklist(auditEvents).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
+  const verificationCloseoutLines = buildProductionVerificationCloseout(status, auditEvents).map(item => (
+    `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -803,6 +861,9 @@ function buildProductionBrief(
     '',
     'Phase 13.9 copied brief checklist',
     ...verificationBriefLines,
+    '',
+    'Phase 13.10 verification closeout',
+    ...verificationCloseoutLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -886,6 +947,11 @@ export function WalletAgentProductionStatusPanel({
     [auditEvents],
   );
   const productionVerificationBriefReviewCount = productionVerificationBriefChecklist.filter(item => !item.complete).length;
+  const productionVerificationCloseout = useMemo(
+    () => buildProductionVerificationCloseout(status, auditEvents),
+    [auditEvents, status],
+  );
+  const productionVerificationCloseoutReviewCount = productionVerificationCloseout.filter(item => !item.complete).length;
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -1475,6 +1541,48 @@ export function WalletAgentProductionStatusPanel({
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2">
                         <BriefIcon className="h-3.5 w-3.5 shrink-0" />
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                      </div>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">
+                        {item.complete ? 'complete' : 'review'}
+                      </span>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#C4A2FF]/14 bg-[#9945FF]/[0.035] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#C4A2FF]">Phase 13.10 verification closeout</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Read-only closeout for the production verification package.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationCloseoutReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationCloseoutReviewCount > 0 ? `${productionVerificationCloseoutReviewCount} review` : 'closed'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionVerificationCloseout.map(item => {
+                const CloseoutIcon = item.complete ? CheckCircle2 : AlertTriangle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.complete
+                        ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                        : 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <CloseoutIcon className="h-3.5 w-3.5 shrink-0" />
                         <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
                       </div>
                       <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.1em]">

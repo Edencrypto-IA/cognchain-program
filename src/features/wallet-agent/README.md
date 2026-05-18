@@ -2010,3 +2010,27 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.10 production verification closeout
+
+Wallet Agent now closes Phase 13 with a compact read-only verification closeout for admins.
+
+It can:
+
+- summarize that the production verification drill, review focus, handoff note, handoff packet, decision context, local timeline, smoke checklist, copied brief checklist, and read-only boundary are covered;
+- surface remaining review signals from the redacted snapshot and browser-local handoff activity;
+- show whether the production brief and focused drill report were copied in the local admin session;
+- include the closeout checklist in the copied production brief;
+- include the same closeout checklist in the copied drill report.
+
+It still cannot:
+
+- approve rollout or mark production as operationally ready;
+- replace human deployment, security, compliance, or operations review;
+- persist closeout state to the server;
+- prove activity from another browser, device, or admin session;
+- change feature flags, environment variables, retention settings, or account settings;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
