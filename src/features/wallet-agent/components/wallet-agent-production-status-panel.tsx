@@ -102,6 +102,12 @@ type ProductionVerificationFocusItem = {
   detail: string;
 };
 
+type ProductionVerificationHandoff = {
+  status: 'blocked' | 'review' | 'ready_for_discussion';
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -259,9 +265,38 @@ function buildProductionVerificationFocus(status: WalletAgentProductionMonitorin
   }];
 }
 
+function buildProductionVerificationHandoff(status: WalletAgentProductionMonitoringStatus): ProductionVerificationHandoff {
+  const focusItems = buildProductionVerificationFocus(status).filter(item => item.severity === 'review');
+  const criticalFlagsEnabled = status.featureFlags.summary.criticalEnabled > 0;
+  const requiredAuditActions = status.audit.summary.actionRequired > 0;
+
+  if (status.health === 'unsafe' || criticalFlagsEnabled || requiredAuditActions) {
+    return {
+      status: 'blocked',
+      label: 'Blocked before rollout discussion',
+      detail: 'Unsafe health, critical execution exposure, or required audit actions must be reviewed before any rollout discussion.',
+    };
+  }
+
+  if (focusItems.length > 0 || status.audit.summary.warning > 0) {
+    return {
+      status: 'review',
+      label: 'Human review needed',
+      detail: 'The drill is available for handoff, but remaining review or warning items should be resolved by an operator first.',
+    };
+  }
+
+  return {
+    status: 'ready_for_discussion',
+    label: 'Ready for rollout discussion',
+    detail: 'The redacted drill has no open review items, but production approval still requires a separate human decision.',
+  };
+}
+
 function buildProductionVerificationDrillReport(status: WalletAgentProductionMonitoringStatus) {
   const drillItems = buildProductionVerificationDrill(status);
   const focusItems = buildProductionVerificationFocus(status);
+  const handoff = buildProductionVerificationHandoff(status);
   const passedCount = drillItems.filter(item => item.passed).length;
   const reviewCount = drillItems.length - passedCount;
   const drillLines = drillItems.map(item => (
@@ -283,6 +318,9 @@ function buildProductionVerificationDrillReport(status: WalletAgentProductionMon
     '',
     'Review focus',
     ...focusLines,
+    '',
+    'Handoff note',
+    `- [${handoff.status}] ${handoff.label}: ${handoff.detail}`,
     '',
     'Safety',
     '- This drill is read-only and redacted.',
@@ -362,6 +400,7 @@ function buildProductionBrief(
   const verificationFocusLines = buildProductionVerificationFocus(status).map(item => (
     `- [${item.severity}] ${item.label}: ${item.detail}`
   ));
+  const verificationHandoff = buildProductionVerificationHandoff(status);
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -401,6 +440,9 @@ function buildProductionBrief(
     '',
     'Phase 13.3 verification review focus',
     ...verificationFocusLines,
+    '',
+    'Phase 13.4 verification handoff note',
+    `- [${verificationHandoff.status}] ${verificationHandoff.label}: ${verificationHandoff.detail}`,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -460,6 +502,7 @@ export function WalletAgentProductionStatusPanel({
   const productionVerificationDrill = useMemo(() => buildProductionVerificationDrill(status), [status]);
   const productionVerificationReviewCount = productionVerificationDrill.filter(item => !item.passed).length;
   const productionVerificationFocus = useMemo(() => buildProductionVerificationFocus(status), [status]);
+  const productionVerificationHandoff = useMemo(() => buildProductionVerificationHandoff(status), [status]);
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -817,6 +860,40 @@ export function WalletAgentProductionStatusPanel({
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className={`rounded-xl border p-2.5 sm:p-3 ${
+            productionVerificationHandoff.status === 'blocked'
+              ? 'border-[#FF5C7A]/18 bg-[#FF5C7A]/[0.055]'
+              : productionVerificationHandoff.status === 'review'
+                ? 'border-[#F5A524]/18 bg-[#F5A524]/[0.055]'
+                : 'border-[#14F195]/14 bg-[#14F195]/[0.045]'
+          }`}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${
+                  productionVerificationHandoff.status === 'blocked'
+                    ? 'text-[#FF8A9E]'
+                    : productionVerificationHandoff.status === 'review'
+                      ? 'text-[#F5A524]'
+                      : 'text-[#14F195]'
+                }`}>Phase 13.4 handoff note</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Read-only next-step summary for operator handoff.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationHandoff.status === 'blocked'
+                  ? 'border-[#FF5C7A]/18 bg-[#FF5C7A]/10 text-[#FF8A9E]'
+                  : productionVerificationHandoff.status === 'review'
+                    ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                    : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationHandoff.status.replaceAll('_', ' ')}
+              </span>
+            </div>
+            <div className="rounded-xl border border-white/[0.055] bg-black/20 p-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/58">{productionVerificationHandoff.label}</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/46">{productionVerificationHandoff.detail}</p>
             </div>
           </div>
         </div>

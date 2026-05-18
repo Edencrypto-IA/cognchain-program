@@ -1875,3 +1875,24 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.4 verification handoff note
+
+Wallet Agent now derives a compact handoff note from the production verification drill.
+
+It can:
+
+- classify the current drill handoff as blocked, review, or ready for rollout discussion;
+- treat unsafe health, required audit actions, or enabled critical execution flags as blocked;
+- treat remaining drill focus items or audit warnings as human-review items;
+- show a safe next-step note inside the admin production status panel;
+- include the handoff note in both the copied production brief and copied drill report.
+
+It still cannot:
+
+- approve a rollout or mark production as operationally approved;
+- change feature flags, environment variables, retention settings, or account settings;
+- run migrations, provider tests, delivery tests, database writes, or background checks;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.
