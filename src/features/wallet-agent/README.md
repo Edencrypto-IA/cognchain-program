@@ -1812,3 +1812,24 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, run migrations, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 13.1 production verification drill
+
+Wallet Agent now starts Phase 13 with a read-only pre-rollout verification drill for admins.
+
+It can:
+
+- derive a production verification checklist from the redacted admin status snapshot;
+- check health, durable history readiness, email readiness, session-secret readiness, critical execution flags, and audit warnings;
+- show pass or review states inside the admin production status panel;
+- include the drill results in the copied production brief;
+- help operators decide what needs review before a future rollout discussion.
+
+It still cannot:
+
+- approve a production rollout by itself;
+- change feature flags or environment variables;
+- run migrations, provider tests, delivery tests, or database writes;
+- bypass admin access checks or endpoint rate limits;
+- expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
+- send email, buy, sell, pay, schedule, sign, submit, or move funds.

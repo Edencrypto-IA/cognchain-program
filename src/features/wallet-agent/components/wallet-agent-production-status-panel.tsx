@@ -88,6 +88,13 @@ type Phase12CloseoutChecklistItem = {
   detail: string;
 };
 
+type ProductionVerificationDrillItem = {
+  id: string;
+  passed: boolean;
+  label: string;
+  detail: string;
+};
+
 const ISSUE_STYLES: Record<ProductionIssueSeverity, {
   label: string;
   className: string;
@@ -166,6 +173,63 @@ function buildPhase12CloseoutChecklist(status: WalletAgentProductionMonitoringSt
   ];
 }
 
+function buildProductionVerificationDrill(status: WalletAgentProductionMonitoringStatus): ProductionVerificationDrillItem[] {
+  const criticalFlagsBlocked = status.featureFlags.summary.criticalEnabled === 0;
+  const noRequiredAuditActions = status.audit.summary.actionRequired === 0;
+  const noWarnings = status.audit.summary.warning === 0;
+
+  return [
+    {
+      id: 'admin-status-health',
+      passed: status.health !== 'unsafe',
+      label: 'Admin status health',
+      detail: status.health === 'unsafe'
+        ? 'The redacted production status is unsafe and must be reviewed before rollout.'
+        : 'The redacted production status is available for operator review.',
+    },
+    {
+      id: 'durable-history',
+      passed: status.operations.durableHistoryReady,
+      label: 'Durable history readiness',
+      detail: status.operations.durableHistoryReady
+        ? 'Durable alert history is reported as ready in the current snapshot.'
+        : 'Durable alert history is not ready or not enabled for production use.',
+    },
+    {
+      id: 'email-delivery',
+      passed: status.operations.emailReady,
+      label: 'Email delivery readiness',
+      detail: status.operations.emailReady
+        ? 'Email provider readiness is reported as ready.'
+        : 'Email provider readiness still needs setup or review.',
+    },
+    {
+      id: 'session-secret',
+      passed: status.operations.sessionSecretReady,
+      label: 'Session secret readiness',
+      detail: status.operations.sessionSecretReady
+        ? 'Session secret readiness is reported as ready.'
+        : 'Session secret readiness is not confirmed by the current snapshot.',
+    },
+    {
+      id: 'critical-flags',
+      passed: criticalFlagsBlocked,
+      label: 'Critical execution flags',
+      detail: criticalFlagsBlocked
+        ? 'Critical execution features remain blocked in the current snapshot.'
+        : 'One or more critical execution flags are enabled and require review.',
+    },
+    {
+      id: 'audit-actions',
+      passed: noRequiredAuditActions && noWarnings,
+      label: 'Readiness audit review',
+      detail: noRequiredAuditActions && noWarnings
+        ? 'The readiness audit reports no required actions or warnings.'
+        : 'The readiness audit still reports required actions or warnings.',
+    },
+  ];
+}
+
 function buildProductionIssueChecklist(status: WalletAgentProductionMonitoringStatus): ProductionIssueChecklistItem[] {
   const requiredAuditItems = status.audit.items
     .filter(item => item.status === 'action_required')
@@ -232,6 +296,9 @@ function buildProductionBrief(
   status: WalletAgentProductionMonitoringStatus,
   auditEvents: ProductionStatusAuditEvent[] = [],
 ) {
+  const drillLines = buildProductionVerificationDrill(status).map(item => (
+    `- [${item.passed ? 'pass' : 'review'}] ${item.label}: ${item.detail}`
+  ));
   const closeoutLines = buildPhase12CloseoutChecklist(status).map(item => (
     `- [${item.complete ? 'complete' : 'review'}] ${item.label}: ${item.detail}`
   ));
@@ -265,6 +332,9 @@ function buildProductionBrief(
     '',
     'Phase 12 closeout',
     ...closeoutLines,
+    '',
+    'Phase 13.1 production verification drill',
+    ...drillLines,
     '',
     'Production issue checklist',
     ...productionIssueLines,
@@ -320,6 +390,8 @@ export function WalletAgentProductionStatusPanel({
   const criticalFlags = status.featureFlags.flags.filter(flag => flag.productionRisk === 'critical');
   const phase12Closeout = useMemo(() => buildPhase12CloseoutChecklist(status), [status]);
   const phase12ReviewCount = phase12Closeout.filter(item => !item.complete).length;
+  const productionVerificationDrill = useMemo(() => buildProductionVerificationDrill(status), [status]);
+  const productionVerificationReviewCount = productionVerificationDrill.filter(item => !item.passed).length;
   const productionIssues = useMemo(() => buildProductionIssueChecklist(status), [status]);
   const requiredIssueCount = productionIssues.filter(item => item.severity === 'required').length;
   const warningIssueCount = productionIssues.filter(item => item.severity === 'warning').length;
@@ -578,6 +650,43 @@ export function WalletAgentProductionStatusPanel({
                   >
                     <div className="mb-1 flex items-center gap-2">
                       <CloseoutIcon className="h-3.5 w-3.5 shrink-0" />
+                      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
+                    </div>
+                    <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#00D1FF]/14 bg-[#00D1FF]/[0.04] p-2.5 sm:p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7DE3FF]">Phase 13.1 verification drill</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">Pre-rollout checks derived from the redacted status snapshot.</p>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] ${
+                productionVerificationReviewCount > 0
+                  ? 'border-[#F5A524]/18 bg-[#F5A524]/10 text-[#F5A524]'
+                  : 'border-[#14F195]/18 bg-[#14F195]/10 text-[#14F195]'
+              }`}>
+                {productionVerificationReviewCount > 0 ? `${productionVerificationReviewCount} review` : 'all pass'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {productionVerificationDrill.map(item => {
+                const DrillIcon = item.passed ? CheckCircle2 : AlertTriangle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 ${
+                      item.passed
+                        ? 'border-[#14F195]/14 bg-[#14F195]/[0.045] text-[#14F195]'
+                        : 'border-[#F5A524]/18 bg-[#F5A524]/[0.055] text-[#F5A524]'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      <DrillIcon className="h-3.5 w-3.5 shrink-0" />
                       <p className="truncate text-[10px] font-semibold uppercase tracking-[0.12em]">{item.label}</p>
                     </div>
                     <p className="line-clamp-2 text-[10px] leading-relaxed text-white/46 sm:line-clamp-none">{item.detail}</p>
