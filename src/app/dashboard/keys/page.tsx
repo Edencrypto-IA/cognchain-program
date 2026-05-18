@@ -34,6 +34,19 @@ const PLAN_COLORS: Record<string, string> = {
 
 const API_BASE_URL = 'https://cognchain-program-production.up.railway.app';
 
+const AGENT_CONNECTORS = [
+  { name: 'Hermes', detail: 'Skills, memorias, ferramentas e resultados de tarefas.' },
+  { name: 'Eliza', detail: 'Memorias de agente, persona, decisoes e logs resumidos.' },
+  { name: 'OpenClaw', detail: 'Execucoes locais, pesquisas, artefatos e handoffs.' },
+];
+
+const KEY_CAPABILITIES = [
+  { icon: Bot, label: 'Agentes externos', detail: 'Conecte Hermes, Eliza, OpenClaw e providers locais sem expor segredos.' },
+  { icon: Database, label: 'Memoria verificavel', detail: 'Salve conteudo com hash, modelo, metadata de origem e trilha por agente.' },
+  { icon: Network, label: 'Provas e anchor', detail: 'Peça ZK proof e anchor on-chain apenas quando o fluxo exigir.' },
+  { icon: Shield, label: 'Limite seguro', detail: 'A key autentica memoria e API. Ela nao assina, nao agenda e nao move fundos.' },
+];
+
 const CODE_EXAMPLES = {
   curl: (key: string) => `curl -X POST ${API_BASE_URL}/api/save-memory \\
   -H "Authorization: Bearer ${key}" \\
@@ -182,8 +195,41 @@ export default function ApiKeysPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white/90">API Keys</h1>
-              <p className="text-sm text-white/40">Agent Memory Bridge para Hermes e agentes externos</p>
+              <p className="text-sm text-white/40">Conecte seu agente Hermes, Eliza ou OpenClaw direto na CongChain</p>
             </div>
+          </div>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-[#00D1FF]/18 bg-[#00D1FF]/[0.035] p-5">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="rounded-lg bg-[#00D1FF]/10 p-2">
+              <Bot className="h-5 w-5 text-[#00D1FF]" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-white/82">Agent Memory Bridge</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/45">
+                Gere uma key para agentes externos gravarem memorias verificaveis, recuperar hashes, pedir provas e preparar anchors sem tocar em fundos ou assinaturas.
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            {AGENT_CONNECTORS.map((agent) => (
+              <div key={agent.name} className="rounded-lg border border-white/[0.05] bg-black/20 p-3">
+                <p className="text-xs font-semibold text-[#00D1FF]/80">{agent.name}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/35">{agent.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {KEY_CAPABILITIES.map(({ icon: Icon, label, detail }) => (
+              <div key={label} className="rounded-lg border border-white/[0.05] bg-black/16 p-3">
+                <Icon className="mb-2 h-4 w-4 text-[#9945FF]/75" />
+                <p className="text-xs font-semibold text-white/72">{label}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/34">{detail}</p>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -259,20 +305,24 @@ export default function ApiKeysPage() {
                 <div>
                   <h2 className="text-sm font-semibold text-white/80">Agent Memory Bridge</h2>
                   <p className="mt-1 text-sm leading-relaxed text-white/45">
-                    Use estas keys para conectar Hermes, providers locais e outros agentes externos a memorias verificaveis da CongChain.
+                    Use estas keys para conectar Hermes, Eliza, OpenClaw, providers locais e outros agentes externos a memorias verificaveis da CongChain.
                   </p>
                 </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  { icon: Bot, label: 'Hermes first', detail: 'Skills, memorias e resultados de tarefas.' },
-                  { icon: Database, label: 'Metadata safe', detail: 'Fonte, tipo, agente, skill e run id.' },
-                  { icon: Network, label: 'Proof ready', detail: 'Hash agora; ZK e anchor por opcao explicita.' },
-                ].map(({ icon: Icon, label, detail }) => (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {KEY_CAPABILITIES.map(({ icon: Icon, label, detail }) => (
                   <div key={label} className="rounded-lg border border-white/[0.05] bg-black/20 p-3">
                     <Icon className="mb-2 h-4 w-4 text-[#00D1FF]/70" />
                     <p className="text-xs font-semibold text-white/70">{label}</p>
                     <p className="mt-1 text-[11px] leading-relaxed text-white/35">{detail}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {AGENT_CONNECTORS.map((agent) => (
+                  <div key={agent.name} className="rounded-lg border border-white/[0.05] bg-black/18 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-[#14F195]/72">{agent.name}</p>
+                    <p className="mt-0.5 text-[10px] leading-relaxed text-white/32">{agent.detail}</p>
                   </div>
                 ))}
               </div>
@@ -418,11 +468,13 @@ export default function ApiKeysPage() {
                 <h3 className="text-sm font-semibold text-white/60">Guia do Agent Memory Bridge</h3>
               </div>
               <div className="space-y-3 text-sm leading-relaxed text-white/40">
-                <p><strong className="text-white/60">1. Criar key</strong> - gere uma API key para Hermes ou outro agente externo nesta pagina.</p>
+                <p><strong className="text-white/60">1. Criar key</strong> - gere uma API key para Hermes, Eliza, OpenClaw ou outro agente externo nesta pagina.</p>
                 <p><strong className="text-white/60">2. Salvar memoria</strong> - <code className="font-mono text-xs text-[#9945FF]/70">POST /api/save-memory</code> com <code className="font-mono text-xs">Authorization: Bearer sua_key</code> e metadata do agente.</p>
                 <p><strong className="text-white/60">3. Recuperar por hash</strong> - <code className="font-mono text-xs text-[#9945FF]/70">GET /api/memory/{'{hash}'}</code> para revisar a memoria gravada.</p>
                 <p><strong className="text-white/60">4. Prova e anchor</strong> - <code className="font-mono text-xs text-[#9945FF]/70">GET /api/memory/{'{hash}'}/proof</code> e <code className="font-mono text-xs text-[#9945FF]/70">POST /api/blockchain/store</code> quando o agente pedir explicitamente.</p>
-                <p><strong className="text-white/60">5. Limite de seguranca</strong> - nunca envie secrets, private keys, seed phrases, signed payloads ou dados que autorizem movimentacao financeira.</p>
+                <p><strong className="text-white/60">5. Medir uso</strong> - acompanhe requisicoes, memorias salvas, tokens usados e limites por plano em cada key.</p>
+                <p><strong className="text-white/60">6. Revogar acesso</strong> - desative uma key quando um agente, ambiente local ou provider nao deve mais gravar memoria.</p>
+                <p><strong className="text-white/60">7. Limite de seguranca</strong> - nunca envie secrets, private keys, seed phrases, signed payloads ou dados que autorizem movimentacao financeira.</p>
               </div>
             </div>
           </>
