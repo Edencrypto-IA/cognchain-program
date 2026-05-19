@@ -23,16 +23,29 @@ export interface AgentCard {
   snippet: string;
   fullContent: string;
   tag: 'intelligence' | 'insight' | 'pay' | 'agent';
+  source?: string;
+  agentId?: string;
+  vault?: string;
+}
+
+function readLine(lines: string[], label: string) {
+  return lines.find(l => l.startsWith(`${label}:`))?.replace(`${label}: `, '').trim();
 }
 
 function parse(m: { hash: string; content: string; model: string; timestamp: number; score: number | null }): AgentCard {
   const lines = m.content.split('\n');
   let service = '', category = '', solPaid = 0, tag: AgentCard['tag'] = 'agent';
+  let source: string | undefined;
+  let agentId: string | undefined;
+  let vault: string | undefined;
 
   if (m.content.startsWith('[AGENT_MEMORY_BRIDGE]')) {
     tag      = 'agent';
-    service  = lines.find(l => l.startsWith('Agent:'))?.replace('Agent: ', '') ?? 'Agent Bridge';
-    category = lines.find(l => l.startsWith('Source:'))?.replace('Source: ', '') ?? 'Bridge';
+    source   = readLine(lines, 'Source')?.toLowerCase();
+    agentId  = readLine(lines, 'Agent ID');
+    vault    = readLine(lines, 'Vault');
+    service  = readLine(lines, 'Agent') ?? 'Agent Bridge';
+    category = source ?? 'Bridge';
   } else if (m.content.startsWith('[INTELLIGENCE_SERVICE]')) {
     tag      = 'intelligence';
     service  = lines.find(l => l.startsWith('Serviço:'))?.replace('Serviço: ', '') ?? 'Serviço';
@@ -64,7 +77,7 @@ function parse(m: { hash: string; content: string; model: string; timestamp: num
   const bodyStart = bridgeBodyStart ?? (m.content.startsWith('[INTELLIGENCE_SERVICE]') || m.content.startsWith('[AGENT_INSIGHT]') ? 6 : 2);
   const snippet = lines.slice(bodyStart).join(' ').replace(/\*\*/g, '').trim().slice(0, 160);
 
-  return { hash: m.hash, model: m.model, timestamp: m.timestamp, score: m.score, service, category, solPaid, snippet, fullContent: m.content, tag };
+  return { hash: m.hash, model: m.model, timestamp: m.timestamp, score: m.score, service, category, solPaid, snippet, fullContent: m.content, tag, source, agentId, vault };
 }
 
 export async function GET() {

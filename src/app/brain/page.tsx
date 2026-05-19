@@ -9,21 +9,36 @@ interface AgentCard {
   service: string; category: string; solPaid: number;
   snippet: string; fullContent: string;
   tag: 'intelligence' | 'insight' | 'pay' | 'agent';
+  source?: string;
+  agentId?: string;
+  vault?: string;
 }
 
 const CAT_COLORS: Record<string, string> = {
   Trade: '#F59E0B', DeFi: '#14F195', 'On-Chain': '#9945FF',
   Pesquisa: '#4285F4', Sentimento: '#00D1FF', Segurança: '#FF6B35',
   Pay: '#F59E0B', Insight: '#9945FF', Agente: '#76B900',
+  mythos: '#14F195', hermes: '#00D1FF', openclaw: '#9945FF', eliza: '#FF6B9D',
 };
 
 const MODEL_LABELS_MAP: Record<string, string> = {
   gpt: 'GPT-4o', claude: 'Claude', nvidia: 'NVIDIA',
   gemini: 'Gemini', deepseek: 'DeepSeek', glm: 'GLM-4.7',
-  minimax: 'MiniMax', qwen: 'Qwen3',
+  minimax: 'MiniMax', qwen: 'Qwen3', mythos: 'Mythos',
 };
 
-type AgentRouteKey = 'all' | 'mythos' | 'hermes' | 'openclaw' | 'eliza';
+type AgentRouteKey =
+  | 'all'
+  | 'mythos'
+  | 'hermes'
+  | 'openclaw'
+  | 'eliza'
+  | 'nvidia'
+  | 'minimax'
+  | 'qwen'
+  | 'gpt'
+  | 'claude'
+  | 'gemini';
 
 const AGENT_ROUTES: Array<{
   key: AgentRouteKey;
@@ -34,6 +49,8 @@ const AGENT_ROUTES: Array<{
   description: string;
   obsidian: string;
   routes: string[];
+  source?: string;
+  model?: string;
 }> = [
   {
     key: 'all',
@@ -54,6 +71,8 @@ const AGENT_ROUTES: Array<{
     description: 'Primeiro candidato oficial ao Agent Memory Bridge com contexto, observabilidade e skill CongChain.',
     obsidian: 'Mythos Obsidian',
     routes: ['Context Engine', 'Observability', 'Blockchain Skill'],
+    source: 'mythos',
+    model: 'mythos',
   },
   {
     key: 'hermes',
@@ -64,6 +83,8 @@ const AGENT_ROUTES: Array<{
     description: 'Rota para agentes Hermes e provedores locais enviarem memoria verificavel para a CongChain.',
     obsidian: 'Hermes Obsidian',
     routes: ['Memory Bridge', 'Provider local', 'Proof handoff'],
+    source: 'hermes',
+    model: 'hermes',
   },
   {
     key: 'openclaw',
@@ -74,6 +95,8 @@ const AGENT_ROUTES: Array<{
     description: 'Espaco para migrar memoria, skills e contexto vindo de agentes OpenClaw sem misturar vaults.',
     obsidian: 'OpenClaw Obsidian',
     routes: ['Migration notes', 'Skill import', 'Memory replay'],
+    source: 'openclaw',
+    model: 'openclaw',
   },
   {
     key: 'eliza',
@@ -84,8 +107,94 @@ const AGENT_ROUTES: Array<{
     description: 'Vault dedicado para agentes Eliza registrarem persona, contexto e memorias auditaveis.',
     obsidian: 'Eliza Obsidian',
     routes: ['Persona memory', 'Agent notes', 'Action history'],
+    source: 'eliza',
+    model: 'eliza',
+  },
+  {
+    key: 'nvidia',
+    name: 'NVIDIA',
+    short: 'NVIDIA',
+    status: 'modelo existente',
+    color: '#76B900',
+    description: 'Memorias e insights salvos pelos fluxos existentes que usam modelos NVIDIA.',
+    obsidian: 'NVIDIA Obsidian',
+    routes: ['Market briefs', 'Trade reports', 'Agent insights'],
+    model: 'nvidia',
+  },
+  {
+    key: 'minimax',
+    name: 'MiniMax',
+    short: 'MiniMax',
+    status: 'modelo existente',
+    color: '#FF6B9D',
+    description: 'Memorias criadas por fluxos antigos ou agentes conectados ao modelo MiniMax.',
+    obsidian: 'MiniMax Obsidian',
+    routes: ['Live briefs', 'Research notes', 'Agent output'],
+    model: 'minimax',
+  },
+  {
+    key: 'qwen',
+    name: 'Qwen3',
+    short: 'Qwen3',
+    status: 'modelo existente',
+    color: '#A855F7',
+    description: 'Memorias e resumos salvos por agentes que usam Qwen3.',
+    obsidian: 'Qwen3 Obsidian',
+    routes: ['Market notes', 'Synthesis', 'Agent output'],
+    model: 'qwen',
+  },
+  {
+    key: 'gpt',
+    name: 'GPT-4o',
+    short: 'GPT-4o',
+    status: 'modelo existente',
+    color: '#10A37F',
+    description: 'Memorias salvas por fluxos internos ou agentes conectados ao modelo GPT.',
+    obsidian: 'GPT Obsidian',
+    routes: ['Chat memories', 'Agent notes', 'Insights'],
+    model: 'gpt',
+  },
+  {
+    key: 'claude',
+    name: 'Claude',
+    short: 'Claude',
+    status: 'modelo existente',
+    color: '#9945FF',
+    description: 'Memorias salvas por fluxos internos ou agentes conectados ao modelo Claude.',
+    obsidian: 'Claude Obsidian',
+    routes: ['Chat memories', 'Agent notes', 'Insights'],
+    model: 'claude',
+  },
+  {
+    key: 'gemini',
+    name: 'Gemini',
+    short: 'Gemini',
+    status: 'modelo existente',
+    color: '#4285F4',
+    description: 'Memorias salvas por fluxos internos ou agentes conectados ao modelo Gemini.',
+    obsidian: 'Gemini Obsidian',
+    routes: ['Chat memories', 'Agent notes', 'Insights'],
+    model: 'gemini',
   },
 ];
+
+function agentCardMatchesRoute(card: AgentCard, agent: typeof AGENT_ROUTES[number]) {
+  if (agent.key === 'all') return true;
+  const source = card.source?.toLowerCase();
+  const category = card.category?.toLowerCase();
+  const model = card.model?.toLowerCase();
+  const content = card.fullContent.toLowerCase();
+
+  if (agent.source) {
+    return source === agent.source || category === agent.source || model.includes(agent.source) || content.includes(`source: ${agent.source}`);
+  }
+
+  if (agent.model) {
+    return model.includes(agent.model);
+  }
+
+  return false;
+}
 
 function AgentObsidianPanel({ agent }: { agent: typeof AGENT_ROUTES[number] }) {
   return (
@@ -158,9 +267,9 @@ function HologramFaceMini({ color }: { color: string }) {
 // ─── Agent Memory Card ─────────────────────────────────────────────────────────
 function AgentMemoryCard({ card, onClick }: { card: AgentCard; onClick: () => void }) {
   const [hover, setHover] = useState(false);
-  const mk = Object.keys({ gpt: 1, claude: 1, nvidia: 1, gemini: 1, deepseek: 1, glm: 1, minimax: 1, qwen: 1 })
+  const mk = Object.keys({ mythos: 1, hermes: 1, openclaw: 1, eliza: 1, gpt: 1, claude: 1, nvidia: 1, gemini: 1, deepseek: 1, glm: 1, minimax: 1, qwen: 1 })
     .find(k => card.model.toLowerCase().includes(k)) ?? 'nvidia';
-  const color = ({ gpt: '#10A37F', claude: '#9945FF', nvidia: '#76B900', gemini: '#4285F4', deepseek: '#FF6B35', glm: '#00D1FF', minimax: '#FF6B9D', qwen: '#A855F7' } as Record<string, string>)[mk] ?? '#888';
+  const color = ({ mythos: '#14F195', hermes: '#00D1FF', openclaw: '#9945FF', eliza: '#FF6B9D', gpt: '#10A37F', claude: '#9945FF', nvidia: '#76B900', gemini: '#4285F4', deepseek: '#FF6B35', glm: '#00D1FF', minimax: '#FF6B9D', qwen: '#A855F7' } as Record<string, string>)[mk] ?? '#888';
   const catColor = CAT_COLORS[card.category] ?? color;
 
   return (
@@ -233,9 +342,9 @@ function AgentMemoryCard({ card, onClick }: { card: AgentCard; onClick: () => vo
 function AgentDetailModal({ card, onClose, onDeleted }: { card: AgentCard; onClose: () => void; onDeleted: (hash: string) => void }) {
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const mk = Object.keys({ gpt:1,claude:1,nvidia:1,gemini:1,deepseek:1,glm:1,minimax:1,qwen:1 })
+  const mk = Object.keys({ mythos:1,hermes:1,openclaw:1,eliza:1,gpt:1,claude:1,nvidia:1,gemini:1,deepseek:1,glm:1,minimax:1,qwen:1 })
     .find(k => card.model.toLowerCase().includes(k)) ?? 'nvidia';
-  const color = ({ gpt:'#10A37F',claude:'#9945FF',nvidia:'#76B900',gemini:'#4285F4',deepseek:'#FF6B35',glm:'#00D1FF',minimax:'#FF6B9D',qwen:'#A855F7' } as Record<string,string>)[mk] ?? '#888';
+  const color = ({ mythos:'#14F195',hermes:'#00D1FF',openclaw:'#9945FF',eliza:'#FF6B9D',gpt:'#10A37F',claude:'#9945FF',nvidia:'#76B900',gemini:'#4285F4',deepseek:'#FF6B35',glm:'#00D1FF',minimax:'#FF6B9D',qwen:'#A855F7' } as Record<string,string>)[mk] ?? '#888';
 
   // Body content (skip header lines)
   const bodyLines = card.fullContent.split('\n');
@@ -333,6 +442,10 @@ function AgentDetailModal({ card, onClose, onDeleted }: { card: AgentCard; onClo
 }
 
 const MODEL_COLORS: Record<string, string> = {
+  mythos:   '#14F195',
+  hermes:   '#00D1FF',
+  openclaw: '#9945FF',
+  eliza:    '#FF6B9D',
   gpt:      '#10A37F',
   claude:   '#9945FF',
   nvidia:   '#76B900',
@@ -344,6 +457,10 @@ const MODEL_COLORS: Record<string, string> = {
 };
 
 const MODEL_LABELS: Record<string, string> = {
+  mythos:   'Mythos',
+  hermes:   'Hermes',
+  openclaw: 'OpenClaw',
+  eliza:    'Eliza',
   gpt:      'GPT-4o',
   claude:   'Claude',
   nvidia:   'NVIDIA',
@@ -460,6 +577,7 @@ export default function BrainPage() {
   const [selectedAgentRoute, setSelectedAgentRoute] = useState<AgentRouteKey>('all');
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const selectedAgent = AGENT_ROUTES.find(agent => agent.key === selectedAgentRoute) ?? AGENT_ROUTES[0];
+  const visibleAgentCards = agentCards.filter(card => agentCardMatchesRoute(card, selectedAgent));
 
   const loadCards = useCallback(() => {
     setAgentLoading(true);
@@ -1051,7 +1169,7 @@ export default function BrainPage() {
                 >
                   {selectedAgent.key === 'all' ? 'Decisões dos Agentes' : `${selectedAgent.name} Memory Route`}
                 </div>
-                <div className="text-[12px] text-white/35">{agentCards.length} registros — {selectedAgent.obsidian}</div>
+                <div className="text-[12px] text-white/35">{visibleAgentCards.length} registros — {selectedAgent.obsidian}</div>
               </div>
               <button
                 onClick={async () => {
@@ -1079,15 +1197,15 @@ export default function BrainPage() {
                 <div className="w-7 h-7 border-2 border-[#F59E0B]/40 border-t-[#F59E0B] rounded-full animate-spin" />
                 <span className="text-[11px] text-white/25">Carregando memórias dos agentes...</span>
               </div>
-            ) : agentCards.length === 0 ? (
+            ) : visibleAgentCards.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Brain className="w-10 h-10 text-white/10" />
-                <p className="text-[12px] text-white/30">Nenhuma memória de agente ainda.</p>
-                <p className="text-[11px] text-white/20">Abra o Office, inicie os agentes ou compre um serviço em /pay.</p>
+                <p className="text-[12px] text-white/30">Nenhuma memória em {selectedAgent.obsidian} ainda.</p>
+                <p className="text-[11px] text-white/20">Use a key da CongChain no agente correspondente ou volte para Todos.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {agentCards.map(card => (
+                {visibleAgentCards.map(card => (
                   <AgentMemoryCard key={card.hash} card={card} onClick={() => setSelectedCard(card)} />
                 ))}
               </div>
