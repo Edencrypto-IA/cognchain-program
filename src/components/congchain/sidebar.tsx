@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Zap,
   Hammer,
+  Orbit,
 } from 'lucide-react';
 
 interface Conversation {
@@ -190,6 +191,22 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
               <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
                 Memory Brain
               </span>
+            </a>
+
+            <a
+              href="/mythos"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
+                bg-transparent border border-transparent
+                hover:bg-white/[0.04] hover:border-white/[0.055]
+                transition-all duration-200 group"
+            >
+              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#76FF03]/25">
+                <Orbit className="w-3.5 h-3.5 text-white/55 group-hover:text-[#76FF03]" />
+              </div>
+              <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
+                Mythos Bridge
+              </span>
+              <span className="ml-auto text-[8px] font-black text-[#76FF03]/60 bg-[#76FF03]/10 border border-[#76FF03]/15 px-1.5 py-0.5 rounded-full tracking-widest">1st</span>
             </a>
 
             <a

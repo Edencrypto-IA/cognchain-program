@@ -54,3 +54,6 @@ coverage/
 
 # Local Claude/Cursor task lock
 .claude/scheduled_tasks.lock
+
+# Local audit/extraction workspace
+.tmp/

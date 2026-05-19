@@ -49,10 +49,16 @@ export async function GET(request: NextRequest) {
         const bridge = parseBridgeEnvelope(memory.content);
         return {
           hash: memory.hash,
+          content_hash: memory.hash,
+          contentHash: memory.hash,
+          memory_id: memory.hash,
           model: memory.model,
           timestamp: memory.timestamp,
+          created_at: memory.timestamp,
           parentHash: memory.parentHash,
           score: memory.score,
+          confidence_bps: Math.round((memory.score ?? 0.8) * 10000),
+          importance_bps: Math.round((memory.score ?? 0.8) * 10000),
           verified: memory.verified,
           zkVerified: memory.zkVerified,
           on_chain: !!memory.poiTxHash,

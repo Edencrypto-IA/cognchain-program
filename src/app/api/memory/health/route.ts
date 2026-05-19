@@ -8,8 +8,13 @@ import {
 export async function GET() {
   return NextResponse.json({
     ok: true,
+    status: 'ok',
     service: 'congchain-agent-memory-bridge',
     mode: 'compat',
+    network: 'off-chain-memory-bridge',
+    cluster: 'devnet-ready',
+    program_id: 'agent-memory-bridge',
+    programId: 'agent-memory-bridge',
     authRequiredForWrites: true,
     keyHeaders: ['Authorization: Bearer cog_live_xxx', 'X-API-Key: cog_live_xxx'],
     sources: AGENT_MEMORY_BRIDGE_SOURCES,

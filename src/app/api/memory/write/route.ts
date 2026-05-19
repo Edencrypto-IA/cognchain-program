@@ -68,7 +68,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       hash: memory.hash,
+      content_hash: memory.hash,
+      contentHash: memory.hash,
+      memory_id: memory.hash,
       timestamp: memory.timestamp,
+      created_at: memory.timestamp,
       message: 'Agent memory saved successfully',
       source: metadata.source,
       agentId: metadata.agentId,
@@ -79,6 +83,8 @@ export async function POST(request: NextRequest) {
       proofUrl: `/api/memory/${memory.hash}/proof`,
       readUrl: `/api/memory/${memory.hash}`,
       verifyUrl: `/api/memory/verify/${memory.hash}`,
+      tx_signature: null,
+      txSignature: null,
       on_chain: false,
       verified: memory.verified,
       zkEnabled: zkResult?.enabled || false,

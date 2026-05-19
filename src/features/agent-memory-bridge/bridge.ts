@@ -62,6 +62,10 @@ function safeOptional(value: unknown, maxLength = 80): string | undefined {
 
 export function normalizeBridgeSource(value: unknown): AgentMemoryBridgeSource {
   const source = safeSlug(value, 'external_agent') as AgentMemoryBridgeSource;
+  if (source.startsWith('mythos')) return 'mythos';
+  if (source.startsWith('hermes')) return 'hermes';
+  if (source.startsWith('openclaw')) return 'openclaw';
+  if (source.startsWith('eliza')) return 'eliza';
   return SUPPORTED_SOURCES.includes(source) ? source : 'external_agent';
 }
 
@@ -93,7 +97,16 @@ export function validateBridgeContent(value: unknown): string {
 export function normalizeBridgeMetadata(value: unknown): AgentMemoryBridgeMetadata {
   const raw = (value && typeof value === 'object') ? value as Record<string, unknown> : {};
   const source = normalizeBridgeSource(raw.source);
-  const contentType = normalizeBridgeContentType(raw.contentType);
+  const defaultContentType = source === 'mythos'
+    ? 'mythos_memory'
+    : source === 'hermes'
+      ? 'hermes_memory'
+      : source === 'openclaw'
+        ? 'openclaw_memory'
+        : source === 'eliza'
+          ? 'eliza_memory'
+          : 'agent_memory';
+  const contentType = normalizeBridgeContentType(raw.contentType ?? defaultContentType);
   const agentId = safeSlug(raw.agentId, source, 64);
   const safety = (raw.safety && typeof raw.safety === 'object') ? raw.safety as Record<string, unknown> : {};
 

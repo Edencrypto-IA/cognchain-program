@@ -29,7 +29,21 @@ export async function GET(
       return NextResponse.json({ error: 'Memory not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ memory });
+    return NextResponse.json({
+      memory,
+      hash: memory.hash,
+      content_hash: memory.hash,
+      contentHash: memory.hash,
+      model: memory.model,
+      created_at: memory.timestamp,
+      timestamp: memory.timestamp,
+      confidence_bps: Math.round((memory.score ?? 0.8) * 10000),
+      importance_bps: Math.round((memory.score ?? 0.8) * 10000),
+      content: memory.content,
+      on_chain: !!memory.poiTxHash,
+      zk_status: memory.zkVerified ? 'verified' : 'not_requested',
+      zkStatus: memory.zkVerified ? 'verified' : 'not_requested',
+    });
   } catch (error: unknown) {
     const status = error instanceof Error && error.name === 'ValidationError' ? 400 : 500;
     return NextResponse.json({ error: safeErrorMessage(error) }, { status });
