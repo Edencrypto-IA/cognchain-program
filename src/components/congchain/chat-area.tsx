@@ -42,6 +42,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
 const WalletAdapterButton = dynamic(() => import('./wallet-button'), { ssr: false });
+const SocialIdentityChip = dynamic(() => import('./social-identity-chip'), { ssr: false });
 type ChatPhase = 'idle' | 'connecting' | 'thinking' | 'streaming' | 'completed' | 'error';
 type DemoStage = {
   visible: boolean;
@@ -3213,6 +3214,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
             {/* Desktop-only: Wallet + Lang + Timeline */}
             <div className="hidden sm:flex items-center gap-1.5">
               <WalletAdapterButton />
+              <SocialIdentityChip />
               <div className="relative">
                 <button onClick={() => setShowLangMenu(!showLangMenu)} className={`p-1.5 rounded-full transition-colors ${showLangMenu ? 'bg-white/[0.08] text-white/70' : 'hover:bg-white/[0.055] text-white/30 hover:text-white/62'}`} title="Traduzir">
                   {isTranslating ? (
