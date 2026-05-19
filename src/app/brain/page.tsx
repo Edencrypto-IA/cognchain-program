@@ -12,6 +12,7 @@ interface AgentCard {
   source?: string;
   agentId?: string;
   vault?: string;
+  preview?: boolean;
 }
 
 const CAT_COLORS: Record<string, string> = {
@@ -247,6 +248,29 @@ function AgentOfficialImage({ card, color, compact = false }: { card: AgentCard;
   );
 }
 
+function buildAgentPreviewCard(agent: typeof AGENT_ROUTES[number]): AgentCard | null {
+  if (agent.key === 'all' || (!agent.source && !agent.model)) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const source = agent.source ?? agent.model ?? agent.key;
+
+  return {
+    hash: `preview-${agent.key}`,
+    model: agent.model ?? source,
+    timestamp: now,
+    score: null,
+    service: agent.name,
+    category: source,
+    solPaid: 0,
+    snippet: `${agent.name} ainda nao gravou memoria real. Este card e apenas uma previa visual do vault ${agent.obsidian}.`,
+    fullContent: `[AGENT_PREVIEW]\nSource: ${source}\nAgent: ${agent.name}\n---\nPreview visual sem memoria salva.`,
+    tag: 'agent',
+    source,
+    agentId: `${agent.key}-preview`,
+    vault: agent.obsidian,
+    preview: true,
+  };
+}
+
 function AgentObsidianPanel({ agent }: { agent: typeof AGENT_ROUTES[number] }) {
   return (
     <div
@@ -343,7 +367,7 @@ function AgentMemoryCard({ card, onClick }: { card: AgentCard; onClick: () => vo
         {/* Tag badge */}
         <div className="absolute top-2.5 right-2.5 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full"
           style={{ background: `${color}20`, color, border: `1px solid ${color}30` }}>
-          {card.tag === 'intelligence' ? 'SERVIÇO' : card.tag === 'insight' ? 'INSIGHT' : card.tag === 'pay' ? 'PAY' : 'AGENTE'}
+          {card.preview ? 'PREVIEW' : card.tag === 'intelligence' ? 'SERVIÇO' : card.tag === 'insight' ? 'INSIGHT' : card.tag === 'pay' ? 'PAY' : 'AGENTE'}
         </div>
       </div>
 
@@ -379,9 +403,9 @@ function AgentMemoryCard({ card, onClick }: { card: AgentCard; onClick: () => vo
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-white/[0.04] pt-2.5">
-          <span className="font-mono text-[9px] text-white/20">{card.hash.slice(0, 8)}…</span>
+          <span className="font-mono text-[9px] text-white/20">{card.preview ? 'sem hash real' : `${card.hash.slice(0, 8)}...`}</span>
           <span className="text-[9px] text-white/20">
-            {new Date(card.timestamp * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+            {card.preview ? 'visual' : new Date(card.timestamp * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
           </span>
         </div>
       </div>
@@ -427,6 +451,7 @@ function AgentDetailModal({ card, onClose, onDeleted }: { card: AgentCard; onClo
           </div>
           <div className="flex items-center gap-2">
             <button onClick={async () => {
+              if (card.preview) return;
               if (!confirm('Apagar esta memória?')) return;
               setDeleting(true);
               await fetch(`/api/memory/${card.hash}`, { method: 'DELETE' });
@@ -457,7 +482,7 @@ function AgentDetailModal({ card, onClose, onDeleted }: { card: AgentCard; onClo
             )}
             <div className="rounded-xl p-3 bg-white/[0.03] border border-white/[0.06] text-center">
               <div className="text-[11px] font-bold text-white/50">
-                {new Date(card.timestamp * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })}
+                {card.preview ? 'Preview' : new Date(card.timestamp * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })}
               </div>
               <div className="text-[9px] text-white/30 uppercase tracking-widest">Data</div>
             </div>
@@ -475,15 +500,15 @@ function AgentDetailModal({ card, onClose, onDeleted }: { card: AgentCard; onClo
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-[9px] uppercase tracking-widest text-white/20 w-12">Hash</span>
-              <span className="font-mono text-[10px] text-white/40 flex-1 truncate">{card.hash}</span>
-              <button onClick={() => { navigator.clipboard?.writeText(card.hash).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),1500); }}
+              <span className="font-mono text-[10px] text-white/40 flex-1 truncate">{card.preview ? 'Preview visual sem hash real' : card.hash}</span>
+              {!card.preview && <button onClick={() => { navigator.clipboard?.writeText(card.hash).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),1500); }}
                 className="text-white/20 hover:text-white/60 transition-colors">
                 {copied ? <ZapIcon className="w-3 h-3 text-[#14F195]" /> : <ChevronRight className="w-3 h-3" />}
-              </button>
+              </button>}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[9px] uppercase tracking-widest text-[#14F195]/40 w-12">Proof</span>
-              <span className="font-mono text-[10px] text-[#14F195]/50 flex-1 truncate">CONGCHAIN://memory/{card.hash.slice(0,16)}…</span>
+              <span className="font-mono text-[10px] text-[#14F195]/50 flex-1 truncate">{card.preview ? 'Sem proof ate a primeira memoria real' : `CONGCHAIN://memory/${card.hash.slice(0,16)}...`}</span>
             </div>
           </div>
         </div>
@@ -629,6 +654,8 @@ export default function BrainPage() {
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const selectedAgent = AGENT_ROUTES.find(agent => agent.key === selectedAgentRoute) ?? AGENT_ROUTES[0];
   const visibleAgentCards = agentCards.filter(card => agentCardMatchesRoute(card, selectedAgent));
+  const previewAgentCard = visibleAgentCards.length === 0 ? buildAgentPreviewCard(selectedAgent) : null;
+  const displayAgentCards = previewAgentCard ? [previewAgentCard] : visibleAgentCards;
 
   const loadCards = useCallback(() => {
     setAgentLoading(true);
@@ -1248,17 +1275,17 @@ export default function BrainPage() {
                 <div className="w-7 h-7 border-2 border-[#F59E0B]/40 border-t-[#F59E0B] rounded-full animate-spin" />
                 <span className="text-[11px] text-white/25">Carregando memórias dos agentes...</span>
               </div>
-            ) : visibleAgentCards.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <Brain className="w-10 h-10 text-white/10" />
-                <p className="text-[12px] text-white/30">Nenhuma memória em {selectedAgent.obsidian} ainda.</p>
-                <p className="text-[11px] text-white/20">Use a key da CongChain no agente correspondente ou volte para Todos.</p>
-              </div>
-            ) : (
+            ) : displayAgentCards.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {visibleAgentCards.map(card => (
+                {displayAgentCards.map(card => (
                   <AgentMemoryCard key={card.hash} card={card} onClick={() => setSelectedCard(card)} />
                 ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Brain className="w-10 h-10 text-white/10" />
+                <p className="text-[12px] text-white/30">Nenhuma memória de agente ainda.</p>
+                <p className="text-[11px] text-white/20">Use a key da CongChain em um agente externo para criar o primeiro card.</p>
               </div>
             )}
           </div>
