@@ -119,6 +119,7 @@ export default function ApiKeysPage() {
   const [newKeyPlan, setNewKeyPlan] = useState('free');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [createdKeyId, setCreatedKeyId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [showExample, setShowExample] = useState<Record<string, string>>({});
   const [exampleLang, setExampleLang] = useState<'curl' | 'typescript' | 'python'>('curl');
@@ -128,7 +129,7 @@ export default function ApiKeysPage() {
     try {
       const res = await fetch(`/api/keys?owner=${encodeURIComponent(ownerEmail)}`);
       const data = await res.json();
-      setKeys(data.keys || []);
+      setKeys((data.keys || []).filter((key: ApiKey) => key.isActive));
     } catch {
       // Keep the page usable even if the key service is unavailable.
     } finally {
@@ -154,9 +155,17 @@ export default function ApiKeysPage() {
       const data = await res.json();
       if (data.rawKey) {
         setCreatedKey(data.rawKey);
+        setCreatedKeyId(data.key?.id || null);
         setShowCreateForm(false);
         setNewKeyName('');
-        loadKeys(owner);
+        if (data.key?.isActive) {
+          setKeys((current) => [
+            data.key,
+            ...current.filter((key) => key.id !== data.key.id && key.isActive),
+          ]);
+        } else {
+          loadKeys(owner);
+        }
       }
     } catch {
       // Inline error handling can be added when the API key surface gets auth.
@@ -172,6 +181,11 @@ export default function ApiKeysPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ owner }),
     });
+    setKeys((current) => current.filter((key) => key.id !== id));
+    if (createdKeyId === id) {
+      setCreatedKey(null);
+      setCreatedKeyId(null);
+    }
     loadKeys(owner);
   }
 
@@ -251,7 +265,13 @@ export default function ApiKeysPage() {
                 {copied === 'new-key' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </button>
             </div>
-            <button onClick={() => setCreatedKey(null)} className="mt-3 text-xs text-white/30 hover:text-white/50">
+            <button
+              onClick={() => {
+                setCreatedKey(null);
+                setCreatedKeyId(null);
+              }}
+              className="mt-3 text-xs text-white/30 hover:text-white/50"
+            >
               Ja salvei, pode fechar
             </button>
             <p className="mt-2 text-[11px] text-[#14F195]/45">
@@ -396,8 +416,19 @@ export default function ApiKeysPage() {
                           {!k.isActive && <span className="text-[10px] text-red-400">REVOGADA</span>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <code className="font-mono text-xs text-white/40">{k.keyPrefix}...</code>
-                          <span className="text-[10px] text-white/22">prefixo de identificacao, nao e a key completa</span>
+                          {createdKey && createdKeyId === k.id ? (
+                            <>
+                              <code className="break-all font-mono text-xs text-[#14F195]">{createdKey}</code>
+                              <button onClick={() => copy(createdKey, k.id)} className="text-[#14F195]/50 transition-colors hover:text-[#14F195]">
+                                {copied === k.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <code className="font-mono text-xs text-white/40">{k.keyPrefix}...</code>
+                              <span className="text-[10px] text-white/22">prefixo de identificacao, nao e a key completa</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       {k.isActive && (
