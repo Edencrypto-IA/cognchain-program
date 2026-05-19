@@ -50,7 +50,19 @@ async function sendMagicLinkEmail(email: string, magicUrl: string) {
   });
 
   if (!response.ok) {
-    return { sent: false, reason: 'email_provider_failed' as const };
+    const providerBody = await response.json().catch(() => null);
+    const providerMessage = typeof providerBody?.message === 'string'
+      ? providerBody.message
+      : typeof providerBody?.error === 'string'
+        ? providerBody.error
+        : 'Resend recusou o envio. Verifique remetente, dominio ou permissao da API key.';
+
+    return {
+      sent: false,
+      reason: 'email_provider_failed' as const,
+      providerStatus: response.status,
+      providerMessage,
+    };
   }
 
   return { sent: true, reason: 'sent' as const };
@@ -83,11 +95,15 @@ export async function POST(req: NextRequest) {
     provider: {
       name: 'resend',
       configured: delivery.reason !== 'email_provider_not_configured',
+      failureReason: delivery.reason === 'email_provider_failed' ? delivery.providerMessage : undefined,
+      failureStatus: delivery.reason === 'email_provider_failed' ? delivery.providerStatus : undefined,
     },
     expiresAt: new Date(link.expiresAt).toISOString(),
     magicUrl: includeDevelopmentLink ? magicUrl : undefined,
     message: delivery.sent
       ? 'Link magico enviado para o email informado.'
-      : 'Link magico preparado, mas o provedor de email ainda nao esta configurado.',
+      : delivery.reason === 'email_provider_failed'
+        ? 'Link magico preparado, mas o Resend recusou o envio. Verifique remetente, dominio ou API key.'
+        : 'Link magico preparado, mas o provedor de email ainda nao esta configurado.',
   });
 }

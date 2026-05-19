@@ -378,10 +378,16 @@ export default function WalletButton() {
         return;
       }
 
-      setEmailMessage(data.delivery === 'email_sent'
-        ? 'Link magico enviado. Confira seu email.'
-        : 'Link magico preparado. Configure RESEND_API_KEY e AUTH_EMAIL_FROM para envio real.'
-      );
+      if (data.delivery === 'email_sent') {
+        setEmailMessage('Link magico enviado. Confira seu email.');
+      } else if (data.delivery === 'email_provider_failed') {
+        setEmailMessage(data.provider?.failureReason
+          ? `Link preparado, mas o Resend recusou o envio: ${data.provider.failureReason}`
+          : 'Link preparado, mas o Resend recusou o envio. Verifique remetente, dominio ou API key.'
+        );
+      } else {
+        setEmailMessage('Link magico preparado. Configure RESEND_API_KEY e AUTH_EMAIL_FROM para envio real.');
+      }
     } catch {
       setEmailMessage('Nao foi possivel preparar o link magico agora.');
     } finally {
