@@ -33,6 +33,7 @@ const PLAN_COLORS: Record<string, string> = {
 };
 
 const API_BASE_URL = 'https://cognchain-program-production.up.railway.app';
+const FULL_KEY_PLACEHOLDER = 'COLE_SUA_KEY_COMPLETA_AQUI';
 
 const AGENT_CONNECTORS = [
   { name: 'Mythos', detail: 'Context engine, observability, skills e task results com vault proprio.' },
@@ -238,8 +239,8 @@ export default function ApiKeysPage() {
           <div className="mb-6 rounded-xl border border-[#14F195]/30 bg-[#14F195]/5 p-5">
             <div className="flex items-center gap-2 mb-3">
               <Shield className="h-4 w-4 text-[#14F195]" />
-              <span className="text-sm font-semibold text-[#14F195]">Chave criada - salve agora!</span>
-              <span className="text-xs text-[#14F195]/60">Esta e a unica vez que ela aparece.</span>
+              <span className="text-sm font-semibold text-[#14F195]">Chave completa criada - salve agora!</span>
+              <span className="text-xs text-[#14F195]/60">Esta e a unica vez que ela aparece inteira.</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-[#14F195]/20 bg-black/30 px-4 py-3">
               <code className="flex-1 break-all font-mono text-sm text-[#14F195]">{createdKey}</code>
@@ -253,6 +254,9 @@ export default function ApiKeysPage() {
             <button onClick={() => setCreatedKey(null)} className="mt-3 text-xs text-white/30 hover:text-white/50">
               Ja salvei, pode fechar
             </button>
+            <p className="mt-2 text-[11px] text-[#14F195]/45">
+              Depois que fechar, a lista mostra apenas o prefixo. Prefixo com "..." nao autentica chamadas.
+            </p>
           </div>
         )}
 
@@ -393,9 +397,7 @@ export default function ApiKeysPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-xs text-white/40">{k.keyPrefix}...</code>
-                          <button onClick={() => copy(`${k.keyPrefix}...`, k.id)} className="text-white/20 transition-colors hover:text-white/50">
-                            {copied === k.id ? <Check className="h-3 w-3 text-[#14F195]" /> : <Copy className="h-3 w-3" />}
-                          </button>
+                          <span className="text-[10px] text-white/22">prefixo de identificacao, nao e a key completa</span>
                         </div>
                       </div>
                       {k.isActive && (
@@ -430,7 +432,7 @@ export default function ApiKeysPage() {
                           className="mb-2 flex items-center gap-1.5 text-[11px] text-[#9945FF]/70 transition-colors hover:text-[#9945FF]"
                         >
                           {showExample[k.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                          {showExample[k.id] ? 'Ocultar exemplo' : 'Ver exemplo Hermes'}
+                          {showExample[k.id] ? 'Ocultar exemplo' : 'Ver exemplo de conexao'}
                         </button>
                         {showExample[k.id] && (
                           <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-black/30">
@@ -445,15 +447,18 @@ export default function ApiKeysPage() {
                                 </button>
                               ))}
                               <button
-                                onClick={() => copy(CODE_EXAMPLES[exampleLang](`${k.keyPrefix}...`), `code-${k.id}`)}
+                                onClick={() => copy(CODE_EXAMPLES[exampleLang](FULL_KEY_PLACEHOLDER), `code-${k.id}`)}
                                 className="ml-auto px-3 py-2 text-white/25 transition-colors hover:text-white/50"
                               >
                                 {copied === `code-${k.id}` ? <Check className="h-3.5 w-3.5 text-[#14F195]" /> : <Copy className="h-3.5 w-3.5" />}
                               </button>
                             </div>
                             <pre className="overflow-x-auto whitespace-pre-wrap p-4 font-mono text-xs leading-relaxed text-white/60">
-                              {CODE_EXAMPLES[exampleLang](`${k.keyPrefix}...`)}
+                              {CODE_EXAMPLES[exampleLang](FULL_KEY_PLACEHOLDER)}
                             </pre>
+                            <div className="border-t border-white/[0.06] px-4 py-2 text-[11px] text-yellow-300/55">
+                              Troque {FULL_KEY_PLACEHOLDER} pela key completa exibida uma unica vez ao criar uma nova key.
+                            </div>
                           </div>
                         )}
                       </div>
