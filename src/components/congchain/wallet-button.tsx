@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
-import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift, FlaskConical, Mail, UserCheck } from 'lucide-react';
+import { signIn, signOut } from 'next-auth/react';
+import { Wallet, LogOut, Copy, Check, ExternalLink, ChevronDown, X, Loader2, ShieldCheck, LockKeyhole, Eye, Gift, FlaskConical, Mail, UserCheck, Chrome, Github } from 'lucide-react';
 
 const WALLET_OPTIONS = [
   {
@@ -57,6 +58,15 @@ type EmailProviderStatus = {
   from: string | null;
 };
 
+type SocialIdentitySession = {
+  email: string;
+  name?: string | null;
+  image?: string | null;
+  provider: string;
+};
+
+type SocialProviderMap = Record<string, { id: string; name: string }>;
+
 function isMobileBrowser() {
   if (typeof navigator === 'undefined') return false;
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
@@ -81,6 +91,10 @@ export default function WalletButton() {
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [emailMessage, setEmailMessage] = useState('');
   const [emailProvider, setEmailProvider] = useState<EmailProviderStatus | null>(null);
+  const [socialSession, setSocialSession] = useState<SocialIdentitySession | null>(null);
+  const [socialProviders, setSocialProviders] = useState<SocialProviderMap>({});
+  const [socialLoading, setSocialLoading] = useState<string | null>(null);
+  const [socialMessage, setSocialMessage] = useState('');
   const walletButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -130,6 +144,35 @@ export default function WalletButton() {
       })
       .catch(() => {});
   }, []);
+
+  const refreshSocialSession = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/session');
+      const data = await res.json();
+      if (data?.user?.email) {
+        setSocialSession({
+          email: data.user.email,
+          name: data.user.name ?? null,
+          image: data.user.image ?? null,
+          provider: data.user.provider || 'social',
+        });
+      } else {
+        setSocialSession(null);
+      }
+    } catch {
+      setSocialSession(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/auth/providers')
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data === 'object') setSocialProviders(data);
+      })
+      .catch(() => {});
+    void refreshSocialSession();
+  }, [refreshSocialSession]);
 
   const fetchBalance = useCallback(async () => {
     if (!publicKey) return;
@@ -407,6 +450,34 @@ export default function WalletButton() {
     }
   }
 
+  async function connectSocialIdentity(provider: 'google' | 'github') {
+    if (!socialProviders[provider]) {
+      setSocialMessage(`${provider === 'google' ? 'Google' : 'GitHub'} ainda nao esta configurado no Railway.`);
+      return;
+    }
+
+    setSocialLoading(provider);
+    setSocialMessage('');
+    await signIn(provider, {
+      callbackUrl: typeof window !== 'undefined' ? window.location.href : '/',
+    });
+  }
+
+  async function logoutSocialIdentity() {
+    setSocialLoading('logout');
+    setSocialMessage('');
+    try {
+      await signOut({ redirect: false });
+      setSocialSession(null);
+      setSocialMessage('Login social desconectado desta sessao.');
+    } catch {
+      setSocialMessage('Nao foi possivel desconectar o login social agora.');
+    } finally {
+      setSocialLoading(null);
+      void refreshSocialSession();
+    }
+  }
+
   function openConnectedMenu() {
     const rect = walletButtonRef.current?.getBoundingClientRect();
     if (!rect || typeof window === 'undefined') {
@@ -612,6 +683,79 @@ export default function WalletButton() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-2.5">
+                  <div className="mb-2 flex items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04]">
+                      <UserCheck className="h-4 w-4 text-white/65" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">Login social</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-white/36">
+                        Entre com Google ou GitHub para identidade. Carteira continua separada para fundos e assinaturas.
+                      </p>
+                    </div>
+                  </div>
+
+                  {socialSession ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 rounded-xl border border-[#14F195]/14 bg-[#14F195]/[0.045] px-3 py-2">
+                        {socialSession.image ? (
+                          <img src={socialSession.image} alt="" className="h-7 w-7 rounded-lg" />
+                        ) : (
+                          <UserCheck className="h-4 w-4 text-[#14F195]/70" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11px] font-semibold text-white/70">
+                            {socialSession.name || socialSession.email}
+                          </p>
+                          <p className="truncate text-[10px] text-[#14F195]/60">
+                            {socialSession.provider} conectado: {socialSession.email}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={logoutSocialIdentity}
+                        disabled={!!socialLoading}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-semibold text-red-300/62 transition-colors hover:bg-red-500/5 hover:text-red-300 disabled:opacity-50"
+                      >
+                        {socialLoading === 'logout' ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3 w-3" />}
+                        Sair do login social
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => connectSocialIdentity('google')}
+                        disabled={!!socialLoading || !socialProviders.google}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs font-semibold text-white/72 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {socialLoading === 'google' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Chrome className="h-3.5 w-3.5" />}
+                        Google
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => connectSocialIdentity('github')}
+                        disabled={!!socialLoading || !socialProviders.github}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs font-semibold text-white/72 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {socialLoading === 'github' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Github className="h-3.5 w-3.5" />}
+                        GitHub
+                      </button>
+                    </div>
+                  )}
+
+                  {socialMessage && (
+                    <p className="mt-2 text-[10px] leading-relaxed text-white/40">{socialMessage}</p>
+                  )}
+                  {!socialProviders.google && !socialProviders.github && (
+                    <p className="mt-2 text-[10px] leading-relaxed text-[#F5A524]/72">
+                      Configure GOOGLE_CLIENT_ID/SECRET ou GITHUB_CLIENT_ID/SECRET no Railway para ativar estes botoes.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex items-start gap-3 rounded-2xl border border-[#00D1FF]/16 bg-[#00D1FF]/7 p-2.5">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#00D1FF]/18 bg-[#00D1FF]/10">
                     <FlaskConical className="h-4 w-4 text-[#00D1FF]" />
@@ -797,6 +941,24 @@ export default function WalletButton() {
                     Nenhum email conectado. Abra Conectar Carteira para adicionar Email Identity.
                   </p>
                 )}
+
+                <div className="mt-2 rounded-lg border border-white/[0.06] bg-black/18 px-2.5 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-white/28">Login social</p>
+                  {socialSession ? (
+                    <>
+                      <p className="mt-0.5 truncate text-[11px] font-semibold text-white/62">
+                        {socialSession.name || socialSession.email}
+                      </p>
+                      <p className="mt-1 truncate text-[10px] leading-relaxed text-white/32">
+                        {socialSession.provider}: {socialSession.email}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-1 text-[10px] leading-relaxed text-white/32">
+                      Google/GitHub ainda nao conectado nesta sessao.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="mb-2 rounded-xl border border-[#14F195]/16 bg-[#14F195]/7 p-3">
