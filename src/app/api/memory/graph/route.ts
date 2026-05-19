@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     /^(assistant:\s*)?novo inicio/i,
     /^assistant:\s*novo/i,
     // Agent-generated content — stays in Office/insights, not in Brain
+    /^\[AGENT_MEMORY_BRIDGE\]/i,
     /^\[AGENT_INSIGHT\]/i,
     /^\[INTELLIGENCE_SERVICE\]/i,
     /^\[.*SYNTHESIS\]/i,

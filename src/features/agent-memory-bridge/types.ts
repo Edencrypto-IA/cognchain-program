@@ -1,5 +1,9 @@
 export const AGENT_MEMORY_BRIDGE_ENDPOINTS = {
   saveMemory: '/api/save-memory',
+  writeMemory: '/api/memory/write',
+  listMemories: '/api/memory/list',
+  health: '/api/memory/health',
+  verifyMemory: '/api/memory/verify/{hash}',
   readMemory: '/api/memory/{hash}',
   readProof: '/api/memory/{hash}/proof',
   generateProof: '/api/zk/prove',
@@ -8,15 +12,27 @@ export const AGENT_MEMORY_BRIDGE_ENDPOINTS = {
 } as const;
 
 export const AGENT_MEMORY_BRIDGE_SOURCES = [
+  'mythos',
   'hermes',
+  'openclaw',
+  'eliza',
   'external_agent',
   'congchain',
 ] as const;
 
 export const AGENT_MEMORY_BRIDGE_CONTENT_TYPES = [
+  'mythos_skill',
+  'mythos_memory',
+  'mythos_task_result',
   'hermes_skill',
   'hermes_memory',
   'hermes_task_result',
+  'openclaw_skill',
+  'openclaw_memory',
+  'openclaw_task_result',
+  'eliza_skill',
+  'eliza_memory',
+  'eliza_task_result',
   'agent_skill',
   'agent_memory',
   'agent_task_result',

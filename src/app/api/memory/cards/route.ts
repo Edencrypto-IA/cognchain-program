@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
 const AGENT_TAGS = [
+  '[AGENT_MEMORY_BRIDGE]',
   '[AGENT_INSIGHT]', '[INTELLIGENCE_SERVICE]', '[CONGCHAIN PAY',
   '[VEGA ', '[NEXUS ', '[NOVA ', '[ECHO ', '[APEX ', '[ARES ', '[FLUX ', '[ZION ',
 ];
@@ -28,7 +29,11 @@ function parse(m: { hash: string; content: string; model: string; timestamp: num
   const lines = m.content.split('\n');
   let service = '', category = '', solPaid = 0, tag: AgentCard['tag'] = 'agent';
 
-  if (m.content.startsWith('[INTELLIGENCE_SERVICE]')) {
+  if (m.content.startsWith('[AGENT_MEMORY_BRIDGE]')) {
+    tag      = 'agent';
+    service  = lines.find(l => l.startsWith('Agent:'))?.replace('Agent: ', '') ?? 'Agent Bridge';
+    category = lines.find(l => l.startsWith('Source:'))?.replace('Source: ', '') ?? 'Bridge';
+  } else if (m.content.startsWith('[INTELLIGENCE_SERVICE]')) {
     tag      = 'intelligence';
     service  = lines.find(l => l.startsWith('Serviço:'))?.replace('Serviço: ', '') ?? 'Serviço';
     category = lines.find(l => l.startsWith('Categoria:'))?.replace('Categoria: ', '') ?? '';
@@ -53,7 +58,10 @@ function parse(m: { hash: string; content: string; model: string; timestamp: num
   }
 
   // Body starts after header block (skip tag lines)
-  const bodyStart = m.content.startsWith('[INTELLIGENCE_SERVICE]') || m.content.startsWith('[AGENT_INSIGHT]') ? 6 : 2;
+  const bridgeBodyStart = m.content.startsWith('[AGENT_MEMORY_BRIDGE]')
+    ? Math.max(lines.findIndex(l => l.trim() === '---') + 1, 1)
+    : null;
+  const bodyStart = bridgeBodyStart ?? (m.content.startsWith('[INTELLIGENCE_SERVICE]') || m.content.startsWith('[AGENT_INSIGHT]') ? 6 : 2);
   const snippet = lines.slice(bodyStart).join(' ').replace(/\*\*/g, '').trim().slice(0, 160);
 
   return { hash: m.hash, model: m.model, timestamp: m.timestamp, score: m.score, service, category, solPaid, snippet, fullContent: m.content, tag };

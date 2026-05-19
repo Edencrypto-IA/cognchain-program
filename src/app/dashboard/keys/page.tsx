@@ -35,6 +35,7 @@ const PLAN_COLORS: Record<string, string> = {
 const API_BASE_URL = 'https://cognchain-program-production.up.railway.app';
 
 const AGENT_CONNECTORS = [
+  { name: 'Mythos', detail: 'Context engine, observability, skills e task results com vault proprio.' },
   { name: 'Hermes', detail: 'Skills, memorias, ferramentas e resultados de tarefas.' },
   { name: 'Eliza', detail: 'Memorias de agente, persona, decisoes e logs resumidos.' },
   { name: 'OpenClaw', detail: 'Execucoes locais, pesquisas, artefatos e handoffs.' },
@@ -48,7 +49,7 @@ const KEY_CAPABILITIES = [
 ];
 
 const CODE_EXAMPLES = {
-  curl: (key: string) => `curl -X POST ${API_BASE_URL}/api/save-memory \\
+  curl: (key: string) => `curl -X POST ${API_BASE_URL}/api/memory/write \\
   -H "Authorization: Bearer ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -64,7 +65,7 @@ const CODE_EXAMPLES = {
     }
   }'`,
 
-  typescript: (key: string) => `const response = await fetch('${API_BASE_URL}/api/save-memory', {
+  typescript: (key: string) => `const response = await fetch('${API_BASE_URL}/api/memory/write', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer ${key}',
@@ -88,7 +89,7 @@ const { hash } = await response.json();
 
   python: (key: string) => `import requests
 
-r = requests.post('${API_BASE_URL}/api/save-memory',
+r = requests.post('${API_BASE_URL}/api/memory/write',
   headers={'Authorization': f'Bearer ${key}'},
   json={
     'content': 'Hermes skill summary or task result',
@@ -468,8 +469,8 @@ export default function ApiKeysPage() {
                 <h3 className="text-sm font-semibold text-white/60">Guia do Agent Memory Bridge</h3>
               </div>
               <div className="space-y-3 text-sm leading-relaxed text-white/40">
-                <p><strong className="text-white/60">1. Criar key</strong> - gere uma API key para Hermes, Eliza, OpenClaw ou outro agente externo nesta pagina.</p>
-                <p><strong className="text-white/60">2. Salvar memoria</strong> - <code className="font-mono text-xs text-[#9945FF]/70">POST /api/save-memory</code> com <code className="font-mono text-xs">Authorization: Bearer sua_key</code> e metadata do agente.</p>
+                <p><strong className="text-white/60">1. Criar key</strong> - gere uma API key para Mythos, Hermes, Eliza, OpenClaw ou outro agente externo nesta pagina.</p>
+                <p><strong className="text-white/60">2. Salvar memoria</strong> - <code className="font-mono text-xs text-[#9945FF]/70">POST /api/memory/write</code> com <code className="font-mono text-xs">Authorization: Bearer sua_key</code> e metadata do agente.</p>
                 <p><strong className="text-white/60">3. Recuperar por hash</strong> - <code className="font-mono text-xs text-[#9945FF]/70">GET /api/memory/{'{hash}'}</code> para revisar a memoria gravada.</p>
                 <p><strong className="text-white/60">4. Prova e anchor</strong> - <code className="font-mono text-xs text-[#9945FF]/70">GET /api/memory/{'{hash}'}/proof</code> e <code className="font-mono text-xs text-[#9945FF]/70">POST /api/blockchain/store</code> quando o agente pedir explicitamente.</p>
                 <p><strong className="text-white/60">5. Medir uso</strong> - acompanhe requisicoes, memorias salvas, tokens usados e limites por plano em cada key.</p>
