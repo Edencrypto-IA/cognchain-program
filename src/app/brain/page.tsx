@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2, ArrowLeft, Trash2, Send, MessageSquare, Menu, Zap, ChevronRight } from 'lucide-react';
+import { X, ZapIcon, ShieldCheck, Link2, Brain, Filter, ZoomIn, ZoomOut, Sparkles, Shuffle, GitBranch, Loader2, ArrowLeft, Trash2, Send, MessageSquare, Menu, Zap, ChevronRight, ChevronDown } from 'lucide-react';
 
 // ─── Agent card types ──────────────────────────────────────────────────────────
 interface AgentCard {
@@ -22,6 +22,114 @@ const MODEL_LABELS_MAP: Record<string, string> = {
   gemini: 'Gemini', deepseek: 'DeepSeek', glm: 'GLM-4.7',
   minimax: 'MiniMax', qwen: 'Qwen3',
 };
+
+type AgentRouteKey = 'all' | 'mythos' | 'hermes' | 'openclaw' | 'eliza';
+
+const AGENT_ROUTES: Array<{
+  key: AgentRouteKey;
+  name: string;
+  short: string;
+  status: string;
+  color: string;
+  description: string;
+  obsidian: string;
+  routes: string[];
+}> = [
+  {
+    key: 'all',
+    name: 'Todos os agentes',
+    short: 'Todos',
+    status: 'visao geral',
+    color: '#F59E0B',
+    description: 'Visao consolidada das memorias de agentes, servicos comprados e atividade existente.',
+    obsidian: 'Global Agent Vault',
+    routes: ['Memorias existentes', 'Servicos comprados', 'Insights e Pay'],
+  },
+  {
+    key: 'mythos',
+    name: 'Mythos',
+    short: 'Mythos',
+    status: 'pronto para bridge',
+    color: '#14F195',
+    description: 'Primeiro candidato oficial ao Agent Memory Bridge com contexto, observabilidade e skill CongChain.',
+    obsidian: 'Mythos Obsidian',
+    routes: ['Context Engine', 'Observability', 'Blockchain Skill'],
+  },
+  {
+    key: 'hermes',
+    name: 'Hermes',
+    short: 'Hermes',
+    status: 'rota preparada',
+    color: '#00D1FF',
+    description: 'Rota para agentes Hermes e provedores locais enviarem memoria verificavel para a CongChain.',
+    obsidian: 'Hermes Obsidian',
+    routes: ['Memory Bridge', 'Provider local', 'Proof handoff'],
+  },
+  {
+    key: 'openclaw',
+    name: 'OpenClaw',
+    short: 'OpenClaw',
+    status: 'compat futuro',
+    color: '#9945FF',
+    description: 'Espaco para migrar memoria, skills e contexto vindo de agentes OpenClaw sem misturar vaults.',
+    obsidian: 'OpenClaw Obsidian',
+    routes: ['Migration notes', 'Skill import', 'Memory replay'],
+  },
+  {
+    key: 'eliza',
+    name: 'Eliza',
+    short: 'Eliza',
+    status: 'compat futuro',
+    color: '#FF6B9D',
+    description: 'Vault dedicado para agentes Eliza registrarem persona, contexto e memorias auditaveis.',
+    obsidian: 'Eliza Obsidian',
+    routes: ['Persona memory', 'Agent notes', 'Action history'],
+  },
+];
+
+function AgentObsidianPanel({ agent }: { agent: typeof AGENT_ROUTES[number] }) {
+  return (
+    <div
+      className="mb-5 rounded-2xl border p-4"
+      style={{
+        borderColor: `${agent.color}24`,
+        background: `linear-gradient(135deg, ${agent.color}10, rgba(255,255,255,0.025))`,
+        boxShadow: `0 18px 60px ${agent.color}08`,
+      }}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span
+              className="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em]"
+              style={{ background: `${agent.color}18`, color: agent.color, border: `1px solid ${agent.color}28` }}
+            >
+              {agent.status}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/28">
+              Agent Memory Route
+            </span>
+          </div>
+          <h2 className="text-lg font-bold text-white/88">{agent.name}</h2>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-white/42">{agent.description}</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.06] bg-black/18 px-3 py-2 lg:min-w-[210px]">
+          <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/24">Obsidian proprio</div>
+          <div className="mt-1 text-sm font-semibold text-white/76">{agent.obsidian}</div>
+          <div className="mt-1 text-[10px] leading-relaxed text-white/34">Vault visual isolado para revisar contexto antes da integracao real.</div>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        {agent.routes.map(route => (
+          <div key={route} className="rounded-xl border border-white/[0.055] bg-black/16 px-3 py-2">
+            <div className="text-[10px] font-semibold text-white/68">{route}</div>
+            <div className="mt-1 text-[9px] text-white/28">rota preparada</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ─── Hologram face (mini version for cards) ────────────────────────────────────
 function HologramFaceMini({ color }: { color: string }) {
@@ -349,6 +457,9 @@ export default function BrainPage() {
   const [agentLoading, setAgentLoading] = useState(false);
   const [selectedCard, setSelectedCard] = useState<AgentCard | null>(null);
   const [seedingAgents, setSeedingAgents] = useState(false);
+  const [selectedAgentRoute, setSelectedAgentRoute] = useState<AgentRouteKey>('all');
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const selectedAgent = AGENT_ROUTES.find(agent => agent.key === selectedAgentRoute) ?? AGENT_ROUTES[0];
 
   const loadCards = useCallback(() => {
     setAgentLoading(true);
@@ -781,13 +892,44 @@ export default function BrainPage() {
             >
               Memórias
             </button>
-            <button
-              onClick={() => setView('agents')}
-              className="flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-all"
-              style={{ background: view === 'agents' ? '#F59E0B' : 'transparent', color: view === 'agents' ? '#000' : 'rgba(255,255,255,0.4)' }}
-            >
-              Agentes
-            </button>
+            <div className="relative flex-1">
+              <button
+                onClick={() => {
+                  setView('agents');
+                  setAgentMenuOpen(open => !open);
+                }}
+                className="flex w-full items-center justify-center gap-1 text-[11px] font-semibold py-1.5 rounded-md transition-all"
+                style={{
+                  background: view === 'agents' ? selectedAgent.color : 'transparent',
+                  color: view === 'agents' ? '#000' : 'rgba(255,255,255,0.4)',
+                }}
+              >
+                Agentes
+                <ChevronDown className={`h-3 w-3 transition-transform ${agentMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {agentMenuOpen && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-white/[0.08] bg-[#10101b] shadow-2xl shadow-black/50">
+                  {AGENT_ROUTES.map(agent => (
+                    <button
+                      key={agent.key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAgentRoute(agent.key);
+                        setView('agents');
+                        setAgentMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors hover:bg-white/[0.055]"
+                    >
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: agent.color }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[11px] font-semibold text-white/72">{agent.short}</span>
+                        <span className="block truncate text-[9px] text-white/28">{agent.obsidian}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <button
             onClick={async () => {
@@ -899,10 +1041,17 @@ export default function BrainPage() {
           </button>
 
           <div className="max-w-5xl mx-auto px-5 py-8">
+            <AgentObsidianPanel agent={selectedAgent} />
+
             <div className="flex items-center justify-between mb-6">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F59E0B]/70 mb-1">Decisões dos Agentes</div>
-                <div className="text-[12px] text-white/35">{agentCards.length} registros — insights, serviços comprados e atividade</div>
+                <div
+                  className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em]"
+                  style={{ color: `${selectedAgent.color}b3` }}
+                >
+                  {selectedAgent.key === 'all' ? 'Decisões dos Agentes' : `${selectedAgent.name} Memory Route`}
+                </div>
+                <div className="text-[12px] text-white/35">{agentCards.length} registros — {selectedAgent.obsidian}</div>
               </div>
               <button
                 onClick={async () => {
@@ -912,7 +1061,12 @@ export default function BrainPage() {
                   setSeedingAgents(false);
                 }}
                 disabled={seedingAgents}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F59E0B]/10 border border-[#F59E0B]/20 hover:bg-[#F59E0B]/20 text-[#F59E0B] text-[10px] font-bold uppercase tracking-wide transition-all disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-all hover:brightness-125 disabled:opacity-40"
+                style={{
+                  background: `${selectedAgent.color}12`,
+                  borderColor: `${selectedAgent.color}24`,
+                  color: selectedAgent.color,
+                }}
               >
                 {seedingAgents
                   ? <><span className="w-3 h-3 border border-[#F59E0B] border-t-transparent rounded-full animate-spin" />Gerando...</>
