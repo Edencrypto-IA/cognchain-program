@@ -196,6 +196,57 @@ function agentCardMatchesRoute(card: AgentCard, agent: typeof AGENT_ROUTES[numbe
   return false;
 }
 
+const AGENT_IMAGE_MAP: Record<string, { src: string; mode?: 'invert' }> = {
+  mythos: { src: '/agents/mythos.png' },
+  hermes: { src: '/agents/hermes.webp', mode: 'invert' },
+  openclaw: { src: '/agents/openclaw.png' },
+  eliza: { src: '/agents/elizaos.png' },
+};
+
+function agentVisualKey(card: AgentCard): string | null {
+  const source = card.source?.toLowerCase();
+  const category = card.category?.toLowerCase();
+  const model = card.model.toLowerCase();
+  const content = card.fullContent.toLowerCase();
+  return Object.keys(AGENT_IMAGE_MAP).find(key =>
+    source === key || category === key || model.includes(key) || content.includes(`source: ${key}`),
+  ) ?? null;
+}
+
+function AgentOfficialImage({ card, color, compact = false }: { card: AgentCard; color: string; compact?: boolean }) {
+  const key = agentVisualKey(card);
+  const image = key ? AGENT_IMAGE_MAP[key] : null;
+  const sizeClass = compact ? 'h-12 w-12' : 'h-24 w-24';
+
+  if (!image) {
+    return (
+      <div className={compact ? 'h-12 w-12' : 'h-20 w-24'}>
+        <HologramFaceMini color={color} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-full border ${sizeClass}`}
+      style={{
+        borderColor: `${color}55`,
+        background: `radial-gradient(circle at center, ${color}24, rgba(5,5,12,0.92) 68%)`,
+        boxShadow: `0 0 28px ${color}25`,
+      }}
+    >
+      <img
+        src={image.src}
+        alt={`${key} agent`}
+        className="h-full w-full object-cover"
+        style={image.mode === 'invert'
+          ? { filter: 'invert(1) contrast(1.25) brightness(1.15)', mixBlendMode: 'screen', padding: '14%' }
+          : undefined}
+      />
+    </div>
+  );
+}
+
 function AgentObsidianPanel({ agent }: { agent: typeof AGENT_ROUTES[number] }) {
   return (
     <div
@@ -286,8 +337,8 @@ function AgentMemoryCard({ card, onClick }: { card: AgentCard; onClick: () => vo
       {/* Hologram area */}
       <div className="relative flex justify-center pt-5 pb-3" style={{ background: `linear-gradient(180deg, ${color}12, transparent)` }}>
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full blur-3xl opacity-15" style={{ background: color }} />
-        <div className="relative w-20 h-24">
-          <HologramFaceMini color={color} />
+        <div className="relative flex h-24 items-center justify-center">
+          <AgentOfficialImage card={card} color={color} />
         </div>
         {/* Tag badge */}
         <div className="absolute top-2.5 right-2.5 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full"
@@ -362,8 +413,8 @@ function AgentDetailModal({ card, onClose, onDeleted }: { card: AgentCard; onClo
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-10">
-              <HologramFaceMini color={color} />
+            <div className="flex h-12 w-12 items-center justify-center">
+              <AgentOfficialImage card={card} color={color} compact />
             </div>
             <div>
               <div className="text-[13px] font-bold text-white/85">{card.service}</div>
