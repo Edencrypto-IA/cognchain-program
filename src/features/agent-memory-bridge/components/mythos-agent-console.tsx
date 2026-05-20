@@ -315,6 +315,20 @@ function formatCognitiveTrace(trace?: MythosCognitiveTrace, label = 'Decision tr
   ].join('\n');
 }
 
+function cleanTerminalText(value: string) {
+  return value
+    .replace(/\r\n/g, '\n')
+    .replace(/```[\s\S]*?```/g, match => match.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, ''))
+    .replace(/(^|\s)\*\*([^*\n]+)\*\*/g, '$1$2')
+    .replace(/(^|\s)__([^_\n]+)__/g, '$1$2')
+    .replace(/(^|\s)\*([^*\n]+)\*/g, '$1$2')
+    .replace(/(^|\s)_([^_\n]+)_/g, '$1$2')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '- ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export default function MythosAgentConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
   const [health, setHealth] = useState<BridgeHealth | null>(null);
@@ -498,7 +512,7 @@ export default function MythosAgentConsole() {
         ...current,
         {
           role: 'assistant',
-          content: `${data.response || 'Mythos respondeu sem conteudo.'}${formatCognitiveTrace(data.cognitiveTrace, copy.decisionTrace)}`,
+          content: cleanTerminalText(`${data.response || 'Mythos respondeu sem conteudo.'}${formatCognitiveTrace(data.cognitiveTrace, copy.decisionTrace)}`),
         },
       ]);
     } catch (error) {
