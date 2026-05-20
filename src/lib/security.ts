@@ -26,6 +26,7 @@ export interface RateLimitConfig {
 const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/chat': { windowMs: 60_000, maxRequests: 20 },
   '/api/forge/chat': { windowMs: 60_000, maxRequests: 15 },
+  '/api/mythos/test-chat': { windowMs: 60_000, maxRequests: 12 },
   '/api/compare': { windowMs: 60_000, maxRequests: 5 },
   '/api/translate': { windowMs: 60_000, maxRequests: 15 },
   '/api/save-memory': { windowMs: 60_000, maxRequests: 30 },
