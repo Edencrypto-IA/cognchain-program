@@ -3,11 +3,11 @@ import { AGENT_MEMORY_BRIDGE_ENDPOINTS } from './types';
 export const MYTHOS_AGENT_PROFILE = {
   id: 'mythos',
   name: 'Mythos',
-  label: 'Primeiro agente externo oficial',
+  label: 'First official external agent',
   image: '/agents/mythos.png',
   route: '/mythos',
   summary:
-    'Agente externo estruturado para contexto, observabilidade, skills, tarefas e memoria verificavel na CongChain.',
+    'External agent structured for context, observability, skills, tasks, and verifiable memory on CongChain.',
   counts: {
     skills: 168,
     memoryProvidersBeforeCongChain: 8,
@@ -17,24 +17,39 @@ export const MYTHOS_AGENT_PROFILE = {
     languageServers: 26,
     toolFiles: 76,
   },
+  identity: {
+    namespace: 'mythos',
+    lineage: 'Hermes-compatible fork',
+    position: 'Independent CongChain external agent',
+    compatibility:
+      'Hermes compatibility remains available only as a legacy adapter layer. Mythos writes use source=mythos, contentType=mythos_*, and an isolated Mythos vault by default.',
+    evolution:
+      'The next identity phase can replace inherited Hermes naming with Mythos-native runtime, docs, skills, and distribution without changing the CongChain bridge contract.',
+  },
   contracts: [
     {
       name: 'Context Engine',
-      status: 'precisa adaptar key',
+      status: 'key adapter ready',
       detail:
-        'Seleciona turnos de alto valor antes da compressao e grava como memoria Mythos autenticada.',
+        'Selects high-value turns before compression and stores them as authenticated Mythos memory.',
     },
     {
       name: 'Observability',
-      status: 'precisa adaptar key',
+      status: 'key adapter ready',
       detail:
-        'Registra tool calls, sessoes e resultados de tarefa como trilha auditavel, sem segredos.',
+        'Records tool calls, sessions, and task results as an auditable trail without secrets.',
     },
     {
       name: 'Blockchain Skill',
-      status: 'compat parcial',
+      status: 'compat ready',
       detail:
-        'Skill existente precisa trocar vault antigo por Authorization Bearer cog_live_*.'
+        'The legacy vault contract is replaced by Authorization Bearer cog_live_* for production use.'
+    },
+    {
+      name: 'Identity Separation',
+      status: 'mythos namespace',
+      detail:
+        'Inherited Hermes behavior is documented as compatibility only; the active agent identity, vault, source, and content types are Mythos-native.',
     },
   ],
   endpoints: {
@@ -63,10 +78,11 @@ export const MYTHOS_AGENT_PROFILE = {
     },
   ],
   safety: [
-    'A key autentica escrita e leitura do vault do agente externo.',
-    'Conteudo com API keys, secrets, private keys ou signed payloads e bloqueado.',
-    'Memoria salva nao assina, nao agenda, nao compra, nao vende e nao move fundos.',
-    'On-chain/ZK ficam explicitos: somente aparecem como ativos quando forem realmente persistidos.',
+    'The key authenticates reads and writes for the external agent vault.',
+    'Content containing API keys, secrets, private keys, or signed payloads is blocked.',
+    'Saved memory does not sign, schedule, buy, sell, or move funds.',
+    'On-chain/ZK states are explicit and only appear active when really persisted.',
+    'Hermes-compatible code paths must not write into the Mythos vault unless source=mythos is explicitly selected.',
   ],
 } as const;
 
@@ -77,43 +93,43 @@ export const MYTHOS_SKILL_CATEGORIES = [
     id: 'congchain',
     label: 'CongChain',
     count: 2,
-    summary: 'Skills oficiais para memoria verificavel, auditoria e bridge.',
+    summary: 'Official skills for verifiable memory, audit, and bridge workflows.',
   },
   {
     id: 'development',
     label: 'Dev',
     count: 18,
-    summary: 'Codigo, debug, testes, PRs, APIs e revisao de repositorios.',
+    summary: 'Code, debugging, tests, PRs, APIs, and repository review.',
   },
   {
     id: 'research',
     label: 'Research',
     count: 13,
-    summary: 'Pesquisa, papers, busca, OSINT e inteligencia de dominio.',
+    summary: 'Research, papers, search, OSINT, and domain intelligence.',
   },
   {
     id: 'agent',
     label: 'Agents',
     count: 7,
-    summary: 'Orquestracao, subagentes, Codex, Mythos e migracoes.',
+    summary: 'Orchestration, subagents, Codex, Mythos, and migrations.',
   },
   {
     id: 'mlops',
     label: 'MLOps',
     count: 39,
-    summary: 'Modelos, inferencia, avaliacao, vetores e fine-tuning.',
+    summary: 'Models, inference, evaluation, vectors, and fine-tuning.',
   },
   {
     id: 'productivity',
-    label: 'Produtividade',
+    label: 'Productivity',
     count: 18,
-    summary: 'Docs, notas, workspace, PDF, apresentacoes e automacao.',
+    summary: 'Docs, notes, workspace, PDF, presentations, and automation.',
   },
   {
     id: 'media',
-    label: 'Criativo',
+    label: 'Creative',
     count: 22,
-    summary: 'Design, imagens, video, musica, diagramas e conteudo.',
+    summary: 'Design, images, video, music, diagrams, and content.',
   },
 ] as const;
 
@@ -122,9 +138,9 @@ export const MYTHOS_CAPABILITY_GROUPS = [
     id: 'memory',
     label: 'Memory providers',
     count: 9,
-    headline: 'Onde o Mythos pode guardar e recuperar contexto.',
+    headline: 'Where Mythos can store and retrieve context.',
     explanation:
-      'Providers de memoria conectam o agente a historico, embeddings, vaults e memoria verificavel. A CongChain entra como o provider on-chain/verificavel, separado dos providers tradicionais.',
+      'Memory providers connect the agent to history, embeddings, vaults, and verifiable memory. CongChain acts as the verifiable/on-chain-ready provider, separate from traditional memory systems.',
     items: [
       'CongChain',
       'byterover',
@@ -137,21 +153,21 @@ export const MYTHOS_CAPABILITY_GROUPS = [
       'supermemory',
     ],
     howToUse: [
-      'Crie uma key em API Keys.',
-      'Configure CONGCHAIN_API_KEY no ambiente do Mythos.',
-      'Ative o provider CongChain para salvar memoria auditavel.',
-      'Use providers externos apenas quando precisar de busca, embeddings ou memoria fora da CongChain.',
+      'Create a key in API Keys.',
+      'Set CONGCHAIN_API_KEY in the Mythos environment.',
+      'Enable the CongChain provider to save auditable memory.',
+      'Use external providers only when you need search, embeddings, or memory outside CongChain.',
     ],
     safety:
-      'Memoria nao deve armazenar secrets, private keys, seed phrases, signed payloads ou dados que possam mover fundos.',
+      'Memory must not store secrets, private keys, seed phrases, signed payloads, or data that can move funds.',
   },
   {
     id: 'llm',
     label: 'LLM providers',
     count: 28,
-    headline: 'Modelos que o Mythos pode usar para pensar e executar tarefas.',
+    headline: 'Models Mythos can use to reason and execute tasks.',
     explanation:
-      'Providers de LLM sao conectores para modelos diferentes. Eles permitem escolher o melhor motor para custo, velocidade, raciocinio, codigo, visao ou contexto longo.',
+      'LLM providers are connectors to different model backends. They let Mythos choose the best engine for cost, speed, reasoning, code, vision, or long context.',
     items: [
       'OpenAI',
       'Anthropic',
@@ -175,21 +191,21 @@ export const MYTHOS_CAPABILITY_GROUPS = [
       'Ollama local',
     ],
     howToUse: [
-      'Escolha o provider pelo tipo de tarefa: codigo, pesquisa, custo, velocidade ou contexto.',
-      'Adicione a API key do provider no ambiente do Mythos.',
-      'Defina um modelo padrao para o agente.',
-      'Use a CongChain para registrar qual modelo gerou cada memoria importante.',
+      'Choose the provider by task type: code, research, cost, speed, or context.',
+      'Add the provider API key to the Mythos environment.',
+      'Set a default model for the agent.',
+      'Use CongChain to record which model generated each important memory.',
     ],
     safety:
-      'Providers podem exigir chaves pagas. Nunca cole API keys dentro de memorias, prompts publicos ou resultados salvos.',
+      'Providers may require paid keys. Never paste API keys into memories, public prompts, or saved outputs.',
   },
   {
     id: 'platforms',
-    label: 'Plataformas',
+    label: 'Platforms',
     count: 19,
-    headline: 'Canais onde o Mythos pode conversar ou receber trabalho.',
+    headline: 'Channels where Mythos can talk or receive work.',
     explanation:
-      'Plataformas sao adaptadores de mensagem. Elas permitem ligar o agente a chats, comunidades, automacoes e interfaces externas.',
+      'Platforms are message adapters. They connect the agent to chats, communities, automations, and external interfaces.',
     items: [
       'Discord',
       'Telegram',
@@ -212,21 +228,21 @@ export const MYTHOS_CAPABILITY_GROUPS = [
       'Webhook',
     ],
     howToUse: [
-      'Escolha uma plataforma onde o agente vai operar.',
-      'Configure token/bot credentials dessa plataforma no runtime do Mythos.',
-      'Defina quais eventos podem virar memoria CongChain.',
-      'Comece em modo leitura ou teste antes de permitir respostas automaticas.',
+      'Choose the platform where the agent will operate.',
+      'Configure that platform token or bot credentials in the Mythos runtime.',
+      'Define which events may become CongChain memory.',
+      'Start in read-only or test mode before allowing automatic replies.',
     ],
     safety:
-      'Canais externos devem ter permissao minima. A CongChain registra contexto, mas nao deve expor tokens de bots nem conversas sensiveis sem consentimento.',
+      'External channels should use minimum permissions. CongChain records context, but must not expose bot tokens or sensitive conversations without consent.',
   },
   {
     id: 'lsp',
     label: 'LSPs',
     count: 26,
-    headline: 'Leitura inteligente de codigo por linguagem.',
+    headline: 'Language-aware code understanding.',
     explanation:
-      'LSPs sao servidores de linguagem. Eles ajudam o Mythos a entender simbolos, erros, referencias, tipos e estrutura de codigo antes de sugerir alteracoes.',
+      'LSPs are language servers. They help Mythos understand symbols, errors, references, types, and code structure before suggesting changes.',
     items: [
       'Python',
       'TypeScript',
@@ -256,21 +272,21 @@ export const MYTHOS_CAPABILITY_GROUPS = [
       'Astro',
     ],
     howToUse: [
-      'Abra um projeto no Mythos.',
-      'Deixe o LSP da linguagem detectar simbolos e diagnosticos.',
-      'Use skills de codigo para planejar, testar e revisar.',
-      'Salve decisoes importantes na CongChain quando houver handoff tecnico.',
+      'Open a project in Mythos.',
+      'Let the language server detect symbols and diagnostics.',
+      'Use code skills to plan, test, and review.',
+      'Save important decisions to CongChain when there is technical handoff.',
     ],
     safety:
-      'LSP entende codigo, mas nao deve executar comandos destrutivos sem revisao humana.',
+      'LSPs understand code, but destructive commands still require human review.',
   },
   {
     id: 'tools',
     label: 'Tool files',
     count: 76,
-    headline: 'Ferramentas internas que expandem o que o agente consegue fazer.',
+    headline: 'Internal tools that expand what the agent can do.',
     explanation:
-      'Tool files incluem helpers, conectores, adaptadores e utilitarios. Nem todo arquivo vira uma ferramenta direta para o modelo, mas todos fazem parte do kit operacional.',
+      'Tool files include helpers, connectors, adapters, and utilities. Not every file is exposed directly to the model, but all of them are part of the operational kit.',
     items: [
       'Terminal controlado',
       'Leitura de arquivos',
@@ -290,13 +306,13 @@ export const MYTHOS_CAPABILITY_GROUPS = [
       'Model routing',
     ],
     howToUse: [
-      'Escolha a skill primeiro.',
-      'A skill orienta quais ferramentas devem ser usadas.',
-      'O Mythos executa ferramentas conforme permissao do ambiente.',
-      'Resultados relevantes podem virar memoria verificavel na CongChain.',
+      'Choose the skill first.',
+      'The skill guides which tools should be used.',
+      'Mythos runs tools according to the environment permissions.',
+      'Relevant results can become verifiable memory in CongChain.',
     ],
     safety:
-      'Ferramentas com escrita, rede, automacao ou limpeza precisam de limites claros e permissao explicita.',
+      'Tools with write, network, automation, or cleanup powers need clear limits and explicit permission.',
   },
 ] as const;
 
@@ -306,11 +322,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'CongChain Memory Bridge',
     category: 'congchain',
     path: 'optional-skills/blockchain/congchain',
-    status: 'pronta para key',
+    status: 'key ready',
     level: 'oficial',
     useCase:
-      'Salvar memoria do Mythos na CongChain com hash, owner, vault isolado e bloqueio contra secrets.',
-    bestFor: 'Quando o agente externo precisa registrar contexto verificavel.',
+      'Save Mythos memory to CongChain with hash, owner, isolated vault, and secret blocking.',
+    bestFor: 'Use when an external agent needs to record verifiable context.',
     command: 'mythos skill use optional-skills/blockchain/congchain',
   },
   {
@@ -318,11 +334,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'CongChain Forge',
     category: 'congchain',
     path: 'skills/software-development/congchain-forge',
-    status: 'pronta',
+    status: 'ready',
     level: 'oficial',
     useCase:
-      'Criar planos tecnicos e registrar decisoes de desenvolvimento conectadas ao vault CongChain.',
-    bestFor: 'Quando o Mythos vai ajudar em codigo, arquitetura ou handoff tecnico.',
+      'Create technical plans and record development decisions connected to the CongChain vault.',
+    bestFor: 'Use when Mythos helps with code, architecture, or technical handoff.',
     command: 'mythos skill use skills/software-development/congchain-forge',
   },
   {
@@ -330,11 +346,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Systematic Debugging',
     category: 'development',
     path: 'skills/software-development/systematic-debugging',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Diagnosticar bugs por hipotese, evidencia, teste minimo e correcao rastreavel.',
-    bestFor: 'Quando algo quebrou e precisa de investigacao sem chute.',
+      'Diagnose bugs through hypotheses, evidence, minimal tests, and traceable fixes.',
+    bestFor: 'Use when something broke and needs investigation without guessing.',
     command: 'mythos skill use skills/software-development/systematic-debugging',
   },
   {
@@ -342,11 +358,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Codebase Inspection',
     category: 'development',
     path: 'skills/github/codebase-inspection',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Ler estrutura de repo, localizar fluxos importantes e responder com referencias tecnicas.',
-    bestFor: 'Antes de alterar um projeto grande ou desconhecido.',
+      'Read repository structure, locate important flows, and answer with technical references.',
+    bestFor: 'Use before changing a large or unfamiliar project.',
     command: 'mythos skill use skills/github/codebase-inspection',
   },
   {
@@ -354,11 +370,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Test Driven Development',
     category: 'development',
     path: 'skills/software-development/test-driven-development',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Transformar requisito em teste, implementar e validar mudancas com menor risco.',
-    bestFor: 'Features sensiveis ou refactors que nao podem quebrar comportamento.',
+      'Turn requirements into tests, implement, and validate changes with lower risk.',
+    bestFor: 'Use for sensitive features or refactors that must not break behavior.',
     command: 'mythos skill use skills/software-development/test-driven-development',
   },
   {
@@ -366,11 +382,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'REST / GraphQL Debug',
     category: 'development',
     path: 'optional-skills/software-development/rest-graphql-debug',
-    status: 'opcional',
+    status: 'optional',
     level: 'optional',
     useCase:
-      'Investigar APIs REST e GraphQL com headers, auth, schemas, erros e contratos.',
-    bestFor: 'Quando uma integracao externa retorna 401, 403, 500 ou dados errados.',
+      'Investigate REST and GraphQL APIs with headers, auth, schemas, errors, and contracts.',
+    bestFor: 'Use when an external integration returns 401, 403, 500, or wrong data.',
     command: 'mythos skill use optional-skills/software-development/rest-graphql-debug',
   },
   {
@@ -378,11 +394,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Arxiv Research',
     category: 'research',
     path: 'skills/research/arxiv',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Pesquisar papers, resumir contribuicoes e comparar metodos com cuidado.',
-    bestFor: 'Pesquisa tecnica e validacao de ideias de IA, cripto ou ciencia.',
+      'Search papers, summarize contributions, and compare methods carefully.',
+    bestFor: 'Use for technical research and validation of AI, crypto, or science ideas.',
     command: 'mythos skill use skills/research/arxiv',
   },
   {
@@ -390,11 +406,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Domain Intelligence',
     category: 'research',
     path: 'optional-skills/research/domain-intel',
-    status: 'opcional',
+    status: 'optional',
     level: 'optional',
     useCase:
-      'Analisar dominio, produto, concorrentes, posicionamento e sinais publicos.',
-    bestFor: 'Antes de criar narrativa, landing page ou estrategia de mercado.',
+      'Analyze domain, product, competitors, positioning, and public signals.',
+    bestFor: 'Use before creating narrative, landing pages, or market strategy.',
     command: 'mythos skill use optional-skills/research/domain-intel',
   },
   {
@@ -402,11 +418,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Subagent Driven Development',
     category: 'agent',
     path: 'skills/software-development/subagent-driven-development',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Quebrar trabalho em agentes menores, revisar entregas e integrar resultados.',
-    bestFor: 'Quando uma tarefa grande pode ser paralelizada com seguranca.',
+      'Break work into smaller agents, review deliverables, and integrate results.',
+    bestFor: 'Use when a large task can be safely parallelized.',
     command: 'mythos skill use skills/software-development/subagent-driven-development',
   },
   {
@@ -414,11 +430,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'OpenClaw Migration',
     category: 'agent',
     path: 'optional-skills/migration/openclaw-migration',
-    status: 'opcional',
+    status: 'optional',
     level: 'optional',
     useCase:
-      'Planejar migracao e compatibilidade entre OpenClaw, Mythos e agentes externos.',
-    bestFor: 'Quando formos ligar outro agente ao mesmo contrato CongChain.',
+      'Plan migration and compatibility between OpenClaw, Mythos, and external agents.',
+    bestFor: 'Use when connecting another agent to the same CongChain contract.',
     command: 'mythos skill use optional-skills/migration/openclaw-migration',
   },
   {
@@ -426,11 +442,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Obsidian',
     category: 'productivity',
     path: 'skills/note-taking/obsidian',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Organizar notas, contexto, links e memoria local em formato de vault.',
-    bestFor: 'Quando o agente precisa transformar trabalho em conhecimento navegavel.',
+      'Organize notes, context, links, and local memory as a vault.',
+    bestFor: 'Use when the agent needs to turn work into navigable knowledge.',
     command: 'mythos skill use skills/note-taking/obsidian',
   },
   {
@@ -438,11 +454,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Google Workspace',
     category: 'productivity',
     path: 'skills/productivity/google-workspace',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Trabalhar com Docs, Sheets, Drive e materiais de produtividade.',
-    bestFor: 'Relatorios, planilhas, handoffs e organizacao operacional.',
+      'Work with Docs, Sheets, Drive, and productivity materials.',
+    bestFor: 'Use for reports, spreadsheets, handoffs, and operational organization.',
     command: 'mythos skill use skills/productivity/google-workspace',
   },
   {
@@ -450,11 +466,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Model Evaluation',
     category: 'mlops',
     path: 'skills/mlops/evaluation/lm-evaluation-harness',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Avaliar modelos, benchmarks e qualidade de saida com criterios repetiveis.',
-    bestFor: 'Comparar providers ou medir melhoria antes de trocar modelo.',
+      'Evaluate models, benchmarks, and output quality with repeatable criteria.',
+    bestFor: 'Use to compare providers or measure improvement before switching models.',
     command: 'mythos skill use skills/mlops/evaluation/lm-evaluation-harness',
   },
   {
@@ -462,11 +478,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Qdrant Vector Memory',
     category: 'mlops',
     path: 'optional-skills/mlops/qdrant',
-    status: 'opcional',
+    status: 'optional',
     level: 'optional',
     useCase:
-      'Usar banco vetorial para busca semantica, memoria e recuperacao de contexto.',
-    bestFor: 'Quando o Mythos precisa recuperar conhecimento por similaridade.',
+      'Use a vector database for semantic search, memory, and context retrieval.',
+    bestFor: 'Use when Mythos needs to retrieve knowledge by similarity.',
     command: 'mythos skill use optional-skills/mlops/qdrant',
   },
   {
@@ -474,11 +490,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Architecture Diagram',
     category: 'media',
     path: 'skills/creative/architecture-diagram',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Transformar arquitetura tecnica em diagrama explicavel e revisavel.',
-    bestFor: 'Explicar CongChain, agentes, memory bridge ou fluxo de produto.',
+      'Turn technical architecture into an explainable and reviewable diagram.',
+    bestFor: 'Use to explain CongChain, agents, memory bridge, or product flows.',
     command: 'mythos skill use skills/creative/architecture-diagram',
   },
   {
@@ -486,11 +502,11 @@ export const MYTHOS_FEATURED_SKILLS = [
     name: 'Popular Web Designs',
     category: 'media',
     path: 'skills/creative/popular-web-designs',
-    status: 'catalogada',
+    status: 'cataloged',
     level: 'core',
     useCase:
-      'Gerar direcao visual e referencias de UI para paginas e dashboards.',
-    bestFor: 'Refinar design da pagina Mythos, Marketplace ou Agent Hub.',
+      'Generate visual direction and UI references for pages and dashboards.',
+    bestFor: 'Use to refine Mythos, Marketplace, or Agent Hub design.',
     command: 'mythos skill use skills/creative/popular-web-designs',
   },
 ] as const;
@@ -615,5 +631,51 @@ export const MYTHOS_CATEGORY_SKILL_INDEX = {
   ],
 } as const;
 
+export const MYTHOS_UNIQUE_IDENTITY_PILLARS = [
+  {
+    id: 'provable-memory-passport',
+    name: 'Provable Memory Passport',
+    signal: 'Every important memory carries source, agent ID, skill context, hash routes, and safety metadata.',
+    enterpriseValue:
+      'Teams can inspect what the agent remembered, where it came from, and whether it is safe to reuse.',
+  },
+  {
+    id: 'skill-governed-execution',
+    name: 'Skill-Governed Execution',
+    signal: 'Work starts from a declared skill category instead of an invisible generic prompt.',
+    enterpriseValue:
+      'Operators can choose the right capability before execution and audit which skill shaped the outcome.',
+  },
+  {
+    id: 'memory-constitution',
+    name: 'Memory Constitution',
+    signal: 'Anti-secret, no-funds, no-signed-payload, and human-review rules travel with each write.',
+    enterpriseValue:
+      'Security teams get a readable policy boundary before Mythos becomes part of real workflows.',
+  },
+  {
+    id: 'cross-model-continuity',
+    name: 'Cross-Model Continuity',
+    signal: 'Mythos can record model, provider, skill, and task context so work can continue across engines.',
+    enterpriseValue:
+      'Companies can route between model providers without losing the operational memory trail.',
+  },
+  {
+    id: 'external-agent-vault',
+    name: 'External Agent Vault',
+    signal: 'Each API key, source, and agent ID writes into an isolated logical vault.',
+    enterpriseValue:
+      'A business can separate Mythos, Hermes, OpenClaw, Eliza, and future agents without mixing records.',
+  },
+  {
+    id: 'boardroom-audit-packet',
+    name: 'Boardroom Audit Packet',
+    signal: 'The page exposes setup, payload, bridge status, capabilities, and safety posture in one review surface.',
+    enterpriseValue:
+      'Technical leaders can review the agent as infrastructure, not just as a chat interface.',
+  },
+] as const;
+
 export type MythosSkillCategory = (typeof MYTHOS_SKILL_CATEGORIES)[number];
 export type MythosFeaturedSkill = (typeof MYTHOS_FEATURED_SKILLS)[number];
+export type MythosUniqueIdentityPillar = (typeof MYTHOS_UNIQUE_IDENTITY_PILLARS)[number];

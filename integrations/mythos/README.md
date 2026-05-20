@@ -9,6 +9,38 @@ Objetivo:
 - manter cada agente em um vault logico separado;
 - preservar o limite de seguranca: sem secrets, sem private keys, sem signed payloads e sem movimento de fundos.
 
+## Identidade Mythos
+
+Mythos pode nascer de um fork compativel com Hermes, mas este pacote trata
+Mythos como identidade propria dentro da CongChain.
+
+- `source`: `mythos`
+- `contentType`: `mythos_memory`, `mythos_skill` ou `mythos_task_result`
+- `namespace`: `mythos`
+- `compatibilityMode`: `hermes_compatible_mythos_primary`
+
+Compatibilidade Hermes deve ser considerada camada legada. O vault padrao,
+os metadados e os exemplos deste pacote escrevem como Mythos.
+
+## Seis pilares de identidade
+
+1. `Provable Memory Passport`: memorias importantes carregam origem, agent ID,
+   skill, hash e metadata de seguranca.
+2. `Skill-Governed Execution`: o trabalho comeca por uma skill declarada, nao
+   por um prompt generico invisivel.
+3. `Memory Constitution`: regras anti-secret, no-funds, no-signed-payload e
+   revisao humana acompanham cada gravacao.
+4. `Cross-Model Continuity`: modelo, provider, skill e tarefa podem continuar
+   rastreaveis mesmo quando o runtime troca de motor.
+5. `External Agent Vault`: cada key, source e agent ID fica em um vault logico
+   isolado.
+6. `Boardroom Audit Packet`: setup, payload, status, capacidades e limites de
+   seguranca ficam prontos para revisao tecnica.
+
+Esses pilares posicionam Mythos como infraestrutura de agente verificavel. Eles
+nao adicionam execucao autonoma, assinatura de carteira, monitoramento real ou
+movimento de fundos.
+
 ## Arquivos
 
 - `plugins/context_engine/congchain`: salva turnos importantes antes da compressao.

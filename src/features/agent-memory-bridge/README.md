@@ -7,6 +7,47 @@ The first target integrations are Mythos, Hermes, OpenClaw, and Eliza, but the
 bridge is intentionally agent-neutral so future agents can use the same safety
 boundary.
 
+## Mythos identity split
+
+Mythos is treated as the first official external agent for CongChain.
+
+It may remain compatible with Hermes-shaped plugins and task contracts, but the
+CongChain production identity is separate:
+
+- default source: `mythos`;
+- default content types: `mythos_skill`, `mythos_memory`, and
+  `mythos_task_result`;
+- default namespace: `mythos`;
+- default vault shape: key owner + Mythos source + Mythos agent ID;
+- Hermes references are compatibility adapters, not the Mythos brand,
+  namespace, or default storage route.
+
+This lets the project evolve Mythos into its own runtime, docs, skills, and
+distribution without breaking the bridge contract or older Hermes-compatible
+payloads.
+
+## Mythos six-pillar identity
+
+The next Mythos identity layer is designed around six enterprise-facing
+signals:
+
+1. Provable Memory Passport: important memories carry source, agent ID, skill
+   context, hash routes, and safety metadata.
+2. Skill-Governed Execution: work starts from a declared skill category instead
+   of an invisible generic prompt.
+3. Memory Constitution: anti-secret, no-funds, no-signed-payload, and
+   human-review rules travel with each write.
+4. Cross-Model Continuity: model, provider, skill, and task context can survive
+   movement between model backends.
+5. External Agent Vault: each API key, source, and agent ID writes into an
+   isolated logical vault.
+6. Boardroom Audit Packet: setup, payload, bridge health, capabilities, and
+   safety posture are visible in one review surface.
+
+These are product identity signals first. They do not claim production
+monitoring, autonomous execution, wallet control, or provider uptime unless a
+future audited phase implements those powers.
+
 ## Product rule
 
 - CongChain may store agent memories, skills, task results, hashes, proofs, and
@@ -111,14 +152,17 @@ Endpoint: `POST /api/memory/write`
 
 ```json
 {
-  "content": "Hermes skill summary or task result",
-  "model": "hermes",
+  "content": "Mythos skill summary or task result",
+  "model": "mythos",
   "generateZkProof": true,
   "metadata": {
-    "source": "hermes",
-    "contentType": "hermes_skill",
-    "agentId": "hermes-local",
-    "agentName": "Hermes",
+    "source": "mythos",
+    "contentType": "mythos_skill",
+    "agentId": "mythos-local",
+    "agentName": "Mythos",
+    "namespace": "mythos",
+    "compatibilityMode": "hermes_compatible_mythos_primary",
+    "identityProgram": "mythos_six_pillar_agent_identity",
     "skillName": "research-summarizer",
     "skillVersion": "1.0.0",
     "proofMode": "zk_requested",
@@ -136,7 +180,7 @@ Endpoint: `POST /api/memory/write`
 
 ## External agent handoff
 
-The first Mythos/Hermes implementation should be a safe-mode plugin or provider.
+The first Mythos implementation should be a safe-mode plugin or provider.
 
 It should:
 
@@ -144,12 +188,12 @@ It should:
 - save only explicit skill summaries, memory notes, or task results;
 - never save `.env` values, private credentials, private prompts, seed phrases,
   wallet keys, signatures, or signed payloads;
-- return the CongChain hash to Hermes after a successful write;
+- return the CongChain hash to Mythos after a successful write;
 - make ZK proof and on-chain anchoring opt-in settings.
 
 It should not:
 
-- mutate Hermes skill files automatically;
+- mutate Mythos or Hermes-compatible skill files automatically;
 - call unverified CongChain endpoints;
 - treat memory anchoring as execution approval;
 - sign, submit, buy, sell, pay, schedule, or move funds.

@@ -37,13 +37,13 @@ const FULL_KEY_PLACEHOLDER = 'COLE_SUA_KEY_COMPLETA_AQUI';
 
 const AGENT_CONNECTORS = [
   { name: 'Mythos', detail: 'Context engine, observability, skills e task results com vault proprio.' },
-  { name: 'Hermes', detail: 'Skills, memorias, ferramentas e resultados de tarefas.' },
+  { name: 'Hermes', detail: 'Adaptador legado compativel para skills, memorias e task results.' },
   { name: 'Eliza', detail: 'Memorias de agente, persona, decisoes e logs resumidos.' },
   { name: 'OpenClaw', detail: 'Execucoes locais, pesquisas, artefatos e handoffs.' },
 ];
 
 const KEY_CAPABILITIES = [
-  { icon: Bot, label: 'Agentes externos', detail: 'Conecte Hermes, Eliza, OpenClaw e providers locais sem expor segredos.' },
+  { icon: Bot, label: 'Agentes externos', detail: 'Conecte Mythos, Hermes, Eliza, OpenClaw e providers locais sem expor segredos.' },
   { icon: Database, label: 'Memoria verificavel', detail: 'Salve conteudo com hash, modelo, metadata de origem e trilha por agente.' },
   { icon: Network, label: 'Provas e anchor', detail: 'Peça ZK proof e anchor on-chain apenas quando o fluxo exigir.' },
   { icon: Shield, label: 'Limite seguro', detail: 'A key autentica memoria e API. Ela nao assina, nao agenda e nao move fundos.' },
@@ -54,13 +54,16 @@ const CODE_EXAMPLES = {
   -H "Authorization: Bearer ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "content": "Hermes skill summary or task result",
-    "model": "hermes",
+    "content": "Mythos skill summary or task result",
+    "model": "mythos",
     "generateZkProof": true,
     "metadata": {
-      "source": "hermes",
-      "contentType": "hermes_skill",
-      "agentId": "hermes-local",
+      "source": "mythos",
+      "contentType": "mythos_skill",
+      "agentId": "mythos-local",
+      "agentName": "Mythos",
+      "namespace": "mythos",
+      "compatibilityMode": "hermes_compatible_mythos_primary",
       "proofMode": "zk_requested",
       "anchorMode": "manual"
     }
@@ -73,13 +76,16 @@ const CODE_EXAMPLES = {
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    content: 'Hermes skill summary or task result',
-    model: 'hermes',
+    content: 'Mythos skill summary or task result',
+    model: 'mythos',
     generateZkProof: true,
     metadata: {
-      source: 'hermes',
-      contentType: 'hermes_skill',
-      agentId: 'hermes-local',
+      source: 'mythos',
+      contentType: 'mythos_skill',
+      agentId: 'mythos-local',
+      agentName: 'Mythos',
+      namespace: 'mythos',
+      compatibilityMode: 'hermes_compatible_mythos_primary',
       proofMode: 'zk_requested',
       anchorMode: 'manual',
     },
@@ -93,13 +99,16 @@ const { hash } = await response.json();
 r = requests.post('${API_BASE_URL}/api/memory/write',
   headers={'Authorization': f'Bearer ${key}'},
   json={
-    'content': 'Hermes skill summary or task result',
-    'model': 'hermes',
+    'content': 'Mythos skill summary or task result',
+    'model': 'mythos',
     'generateZkProof': True,
     'metadata': {
-      'source': 'hermes',
-      'contentType': 'hermes_skill',
-      'agentId': 'hermes-local',
+      'source': 'mythos',
+      'contentType': 'mythos_skill',
+      'agentId': 'mythos-local',
+      'agentName': 'Mythos',
+      'namespace': 'mythos',
+      'compatibilityMode': 'hermes_compatible_mythos_primary',
       'proofMode': 'zk_requested',
       'anchorMode': 'manual',
     },
@@ -211,7 +220,7 @@ export default function ApiKeysPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white/90">API Keys</h1>
-              <p className="text-sm text-white/40">Conecte seu agente Hermes, Eliza ou OpenClaw direto na CongChain</p>
+              <p className="text-sm text-white/40">Conecte Mythos, Hermes, Eliza ou OpenClaw direto na CongChain</p>
             </div>
           </div>
         </div>
@@ -330,7 +339,7 @@ export default function ApiKeysPage() {
                 <div>
                   <h2 className="text-sm font-semibold text-white/80">Agent Memory Bridge</h2>
                   <p className="mt-1 text-sm leading-relaxed text-white/45">
-                    Use estas keys para conectar Hermes, Eliza, OpenClaw, providers locais e outros agentes externos a memorias verificaveis da CongChain.
+                    Use estas keys para conectar Mythos, Hermes, Eliza, OpenClaw, providers locais e outros agentes externos a memorias verificaveis da CongChain.
                   </p>
                 </div>
               </div>
@@ -360,7 +369,7 @@ export default function ApiKeysPage() {
               <div className="mb-6 space-y-4 rounded-xl border border-[#9945FF]/20 bg-[#9945FF]/5 p-5">
                 <h3 className="text-sm font-semibold text-[#9945FF]">Nova API Key</h3>
                 <input
-                  placeholder="Nome da integracao (ex: Hermes Skill Bridge, MiniMax Agent)"
+                  placeholder="Nome da integracao (ex: Mythos Agent, Hermes Compat Bridge, MiniMax Agent)"
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
                   className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/20 focus:border-[#9945FF]/40"
