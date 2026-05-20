@@ -60,6 +60,27 @@ function safeOptional(value: unknown, maxLength = 80): string | undefined {
   return trimmed.slice(0, maxLength);
 }
 
+function safeNumberLabel(value: unknown): string | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return String(Math.round(value));
+}
+
+function safeJsonMetadata(value: unknown, maxLength = 2400): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  let serialized = '';
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    serialized = String(value);
+  }
+  const trimmed = serialized.trim();
+  if (!trimmed) return undefined;
+  if (SECRET_PATTERNS.some(pattern => pattern.test(trimmed))) {
+    throw new ValidationError('Bridge runtime metadata appears to contain secrets or private credentials.');
+  }
+  return trimmed.slice(0, maxLength);
+}
+
 export function normalizeBridgeSource(value: unknown): AgentMemoryBridgeSource {
   const source = safeSlug(value, 'external_agent') as AgentMemoryBridgeSource;
   if (source.startsWith('mythos')) return 'mythos';
@@ -129,6 +150,11 @@ export function normalizeBridgeMetadata(value: unknown): AgentMemoryBridgeMetada
     taskId: safeOptional(raw.taskId, 80),
     runId: safeOptional(raw.runId, 80),
     origin: safeOptional(raw.origin, 120),
+    eventType: safeOptional(raw.eventType, 80),
+    confidenceBps: safeNumberLabel(raw.confidenceBps),
+    importanceBps: safeNumberLabel(raw.importanceBps),
+    runtime: safeJsonMetadata(raw.runtime, 1200),
+    runtimeEvent: safeJsonMetadata(raw.runtimeEvent, 2400),
     proofMode: raw.proofMode === 'zk_requested' || raw.proofMode === 'zk_ready' ? raw.proofMode : 'none',
     anchorMode: raw.anchorMode === 'manual' || raw.anchorMode === 'requested' || raw.anchorMode === 'anchored' ? raw.anchorMode : 'none',
     safety: {
@@ -161,6 +187,11 @@ export function buildBridgeEnvelope(input: {
     metadata.taskId ? `Task ID: ${metadata.taskId}` : null,
     metadata.runId ? `Run ID: ${metadata.runId}` : null,
     metadata.origin ? `Origin: ${metadata.origin}` : null,
+    metadata.eventType ? `Runtime Event: ${metadata.eventType}` : null,
+    metadata.confidenceBps ? `Confidence BPS: ${metadata.confidenceBps}` : null,
+    metadata.importanceBps ? `Importance BPS: ${metadata.importanceBps}` : null,
+    metadata.runtime ? `Runtime: ${metadata.runtime}` : null,
+    metadata.runtimeEvent ? `Runtime Event Payload: ${metadata.runtimeEvent}` : null,
     `Proof Mode: ${metadata.proofMode}`,
     `Anchor Mode: ${metadata.anchorMode}`,
     `Human Review: ${metadata.safety.requiresHumanReview ? 'required' : 'not_required'}`,

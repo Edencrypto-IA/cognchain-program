@@ -1,0 +1,43 @@
+name: congchain-adapter
+version: "2.0.0"
+description: "Official CongChain adapter for Mythos Agent runtime hooks. Records task, skill, tool, compression, completion, and safety events through the authenticated Agent Memory Bridge."
+author: Eden Lucas / CongChain + Mythos Agent
+license: MIT
+pip_dependencies: []
+hooks:
+  - on_session_start
+  - on_session_end
+  - on_session_finalize
+  - pre_llm_call
+  - post_llm_call
+  - pre_tool_call
+  - post_tool_call
+  - post_api_request
+requires_env:
+  - CONGCHAIN_API_KEY
+optional_env:
+  - CONGCHAIN_API_URL
+  - CONGCHAIN_AGENT_ID
+  - CONGCHAIN_ADAPTER_DEBUG
+  - CONGCHAIN_ADAPTER_MIN_TOOLS
+  - CONGCHAIN_ADAPTER_ANCHOR_TASK_START
+  - CONGCHAIN_ADAPTER_ANCHOR_SKILL
+  - CONGCHAIN_ADAPTER_ANCHOR_TOOL_CALL
+  - CONGCHAIN_ADAPTER_ANCHOR_TOOL_RESULT
+  - CONGCHAIN_ADAPTER_ANCHOR_COMPRESS
+  - CONGCHAIN_ADAPTER_ANCHOR_TASK_COMPLETE
+  - CONGCHAIN_ADAPTER_ANCHOR_SAFETY
+notes: |
+  Maps CongChain's seven runtime audit events onto real Mythos hooks:
+
+    onTaskStart       -> on_session_start
+    onSkillSelected   -> pre_llm_call on the first turn
+    onToolCall        -> pre_tool_call
+    onToolResult      -> post_tool_call
+    onMemoryCompress  -> post_api_request when finish_reason is length/max_tokens
+    onTaskComplete    -> on_session_end / on_session_finalize
+    onSafetyBlock     -> post_tool_call and post_llm_call block/refusal detection
+
+  The adapter is observer-first. It does not remove Mythos tools, does not block
+  normal execution by default, and never stores API keys, private keys, seed
+  phrases, signed payloads, or wallet secrets.

@@ -62,11 +62,37 @@ Metadados usados pelo pacote:
 
 ## Arquivos
 
+- `plugins/congchain-adapter`: conecta os hooks reais do runtime Mythos a
+  eventos auditaveis na CongChain.
 - `plugins/context_engine/congchain`: salva turnos importantes antes da compressao.
 - `plugins/observability/congchain`: salva tool calls e resumo de sessao.
 - `plugins/interpretability/congchain-cna`: modo experimental para fingerprint CNA em modelos locais.
 - `optional-skills/blockchain/congchain`: CLI stdlib para `health`, `write`, `list`, `read` e `verify`.
 - `skills/software-development/congchain-forge`: protocolo para Mythos atuar como backend do Forge.
+
+## Runtime adapter
+
+O `plugins/congchain-adapter` e a camada principal para ligar o Mythos real a
+CongChain sem nerfar o agente. Ele nao remove browser, terminal, arquivos,
+Python, plataformas, cron, subagentes ou ferramentas. Ele observa os hooks reais
+e grava memoria auditavel quando algo importante acontece.
+
+Mapeamento de eventos:
+
+| Evento CongChain | Hook real do Mythos | Dados principais |
+| --- | --- | --- |
+| `onTaskStart` | `on_session_start` | `session_id`, `model`, `platform` |
+| `onSkillSelected` | `pre_llm_call` na primeira chamada | `model`, `user_message`, `is_first_turn` |
+| `onToolCall` | `pre_tool_call` | `tool_name`, `args`, `task_id`, `tool_call_id` |
+| `onToolResult` | `post_tool_call` | `result`, `duration_ms`, `error` |
+| `onMemoryCompress` | `post_api_request` com `finish_reason=length/max_tokens` | `message_count`, `api_call_count` |
+| `onTaskComplete` | `on_session_end` e `on_session_finalize` | `completed`, `interrupted`, `tool_count` |
+| `onSafetyBlock` | `post_tool_call` e `post_llm_call` | bloqueios, recusas e whitelist |
+
+O adapter escreve em `/api/memory/write` com `Authorization: Bearer
+CONGCHAIN_API_KEY`. Cada evento usa `source=mythos`, `agentName=Mythos`,
+`origin=mythos-runtime-congchain-adapter` e flags de seguranca que bloqueiam
+secrets, private keys, signed payloads e movimento de fundos.
 
 ## Ambiente
 
@@ -85,6 +111,7 @@ Copie o conteudo desta pasta para a raiz do repositorio Mythos, preservando as p
 Depois habilite:
 
 ```bash
+mythos plugins enable congchain-adapter
 mythos config set context.engine congchain
 mythos plugins enable observability/congchain
 mythos plugins enable interpretability/congchain-cna

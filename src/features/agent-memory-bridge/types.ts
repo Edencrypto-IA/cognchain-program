@@ -62,6 +62,11 @@ export interface AgentMemoryBridgeMetadata {
   taskId?: string;
   runId?: string;
   origin?: string;
+  eventType?: string;
+  confidenceBps?: string;
+  importanceBps?: string;
+  runtime?: string;
+  runtimeEvent?: string;
   proofMode: AgentMemoryBridgeProofMode;
   anchorMode: AgentMemoryBridgeAnchorMode;
   safety: {
