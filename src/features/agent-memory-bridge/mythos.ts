@@ -71,3 +71,246 @@ export const MYTHOS_AGENT_PROFILE = {
 } as const;
 
 export type MythosAgentProfile = typeof MYTHOS_AGENT_PROFILE;
+
+export const MYTHOS_SKILL_CATEGORIES = [
+  {
+    id: 'congchain',
+    label: 'CongChain',
+    count: 2,
+    summary: 'Skills oficiais para memoria verificavel, auditoria e bridge.',
+  },
+  {
+    id: 'development',
+    label: 'Dev',
+    count: 18,
+    summary: 'Codigo, debug, testes, PRs, APIs e revisao de repositorios.',
+  },
+  {
+    id: 'research',
+    label: 'Research',
+    count: 13,
+    summary: 'Pesquisa, papers, busca, OSINT e inteligencia de dominio.',
+  },
+  {
+    id: 'agent',
+    label: 'Agents',
+    count: 7,
+    summary: 'Orquestracao, subagentes, Codex, Mythos e migracoes.',
+  },
+  {
+    id: 'mlops',
+    label: 'MLOps',
+    count: 39,
+    summary: 'Modelos, inferencia, avaliacao, vetores e fine-tuning.',
+  },
+  {
+    id: 'productivity',
+    label: 'Produtividade',
+    count: 18,
+    summary: 'Docs, notas, workspace, PDF, apresentacoes e automacao.',
+  },
+  {
+    id: 'media',
+    label: 'Criativo',
+    count: 22,
+    summary: 'Design, imagens, video, musica, diagramas e conteudo.',
+  },
+] as const;
+
+export const MYTHOS_FEATURED_SKILLS = [
+  {
+    id: 'congchain-memory',
+    name: 'CongChain Memory Bridge',
+    category: 'congchain',
+    path: 'optional-skills/blockchain/congchain',
+    status: 'pronta para key',
+    level: 'oficial',
+    useCase:
+      'Salvar memoria do Mythos na CongChain com hash, owner, vault isolado e bloqueio contra secrets.',
+    bestFor: 'Quando o agente externo precisa registrar contexto verificavel.',
+    command: 'mythos skill use optional-skills/blockchain/congchain',
+  },
+  {
+    id: 'congchain-forge',
+    name: 'CongChain Forge',
+    category: 'congchain',
+    path: 'skills/software-development/congchain-forge',
+    status: 'pronta',
+    level: 'oficial',
+    useCase:
+      'Criar planos tecnicos e registrar decisoes de desenvolvimento conectadas ao vault CongChain.',
+    bestFor: 'Quando o Mythos vai ajudar em codigo, arquitetura ou handoff tecnico.',
+    command: 'mythos skill use skills/software-development/congchain-forge',
+  },
+  {
+    id: 'systematic-debugging',
+    name: 'Systematic Debugging',
+    category: 'development',
+    path: 'skills/software-development/systematic-debugging',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Diagnosticar bugs por hipotese, evidencia, teste minimo e correcao rastreavel.',
+    bestFor: 'Quando algo quebrou e precisa de investigacao sem chute.',
+    command: 'mythos skill use skills/software-development/systematic-debugging',
+  },
+  {
+    id: 'codebase-inspection',
+    name: 'Codebase Inspection',
+    category: 'development',
+    path: 'skills/github/codebase-inspection',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Ler estrutura de repo, localizar fluxos importantes e responder com referencias tecnicas.',
+    bestFor: 'Antes de alterar um projeto grande ou desconhecido.',
+    command: 'mythos skill use skills/github/codebase-inspection',
+  },
+  {
+    id: 'test-driven-development',
+    name: 'Test Driven Development',
+    category: 'development',
+    path: 'skills/software-development/test-driven-development',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Transformar requisito em teste, implementar e validar mudancas com menor risco.',
+    bestFor: 'Features sensiveis ou refactors que nao podem quebrar comportamento.',
+    command: 'mythos skill use skills/software-development/test-driven-development',
+  },
+  {
+    id: 'rest-graphql-debug',
+    name: 'REST / GraphQL Debug',
+    category: 'development',
+    path: 'optional-skills/software-development/rest-graphql-debug',
+    status: 'opcional',
+    level: 'optional',
+    useCase:
+      'Investigar APIs REST e GraphQL com headers, auth, schemas, erros e contratos.',
+    bestFor: 'Quando uma integracao externa retorna 401, 403, 500 ou dados errados.',
+    command: 'mythos skill use optional-skills/software-development/rest-graphql-debug',
+  },
+  {
+    id: 'arxiv',
+    name: 'Arxiv Research',
+    category: 'research',
+    path: 'skills/research/arxiv',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Pesquisar papers, resumir contribuicoes e comparar metodos com cuidado.',
+    bestFor: 'Pesquisa tecnica e validacao de ideias de IA, cripto ou ciencia.',
+    command: 'mythos skill use skills/research/arxiv',
+  },
+  {
+    id: 'domain-intel',
+    name: 'Domain Intelligence',
+    category: 'research',
+    path: 'optional-skills/research/domain-intel',
+    status: 'opcional',
+    level: 'optional',
+    useCase:
+      'Analisar dominio, produto, concorrentes, posicionamento e sinais publicos.',
+    bestFor: 'Antes de criar narrativa, landing page ou estrategia de mercado.',
+    command: 'mythos skill use optional-skills/research/domain-intel',
+  },
+  {
+    id: 'subagent-driven-development',
+    name: 'Subagent Driven Development',
+    category: 'agent',
+    path: 'skills/software-development/subagent-driven-development',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Quebrar trabalho em agentes menores, revisar entregas e integrar resultados.',
+    bestFor: 'Quando uma tarefa grande pode ser paralelizada com seguranca.',
+    command: 'mythos skill use skills/software-development/subagent-driven-development',
+  },
+  {
+    id: 'openclaw-migration',
+    name: 'OpenClaw Migration',
+    category: 'agent',
+    path: 'optional-skills/migration/openclaw-migration',
+    status: 'opcional',
+    level: 'optional',
+    useCase:
+      'Planejar migracao e compatibilidade entre OpenClaw, Mythos e agentes externos.',
+    bestFor: 'Quando formos ligar outro agente ao mesmo contrato CongChain.',
+    command: 'mythos skill use optional-skills/migration/openclaw-migration',
+  },
+  {
+    id: 'obsidian',
+    name: 'Obsidian',
+    category: 'productivity',
+    path: 'skills/note-taking/obsidian',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Organizar notas, contexto, links e memoria local em formato de vault.',
+    bestFor: 'Quando o agente precisa transformar trabalho em conhecimento navegavel.',
+    command: 'mythos skill use skills/note-taking/obsidian',
+  },
+  {
+    id: 'google-workspace',
+    name: 'Google Workspace',
+    category: 'productivity',
+    path: 'skills/productivity/google-workspace',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Trabalhar com Docs, Sheets, Drive e materiais de produtividade.',
+    bestFor: 'Relatorios, planilhas, handoffs e organizacao operacional.',
+    command: 'mythos skill use skills/productivity/google-workspace',
+  },
+  {
+    id: 'evaluation',
+    name: 'Model Evaluation',
+    category: 'mlops',
+    path: 'skills/mlops/evaluation/lm-evaluation-harness',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Avaliar modelos, benchmarks e qualidade de saida com criterios repetiveis.',
+    bestFor: 'Comparar providers ou medir melhoria antes de trocar modelo.',
+    command: 'mythos skill use skills/mlops/evaluation/lm-evaluation-harness',
+  },
+  {
+    id: 'qdrant',
+    name: 'Qdrant Vector Memory',
+    category: 'mlops',
+    path: 'optional-skills/mlops/qdrant',
+    status: 'opcional',
+    level: 'optional',
+    useCase:
+      'Usar banco vetorial para busca semantica, memoria e recuperacao de contexto.',
+    bestFor: 'Quando o Mythos precisa recuperar conhecimento por similaridade.',
+    command: 'mythos skill use optional-skills/mlops/qdrant',
+  },
+  {
+    id: 'architecture-diagram',
+    name: 'Architecture Diagram',
+    category: 'media',
+    path: 'skills/creative/architecture-diagram',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Transformar arquitetura tecnica em diagrama explicavel e revisavel.',
+    bestFor: 'Explicar CongChain, agentes, memory bridge ou fluxo de produto.',
+    command: 'mythos skill use skills/creative/architecture-diagram',
+  },
+  {
+    id: 'popular-web-designs',
+    name: 'Popular Web Designs',
+    category: 'media',
+    path: 'skills/creative/popular-web-designs',
+    status: 'catalogada',
+    level: 'core',
+    useCase:
+      'Gerar direcao visual e referencias de UI para paginas e dashboards.',
+    bestFor: 'Refinar design da pagina Mythos, Marketplace ou Agent Hub.',
+    command: 'mythos skill use skills/creative/popular-web-designs',
+  },
+] as const;
+
+export type MythosSkillCategory = (typeof MYTHOS_SKILL_CATEGORIES)[number];
+export type MythosFeaturedSkill = (typeof MYTHOS_FEATURED_SKILLS)[number];

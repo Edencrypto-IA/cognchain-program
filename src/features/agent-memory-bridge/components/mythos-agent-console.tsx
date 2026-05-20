@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Brain,
   CheckCircle2,
+  ChevronRight,
   Copy,
   Database,
   ExternalLink,
@@ -16,7 +17,7 @@ import {
   Sparkles,
   TerminalSquare,
 } from 'lucide-react';
-import { MYTHOS_AGENT_PROFILE } from '../mythos';
+import { MYTHOS_AGENT_PROFILE, MYTHOS_FEATURED_SKILLS, MYTHOS_SKILL_CATEGORIES } from '../mythos';
 
 type BridgeHealth = {
   ok?: boolean;
@@ -91,8 +92,15 @@ export default function MythosAgentConsole() {
   const [writing, setWriting] = useState(false);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('congchain');
+  const [selectedSkillId, setSelectedSkillId] = useState(MYTHOS_FEATURED_SKILLS[0]?.id || '');
 
   const canUseKey = apiKey.trim().startsWith('cog_live_');
+  const visibleSkills = MYTHOS_FEATURED_SKILLS.filter(skill => skill.category === selectedCategory);
+  const selectedSkill =
+    MYTHOS_FEATURED_SKILLS.find(skill => skill.id === selectedSkillId) ||
+    visibleSkills[0] ||
+    MYTHOS_FEATURED_SKILLS[0];
 
   const setupSnippet = useMemo(() => {
     return [
@@ -255,6 +263,127 @@ export default function MythosAgentConsole() {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#76FF03]/18 bg-[linear-gradient(135deg,rgba(118,255,3,0.055),rgba(255,255,255,0.025))] p-4">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#76FF03]">Biblioteca de skills</p>
+              <h2 className="mt-1 text-2xl font-black">Escolha a skill pelo trabalho que o Mythos vai fazer</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-white/50">
+                O Mythos tem 168 skills no catalogo. Esta tela organiza as principais por objetivo para voce entender qual usar antes de conectar o agente externo.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/8 bg-black/25 px-4 py-3 text-right">
+              <p className="text-2xl font-black text-white">{profile.counts.skills}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/35">skills auditadas</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[260px_1fr_360px]">
+            <div className="space-y-2">
+              {MYTHOS_SKILL_CATEGORIES.map(category => (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(category.id);
+                    const firstSkill = MYTHOS_FEATURED_SKILLS.find(skill => skill.category === category.id);
+                    if (firstSkill) setSelectedSkillId(firstSkill.id);
+                  }}
+                  className={`w-full rounded-xl border p-3 text-left transition ${
+                    selectedCategory === category.id
+                      ? 'border-[#76FF03]/35 bg-[#76FF03]/12'
+                      : 'border-white/8 bg-black/20 hover:border-white/14 hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-black text-white">{category.label}</span>
+                    <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-0.5 text-[10px] font-bold text-white/55">
+                      {category.count}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-white/43">{category.summary}</p>
+                </button>
+              ))}
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-white/80">
+                  {MYTHOS_SKILL_CATEGORIES.find(category => category.id === selectedCategory)?.label || 'Skills'}
+                </p>
+                <p className="text-xs text-white/36">{visibleSkills.length} destaques nesta categoria</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {visibleSkills.map(skill => (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onClick={() => setSelectedSkillId(skill.id)}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      selectedSkill?.id === skill.id
+                        ? 'border-[#76FF03]/35 bg-[#76FF03]/10 shadow-[0_0_28px_rgba(118,255,3,0.08)]'
+                        : 'border-white/8 bg-black/22 hover:border-[#76FF03]/18 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-white/45">
+                        {skill.level}
+                      </span>
+                      <span className="text-[10px] font-bold text-[#76FF03]/70">{skill.status}</span>
+                    </div>
+                    <p className="text-sm font-black text-white">{skill.name}</p>
+                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-white/47">{skill.useCase}</p>
+                    <div className="mt-3 flex items-center gap-1 text-[11px] font-bold text-[#5AD7FF]/75">
+                      Ver uso
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {selectedSkill && (
+              <aside className="rounded-2xl border border-[#5AD7FF]/16 bg-[#5AD7FF]/[0.045] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5AD7FF]">Skill selecionada</p>
+                <h3 className="mt-2 text-xl font-black text-white">{selectedSkill.name}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/55">{selectedSkill.bestFor}</p>
+
+                <div className="mt-4 rounded-xl border border-white/8 bg-black/25 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/35">Caminho</p>
+                  <p className="mt-2 break-all font-mono text-xs text-white/68">{selectedSkill.path}</p>
+                </div>
+
+                <div className="mt-3 rounded-xl border border-white/8 bg-black/25 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/35">Como usar no Mythos</p>
+                  <pre className="mt-2 overflow-x-auto text-xs leading-5 text-white/68"><code>{selectedSkill.command}</code></pre>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => copyText(`skill-${selectedSkill.id}`, selectedSkill.command)}
+                  className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#5AD7FF]/20 bg-[#5AD7FF]/10 px-3 text-xs font-bold text-[#7DE4FF] transition hover:bg-[#5AD7FF]/15"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copied === `skill-${selectedSkill.id}` ? 'Comando copiado' : 'Copiar comando da skill'}
+                </button>
+
+                <div className="mt-4 space-y-2 border-t border-white/8 pt-4">
+                  {[
+                    'A selecao aqui nao executa a skill automaticamente.',
+                    'Use a skill dentro do Mythos com uma key CongChain ativa.',
+                    'Memorias criadas pela skill devem respeitar o filtro anti-segredos.',
+                  ].map(item => (
+                    <div key={item} className="flex gap-2 text-xs leading-5 text-white/50">
+                      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#14F195]" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            )}
           </div>
         </section>
 
