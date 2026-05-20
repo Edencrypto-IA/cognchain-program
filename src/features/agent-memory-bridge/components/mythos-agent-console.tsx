@@ -17,7 +17,7 @@ import {
   Sparkles,
   TerminalSquare,
 } from 'lucide-react';
-import { MYTHOS_AGENT_PROFILE, MYTHOS_CAPABILITY_GROUPS, MYTHOS_FEATURED_SKILLS, MYTHOS_SKILL_CATEGORIES } from '../mythos';
+import { MYTHOS_AGENT_PROFILE, MYTHOS_CAPABILITY_GROUPS, MYTHOS_CATEGORY_SKILL_INDEX, MYTHOS_FEATURED_SKILLS, MYTHOS_SKILL_CATEGORIES } from '../mythos';
 
 type BridgeHealth = {
   ok?: boolean;
@@ -136,6 +136,8 @@ export default function MythosAgentConsole() {
     MYTHOS_CAPABILITY_GROUPS.find(group => group.id === selectedCapabilityId) ||
     MYTHOS_CAPABILITY_GROUPS[0];
   const visibleSkills = MYTHOS_FEATURED_SKILLS.filter(skill => skill.category === selectedCategory);
+  const selectedCategoryMeta = MYTHOS_SKILL_CATEGORIES.find(category => category.id === selectedCategory);
+  const categorySkillIndex = MYTHOS_CATEGORY_SKILL_INDEX[selectedCategory as keyof typeof MYTHOS_CATEGORY_SKILL_INDEX] || [];
   const selectedSkill =
     MYTHOS_FEATURED_SKILLS.find(skill => skill.id === selectedSkillId) ||
     visibleSkills[0] ||
@@ -690,9 +692,11 @@ export default function MythosAgentConsole() {
             <div>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-bold text-white/80">
-                  {MYTHOS_SKILL_CATEGORIES.find(category => category.id === selectedCategory)?.label || 'Skills'}
+                  {selectedCategoryMeta?.label || 'Skills'}
                 </p>
-                <p className="text-xs text-white/36">{visibleSkills.length} destaques nesta categoria</p>
+                <p className="text-xs text-white/36">
+                  Mostrando {visibleSkills.length} de {selectedCategoryMeta?.count || categorySkillIndex.length} skills principais
+                </p>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {visibleSkills.map(skill => (
@@ -720,6 +724,44 @@ export default function MythosAgentConsole() {
                     </div>
                   </button>
                 ))}
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/8 bg-black/18 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Todas da categoria</p>
+                    <p className="mt-1 text-sm font-bold text-white">
+                      {selectedCategoryMeta?.count || categorySkillIndex.length} skills {selectedCategoryMeta?.label || ''}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[10px] font-bold text-white/50">
+                    catalogo
+                  </span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {categorySkillIndex.map((skillName, index) => {
+                    const highlighted = visibleSkills.some(skill => skill.name === skillName);
+                    return (
+                      <div
+                        key={`${skillName}-${index}`}
+                        className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
+                          highlighted
+                            ? 'border-[#76FF03]/20 bg-[#76FF03]/8'
+                            : 'border-white/8 bg-white/[0.025]'
+                        }`}
+                      >
+                        <span className="truncate text-xs font-semibold text-white/68">{skillName}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] ${
+                          highlighted
+                            ? 'bg-[#76FF03]/12 text-[#A7FF3D]'
+                            : 'bg-white/[0.055] text-white/32'
+                        }`}>
+                          {highlighted ? 'card' : 'lista'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
