@@ -76,7 +76,7 @@ _HIGH_IMPACT_TOOLS = {
 _SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----", re.I),
     re.compile(r"\b(seed phrase|mnemonic|private key|secret key)\b", re.I),
-    re.compile(r"\b[A-Z0-9_]*(API_KEY|SECRET|TOKEN|PRIVATE_KEY)\s*=", re.I),
+    re.compile(r"\b[A-Z0-9_]*(API_KEY|SECRET|TOKEN|PRIVATE_KEY)\s*=\s*[^\s,;\"']+", re.I),
     re.compile(r"\bcog_live_[a-f0-9]{24,}\b", re.I),
     re.compile(r"\b(?:[1-9A-HJ-NP-Za-km-z]{80,})\b"),
 ]

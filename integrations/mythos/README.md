@@ -127,6 +127,20 @@ python optional-skills/blockchain/congchain/scripts/congchain_client.py write "M
 python optional-skills/blockchain/congchain/scripts/congchain_client.py list --limit 5
 ```
 
+## Teste do runtime adapter
+
+Dentro deste repositorio CongChain, o runtime completo do Mythos nao esta
+incluido. Para validar o adapter sem depender do agente inteiro, rode o smoke
+test que simula os hooks reais e confirma que os sete eventos geram payloads
+para `/api/memory/write`:
+
+```bash
+python -m unittest integrations.mythos.tests.test_congchain_adapter
+```
+
+Esse teste cobre registro dos hooks, lifecycle completo, metadata Mythos,
+flags de seguranca e redacao de secrets antes da escrita.
+
 ## Notas de seguranca
 
 - Nao cole `CONGCHAIN_API_KEY` em chat, logs ou prints.
