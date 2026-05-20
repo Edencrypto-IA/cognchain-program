@@ -21,6 +21,14 @@ type MythosTestMessage = {
   content: string;
 };
 
+type MythosTestBody = {
+  model?: string;
+  mode?: string;
+  selectedSkill?: string;
+  skillPath?: string;
+  messages?: unknown;
+};
+
 type MythosCognitiveTrace = {
   perception: string;
   memoryContext: string;
@@ -53,15 +61,15 @@ function inferSkill(content: string) {
   return 'Mythos General Reasoning';
 }
 
-function buildCognitiveTrace(messages: MythosTestMessage[], model: string): MythosCognitiveTrace {
+function buildCognitiveTrace(messages: MythosTestMessage[], model: string, selectedSkillInput?: string): MythosCognitiveTrace {
   const latest = messages[messages.length - 1]?.content || '';
-  const selectedSkill = inferSkill(latest);
+  const selectedSkill = selectedSkillInput?.trim() || inferSkill(latest);
 
   return {
     perception:
       `User asked: "${latest.slice(0, 180)}${latest.length > 180 ? '...' : ''}". Runtime model route: ${model}.`,
     memoryContext:
-      'This terminal test does not read private vault memory automatically. It only uses the current conversation sent in this request.',
+      'This Lab request does not read private vault memory automatically. It only uses the current conversation, selected skill, and visible request context.',
     selectedSkill,
     reasoningPath:
       `Mythos maps the request to ${selectedSkill}, checks whether the answer needs external tools or memory writes, and keeps the response in safe demo mode.`,
@@ -108,14 +116,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json() as MythosTestBody;
     const model = validateModel(body.model || 'nvidia');
     const messages = sanitizeMessages(body.messages);
-    const cognitiveTrace = buildCognitiveTrace(messages, model);
+    const cognitiveTrace = buildCognitiveTrace(messages, model, body.selectedSkill);
+    const skillContext = body.selectedSkill
+      ? `Selected Mythos skill: ${body.selectedSkill}${body.skillPath ? ` (${body.skillPath})` : ''}. Lab mode: ${body.mode || 'demo'}.`
+      : `No explicit Mythos skill selected. Lab mode: ${body.mode || 'demo'}.`;
 
     const result = await callModel({
       model,
-      messages,
+      messages: [
+        {
+          role: 'user',
+          content: skillContext,
+        },
+        ...messages,
+      ],
       systemPrompt: MYTHOS_TEST_SYSTEM,
       useContext: false,
       agentName: 'Mythos',

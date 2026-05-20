@@ -62,48 +62,12 @@ type ListResponse = {
   error?: string;
 };
 
-type MythosTerminalMessage = {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-};
-
-type MythosCognitiveTrace = {
-  perception?: string;
-  memoryContext?: string;
-  selectedSkill?: string;
-  reasoningPath?: string;
-  prediction?: string;
-  decision?: string;
-  confidence?: number;
-  safetyBoundary?: string;
-  nextHumanStep?: string;
-};
-
 const DEFAULT_TEST_MEMORY =
   'Mythos official bridge smoke test: context, observability and task memory are connected to CongChain with authenticated human-reviewed metadata.';
 
-const MYTHOS_TERMINAL_PROMPTS = [
-  {
-    label: 'Analyze',
-    prompt: 'Analyze how Mythos uses skills, memory, and CongChain in a real task.',
-  },
-  {
-    label: 'Research',
-    prompt: 'Explain how you would research a topic and save verifiable memory to CongChain.',
-  },
-  {
-    label: 'Reason',
-    prompt: 'Reason about which skill I should choose to debug an API returning 401.',
-  },
-  {
-    label: 'Create',
-    prompt: 'Create a short plan to connect an external agent to the Agent Memory Bridge.',
-  },
-];
-
 const PT = {
   backToChat: 'Voltar ao Chat',
-  testMythos: 'Testar Mythos',
+  testMythos: 'Abrir Mythos Lab',
   closeTest: 'Fechar teste',
   heroLabel: 'Primeiro agente externo oficial',
   heroSummary:
@@ -188,7 +152,7 @@ const PT = {
 
 const EN = {
   backToChat: 'Back to Chat',
-  testMythos: 'Test Mythos',
+  testMythos: 'Open Mythos Lab',
   closeTest: 'Close test',
   heroLabel: 'First official external agent',
   heroSummary:
@@ -294,41 +258,6 @@ function buildAuthHeaders(apiKey: string) {
   };
 }
 
-function formatCognitiveTrace(trace?: MythosCognitiveTrace, label = 'Decision trace') {
-  if (!trace) return '';
-  const confidence = typeof trace.confidence === 'number'
-    ? `${Math.round(trace.confidence * 100)}%`
-    : 'not scored';
-
-  return [
-    '',
-    `${label}:`,
-    `- Perception: ${trace.perception || 'not provided'}`,
-    `- Memory: ${trace.memoryContext || 'not provided'}`,
-    `- Skill: ${trace.selectedSkill || 'not selected'}`,
-    `- Reasoning path: ${trace.reasoningPath || 'not provided'}`,
-    `- Prediction: ${trace.prediction || 'not provided'}`,
-    `- Decision: ${trace.decision || 'not provided'}`,
-    `- Confidence: ${confidence}`,
-    `- Safety: ${trace.safetyBoundary || 'not provided'}`,
-    `- Next human step: ${trace.nextHumanStep || 'not provided'}`,
-  ].join('\n');
-}
-
-function cleanTerminalText(value: string) {
-  return value
-    .replace(/\r\n/g, '\n')
-    .replace(/```[\s\S]*?```/g, match => match.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, ''))
-    .replace(/(^|\s)\*\*([^*\n]+)\*\*/g, '$1$2')
-    .replace(/(^|\s)__([^_\n]+)__/g, '$1$2')
-    .replace(/(^|\s)\*([^*\n]+)\*/g, '$1$2')
-    .replace(/(^|\s)_([^_\n]+)_/g, '$1$2')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^\s*[-*]\s+/gm, '- ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
 export default function MythosAgentConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
   const [health, setHealth] = useState<BridgeHealth | null>(null);
@@ -345,18 +274,7 @@ export default function MythosAgentConsole() {
   const [selectedCapabilityId, setSelectedCapabilityId] = useState(MYTHOS_CAPABILITY_GROUPS[0]?.id || '');
   const [selectedCategory, setSelectedCategory] = useState('congchain');
   const [selectedSkillId, setSelectedSkillId] = useState(MYTHOS_FEATURED_SKILLS[0]?.id || '');
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
-  const [terminalModel, setTerminalModel] = useState('nvidia');
-  const [terminalInput, setTerminalInput] = useState('');
-  const [terminalLoading, setTerminalLoading] = useState(false);
   const [language, setLanguage] = useState<'en' | 'pt'>('en');
-  const [terminalMessages, setTerminalMessages] = useState<MythosTerminalMessage[]>([
-    {
-      role: 'system',
-      content:
-        'Terminal Mythos pronto. Este teste usa providers configurados no backend da CongChain; nenhuma API key aparece no navegador.',
-    },
-  ]);
 
   const canUseKey = apiKey.trim().startsWith('cog_live_');
   const copy = language === 'pt' ? PT : EN;
@@ -370,7 +288,6 @@ export default function MythosAgentConsole() {
     MYTHOS_FEATURED_SKILLS.find(skill => skill.id === selectedSkillId) ||
     visibleSkills[0] ||
     MYTHOS_FEATURED_SKILLS[0];
-  const hasTerminalConversation = terminalMessages.some(item => item.role !== 'system');
 
   const setupSnippet = useMemo(() => {
     return [
@@ -485,49 +402,6 @@ export default function MythosAgentConsole() {
     window.setTimeout(() => setCopied(''), 1400);
   }
 
-  async function sendTerminalMessage(prompt?: string) {
-    const content = (prompt || terminalInput).trim();
-    if (!content || terminalLoading) return;
-
-    const userMessage: MythosTerminalMessage = { role: 'user', content };
-    const nextMessages = [...terminalMessages, userMessage];
-    setTerminalMessages(nextMessages);
-    setTerminalInput('');
-    setTerminalLoading(true);
-
-    try {
-      const response = await fetch('/api/mythos/test-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: terminalModel,
-          messages: nextMessages
-            .filter(item => item.role !== 'system')
-            .map(item => ({ role: item.role, content: item.content })),
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || (language === 'pt' ? 'Falha ao chamar terminal Mythos.' : 'Failed to call the Mythos terminal.'));
-      setTerminalMessages(current => [
-        ...current,
-        {
-          role: 'assistant',
-          content: cleanTerminalText(`${data.response || 'Mythos respondeu sem conteudo.'}${formatCognitiveTrace(data.cognitiveTrace, copy.decisionTrace)}`),
-        },
-      ]);
-    } catch (error) {
-      setTerminalMessages(current => [
-        ...current,
-        {
-          role: 'system',
-          content: error instanceof Error ? error.message : (language === 'pt' ? 'Nao foi possivel testar o Mythos agora.' : 'Could not test Mythos right now.'),
-        },
-      ]);
-    } finally {
-      setTerminalLoading(false);
-    }
-  }
-
   useEffect(() => {
     loadHealth();
   }, []);
@@ -547,14 +421,13 @@ export default function MythosAgentConsole() {
             >
               {language === 'en' ? 'PT' : 'EN'}
             </button>
-            <button
-              type="button"
-              onClick={() => setIsTerminalOpen(value => !value)}
+            <a
+              href="/mythos/lab"
               className="inline-flex items-center gap-2 rounded-xl border border-[#76FF03]/25 bg-[#76FF03]/12 px-3 py-2 text-xs font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/18"
             >
               <TerminalSquare className="h-4 w-4" />
-              {isTerminalOpen ? copy.closeTest : copy.testMythos}
-            </button>
+              {copy.testMythos}
+            </a>
             <a href="/brain" className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 px-3 py-2 text-xs font-bold text-[#14F195] transition hover:bg-[#14F195]/15">
               <Brain className="h-4 w-4" />
               Memory Brain
@@ -734,187 +607,6 @@ export default function MythosAgentConsole() {
             </div>
           </div>
         </section>
-
-        {isTerminalOpen && (
-          <section className="overflow-hidden rounded-[28px] border border-[#76FF03]/18 bg-[#020402] shadow-[0_0_80px_rgba(118,255,3,0.08)]">
-            <div className="grid min-h-[760px] lg:grid-cols-[300px_1fr]">
-              <aside className="relative flex flex-col border-b border-white/8 bg-[linear-gradient(180deg,rgba(6,12,6,0.92),rgba(0,0,0,0.98))] p-5 lg:border-b-0 lg:border-r">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_5%,rgba(118,255,3,0.16),transparent_28%)]" />
-                <div className="relative flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-16 w-16 overflow-hidden rounded-full border border-[#76FF03]/34 bg-black shadow-[0_0_28px_rgba(118,255,3,0.22)]">
-                      <img src={profile.image} alt="" className="h-full w-full object-cover" />
-                    </div>
-                    <div>
-                      <p className="text-xl font-black uppercase tracking-[0.28em] text-[#A7FF3D]">Mythos</p>
-                      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">The 1st autonomous external agent</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setTerminalMessages([{ role: 'system', content: language === 'pt' ? 'Nova conversa Mythos iniciada. Nenhuma memoria e salva automaticamente neste terminal.' : 'New Mythos conversation started. No memory is saved automatically in this terminal.' }])}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] text-[#A7FF3D] transition hover:bg-[#76FF03]/10"
-                    aria-label="Nova conversa Mythos"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setTerminalMessages([{ role: 'system', content: language === 'pt' ? 'Nova conversa Mythos iniciada. Nenhuma memoria e salva automaticamente neste terminal.' : 'New Mythos conversation started. No memory is saved automatically in this terminal.' }])}
-                  className="relative mt-8 inline-flex h-14 items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.055] px-4 text-sm font-bold text-white/80 transition hover:border-[#76FF03]/20 hover:bg-[#76FF03]/8"
-                >
-                  <TerminalSquare className="h-5 w-5 text-white/78" />
-                  New Conversation
-                </button>
-
-                <div className="relative mt-8">
-                  <p className="text-sm text-white/42">Today</p>
-                  <div className="mt-4 flex items-center justify-between gap-3 rounded-xl px-1 text-sm text-white/72">
-                    <span>Welcome to Mythos</span>
-                    <span className="text-white/35">...</span>
-                  </div>
-                </div>
-
-                <div className="relative mt-8 rounded-2xl border border-white/8 bg-black/28 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">Safe test mode</p>
-                  <p className="mt-2 text-xs leading-5 text-white/45">
-                    O teste usa o backend da CongChain. Keys ficam no servidor, nao no navegador.
-                  </p>
-                  <select
-                    value={terminalModel}
-                    onChange={event => setTerminalModel(event.target.value)}
-                    className="mt-4 w-full rounded-xl border border-white/10 bg-black/45 px-3 py-2.5 text-sm text-white outline-none focus:border-[#76FF03]/35"
-                  >
-                    <option value="nvidia">NVIDIA</option>
-                    <option value="glm">GLM-4.7</option>
-                    <option value="minimax">MiniMax</option>
-                    <option value="qwen">Qwen</option>
-                  </select>
-                </div>
-
-                <div className="relative mt-auto pt-8">
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/35 p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-11 w-11 overflow-hidden rounded-full border border-[#76FF03]/25 bg-black">
-                        <img src={profile.image} alt="" className="h-full w-full object-cover" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white">Mythos</p>
-                        <p className="text-xs text-white/50"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-[#76FF03]" />ONLINE</p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-white/35" />
-                  </div>
-                </div>
-              </aside>
-
-              <div className="relative flex min-h-[760px] flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_12%,rgba(118,255,3,0.16),transparent_28%),linear-gradient(180deg,rgba(2,4,2,0.98),rgba(0,0,0,0.99))]">
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(118,255,3,0.03)_1px,transparent_1px),linear-gradient(180deg,rgba(118,255,3,0.025)_1px,transparent_1px)] bg-[size:90px_90px] opacity-20" />
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_center,rgba(118,255,3,0.18),transparent_52%)] blur-2xl" />
-
-                <div className="relative flex flex-1 flex-col items-center px-5 py-8">
-                  {!hasTerminalConversation && (
-                    <div className="flex w-full flex-1 flex-col items-center justify-center">
-                      <div className="relative h-64 w-64 sm:h-80 sm:w-80">
-                        <div className="absolute inset-4 rounded-full border border-[#76FF03]/18 shadow-[0_0_80px_rgba(118,255,3,0.16)]" />
-                        <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(118,255,3,0.14),transparent_64%)]" />
-                        <img src={profile.image} alt="" className="relative h-full w-full rounded-full object-cover opacity-95 mix-blend-screen" />
-                      </div>
-                      <h2 className="mt-6 text-center text-4xl font-black uppercase tracking-[0.38em] text-[#A7FF3D] sm:text-5xl">Mythos</h2>
-                      <p className="mt-3 text-center text-xs font-bold uppercase tracking-[0.22em] text-white/45 sm:text-sm">
-                        The 1st autonomous external agent
-                      </p>
-                    </div>
-                  )}
-
-                  {hasTerminalConversation && (
-                    <div className="w-full flex-1 overflow-y-auto py-2">
-                      <div className="mx-auto flex max-w-3xl flex-col gap-3">
-                        {terminalMessages.map((item, index) => (
-                          <div
-                            key={`${item.role}-${index}`}
-                            className={`rounded-2xl border px-4 py-3 text-sm leading-6 backdrop-blur ${
-                              item.role === 'user'
-                                ? 'ml-auto max-w-[85%] border-[#76FF03]/26 bg-[#76FF03]/12 text-white'
-                                : item.role === 'assistant'
-                                  ? 'mr-auto max-w-[92%] border-white/8 bg-white/[0.055] text-white/74'
-                                  : 'mx-auto max-w-[92%] border-[#5AD7FF]/14 bg-[#5AD7FF]/8 text-white/52'
-                            }`}
-                          >
-                            <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/32">
-                              {item.role === 'user' ? copy.user : item.role === 'assistant' ? 'Mythos' : copy.system}
-                            </p>
-                            <p className="whitespace-pre-wrap">{item.content}</p>
-                          </div>
-                        ))}
-                        {terminalLoading && (
-                          <div className="mr-auto inline-flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.055] px-4 py-3 text-sm text-white/55">
-                            <Loader2 className="h-4 w-4 animate-spin text-[#76FF03]" />
-                            {language === 'pt' ? 'Mythos pensando...' : 'Mythos is thinking...'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="w-full max-w-3xl">
-                    <div className="rounded-[26px] border border-[#76FF03]/28 bg-black/48 p-4 shadow-[0_0_40px_rgba(118,255,3,0.08)] backdrop-blur-xl">
-                      <textarea
-                        value={terminalInput}
-                        onChange={event => setTerminalInput(event.target.value)}
-                        onKeyDown={event => {
-                          if (event.key === 'Enter' && !event.shiftKey) {
-                            event.preventDefault();
-                            sendTerminalMessage();
-                          }
-                        }}
-                        rows={3}
-                        placeholder="Message Mythos..."
-                        className="w-full resize-none bg-transparent px-1 text-base leading-6 text-white outline-none placeholder:text-white/34"
-                      />
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-white/42">
-                          <span className="text-xl leading-none">&gt;</span>
-                          <span className="text-[11px]">{copy.backendDemo}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => sendTerminalMessage()}
-                          disabled={!terminalInput.trim() || terminalLoading}
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/80 text-black transition hover:bg-[#A7FF3D] disabled:cursor-not-allowed disabled:opacity-45"
-                          aria-label={language === 'pt' ? 'Enviar mensagem ao Mythos' : 'Send message to Mythos'}
-                        >
-                          {terminalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-                      {MYTHOS_TERMINAL_PROMPTS.map(item => (
-                        <button
-                          key={item.label}
-                          type="button"
-                          onClick={() => sendTerminalMessage(item.prompt)}
-                          disabled={terminalLoading}
-                          className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-black/28 px-5 text-sm font-semibold text-white/74 transition hover:border-[#76FF03]/25 hover:bg-[#76FF03]/8 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Sparkles className="h-4 w-4 text-[#A7FF3D]" />
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <p className="mt-10 text-center text-xs text-white/35">
-                    Mythos can make mistakes. Verify important information.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
 
         <section className="rounded-2xl border border-[#5AD7FF]/14 bg-white/[0.025] p-4">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
