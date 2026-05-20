@@ -8,6 +8,7 @@ import {
   Settings,
   Trash2,
   ChevronLeft,
+  ChevronDown,
   MoreHorizontal,
   Bot,
   RefreshCw,
@@ -45,6 +46,7 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAgentHubOpen, setIsAgentHubOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/verify').then(r => r.json()).then(d => setIsAdmin(d.admin)).catch(() => {});
@@ -148,35 +150,90 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
 
           {/* Primary Navigation */}
           <nav className="px-3 pb-2 space-y-0.5">
-            <a
-              href="/pay"
+            <button
+              type="button"
+              onClick={() => setIsAgentHubOpen((value) => !value)}
+              aria-expanded={isAgentHubOpen}
               className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
                 bg-transparent border border-transparent
                 hover:bg-white/[0.04] hover:border-white/[0.055]
                 transition-all duration-200 group"
             >
               <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#F59E0B]/25">
-                <Zap className="w-3.5 h-3.5 text-white/55 group-hover:text-[#F59E0B]" />
+                <Bot className="w-3.5 h-3.5 text-white/55 group-hover:text-[#F59E0B]" />
               </div>
               <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
-                CONGCHAIN Pay
+                Agent Hub
               </span>
-            </a>
+              <ChevronDown className={`ml-auto w-3.5 h-3.5 text-white/35 transition-transform duration-200 ${isAgentHubOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-            <a
-              href="/marketplace"
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
-                bg-transparent border border-transparent
-                hover:bg-white/[0.04] hover:border-white/[0.055]
-                transition-all duration-200 group"
-            >
-              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
-                <Sparkles className="w-3.5 h-3.5 text-white/55 group-hover:text-[#14F195]" />
+            {isAgentHubOpen && (
+              <div className="ml-3 mb-1 space-y-0.5 border-l border-white/[0.055] pl-2">
+                <a
+                  href="/office"
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
+                    bg-transparent border border-transparent
+                    hover:bg-white/[0.04] hover:border-white/[0.055]
+                    transition-all duration-200 group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-white/55 group-hover:text-[#9945FF]">
+                      <path d="M7 1L12.5 4V10L7 13L1.5 10V4L7 1Z" fill="currentColor" fillOpacity="0.9"/>
+                    </svg>
+                  </div>
+                  <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
+                    Agent Office
+                  </span>
+                  <span className="ml-auto text-[8px] font-black text-[#14F195]/60 bg-[#14F195]/10 border border-[#14F195]/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
+                </a>
+
+                <a
+                  href="/agents"
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
+                    bg-transparent border border-transparent
+                    hover:bg-white/[0.04] hover:border-white/[0.055]
+                    transition-all duration-200 group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#00D1FF]/25">
+                    <Bot className="w-3.5 h-3.5 text-white/55 group-hover:text-[#00D1FF]" />
+                  </div>
+                  <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
+                    Agent Builder
+                  </span>
+                </a>
+
+                <a
+                  href="/pay"
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
+                    bg-transparent border border-transparent
+                    hover:bg-white/[0.04] hover:border-white/[0.055]
+                    transition-all duration-200 group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#F59E0B]/25">
+                    <Zap className="w-3.5 h-3.5 text-white/55 group-hover:text-[#F59E0B]" />
+                  </div>
+                  <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
+                    CongChain Pay
+                  </span>
+                </a>
+
+                <a
+                  href="/marketplace"
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
+                    bg-transparent border border-transparent
+                    hover:bg-white/[0.04] hover:border-white/[0.055]
+                    transition-all duration-200 group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#14F195]/25">
+                    <Sparkles className="w-3.5 h-3.5 text-white/55 group-hover:text-[#14F195]" />
+                  </div>
+                  <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
+                    Marketplace
+                  </span>
+                </a>
               </div>
-              <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
-                Marketplace
-              </span>
-            </a>
+            )}
 
             <a
               href="/brain"
@@ -204,27 +261,9 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
                 <Orbit className="w-3.5 h-3.5 text-white/55 group-hover:text-[#76FF03]" />
               </div>
               <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
-                Mythos Bridge
+                Mythos Agent
               </span>
               <span className="ml-auto text-[8px] font-black text-[#76FF03]/60 bg-[#76FF03]/10 border border-[#76FF03]/15 px-1.5 py-0.5 rounded-full tracking-widest">1st</span>
-            </a>
-
-            <a
-              href="/office"
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
-                bg-transparent border border-transparent
-                hover:bg-white/[0.04] hover:border-white/[0.055]
-                transition-all duration-200 group"
-            >
-              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#9945FF]/25">
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-white/55 group-hover:text-[#9945FF]">
-                  <path d="M7 1L12.5 4V10L7 13L1.5 10V4L7 1Z" fill="currentColor" fillOpacity="0.9"/>
-                </svg>
-              </div>
-              <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
-                Agent Office
-              </span>
-              <span className="ml-auto text-[8px] font-black text-[#14F195]/60 bg-[#14F195]/10 border border-[#14F195]/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
             </a>
 
             <a
@@ -255,21 +294,6 @@ export default function Sidebar({ isOpen, onToggle, conversations, activeId, onS
               </div>
               <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
                 API Keys
-              </span>
-            </a>
-
-            <a
-              href="/agents"
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl
-                bg-transparent border border-transparent
-                hover:bg-white/[0.04] hover:border-white/[0.055]
-                transition-all duration-200 group"
-            >
-              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:border-[#00D1FF]/25">
-                <Bot className="w-3.5 h-3.5 text-white/55 group-hover:text-[#00D1FF]" />
-              </div>
-              <span className="text-[13px] font-medium text-white/60 group-hover:text-white/88 transition-colors">
-                Agent Builder
               </span>
             </a>
           </nav>
