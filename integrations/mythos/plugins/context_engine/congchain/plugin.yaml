@@ -1,0 +1,9 @@
+name: congchain
+version: "1.0.0"
+description: "CongChain context engine — salva turnos de alta confiança no Agent Memory Bridge antes de comprimir. O contexto fica disponível por hash em qualquer sessão futura."
+author: Eden Lucas / CognChain + Mythos Agent
+requires_env:
+  - CONGCHAIN_API_URL
+  - CONGCHAIN_API_KEY
+optional_env:
+  - CONGCHAIN_AGENT_ID

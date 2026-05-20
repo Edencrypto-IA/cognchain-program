@@ -1,0 +1,29 @@
+name: congchain-cna
+version: "1.0.0"
+description: "CongChain CNA Interpretability — implementa Contrastive Neuron Attribution para modelos locais. Identifica os neurônios MLP mais contrastivos durante uma sessão e salva o fingerprint como log de interpretabilidade verificável."
+author: Eden Lucas / CognChain + Mythos Agent
+license: MIT
+pip_dependencies:
+  - torch>=2.0.0
+  - transformers>=4.40.0
+hooks:
+  - on_session_start
+  - on_session_end
+  - post_llm_call
+requires_env:
+  - CONGCHAIN_API_URL
+  - CONGCHAIN_API_KEY
+optional_env:
+  - CONGCHAIN_AGENT_ID
+  - CNA_MODEL_PATH
+  - CNA_TOP_K_FRACTION
+  - CNA_MIN_PROMPTS
+  - CNA_ANCHOR_FINGERPRINT
+  - CNA_DEVICE
+notes: |
+  Requer modelo local carregado via transformers (Llama, Qwen, Mistral, etc).
+  Não funciona com APIs remotas (Claude, GPT) — apenas modelos com acesso aos pesos.
+  Compatível com modelos via Ollama SOMENTE se o modelo também estiver disponível
+  localmente via transformers para extração de ativações.
+  Se CNA_MODEL_PATH não estiver definido, o plugin opera em modo passivo
+  (ancora apenas metadados de sessão, sem fingerprint de neurônios).

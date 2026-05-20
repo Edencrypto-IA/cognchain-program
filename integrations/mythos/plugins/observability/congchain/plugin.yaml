@@ -1,0 +1,16 @@
+name: congchain
+version: "1.0.0"
+description: "CongChain observability — registra tool calls, decisões e comportamento do agente como memórias verificáveis. Cria um log de auditoria por hash para cada sessão Mythos."
+author: Eden Lucas / CognChain + Mythos Agent
+requires_env:
+  - CONGCHAIN_API_URL
+  - CONGCHAIN_API_KEY
+optional_env:
+  - CONGCHAIN_AGENT_ID
+  - CONGCHAIN_OBS_MIN_TOOLS
+  - CONGCHAIN_OBS_DEBUG
+hooks:
+  - on_session_start
+  - on_session_end
+  - post_tool_call
+  - post_llm_call
