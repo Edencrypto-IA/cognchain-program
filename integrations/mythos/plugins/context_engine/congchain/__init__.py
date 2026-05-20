@@ -260,6 +260,8 @@ def _anchor_turns_async(turns: List[Dict[str, Any]], session_id: str) -> None:
                         "lineage": "Hermes-compatible fork",
                         "compatibilityMode": "hermes_compatible_mythos_primary",
                         "identityProgram": "mythos_six_pillar_agent_identity",
+                        "cognitiveArchitecture": "mythos_verifiable_brain_v1",
+                        "decisionTraceSchema": "mythos_decision_trace_v1",
                         "session_id": session_id or "",
                         "local_hash": turn["content_hash_local"],
                         "engine": "congchain",

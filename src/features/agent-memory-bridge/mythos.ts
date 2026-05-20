@@ -676,6 +676,82 @@ export const MYTHOS_UNIQUE_IDENTITY_PILLARS = [
   },
 ] as const;
 
+export const MYTHOS_COGNITIVE_LAYERS = [
+  {
+    id: 'perception',
+    name: 'Perception Layer',
+    brainAnalogy: 'Sees signals',
+    function:
+      'Collects the user request, selected skill, model route, available memory context, and visible system state.',
+    auditOutput:
+      'What Mythos observed before answering.',
+  },
+  {
+    id: 'memory',
+    name: 'Memory Layer',
+    brainAnalogy: 'Remembers context',
+    function:
+      'Separates live prompt context, saved CongChain memory, local Obsidian notes, and external provider memory.',
+    auditOutput:
+      'Which memory sources were available and which were not used.',
+  },
+  {
+    id: 'reasoning',
+    name: 'Reasoning Layer',
+    brainAnalogy: 'Explains why',
+    function:
+      'Connects observations to a chosen skill, evaluates alternatives, and states why a path was selected.',
+    auditOutput:
+      'Decision rationale, rejected paths, confidence, and assumptions.',
+  },
+  {
+    id: 'prediction',
+    name: 'Prediction Layer',
+    brainAnalogy: 'Simulates next states',
+    function:
+      'Projects likely outcomes, risks, and next actions before Mythos recommends a step.',
+    auditOutput:
+      'Short forecast with uncertainty and risk labels.',
+  },
+  {
+    id: 'conscience',
+    name: 'Operational Conscience',
+    brainAnalogy: 'Knows limits',
+    function:
+      'Applies no-secrets, no-funds, no-signed-payloads, and human-review boundaries before action.',
+    auditOutput:
+      'Safety gates and actions Mythos must not perform automatically.',
+  },
+  {
+    id: 'learning',
+    name: 'Auditable Learning Layer',
+    brainAnalogy: 'Learns with receipts',
+    function:
+      'Turns important decisions into reviewable memory only when the user or integration explicitly writes it.',
+    auditOutput:
+      'Memory candidate, write status, hash route, and review requirements.',
+  },
+] as const;
+
+export const MYTHOS_DECISION_TRACE_SCHEMA = {
+  id: 'mythos_decision_trace_v1',
+  version: '1.0.0',
+  requiredFields: [
+    'perception',
+    'memoryContext',
+    'selectedSkill',
+    'reasoningPath',
+    'prediction',
+    'decision',
+    'confidence',
+    'safetyBoundary',
+    'nextHumanStep',
+  ],
+  guarantee:
+    'The trace explains operational reasoning and limits. It is not hidden chain-of-thought and must not reveal secrets, private prompts, keys, or signed payloads.',
+} as const;
+
 export type MythosSkillCategory = (typeof MYTHOS_SKILL_CATEGORIES)[number];
 export type MythosFeaturedSkill = (typeof MYTHOS_FEATURED_SKILLS)[number];
 export type MythosUniqueIdentityPillar = (typeof MYTHOS_UNIQUE_IDENTITY_PILLARS)[number];
+export type MythosCognitiveLayer = (typeof MYTHOS_COGNITIVE_LAYERS)[number];

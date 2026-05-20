@@ -41,6 +41,25 @@ Esses pilares posicionam Mythos como infraestrutura de agente verificavel. Eles
 nao adicionam execucao autonoma, assinatura de carteira, monitoramento real ou
 movimento de fundos.
 
+## Cerebro verificavel v1
+
+Mythos agora carrega uma arquitetura cognitiva auditavel:
+
+- Perception Layer: registra sinais observados antes da resposta.
+- Memory Layer: separa prompt vivo, memoria CongChain, Obsidian e providers
+  externos.
+- Reasoning Layer: explica por que uma skill ou caminho foi escolhido sem
+  expor chain-of-thought sensivel.
+- Prediction Layer: resume cenarios provaveis, riscos e incerteza.
+- Operational Conscience: aplica limites de seguranca antes de qualquer acao.
+- Auditable Learning Layer: transforma decisoes em candidatas a memoria apenas
+  quando houver escrita autenticada explicita.
+
+Metadados usados pelo pacote:
+
+- `cognitiveArchitecture`: `mythos_verifiable_brain_v1`
+- `decisionTraceSchema`: `mythos_decision_trace_v1`
+
 ## Arquivos
 
 - `plugins/context_engine/congchain`: salva turnos importantes antes da compressao.

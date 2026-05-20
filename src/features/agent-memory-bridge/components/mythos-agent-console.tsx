@@ -21,6 +21,8 @@ import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_CAPABILITY_GROUPS,
   MYTHOS_CATEGORY_SKILL_INDEX,
+  MYTHOS_COGNITIVE_LAYERS,
+  MYTHOS_DECISION_TRACE_SCHEMA,
   MYTHOS_FEATURED_SKILLS,
   MYTHOS_SKILL_CATEGORIES,
   MYTHOS_UNIQUE_IDENTITY_PILLARS,
@@ -65,6 +67,18 @@ type MythosTerminalMessage = {
   content: string;
 };
 
+type MythosCognitiveTrace = {
+  perception?: string;
+  memoryContext?: string;
+  selectedSkill?: string;
+  reasoningPath?: string;
+  prediction?: string;
+  decision?: string;
+  confidence?: number;
+  safetyBoundary?: string;
+  nextHumanStep?: string;
+};
+
 const DEFAULT_TEST_MEMORY =
   'Mythos official bridge smoke test: context, observability and task memory are connected to CongChain with authenticated human-reviewed metadata.';
 
@@ -104,6 +118,13 @@ const PT = {
     'A meta nao e competir como mais um chat. Mythos deve parecer infraestrutura de agente: memoria comprovavel, skills governadas, vault isolado e auditoria pronta para empresas.',
   auditSignal: 'Sinal auditavel',
   enterpriseValue: 'Valor para empresas',
+  cognitiveEyebrow: 'Cerebro verificavel',
+  cognitiveTitle: 'Como Mythos pensa, lembra, prevê e explica',
+  cognitiveCopy:
+    'Esta fase cria uma arquitetura cognitiva auditavel. Mythos nao revela pensamento interno sensivel, mas explica sinais, memoria, decisao, previsao e limites de seguranca.',
+  brainAnalogy: 'Analogia cerebral',
+  auditOutput: 'Saida auditavel',
+  decisionTrace: 'Trilha de decisao',
   capabilityEyebrow: 'Mapa de capacidades',
   capabilityTitle: 'O que esses numeros significam na pratica',
   capabilityCopy:
@@ -182,6 +203,13 @@ const EN = {
     'The goal is not to be another chat surface. Mythos should feel like agent infrastructure: provable memory, governed skills, isolated vaults, and enterprise-ready audit context.',
   auditSignal: 'Audit signal',
   enterpriseValue: 'Enterprise value',
+  cognitiveEyebrow: 'Verifiable brain',
+  cognitiveTitle: 'How Mythos thinks, remembers, predicts, and explains',
+  cognitiveCopy:
+    'This phase creates an auditable cognitive architecture. Mythos does not expose sensitive hidden reasoning, but it can explain signals, memory, decisions, forecasts, and safety limits.',
+  brainAnalogy: 'Brain analogy',
+  auditOutput: 'Audit output',
+  decisionTrace: 'Decision trace',
   capabilityEyebrow: 'Capability map',
   capabilityTitle: 'What these numbers mean in practice',
   capabilityCopy:
@@ -266,6 +294,27 @@ function buildAuthHeaders(apiKey: string) {
   };
 }
 
+function formatCognitiveTrace(trace?: MythosCognitiveTrace, label = 'Decision trace') {
+  if (!trace) return '';
+  const confidence = typeof trace.confidence === 'number'
+    ? `${Math.round(trace.confidence * 100)}%`
+    : 'not scored';
+
+  return [
+    '',
+    `${label}:`,
+    `- Perception: ${trace.perception || 'not provided'}`,
+    `- Memory: ${trace.memoryContext || 'not provided'}`,
+    `- Skill: ${trace.selectedSkill || 'not selected'}`,
+    `- Reasoning path: ${trace.reasoningPath || 'not provided'}`,
+    `- Prediction: ${trace.prediction || 'not provided'}`,
+    `- Decision: ${trace.decision || 'not provided'}`,
+    `- Confidence: ${confidence}`,
+    `- Safety: ${trace.safetyBoundary || 'not provided'}`,
+    `- Next human step: ${trace.nextHumanStep || 'not provided'}`,
+  ].join('\n');
+}
+
 export default function MythosAgentConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
   const [health, setHealth] = useState<BridgeHealth | null>(null);
@@ -333,6 +382,9 @@ export default function MythosAgentConsole() {
       compatibilityMode: 'hermes_compatible_mythos_primary',
       identityProgram: 'mythos_six_pillar_agent_identity',
       identityPillars: MYTHOS_UNIQUE_IDENTITY_PILLARS.map(pillar => pillar.id),
+      cognitiveArchitecture: 'mythos_verifiable_brain_v1',
+      cognitiveLayers: MYTHOS_COGNITIVE_LAYERS.map(layer => layer.id),
+      decisionTraceSchema: MYTHOS_DECISION_TRACE_SCHEMA.id,
       origin: 'congchain-mythos-console',
       proofMode: 'none',
       anchorMode: 'none',
@@ -446,7 +498,7 @@ export default function MythosAgentConsole() {
         ...current,
         {
           role: 'assistant',
-          content: data.response || 'Mythos respondeu sem conteudo.',
+          content: `${data.response || 'Mythos respondeu sem conteudo.'}${formatCognitiveTrace(data.cognitiveTrace, copy.decisionTrace)}`,
         },
       ]);
     } catch (error) {
@@ -610,6 +662,62 @@ export default function MythosAgentConsole() {
                 </div>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#5AD7FF]/18 bg-[radial-gradient(circle_at_top_left,rgba(90,215,255,0.10),transparent_30%),linear-gradient(180deg,rgba(3,9,12,0.82),rgba(5,5,11,0.96))] p-4">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7DE4FF]">{copy.cognitiveEyebrow}</p>
+              <h2 className="mt-1 max-w-3xl text-2xl font-black">{copy.cognitiveTitle}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-white/50">{copy.cognitiveCopy}</p>
+            </div>
+            <div className="rounded-xl border border-[#5AD7FF]/20 bg-[#5AD7FF]/10 px-4 py-3 text-right">
+              <p className="text-2xl font-black text-white">{MYTHOS_COGNITIVE_LAYERS.length}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#7DE4FF]">cognitive layers</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {MYTHOS_COGNITIVE_LAYERS.map((layer, index) => (
+              <article key={layer.id} className="rounded-2xl border border-white/8 bg-black/24 p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#5AD7FF]/22 bg-[#5AD7FF]/10 text-xs font-black text-[#7DE4FF]">
+                    {index + 1}
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[9px] font-black uppercase tracking-[0.13em] text-white/42">
+                    {layer.id}
+                  </span>
+                </div>
+                <h3 className="text-base font-black text-white">{layer.name}</h3>
+                <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-[#7DE4FF]/70">{copy.brainAnalogy}: {layer.brainAnalogy}</p>
+                <p className="mt-3 text-xs leading-5 text-white/52">{layer.function}</p>
+                <div className="mt-4 rounded-xl border border-[#76FF03]/12 bg-[#76FF03]/[0.045] p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">{copy.auditOutput}</p>
+                  <p className="mt-2 text-xs leading-5 text-white/56">{layer.auditOutput}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/8 bg-black/24 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/38">{copy.decisionTrace}</p>
+                <h3 className="mt-1 text-lg font-black text-white">{MYTHOS_DECISION_TRACE_SCHEMA.id}</h3>
+                <p className="mt-2 max-w-3xl text-xs leading-5 text-white/48">{MYTHOS_DECISION_TRACE_SCHEMA.guarantee}</p>
+              </div>
+              <span className="rounded-full border border-[#5AD7FF]/20 bg-[#5AD7FF]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#7DE4FF]">
+                v{MYTHOS_DECISION_TRACE_SCHEMA.version}
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {MYTHOS_DECISION_TRACE_SCHEMA.requiredFields.map(field => (
+                <span key={field} className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[11px] font-semibold text-white/58">
+                  {field}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 

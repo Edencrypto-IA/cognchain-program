@@ -158,6 +158,8 @@ def cmd_write(args: argparse.Namespace) -> None:
             "lineage": "Hermes-compatible fork",
             "compatibilityMode": "hermes_compatible_mythos_primary",
             "identityProgram": "mythos_six_pillar_agent_identity",
+            "cognitiveArchitecture": "mythos_verifiable_brain_v1",
+            "decisionTraceSchema": "mythos_decision_trace_v1",
             "origin": "mythos-congchain-client",
             "proofMode": "none",
             "anchorMode": "none",

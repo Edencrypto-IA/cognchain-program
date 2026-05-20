@@ -48,6 +48,27 @@ These are product identity signals first. They do not claim production
 monitoring, autonomous execution, wallet control, or provider uptime unless a
 future audited phase implements those powers.
 
+## Mythos verifiable brain v1
+
+The first cognitive layer gives Mythos a reviewable operational brain model:
+
+1. Perception Layer: records what request, skill, model route, and state were
+   visible before the response.
+2. Memory Layer: separates live prompt context, CongChain memory, Obsidian
+   notes, and external memory providers.
+3. Reasoning Layer: explains why a skill or path was chosen without exposing
+   hidden chain-of-thought or sensitive prompts.
+4. Prediction Layer: summarizes likely next states, risks, and uncertainty.
+5. Operational Conscience: applies no-secrets, no-funds, no-signed-payload, and
+   human-review boundaries.
+6. Auditable Learning Layer: turns important decisions into memory candidates
+   only when an explicit authenticated write happens.
+
+The terminal test endpoint can return a `mythos_decision_trace_v1` object with
+perception, memory context, selected skill, reasoning path, prediction, decision,
+confidence, safety boundary, and next human step. This trace is an audit
+explanation, not hidden model chain-of-thought.
+
 ## Product rule
 
 - CongChain may store agent memories, skills, task results, hashes, proofs, and
@@ -163,6 +184,8 @@ Endpoint: `POST /api/memory/write`
     "namespace": "mythos",
     "compatibilityMode": "hermes_compatible_mythos_primary",
     "identityProgram": "mythos_six_pillar_agent_identity",
+    "cognitiveArchitecture": "mythos_verifiable_brain_v1",
+    "decisionTraceSchema": "mythos_decision_trace_v1",
     "skillName": "research-summarizer",
     "skillVersion": "1.0.0",
     "proofMode": "zk_requested",
