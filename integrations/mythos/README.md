@@ -106,7 +106,61 @@ export CONGCHAIN_AGENT_ID=mythos-local
 
 ## Instalar no Mythos
 
-Copie o conteudo desta pasta para a raiz do repositorio Mythos, preservando as pastas `plugins/`, `optional-skills/` e `skills/`.
+Modo recomendado: use o instalador stdlib do pacote CongChain. Ele copia o
+adapter, plugins auxiliares e skills para `MYTHOS_HOME`, habilita
+`plugins.enabled` no `config.yaml` e prepara `context.engine=congchain`.
+
+```bash
+python integrations/mythos/scripts/install_congchain_into_mythos.py \
+  --mythos-home ~/.mythos \
+  --api-url https://cognchain-program-production.up.railway.app \
+  --agent-id mythos-local
+```
+
+Para gravacoes reais, defina a key no ambiente do Mythos ou passe uma vez para
+o instalador local:
+
+```bash
+export CONGCHAIN_API_KEY=cog_live_sua_key_completa
+```
+
+ou:
+
+```bash
+python integrations/mythos/scripts/install_congchain_into_mythos.py \
+  --api-key cog_live_sua_key_completa
+```
+
+Nao compartilhe essa key em prints, tickets ou commits.
+
+Para verificar contra um runtime Mythos extraido/clonado:
+
+```bash
+python integrations/mythos/scripts/install_congchain_into_mythos.py \
+  --mythos-home ~/.mythos \
+  --runtime-path /caminho/para/mythos-agent
+```
+
+O verificador importa `mythos_cli.plugins`, roda `discover_plugins(force=True)`
+e confirma que `congchain-adapter` esta `enabled=True` com hooks como
+`pre_tool_call` e `post_tool_call` registrados.
+
+Se o runtime extraido ainda nao tiver dependencias instaladas, use apenas para
+contract check local:
+
+```bash
+python integrations/mythos/scripts/install_congchain_into_mythos.py \
+  --mythos-home ~/.mythos \
+  --runtime-path /caminho/para/mythos-agent \
+  --allow-yaml-shim
+```
+
+Esse shim valida descoberta/config/hook do plugin. Ele nao substitui instalar
+as dependencias reais do Mythos antes de rodar browser, terminal, gateway,
+Telegram ou outras plataformas.
+
+Modo manual: copie o conteudo desta pasta para a raiz do repositorio Mythos,
+preservando as pastas `plugins/`, `optional-skills/` e `skills/`.
 
 Depois habilite:
 
@@ -136,6 +190,7 @@ para `/api/memory/write`:
 
 ```bash
 python -m unittest integrations.mythos.tests.test_congchain_adapter
+python -m unittest integrations.mythos.tests.test_install_congchain_into_mythos
 ```
 
 Esse teste cobre registro dos hooks, lifecycle completo, metadata Mythos,

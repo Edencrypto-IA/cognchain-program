@@ -474,6 +474,13 @@ def _handle_congchain_recall(args: Dict[str, Any], **kwargs: Any) -> str:
 
 def register(ctx) -> None:
     """Registra o CognChainContextEngine no sistema de plugins do Mythos."""
+    if not _BASE_AVAILABLE:
+        logger.warning(
+            "CognChain context engine nao foi registrado porque o ContextCompressor "
+            "do Mythos nao esta disponivel neste ambiente. Instale as dependencias "
+            "do runtime Mythos para ativar context.engine=congchain."
+        )
+        return
     engine = CognChainContextEngine()
     ctx.register_context_engine(engine)
     logger.debug("CognChain context engine registrado")
