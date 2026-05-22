@@ -34,6 +34,7 @@ class CongChainMythosInstallerTest(unittest.TestCase):
 
             config = (home / "config.yaml").read_text(encoding="utf-8")
             self.assertIn("- congchain-adapter", config)
+            self.assertIn("- nvidia-router", config)
             self.assertIn("- observability/congchain", config)
             self.assertIn("- interpretability/congchain-cna", config)
             self.assertIn("- context_engine/congchain", config)
@@ -54,7 +55,30 @@ class CongChainMythosInstallerTest(unittest.TestCase):
             self.assertIn("model: nvidia", config)
             self.assertIn("- observability/langfuse", config)
             self.assertIn("- congchain-adapter", config)
+            self.assertIn("- nvidia-router", config)
             self.assertEqual(config.count("- congchain-adapter"), 1)
+
+    def test_config_update_removes_legacy_malformed_plugin_list(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            home.mkdir(parents=True, exist_ok=True)
+            (home / "config.yaml").write_text(
+                "plugins:\n"
+                "  enabled:\n"
+                "    - congchain-adapter\n"
+                "  - congchain-adapter\n"
+                "  - observability/congchain\n"
+                "session_reset:\n"
+                "  mode: both\n",
+                encoding="utf-8",
+            )
+
+            update_config(home)
+            config = (home / "config.yaml").read_text(encoding="utf-8")
+
+            self.assertIn("plugins:\n  enabled:\n    - congchain-adapter", config)
+            self.assertNotIn("  - observability/congchain\nsession_reset", config)
+            self.assertIn("session_reset:\n  mode: both", config)
 
     def test_env_hint_does_not_require_api_key(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -74,6 +98,7 @@ class CongChainMythosInstallerTest(unittest.TestCase):
 
     def test_pack_root_points_to_integration_pack(self):
         self.assertTrue((PACK_ROOT / "plugins" / "congchain-adapter" / "plugin.yaml").exists())
+        self.assertTrue((PACK_ROOT / "plugins" / "nvidia-router" / "plugin.yaml").exists())
 
 
 if __name__ == "__main__":

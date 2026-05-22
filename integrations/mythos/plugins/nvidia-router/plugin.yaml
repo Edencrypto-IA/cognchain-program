@@ -1,0 +1,20 @@
+name: nvidia-router
+version: "1.0.0"
+description: "NVIDIA model recommendation and audit context for Mythos. It does not switch models automatically in v1."
+author: Eden Lucas / CongChain + Mythos Agent
+license: MIT
+pip_dependencies: []
+hooks:
+  - on_session_start
+  - pre_llm_call
+  - on_session_end
+optional_env:
+  - NVIDIA_ROUTER_ENABLED
+  - NVIDIA_ROUTER_DEBUG
+  - NVIDIA_ROUTER_RECORD_CONGCHAIN
+  - NVIDIA_ROUTER_DEFAULT_MODEL
+notes: |
+  V1 recommends the best configured model family for the task and injects
+  safe routing context through the supported pre_llm_call context contract.
+  It never returns model_override, api_key_override, or base_url_override.
+  CongChain recording is metadata-only and optional.

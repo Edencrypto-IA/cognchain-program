@@ -19,6 +19,7 @@ from pathlib import Path
 PACK_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_KEYS = (
     "congchain-adapter",
+    "nvidia-router",
     "observability/congchain",
     "interpretability/congchain-cna",
     "context_engine/congchain",
@@ -59,12 +60,24 @@ def install_files(home: Path, *, include_optional_plugins: bool = True) -> list[
     installed.append("skills/blockchain/congchain")
 
     copy_tree(
+        PACK_ROOT / "skills" / "autonomous-ai-agents" / "nvidia-router",
+        home / "skills" / "autonomous-ai-agents" / "nvidia-router",
+    )
+    installed.append("skills/autonomous-ai-agents/nvidia-router")
+
+    copy_tree(
         PACK_ROOT / "skills" / "software-development" / "congchain-forge",
         home / "skills" / "software-development" / "congchain-forge",
     )
     installed.append("skills/software-development/congchain-forge")
 
     if include_optional_plugins:
+        copy_tree(
+            PACK_ROOT / "plugins" / "nvidia-router",
+            home / "plugins" / "nvidia-router",
+        )
+        installed.append("plugins/nvidia-router")
+
         copy_tree(
             PACK_ROOT / "plugins" / "observability" / "congchain",
             home / "plugins" / "observability" / "congchain",
@@ -116,6 +129,37 @@ def _enabled_values(lines: list[str], block: tuple[int, int]) -> set[str]:
     return values
 
 
+def _remove_legacy_plugin_items(lines: list[str]) -> list[str]:
+    """Remove old malformed ``plugins:`` list items beside ``enabled:``.
+
+    Older local experiments could leave this invalid shape:
+
+    plugins:
+      enabled:
+        - congchain-adapter
+      - congchain-adapter
+
+    Mythos expects the list under ``plugins.enabled``. Keeping the stray
+    two-space list items makes the YAML invalid, so the installer normalizes it
+    whenever it touches config.yaml.
+    """
+    cleaned: list[str] = []
+    inside_plugins = False
+    for line in lines:
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip(" "))
+        if stripped == "plugins:" and indent == 0:
+            inside_plugins = True
+            cleaned.append(line)
+            continue
+        if inside_plugins and stripped and indent == 0:
+            inside_plugins = False
+        if inside_plugins and indent == 2 and stripped.startswith("- "):
+            continue
+        cleaned.append(line)
+    return cleaned
+
+
 def update_config(
     home: Path,
     *,
@@ -128,7 +172,7 @@ def update_config(
 
     desired = ["congchain-adapter"]
     if enable_optional_plugins:
-        desired.extend(["observability/congchain", "interpretability/congchain-cna"])
+        desired.extend(["nvidia-router", "observability/congchain", "interpretability/congchain-cna"])
     if enable_context_engine:
         desired.append("context_engine/congchain")
 
@@ -144,6 +188,9 @@ def update_config(
     if additions:
         insert_at = block[1]
         lines[insert_at:insert_at] = [f"    - {key}" for key in additions]
+        block = (block[0], block[1] + len(additions))
+
+    lines = _remove_legacy_plugin_items(lines)
 
     if enable_context_engine and not any(line.strip() == "engine: congchain" for line in lines):
         if lines and lines[-1].strip():

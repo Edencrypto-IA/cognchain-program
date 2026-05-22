@@ -64,10 +64,14 @@ Metadados usados pelo pacote:
 
 - `plugins/congchain-adapter`: conecta os hooks reais do runtime Mythos a
   eventos auditaveis na CongChain.
+- `plugins/nvidia-router`: recomenda o melhor modelo para a tarefa e registra
+  a decisao como contexto auditavel sem trocar o modelo automaticamente.
 - `plugins/context_engine/congchain`: salva turnos importantes antes da compressao.
 - `plugins/observability/congchain`: salva tool calls e resumo de sessao.
 - `plugins/interpretability/congchain-cna`: modo experimental para fingerprint CNA em modelos locais.
 - `optional-skills/blockchain/congchain`: CLI stdlib para `health`, `write`, `list`, `read` e `verify`.
+- `skills/autonomous-ai-agents/nvidia-router`: guia operacional para escolher
+  modelos NVIDIA/OpenRouter por tipo de trabalho.
 - `skills/software-development/congchain-forge`: protocolo para Mythos atuar como backend do Forge.
 
 ## Runtime adapter
@@ -173,6 +177,46 @@ mythos plugins enable interpretability/congchain-cna
 
 O plugin CNA deve ficar opcional. Sem `CNA_MODEL_PATH`, ele roda em modo passivo.
 
+## NVIDIA Router v1
+
+O `plugins/nvidia-router` e uma camada de recomendacao, nao um roteador
+automatico. Ele usa o hook `pre_llm_call` apenas pelo contrato suportado pelo
+Mythos: retorna `{"context": "..."}` com a recomendacao e os motivos.
+
+Ele nao retorna:
+
+- `model_override`;
+- `api_key_override`;
+- `base_url_override`.
+
+Isso evita prometer uma troca de modelo que o loop principal pode ignorar. A
+troca real deve ficar para uma v2, usando um caminho suportado pelo runtime
+Mythos.
+
+Tabela recomendada:
+
+| Tipo de tarefa | Modelo primario | Fallback |
+| --- | --- | --- |
+| Agent loop geral | `nvidia/nemotron-3-super-120b-a12b` | `meta/llama-3.3-70b-instruct` |
+| Raciocinio pesado | `openai/gpt-oss-120b` | `nvidia/nemotron-3-super-120b-a12b` |
+| Codigo/debugging | `deepseek-ai/deepseek-v4-pro` | `qwen/qwen3.5-122b-a10b` |
+| Contexto longo | `moonshotai/kimi-k2.6` | `qwen/qwen3.5-122b-a10b` |
+| Rapido/barato | `microsoft/phi-4-mini-instruct` | `google/gemma-3n-e2b-it` |
+| Portugues/multilingual | `z-ai/glm-5.1` | `meta/llama-3.3-70b-instruct` |
+| Criativo/conteudo | `google/gemma-4-31b-it` | `mistralai/mistral-large-3-675b-instruct-2512` |
+
+Use chaves por provedor sempre que possivel:
+
+```bash
+export NVIDIA_API_KEY=sua_key_nvidia
+export OPENROUTER_API_KEY=sua_key_openrouter
+```
+
+Nao crie uma variavel secreta por modelo a menos que voce realmente tenha
+contas ou provedores diferentes. As decisoes do router podem ser registradas na
+CongChain como metadata verificavel. O texto "on-chain" so deve aparecer quando
+um fluxo chamar explicitamente o endpoint de anchor blockchain.
+
 ## Teste seguro
 
 ```bash
@@ -191,6 +235,7 @@ para `/api/memory/write`:
 ```bash
 python -m unittest integrations.mythos.tests.test_congchain_adapter
 python -m unittest integrations.mythos.tests.test_install_congchain_into_mythos
+python -m unittest integrations.mythos.tests.test_nvidia_router
 ```
 
 Esse teste cobre registro dos hooks, lifecycle completo, metadata Mythos,
