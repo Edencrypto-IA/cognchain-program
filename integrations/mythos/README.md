@@ -72,7 +72,50 @@ Metadados usados pelo pacote:
 - `optional-skills/blockchain/congchain`: CLI stdlib para `health`, `write`, `list`, `read` e `verify`.
 - `skills/autonomous-ai-agents/nvidia-router`: guia operacional para escolher
   modelos NVIDIA/OpenRouter por tipo de trabalho.
+- `skills/congchain`: pacote Mythos Verifiable Brain com 16 skills CongChain
+  para auditoria, busca de memoria, diff de contexto, rollback, export,
+  continuidade multimodelo e revisao Solana segura.
 - `skills/software-development/congchain-forge`: protocolo para Mythos atuar como backend do Forge.
+
+## Mythos Verifiable Brain Skill Pack
+
+As 16 skills em `skills/congchain` sao diferenciais oficiais do Mythos dentro
+da CongChain. Elas foram corrigidas para nao prometer execucao que o runtime
+ainda nao garante.
+
+Skills de governanca e memoria:
+
+- `congchain-session-audit`: cria resumo auditavel de sessao.
+- `congchain-memory-search`: busca memorias por hash, metadata e resumo seguro.
+- `congchain-context-diff`: compara sessoes ou memorias sem expor chain-of-thought.
+- `congchain-vault-bootstrap`: guia setup de API key e vault logico.
+- `congchain-chain-graph`: mostra relacoes entre sessoes, skills, hashes e provas.
+- `congchain-confidence-calibration`: calibra confianca por evidencia e incerteza.
+- `congchain-rollback`: prepara plano de rollback sem reverter automaticamente.
+- `congchain-multimodel-sync`: preserva contexto entre modelos e provedores.
+- `congchain-export`: exporta somente metadata segura para revisao.
+
+Skills de desenvolvimento:
+
+- `congchain-forge-lsp`: adiciona diagnosticos LSP/testes antes de confiar em propostas.
+
+Skills Solana seguras:
+
+- `solana-tx-inspector`: inspeciona transacoes publicas em modo read-only.
+- `solana-vault-health`: revisa sinais publicos de vault/endereco.
+- `solana-airdrop-manager`: ajuda Devnet airdrop sem tocar fundos reais.
+- `solana-anchor-schema-validator`: revisa IDL/schema Anchor sem deploy.
+- `solana-memory-finality-tracker`: separa memoria local, API, prova, anchor e finality.
+- `solana-wallet-ecosystem-bridge`: planejamento futuro de wallet/ecossistema; nao assina.
+
+Contrato de seguranca:
+
+- nao armazenar secrets, private keys, seed phrases, signed payloads ou dados
+  privados de carteira;
+- dizer `registered in CongChain` apenas quando a API de memoria confirmar;
+- dizer `on-chain` apenas quando um endpoint de anchor blockchain confirmar;
+- manter skills Solana como read-only, Devnet-only ou planning-only ate existir
+  fase auditada de Wallet Agent com aprovacao visivel e assinatura explicita.
 
 ## Runtime adapter
 
