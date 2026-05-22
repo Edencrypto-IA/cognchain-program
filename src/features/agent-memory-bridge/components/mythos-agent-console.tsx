@@ -24,6 +24,7 @@ import {
   MYTHOS_COGNITIVE_LAYERS,
   MYTHOS_DECISION_TRACE_SCHEMA,
   MYTHOS_FEATURED_SKILLS,
+  MYTHOS_READINESS_ITEMS,
   MYTHOS_SKILL_CATEGORIES,
   MYTHOS_UNIQUE_IDENTITY_PILLARS,
 } from '../mythos';
@@ -148,6 +149,18 @@ const PT = {
   user: 'Voce',
   system: 'Sistema',
   backendDemo: 'Backend demo, sem keys expostas',
+  readinessEyebrow: 'Readiness do Mythos',
+  readinessTitle: 'O que esta pronto, configurado ou bloqueado',
+  readinessCopy:
+    'Este painel ajuda operadores a entender o Mythos de hoje: runtime, ponte CongChain, memoria, skills, web, browser, mensagens, media e limites de seguranca.',
+  runSafeCheck: 'Abrir teste seguro',
+  ready: 'pronto',
+  configured: 'configurado',
+  live: 'ao vivo',
+  blocked: 'bloqueado',
+  review: 'revisar',
+  setupNeeded: 'Setup',
+  safetyBoundary: 'Limite seguro',
 };
 
 const EN = {
@@ -233,6 +246,18 @@ const EN = {
   user: 'You',
   system: 'System',
   backendDemo: 'Backend demo, no exposed keys',
+  readinessEyebrow: 'Mythos readiness',
+  readinessTitle: 'What is ready, configured, or intentionally blocked',
+  readinessCopy:
+    'This panel gives operators a clean view of Mythos today: runtime, CongChain bridge, memory, skills, web, browser, messaging, media, and safety limits.',
+  runSafeCheck: 'Open safe test',
+  ready: 'ready',
+  configured: 'configured',
+  live: 'live',
+  blocked: 'blocked',
+  review: 'review',
+  setupNeeded: 'Setup',
+  safetyBoundary: 'Safety boundary',
 };
 
 function shortHash(value: string, size = 10) {
@@ -288,6 +313,25 @@ export default function MythosAgentConsole() {
     MYTHOS_FEATURED_SKILLS.find(skill => skill.id === selectedSkillId) ||
     visibleSkills[0] ||
     MYTHOS_FEATURED_SKILLS[0];
+  const readinessItems = MYTHOS_READINESS_ITEMS.map(item => {
+    if (item.id !== 'bridge') return item;
+    if (healthLoading) return { ...item, state: 'review' as const, signal: 'Checking the public CongChain bridge health endpoint now.' };
+    if (health?.ok) return { ...item, state: 'live' as const, signal: `${item.signal} Current status: online.` };
+    return { ...item, state: 'review' as const, signal: 'Bridge health is unavailable from this browser right now; check Railway or the health endpoint before production use.' };
+  });
+  const readinessCounts = {
+    ready: readinessItems.filter(item => item.state === 'ready' || item.state === 'configured' || item.state === 'live').length,
+    review: readinessItems.filter(item => item.state === 'review').length,
+    blocked: readinessItems.filter(item => item.state === 'blocked').length,
+  };
+
+  function readinessLabel(state: string) {
+    if (state === 'ready') return copy.ready;
+    if (state === 'configured') return copy.configured;
+    if (state === 'live') return copy.live;
+    if (state === 'blocked') return copy.blocked;
+    return copy.review;
+  }
 
   const setupSnippet = useMemo(() => {
     return [
@@ -485,6 +529,116 @@ export default function MythosAgentConsole() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#14F195]/18 bg-[radial-gradient(circle_at_top_right,rgba(20,241,149,0.09),transparent_30%),linear-gradient(180deg,rgba(5,14,12,0.86),rgba(5,5,11,0.96))] p-4">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#14F195]">{copy.readinessEyebrow}</p>
+              <h2 className="mt-1 text-2xl font-black">{copy.readinessTitle}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-white/50">{copy.readinessCopy}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl border border-[#14F195]/18 bg-[#14F195]/10 px-3 py-2">
+                <p className="text-xl font-black text-white">{readinessCounts.ready}</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#14F195]">{copy.ready}</p>
+              </div>
+              <div className="rounded-xl border border-[#FACC15]/18 bg-[#FACC15]/10 px-3 py-2">
+                <p className="text-xl font-black text-white">{readinessCounts.review}</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#FACC15]">{copy.review}</p>
+              </div>
+              <div className="rounded-xl border border-[#FF5C8A]/18 bg-[#FF5C8A]/10 px-3 py-2">
+                <p className="text-xl font-black text-white">{readinessCounts.blocked}</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#FF7AA2]">{copy.blocked}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {readinessItems.map(item => {
+              const isReady = item.state === 'ready' || item.state === 'configured' || item.state === 'live';
+              const isBlocked = item.state === 'blocked';
+              return (
+                <article
+                  key={item.id}
+                  className={`rounded-2xl border p-4 ${
+                    isReady
+                      ? 'border-[#14F195]/18 bg-[#14F195]/[0.055]'
+                      : isBlocked
+                        ? 'border-[#FF5C8A]/18 bg-[#FF5C8A]/[0.055]'
+                        : 'border-[#FACC15]/18 bg-[#FACC15]/[0.055]'
+                  }`}
+                >
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl border ${
+                        isReady
+                          ? 'border-[#14F195]/22 bg-[#14F195]/10 text-[#14F195]'
+                          : isBlocked
+                            ? 'border-[#FF5C8A]/22 bg-[#FF5C8A]/10 text-[#FF7AA2]'
+                            : 'border-[#FACC15]/22 bg-[#FACC15]/10 text-[#FACC15]'
+                      }`}
+                    >
+                      {isReady ? <CheckCircle2 className="h-4 w-4" /> : isBlocked ? <ShieldCheck className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${
+                        isReady
+                          ? 'bg-[#14F195]/12 text-[#14F195]'
+                          : isBlocked
+                            ? 'bg-[#FF5C8A]/12 text-[#FF7AA2]'
+                            : 'bg-[#FACC15]/12 text-[#FACC15]'
+                      }`}
+                    >
+                      {readinessLabel(item.state)}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-black text-white">{item.label}</h3>
+                  <p className="mt-2 text-xs leading-5 text-white/52">{item.signal}</p>
+                  <div className="mt-4 space-y-2 border-t border-white/8 pt-3">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">{copy.setupNeeded}</p>
+                      <p className="mt-1 text-[11px] leading-5 text-white/50">{item.setup}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">{copy.safetyBoundary}</p>
+                      <p className="mt-1 text-[11px] leading-5 text-white/50">{item.safety}</p>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/24 p-4">
+            <div className="flex items-start gap-3">
+              <TerminalSquare className="mt-0.5 h-5 w-5 text-[#A7FF3D]" />
+              <div>
+                <p className="text-sm font-black text-white">Safe Mythos Check</p>
+                <p className="mt-1 text-xs leading-5 text-white/46">
+                  {language === 'pt'
+                    ? 'Use o Lab para testar resposta, skill, trilha cognitiva e memoria sem expor keys no navegador.'
+                    : 'Use the Lab to test response, skill, cognitive trace, and memory without exposing provider keys in the browser.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/mythos/lab"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#76FF03]/20 bg-[#76FF03]/10 px-3 text-xs font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/15"
+              >
+                <TerminalSquare className="h-4 w-4" />
+                {copy.runSafeCheck}
+              </a>
+              <a
+                href="/dashboard/keys"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#5AD7FF]/20 bg-[#5AD7FF]/10 px-3 text-xs font-bold text-[#7DE4FF] transition hover:bg-[#5AD7FF]/15"
+              >
+                <KeyRound className="h-4 w-4" />
+                {copy.createKey}
+              </a>
             </div>
           </div>
         </section>

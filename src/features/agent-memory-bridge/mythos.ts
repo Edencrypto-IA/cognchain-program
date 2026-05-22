@@ -316,6 +316,89 @@ export const MYTHOS_CAPABILITY_GROUPS = [
   },
 ] as const;
 
+export const MYTHOS_READINESS_ITEMS = [
+  {
+    id: 'runtime',
+    label: 'Mythos runtime',
+    state: 'ready',
+    signal: 'Local Mythos runtime can run terminal, skills, planning, memory, browser, web, image/video, and messaging when configured.',
+    setup: 'Run `mythos doctor` in the Mythos environment before real tasks.',
+    safety: 'Runtime tools still follow local permissions and user approval.',
+  },
+  {
+    id: 'bridge',
+    label: 'CongChain bridge',
+    state: 'live',
+    signal: 'The public bridge health endpoint confirms service availability when online.',
+    setup: 'Use `/api/memory/health` and a `cog_live_*` key for authenticated writes.',
+    safety: 'Writes require Authorization Bearer key; health alone does not prove write access.',
+  },
+  {
+    id: 'memory-write',
+    label: 'Verifiable memory write',
+    state: 'configured',
+    signal: 'Mythos can write safe metadata through `/api/memory/write` with source `mythos` and isolated vault metadata.',
+    setup: 'Set `CONGCHAIN_API_KEY` and `CONGCHAIN_AGENT_ID` in the Mythos environment.',
+    safety: 'Secrets, private keys, signed payloads, and fund-moving data must be blocked.',
+  },
+  {
+    id: 'skills',
+    label: 'Skill-governed execution',
+    state: 'ready',
+    signal: 'The Mythos page now exposes CongChain governance, Solana review, routing, dev, research, and creative skills.',
+    setup: 'Choose a skill before sending complex work to Mythos.',
+    safety: 'Selecting a skill does not execute it automatically.',
+  },
+  {
+    id: 'web',
+    label: 'Web search and extraction',
+    state: 'configured',
+    signal: 'Available when `TAVILY_API_KEY`, `EXA_API_KEY`, Firecrawl, Parallel, or another supported web provider is configured.',
+    setup: 'Keep at least one web provider key in Mythos `.env`.',
+    safety: 'Web evidence needs source review and date awareness.',
+  },
+  {
+    id: 'browser',
+    label: 'Browser automation',
+    state: 'configured',
+    signal: 'Available when `agent-browser` and Playwright/Chromium are installed.',
+    setup: 'Use browser tools for visible web workflows and inspect results before saving memory.',
+    safety: 'Do not automate logins, purchases, transfers, or destructive account actions without explicit approval.',
+  },
+  {
+    id: 'messaging',
+    label: 'Telegram and Discord gateway',
+    state: 'configured',
+    signal: 'Messaging works when platform tokens and allowlists are configured in Mythos gateway.',
+    setup: 'Run `mythos gateway run` after configuring `TELEGRAM_BOT_TOKEN` or `DISCORD_BOT_TOKEN`.',
+    safety: 'Use allowlists; never expose bot tokens in memory or screenshots.',
+  },
+  {
+    id: 'media',
+    label: 'Image and video generation',
+    state: 'configured',
+    signal: 'Available when FAL/OpenAI or other supported media provider keys are present.',
+    setup: 'Use `FAL_KEY` or the provider key supported by the Mythos tool.',
+    safety: 'Generated media should be labeled as generated and checked before public use.',
+  },
+  {
+    id: 'computer-use',
+    label: 'Computer use',
+    state: 'blocked',
+    signal: 'Full computer-use mode is not available on this Windows setup because the runtime path is macOS-only today.',
+    setup: 'Use browser automation and terminal tools here; test computer-use on supported macOS runtime later.',
+    safety: 'This is intentionally blocked instead of pretending to be ready.',
+  },
+  {
+    id: 'wallet-funds',
+    label: 'Wallet and funds movement',
+    state: 'blocked',
+    signal: 'Mythos and CongChain memory tools cannot buy, sell, sign, submit, schedule, or move funds automatically.',
+    setup: 'Use the Wallet Agent review/signature/submission phases for any future value-moving flow.',
+    safety: 'Every value-moving action requires visible user approval and wallet-side signature.',
+  },
+] as const;
+
 export const MYTHOS_FEATURED_SKILLS = [
   {
     id: 'congchain-memory',
