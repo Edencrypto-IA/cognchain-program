@@ -558,7 +558,7 @@ export default function MythosAgentConsole() {
               <TerminalSquare className="h-4 w-4" />
               {copy.testMythos}
             </a>
-            <a href="/brain" className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 px-3 py-2 text-xs font-bold text-[#14F195] transition hover:bg-[#14F195]/15">
+            <a href="/brain?view=agents&agent=mythos" className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 px-3 py-2 text-xs font-bold text-[#14F195] transition hover:bg-[#14F195]/15">
               <Brain className="h-4 w-4" />
               Memory Brain
             </a>

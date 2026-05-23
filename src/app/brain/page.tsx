@@ -657,6 +657,21 @@ export default function BrainPage() {
   const previewAgentCard = visibleAgentCards.length === 0 ? buildAgentPreviewCard(selectedAgent) : null;
   const displayAgentCards = previewAgentCard ? [previewAgentCard] : visibleAgentCards;
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedView = params.get('view');
+    const requestedAgent = params.get('agent');
+    const agentExists = AGENT_ROUTES.some(agent => agent.key === requestedAgent);
+
+    if (requestedView === 'agents' || agentExists) {
+      setView('agents');
+    }
+
+    if (agentExists) {
+      setSelectedAgentRoute(requestedAgent as AgentRouteKey);
+    }
+  }, []);
+
   const loadCards = useCallback(() => {
     setAgentLoading(true);
     fetch('/api/memory/cards').then(r => r.json()).then(d => {
