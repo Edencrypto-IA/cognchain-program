@@ -63,6 +63,33 @@ type ListResponse = {
   error?: string;
 };
 
+type MythosDoctorResponse = {
+  ok?: boolean;
+  checkedAt?: string;
+  profile?: {
+    skills?: number;
+    featuredSkills?: number;
+    categories?: number;
+    readinessItems?: number;
+  };
+  bridge?: {
+    ok?: boolean;
+    mode?: string;
+    authRequiredForWrites?: boolean;
+  };
+  checks?: Array<{
+    id: string;
+    label: string;
+    state: 'ready' | 'configured' | 'review' | 'blocked';
+    detail: string;
+  }>;
+  counts?: {
+    ready?: number;
+    review?: number;
+    blocked?: number;
+  };
+};
+
 const DEFAULT_TEST_MEMORY =
   'Mythos official bridge smoke test: context, observability and task memory are connected to CongChain with authenticated human-reviewed metadata.';
 
@@ -154,6 +181,9 @@ const PT = {
   readinessCopy:
     'Este painel ajuda operadores a entender o Mythos de hoje: runtime, ponte CongChain, memoria, skills, web, browser, mensagens, media e limites de seguranca.',
   runSafeCheck: 'Abrir teste seguro',
+  runtimeProof: 'Prova de runtime',
+  copyProof: 'Copiar prova',
+  doctor: 'Mythos Doctor',
   ready: 'pronto',
   configured: 'configurado',
   live: 'ao vivo',
@@ -251,6 +281,9 @@ const EN = {
   readinessCopy:
     'This panel gives operators a clean view of Mythos today: runtime, CongChain bridge, memory, skills, web, browser, messaging, media, and safety limits.',
   runSafeCheck: 'Open safe test',
+  runtimeProof: 'Runtime proof',
+  copyProof: 'Copy proof',
+  doctor: 'Mythos Doctor',
   ready: 'ready',
   configured: 'configured',
   live: 'live',
@@ -287,6 +320,8 @@ export default function MythosAgentConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
   const [health, setHealth] = useState<BridgeHealth | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
+  const [doctor, setDoctor] = useState<MythosDoctorResponse | null>(null);
+  const [doctorLoading, setDoctorLoading] = useState(true);
   const [apiKey, setApiKey] = useState('');
   const [agentId, setAgentId] = useState('mythos-local-test');
   const [testMemory, setTestMemory] = useState(DEFAULT_TEST_MEMORY);
@@ -296,9 +331,9 @@ export default function MythosAgentConsole() {
   const [writing, setWriting] = useState(false);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState('');
-  const [selectedCapabilityId, setSelectedCapabilityId] = useState(MYTHOS_CAPABILITY_GROUPS[0]?.id || '');
-  const [selectedCategory, setSelectedCategory] = useState('congchain');
-  const [selectedSkillId, setSelectedSkillId] = useState(MYTHOS_FEATURED_SKILLS[0]?.id || '');
+  const [selectedCapabilityId, setSelectedCapabilityId] = useState<string>(MYTHOS_CAPABILITY_GROUPS[0]?.id || '');
+  const [selectedCategory, setSelectedCategory] = useState<string>('congchain');
+  const [selectedSkillId, setSelectedSkillId] = useState<string>(MYTHOS_FEATURED_SKILLS[0]?.id || '');
   const [language, setLanguage] = useState<'en' | 'pt'>('en');
 
   const canUseKey = apiKey.trim().startsWith('cog_live_');
@@ -324,6 +359,26 @@ export default function MythosAgentConsole() {
     review: readinessItems.filter(item => item.state === 'review').length,
     blocked: readinessItems.filter(item => item.state === 'blocked').length,
   };
+  const latestMemory = memories[0];
+  const runtimeProof = useMemo(() => {
+    return [
+      'Mythos Runtime Proof',
+      `checkedAt=${doctor?.checkedAt || new Date().toISOString()}`,
+      `bridge=${health?.ok || doctor?.bridge?.ok ? 'online' : 'review'}`,
+      `bridgeMode=${health?.mode || doctor?.bridge?.mode || 'unknown'}`,
+      `agentId=${agentId || 'mythos-local-test'}`,
+      `selectedSkill=${selectedSkill?.name || 'none'}`,
+      `skillPath=${selectedSkill?.path || 'none'}`,
+      `skillsCatalog=${profile.counts.skills}`,
+      `featuredSkills=${MYTHOS_FEATURED_SKILLS.length}`,
+      `readinessReady=${doctor?.counts?.ready ?? readinessCounts.ready}`,
+      `readinessReview=${doctor?.counts?.review ?? readinessCounts.review}`,
+      `readinessBlocked=${doctor?.counts?.blocked ?? readinessCounts.blocked}`,
+      `loadedMemories=${memories.length}`,
+      `latestMemoryHash=${latestMemory?.hash || 'none'}`,
+      'safety=no-secrets,no-private-keys,no-signed-payloads,no-fund-movement,human-review',
+    ].join('\n');
+  }, [agentId, doctor, health, latestMemory?.hash, memories.length, profile.counts.skills, readinessCounts.blocked, readinessCounts.ready, readinessCounts.review, selectedSkill?.name, selectedSkill?.path]);
 
   function readinessLabel(state: string) {
     if (state === 'ready') return copy.ready;
@@ -383,6 +438,19 @@ export default function MythosAgentConsole() {
       setHealth(null);
     } finally {
       setHealthLoading(false);
+    }
+  }
+
+  async function loadDoctor() {
+    setDoctorLoading(true);
+    try {
+      const response = await fetch('/api/mythos/doctor', { cache: 'no-store' });
+      const data = await response.json() as MythosDoctorResponse;
+      setDoctor(data);
+    } catch {
+      setDoctor(null);
+    } finally {
+      setDoctorLoading(false);
     }
   }
 
@@ -448,6 +516,7 @@ export default function MythosAgentConsole() {
 
   useEffect(() => {
     loadHealth();
+    loadDoctor();
   }, []);
 
   return (
@@ -639,6 +708,82 @@ export default function MythosAgentConsole() {
                 <KeyRound className="h-4 w-4" />
                 {copy.createKey}
               </a>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_360px]">
+            <div className="rounded-2xl border border-[#5AD7FF]/14 bg-[#5AD7FF]/[0.045] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">{copy.doctor}</p>
+                  <h3 className="mt-1 text-lg font-black text-white">{copy.runtimeProof}</h3>
+                  <p className="mt-2 max-w-3xl text-xs leading-5 text-white/48">
+                    {language === 'pt'
+                      ? 'Recibo operacional do Mythos de hoje: ponte, skills, readiness, memoria carregada e limites de seguranca. Nao revela keys nem executa acoes.'
+                      : 'Operational receipt for today Mythos state: bridge, skills, readiness, loaded memory, and safety boundaries. It reveals no keys and executes no actions.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText('runtime-proof', runtimeProof)}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#5AD7FF]/20 bg-[#5AD7FF]/10 px-3 text-xs font-bold text-[#7DE4FF] transition hover:bg-[#5AD7FF]/15"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copied === 'runtime-proof' ? copy.copied : copy.copyProof}
+                </button>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ['Bridge', health?.ok || doctor?.bridge?.ok ? 'online' : doctorLoading || healthLoading ? copy.checking : copy.review],
+                  ['Skill', selectedSkill?.name || 'none'],
+                  ['Memory', latestMemory?.hash ? shortHash(latestMemory.hash, 14) : `${memories.length} loaded`],
+                  ['Checked', doctor?.checkedAt ? formatDate(doctor.checkedAt) : doctorLoading ? copy.checking : 'local'],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-white/8 bg-black/28 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/32">{label}</p>
+                    <p className="mt-1 break-words text-xs font-bold text-white/72">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/8 bg-black/24 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/38">Doctor checks</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadHealth();
+                    loadDoctor();
+                  }}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-[10px] font-bold text-white/56 transition hover:bg-white/[0.07]"
+                >
+                  {doctorLoading || healthLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  {copy.refresh}
+                </button>
+              </div>
+              <div className="grid gap-2">
+                {(doctor?.checks || []).slice(0, 4).map(check => (
+                  <div key={check.id} className="flex items-start gap-2 rounded-xl border border-white/8 bg-white/[0.035] p-3">
+                    <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                      check.state === 'ready' || check.state === 'configured'
+                        ? 'bg-[#14F195]'
+                        : check.state === 'blocked'
+                          ? 'bg-[#FF5C8A]'
+                          : 'bg-[#FACC15]'
+                    }`} />
+                    <div>
+                      <p className="text-xs font-bold text-white/76">{check.label}</p>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-white/42">{check.detail}</p>
+                    </div>
+                  </div>
+                ))}
+                {!doctor?.checks?.length && (
+                  <p className="rounded-xl border border-white/8 bg-white/[0.035] p-3 text-xs leading-5 text-white/42">
+                    {doctorLoading ? copy.checking : 'Doctor data unavailable.'}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </section>
