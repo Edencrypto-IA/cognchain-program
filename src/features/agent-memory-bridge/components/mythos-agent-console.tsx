@@ -24,6 +24,7 @@ import {
   MYTHOS_COGNITIVE_LAYERS,
   MYTHOS_DECISION_TRACE_SCHEMA,
   MYTHOS_FEATURED_SKILLS,
+  MYTHOS_PRODUCTIZATION_STEPS,
   MYTHOS_READINESS_ITEMS,
   MYTHOS_RUNTIME_PROOF,
   MYTHOS_SKILL_CATEGORIES,
@@ -200,6 +201,13 @@ const PT = {
   runtimeTools: 'Ferramentas ativas',
   providerChecks: 'Providers verificados',
   proofLimit: 'Limite da prova',
+  productizationEyebrow: 'Caminho para produto publico',
+  productizationTitle: 'Como transformar o laboratorio Mythos em fluxo para todos os usuarios',
+  productizationCopy:
+    'Essas etapas conectam o que ja funciona localmente a um produto seguro: configuracao por usuario, providers, sandbox, logs, consentimento de memoria e UI publica.',
+  alreadyExists: 'Ja existe',
+  nextStep: 'Proximo passo',
+  productOwner: 'Responsavel',
 };
 
 const EN = {
@@ -308,6 +316,13 @@ const EN = {
   runtimeTools: 'Active tools',
   providerChecks: 'Provider checks',
   proofLimit: 'Proof limit',
+  productizationEyebrow: 'Public product path',
+  productizationTitle: 'How the Mythos lab becomes a flow for every user',
+  productizationCopy:
+    'These steps connect what already works locally to a safe product surface: per-user configuration, providers, sandboxing, logs, memory consent, and public UI.',
+  alreadyExists: 'Already exists',
+  nextStep: 'Next step',
+  productOwner: 'Owner',
 };
 
 function shortHash(value: string, size = 10) {
@@ -891,6 +906,84 @@ export default function MythosAgentConsole() {
                 ))}
               </div>
             </aside>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#A855F7]/18 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.10),transparent_30%),linear-gradient(180deg,rgba(10,6,16,0.88),rgba(5,5,11,0.96))] p-4">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#C084FC]">{copy.productizationEyebrow}</p>
+              <h2 className="mt-1 max-w-4xl text-2xl font-black">{copy.productizationTitle}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-white/50">{copy.productizationCopy}</p>
+            </div>
+            <div className="rounded-xl border border-[#A855F7]/20 bg-[#A855F7]/10 px-4 py-3 text-right">
+              <p className="text-2xl font-black text-white">{MYTHOS_PRODUCTIZATION_STEPS.length}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C084FC]">product gates</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {MYTHOS_PRODUCTIZATION_STEPS.map(step => {
+              const isReady = step.state === 'ready';
+              const isReview = step.state === 'review';
+              return (
+                <article
+                  key={step.id}
+                  className={`rounded-2xl border p-4 ${
+                    isReady
+                      ? 'border-[#14F195]/18 bg-[#14F195]/[0.045]'
+                      : isReview
+                        ? 'border-[#FACC15]/18 bg-[#FACC15]/[0.045]'
+                        : 'border-[#A855F7]/18 bg-[#A855F7]/[0.045]'
+                  }`}
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl border ${
+                        isReady
+                          ? 'border-[#14F195]/22 bg-[#14F195]/10 text-[#14F195]'
+                          : isReview
+                            ? 'border-[#FACC15]/22 bg-[#FACC15]/10 text-[#FACC15]'
+                            : 'border-[#A855F7]/22 bg-[#A855F7]/10 text-[#C084FC]'
+                      }`}
+                    >
+                      {isReady ? <CheckCircle2 className="h-4 w-4" /> : isReview ? <AlertTriangle className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${
+                        isReady
+                          ? 'bg-[#14F195]/12 text-[#14F195]'
+                          : isReview
+                            ? 'bg-[#FACC15]/12 text-[#FACC15]'
+                            : 'bg-[#A855F7]/12 text-[#C084FC]'
+                      }`}
+                    >
+                      {step.state}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-black text-white">{step.title}</h3>
+                  <p className="mt-2 text-xs leading-5 text-white/54">{step.detail}</p>
+                  <div className="mt-4 space-y-3 border-t border-white/8 pt-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/32">{copy.productOwner}</p>
+                      <p className="mt-1 text-xs font-semibold text-white/62">{step.owner}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#14F195]/70">{copy.alreadyExists}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/48">{step.existing}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#7DE4FF]/70">{copy.nextStep}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/48">{step.next}</p>
+                    </div>
+                    <div className="rounded-xl border border-[#FF5C8A]/12 bg-[#FF5C8A]/[0.035] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#FF7AA2]">{copy.safetyBoundary}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/50">{step.safety}</p>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
 

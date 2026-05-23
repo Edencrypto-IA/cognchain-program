@@ -443,6 +443,93 @@ export const MYTHOS_RUNTIME_PROOF = {
     'This proof confirms the current Mythos runtime can install CongChain skills and write/read/verify safe Mythos memory through the authenticated bridge. It does not claim ZK proof or on-chain finality.',
 } as const;
 
+export const MYTHOS_PRODUCTIZATION_STEPS = [
+  {
+    id: 'secure-config',
+    title: 'Secure configuration surface',
+    state: 'contract',
+    owner: 'CongChain app',
+    detail:
+      'A public UI should let each user connect provider keys, platform tokens, and runtime preferences without exposing values after save.',
+    existing:
+      'API Keys, email/social identity, Mythos Doctor, and safe browser-only key tests already exist.',
+    next:
+      'Add account-scoped provider settings with masked status, explicit delete, and no client-side secret replay.',
+    safety:
+      'Secrets must never be copied into chat, memory, screenshots, runtime proof, or public logs.',
+  },
+  {
+    id: 'user-owned-providers',
+    title: 'User-owned provider access',
+    state: 'contract',
+    owner: 'Verified user',
+    detail:
+      'Users can choose their own model, web, media, Telegram, Discord, or GitHub credentials, or use server-managed defaults when available.',
+    existing:
+      'Local Mythos runtime already validates NVIDIA, OpenRouter, Tavily, FAL, Telegram, Discord, and CongChain keys.',
+    next:
+      'Create a provider registry that stores readiness metadata and routes requests only through approved server-side handlers.',
+    safety:
+      'Provider keys authenticate capabilities, not permission to move funds or bypass wallet approvals.',
+  },
+  {
+    id: 'per-user-sandbox',
+    title: 'Per-user sandbox',
+    state: 'review',
+    owner: 'Runtime service',
+    detail:
+      'Real agent execution needs isolated sessions, resource limits, file boundaries, and optional Docker/cloud sandboxes per user.',
+    existing:
+      'Local terminal, browser, web, skills, planning, media, and messaging have been proven in a developer runtime.',
+    next:
+      'Separate demo mode from connected mode, then add a queue-backed runtime worker with timeout, allowlists, and audit receipts.',
+    safety:
+      'No production user task should run in the app server process or share another user workspace.',
+  },
+  {
+    id: 'backend-observability',
+    title: 'Backend execution logs and limits',
+    state: 'contract',
+    owner: 'CongChain backend',
+    detail:
+      'Every real Mythos run should produce metadata-only receipts: model, provider, skill, tools, duration, memory hash, and safety result.',
+    existing:
+      'Runtime proof, Doctor status, memory hash, bridge health, and CongChain adapter hooks already define the audit language.',
+    next:
+      'Persist run receipts, expose a user dashboard, and keep admin views redacted.',
+    safety:
+      'Logs must redact prompts, secrets, private keys, signed payloads, bot tokens, and wallet-sensitive data.',
+  },
+  {
+    id: 'memory-consent',
+    title: 'Explicit memory consent',
+    state: 'ready',
+    owner: 'User',
+    detail:
+      'A user must decide what becomes CongChain memory, which vault receives it, and whether the record stays off-chain or is later anchored.',
+    existing:
+      'Agent Memory Bridge already requires authenticated writes and records source, agentId, content type, vault, hash, and safety flags.',
+    next:
+      'Add save-from-run controls so users can approve a response, tool result, or session summary as Mythos memory.',
+    safety:
+      'Automatic memory is allowed only for safe metadata or explicit user-approved summaries.',
+  },
+  {
+    id: 'public-product-flow',
+    title: 'Public product flow',
+    state: 'review',
+    owner: 'Product UI',
+    detail:
+      'The local lab should become a guided public flow: choose skill, choose provider mode, run safely, inspect trace, save memory, verify hash.',
+    existing:
+      'The Mythos page, Mythos Lab, skill library, Memory Brain route, API Keys, and memory verification pages already exist.',
+    next:
+      'Connect these screens into a single onboarding and runtime journey with clear demo versus connected states.',
+    safety:
+      'The public flow must keep high-risk actions blocked until future audited execution phases exist.',
+  },
+] as const;
+
 export const MYTHOS_FEATURED_SKILLS = [
   {
     id: 'congchain-memory',
