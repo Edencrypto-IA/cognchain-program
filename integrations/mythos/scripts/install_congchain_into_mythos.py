@@ -71,6 +71,12 @@ def install_files(home: Path, *, include_optional_plugins: bool = True) -> list[
     )
     installed.append("skills/software-development/congchain-forge")
 
+    copy_tree(
+        PACK_ROOT / "skills" / "congchain",
+        home / "skills" / "congchain",
+    )
+    installed.append("skills/congchain")
+
     if include_optional_plugins:
         copy_tree(
             PACK_ROOT / "plugins" / "nvidia-router",

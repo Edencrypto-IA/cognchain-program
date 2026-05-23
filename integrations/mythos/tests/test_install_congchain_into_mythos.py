@@ -31,6 +31,10 @@ class CongChainMythosInstallerTest(unittest.TestCase):
             self.assertTrue(
                 (home / "skills" / "software-development" / "congchain-forge" / "SKILL.md").exists()
             )
+            self.assertTrue((home / "skills" / "congchain" / "session-audit" / "SKILL.md").exists())
+            self.assertTrue(
+                (home / "skills" / "congchain" / "solana-wallet-ecosystem-bridge" / "SKILL.md").exists()
+            )
 
             config = (home / "config.yaml").read_text(encoding="utf-8")
             self.assertIn("- congchain-adapter", config)

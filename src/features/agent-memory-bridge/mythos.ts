@@ -399,6 +399,50 @@ export const MYTHOS_READINESS_ITEMS = [
   },
 ] as const;
 
+export const MYTHOS_RUNTIME_PROOF = {
+  id: 'mythos_runtime_proof_2026_05_23',
+  generatedAt: '2026-05-23T00:31:19-03:00',
+  hash: 'b727b1e1715680f4ef234f4d46cc76e7625ff36c1594a4165baf71c8cc1b570c',
+  shortHash: 'b727b1e1715680f4e...',
+  agentId: 'mythos-local',
+  source: 'mythos',
+  contentType: 'mythos_memory',
+  providerChecks: ['OpenRouter API', 'NVIDIA NIM'],
+  enabledTools: [
+    'browser',
+    'browser-cdp',
+    'code_execution',
+    'terminal',
+    'discord',
+    'image_gen',
+    'moa',
+    'skills',
+    'video_gen',
+    'vision',
+    'web',
+  ],
+  installedCongChainSkills: 16,
+  localSkillsEnabled: 19,
+  totalRuntimeSkillsEnabled: 93,
+  memoryState: {
+    write: 'passed',
+    read: 'passed',
+    verify: 'exists',
+    list: 'passed',
+    onChain: false,
+    zkVerified: false,
+  },
+  safety: [
+    'No secrets stored',
+    'No private keys stored',
+    'No signed payloads stored',
+    'No fund movement',
+    'Human review required',
+  ],
+  note:
+    'This proof confirms the current Mythos runtime can install CongChain skills and write/read/verify safe Mythos memory through the authenticated bridge. It does not claim ZK proof or on-chain finality.',
+} as const;
+
 export const MYTHOS_FEATURED_SKILLS = [
   {
     id: 'congchain-memory',

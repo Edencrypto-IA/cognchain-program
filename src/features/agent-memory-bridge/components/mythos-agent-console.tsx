@@ -25,6 +25,7 @@ import {
   MYTHOS_DECISION_TRACE_SCHEMA,
   MYTHOS_FEATURED_SKILLS,
   MYTHOS_READINESS_ITEMS,
+  MYTHOS_RUNTIME_PROOF,
   MYTHOS_SKILL_CATEGORIES,
   MYTHOS_UNIQUE_IDENTITY_PILLARS,
 } from '../mythos';
@@ -191,6 +192,14 @@ const PT = {
   review: 'revisar',
   setupNeeded: 'Setup',
   safetyBoundary: 'Limite seguro',
+  proofEyebrow: 'Prova do runtime',
+  proofTitle: 'Mythos escreveu, leu e verificou uma memoria real',
+  proofCopy:
+    'Este painel mostra o ultimo teste ponta a ponta do runtime local conectado ao bridge CongChain.',
+  memoryReceipt: 'Recibo de memoria',
+  runtimeTools: 'Ferramentas ativas',
+  providerChecks: 'Providers verificados',
+  proofLimit: 'Limite da prova',
 };
 
 const EN = {
@@ -291,6 +300,14 @@ const EN = {
   review: 'review',
   setupNeeded: 'Setup',
   safetyBoundary: 'Safety boundary',
+  proofEyebrow: 'Runtime proof',
+  proofTitle: 'Mythos wrote, read, and verified a real memory',
+  proofCopy:
+    'This panel shows the latest end-to-end test from the local runtime connected to the CongChain bridge.',
+  memoryReceipt: 'Memory receipt',
+  runtimeTools: 'Active tools',
+  providerChecks: 'Provider checks',
+  proofLimit: 'Proof limit',
 };
 
 function shortHash(value: string, size = 10) {
@@ -785,6 +802,95 @@ export default function MythosAgentConsole() {
                 )}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#5AD7FF]/18 bg-[radial-gradient(circle_at_top_left,rgba(90,215,255,0.12),transparent_30%),linear-gradient(180deg,rgba(4,10,13,0.88),rgba(5,5,11,0.96))] p-4">
+          <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7DE4FF]">{copy.proofEyebrow}</p>
+              <h2 className="mt-1 text-2xl font-black">{copy.proofTitle}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-white/50">{copy.proofCopy}</p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['Write', MYTHOS_RUNTIME_PROOF.memoryState.write],
+                  ['Read', MYTHOS_RUNTIME_PROOF.memoryState.read],
+                  ['Verify', MYTHOS_RUNTIME_PROOF.memoryState.verify],
+                  ['List', MYTHOS_RUNTIME_PROOF.memoryState.list],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-[#14F195]/16 bg-[#14F195]/[0.06] p-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-[#14F195]" />
+                      <p className="text-sm font-black text-white">{label}</p>
+                    </div>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#14F195]">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-white/8 bg-black/25 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">{copy.memoryReceipt}</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">Hash</p>
+                    <p className="mt-1 break-all font-mono text-xs text-[#7DE4FF]">{MYTHOS_RUNTIME_PROOF.shortHash}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">Agent / source</p>
+                    <p className="mt-1 text-xs font-semibold text-white/65">
+                      {MYTHOS_RUNTIME_PROOF.agentId} · {MYTHOS_RUNTIME_PROOF.source}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">Skills</p>
+                    <p className="mt-1 text-xs font-semibold text-white/65">
+                      {MYTHOS_RUNTIME_PROOF.installedCongChainSkills} CongChain · {MYTHOS_RUNTIME_PROOF.totalRuntimeSkillsEnabled} enabled
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">ZK / on-chain</p>
+                    <p className="mt-1 text-xs font-semibold text-white/65">
+                      {MYTHOS_RUNTIME_PROOF.memoryState.zkVerified ? 'zk verified' : 'not requested'} · {MYTHOS_RUNTIME_PROOF.memoryState.onChain ? 'on-chain' : 'off-chain bridge'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside className="rounded-2xl border border-white/8 bg-black/25 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">{copy.providerChecks}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {MYTHOS_RUNTIME_PROOF.providerChecks.map(provider => (
+                  <span key={provider} className="rounded-full border border-[#14F195]/16 bg-[#14F195]/10 px-3 py-1 text-[11px] font-bold text-[#14F195]">
+                    {provider}
+                  </span>
+                ))}
+              </div>
+
+              <p className="mt-5 text-[10px] font-black uppercase tracking-[0.16em] text-[#7DE4FF]">{copy.runtimeTools}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {MYTHOS_RUNTIME_PROOF.enabledTools.map(tool => (
+                  <span key={tool} className="rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[10px] font-semibold text-white/58">
+                    {tool}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-xl border border-[#FACC15]/16 bg-[#FACC15]/[0.055] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FACC15]">{copy.proofLimit}</p>
+                <p className="mt-2 text-xs leading-5 text-white/52">{MYTHOS_RUNTIME_PROOF.note}</p>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {MYTHOS_RUNTIME_PROOF.safety.map(item => (
+                  <div key={item} className="flex gap-2 text-xs leading-5 text-white/50">
+                    <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#14F195]" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </aside>
           </div>
         </section>
 
