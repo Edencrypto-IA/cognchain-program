@@ -54,6 +54,132 @@ Comece pelo chat principal para entender o produto: o CognChain permite conversa
 
 Esse e o ponto central: a memoria da IA continua mesmo quando o usuario troca de modelo, sessao ou provedor.
 
+## Latest update - Mythos Agent Bridge
+
+Mythos is now the first official external agent integration for CognChain.
+
+The goal is simple: any serious autonomous agent should be able to create memory that is portable, authenticated, auditable, and safe to verify later. Mythos brings that idea into a real agent runtime instead of keeping it as a chat-only demo.
+
+### What is live now
+
+- **Agent Memory Bridge APIs** for external agents:
+  - `GET /api/memory/health`
+  - `POST /api/memory/write`
+  - `GET /api/memory/list`
+  - `GET /api/memory/{hash}`
+  - `GET /api/memory/{hash}/proof`
+  - `GET /api/memory/verify/{hash}`
+- **Authenticated agent keys** through `/dashboard/keys`.
+- **Source isolation** for `mythos`, `hermes`, `openclaw`, `eliza`, and other external agents.
+- **Mythos vault metadata** with `source=mythos`, `agentId`, `contentType`, owner, hash, read URL, proof URL, and verify URL.
+- **Memory Brain agent routes** so Mythos memories can be reviewed separately from NVIDIA, GPT, Claude, MiniMax, Qwen, and other model memories.
+- **Mythos page** at `/mythos` with:
+  - capability map;
+  - readiness panel;
+  - productization path;
+  - runtime proof;
+  - skill library;
+  - safety boundaries;
+  - English/PT toggle.
+- **Mythos Lab** at `/mythos/lab` for safe browser-based testing.
+- **CongChain skill pack for Mythos** under `integrations/mythos/skills/congchain`.
+- **Runtime adapter skeleton** under `integrations/mythos/plugins/congchain-adapter`.
+- **NVIDIA router skill/plugin draft** for model-routing recommendations without pretending to override unsupported runtime internals.
+
+### Mythos capability snapshot
+
+Current audited inventory for the Mythos integration:
+
+| Area | Count | Meaning |
+|---|---:|---|
+| Skills | 168 | Core and optional skills available to the Mythos runtime |
+| CongChain skills | 18 | Official skills for bridge, audit, memory search, Solana review, routing, export, rollback, and governance |
+| Memory providers | 9 | 8 original memory providers plus CognChain as the verifiable memory layer |
+| LLM providers | 28 | Multi-provider model access for reasoning, coding, research, and long-context work |
+| Messaging platforms | 19 | External channels supported by the Mythos ecosystem when configured |
+| LSPs | 26 | Language-aware development support for code understanding |
+| Tool files | 76 | Tooling surface across terminal, browser, files, web, media, planning, delegation, and more |
+
+### Runtime proof completed
+
+A local Mythos runtime was connected to CognChain and validated with a real memory write/read/verify flow.
+
+Proof summary:
+
+- Mythos wrote a safe memory through the authenticated bridge.
+- CognChain returned a stable hash.
+- The memory was readable by hash.
+- Verification endpoint confirmed the record exists.
+- The memory appeared under a Mythos vault namespace.
+- No private keys, seed phrases, signed payloads, wallet secrets, or fund-moving data were stored.
+
+Current proof hash:
+
+```text
+b727b1e1715680f4ef234f4d46cc76e7625ff36c1594a4165baf71c8cc1b570c
+```
+
+Important boundary: this proves the authenticated Agent Memory Bridge path. It does **not** claim that every Mythos runtime event is already finalized on-chain. On-chain anchoring and ZK persistence are explicit states and are only shown as active when the corresponding flow actually persists them.
+
+### How an external agent writes memory
+
+External agents use a CognChain API key and send memory with agent metadata:
+
+```bash
+curl -X POST https://cognchain-program-production.up.railway.app/api/memory/write \
+  -H "Authorization: Bearer cog_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Mythos completed a safe runtime test and summarized the result.",
+    "model": "mythos",
+    "metadata": {
+      "source": "mythos",
+      "contentType": "mythos_memory",
+      "agentId": "mythos-local",
+      "agentName": "Mythos",
+      "namespace": "mythos"
+    }
+  }'
+```
+
+The response includes:
+
+- `hash`
+- `timestamp`
+- `owner`
+- `vault`
+- `readUrl`
+- `proofUrl`
+- `verifyUrl`
+- safety flags
+
+### Safety contract
+
+CognChain memory is not a wallet executor.
+
+The Mythos bridge must not:
+
+- store API keys, bot tokens, private keys, seed phrases, or signed payloads;
+- buy, sell, pay, schedule, sign, submit, or move funds;
+- claim on-chain finality unless a real anchor transaction exists;
+- mix Mythos vaults with Hermes, OpenClaw, Eliza, or model-provider memory;
+- expose user provider credentials in public UI, logs, memory, screenshots, or runtime proof.
+
+Every value-moving action remains outside the memory bridge and must require explicit user approval plus wallet-side signature.
+
+### Productization path
+
+The local Mythos lab is now being turned into a public, user-safe product flow:
+
+1. Secure configuration surface for user-owned provider keys.
+2. Optional server-managed providers for safe demo mode.
+3. Per-user sandbox/runtime isolation before real autonomous execution.
+4. Backend execution receipts with model, provider, skill, tool, duration, hash, and safety result.
+5. Explicit memory consent before saving user task output.
+6. Public Mythos flow: choose skill, choose provider mode, run safely, inspect trace, save memory, verify hash.
+
+This is the bridge from "developer runtime works locally" to "every CognChain user can safely connect an external agent."
+
 ## CongChain Forge - AI IDE Sandbox
 
 CongChain Forge (`/forge`) is the new AI-native build workspace inside CognChain. It presents a Cursor-style terminal and preview environment where agents can stream plans, generate structured file proposals, show diffs, and apply proposals into a local sandbox session.
