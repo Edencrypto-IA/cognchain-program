@@ -76,6 +76,12 @@ The goal is simple: any serious autonomous agent should be able to create memory
 - **Mythos page** at `/mythos` with:
   - capability map;
   - readiness panel;
+  - market differentiator panel;
+  - cognitive flight recorder;
+  - memory replay model;
+  - agent-to-agent memory standard;
+  - safe execution ladder;
+  - Solana builder copilot overview;
   - productization path;
   - runtime proof;
   - skill library;

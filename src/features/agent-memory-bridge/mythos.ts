@@ -1245,6 +1245,133 @@ export const MYTHOS_DECISION_TRACE_SCHEMA = {
     'The trace explains operational reasoning and limits. It is not hidden chain-of-thought and must not reveal secrets, private prompts, keys, or signed payloads.',
 } as const;
 
+export const MYTHOS_FLIGHT_RECORDER_EVENTS = [
+  {
+    stage: 'Perception',
+    artifact: 'request + source + agentId',
+    proof: 'What Mythos saw before taking a step.',
+  },
+  {
+    stage: 'Evidence',
+    artifact: 'RPC/API/tool output snapshot',
+    proof: 'What data was allowed to influence the answer.',
+  },
+  {
+    stage: 'Skill',
+    artifact: 'selected skill + category + command path',
+    proof: 'Which governed capability shaped the work.',
+  },
+  {
+    stage: 'Decision',
+    artifact: 'decision label + confidence + rejected unsafe paths',
+    proof: 'Why Mythos recommended this step instead of another.',
+  },
+  {
+    stage: 'Action',
+    artifact: 'tool call summary + status + latency',
+    proof: 'What was executed, simulated, skipped, or blocked.',
+  },
+  {
+    stage: 'Memory',
+    artifact: 'hash + vault + proof/read/verify routes',
+    proof: 'What became reusable CongChain memory.',
+  },
+] as const;
+
+export const MYTHOS_MEMORY_REPLAY_ENGINE = {
+  name: 'Memory Replay Engine',
+  thesis:
+    'Mythos compares a new task against previous verified memories before recommending a next step.',
+  examples: [
+    'This Anchor error pattern was seen 194 times; most matches were PDA seed mismatches.',
+    'This token risk pattern matches active authority plus concentrated holders.',
+    'This RPC failure resembles provider lag or missing historical lookup.',
+  ],
+  output:
+    'memoryMatchBps, previousMatches, likelyCause, confidence, and the reusable memory candidate.',
+} as const;
+
+export const MYTHOS_AGENT_MEMORY_STANDARD = [
+  'source',
+  'agentId',
+  'agentName',
+  'contentType',
+  'skillName',
+  'vault',
+  'owner',
+  'hash',
+  'readUrl',
+  'proofUrl',
+  'verifyUrl',
+  'riskLabel',
+  'safety',
+] as const;
+
+export const MYTHOS_SAFE_EXECUTION_LADDER = [
+  {
+    level: 'L0',
+    name: 'Read-only analysis',
+    rule: 'Collect evidence without writing, signing, submitting, or moving funds.',
+  },
+  {
+    level: 'L1',
+    name: 'Plan',
+    rule: 'Produce a human-readable plan with assumptions, missing data, and risk labels.',
+  },
+  {
+    level: 'L2',
+    name: 'Simulate',
+    rule: 'Run local/dry-run checks where supported; no irreversible effects.',
+  },
+  {
+    level: 'L3',
+    name: 'Propose',
+    rule: 'Prepare an auditable proposal, not an execution.',
+  },
+  {
+    level: 'L4',
+    name: 'Human confirmation',
+    rule: 'Require explicit in-app confirmation before value-moving steps.',
+  },
+  {
+    level: 'L5',
+    name: 'Wallet signature',
+    rule: 'Require visible wallet-side approval for any value movement.',
+  },
+  {
+    level: 'L6',
+    name: 'Controlled submit',
+    rule: 'Submit only after the signed payload and network are explicitly reviewed.',
+  },
+] as const;
+
+export const MYTHOS_SOLANA_COPILOT_MODES = [
+  {
+    name: 'Explain this transaction',
+    result: 'Human explanation, evidence, program hints, status, compute, fees, and next step.',
+  },
+  {
+    name: 'Find vulnerability',
+    result: 'Signer, PDA, authority, unchecked account, CPI, rent, and token-risk review.',
+  },
+  {
+    name: 'Optimize compute units',
+    result: 'Compute evidence, redundant CPI hints, and safe optimization suggestions.',
+  },
+  {
+    name: 'Wallet intelligence',
+    result: 'Balance, recent activity, failed txs, token exposure, and behavior profile.',
+  },
+  {
+    name: 'Token risk scanner',
+    result: 'Supply, authorities, holder concentration, activity, and risk boundary.',
+  },
+  {
+    name: 'Save reusable memory',
+    result: 'CongChain hash, isolated vault, proof/read/verify routes, and safety metadata.',
+  },
+] as const;
+
 export type MythosSkillCategory = (typeof MYTHOS_SKILL_CATEGORIES)[number];
 export type MythosFeaturedSkill = (typeof MYTHOS_FEATURED_SKILLS)[number];
 export type MythosUniqueIdentityPillar = (typeof MYTHOS_UNIQUE_IDENTITY_PILLARS)[number];

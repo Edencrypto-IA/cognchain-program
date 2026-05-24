@@ -19,15 +19,20 @@ import {
 } from 'lucide-react';
 import {
   MYTHOS_AGENT_PROFILE,
+  MYTHOS_AGENT_MEMORY_STANDARD,
   MYTHOS_CAPABILITY_GROUPS,
   MYTHOS_CATEGORY_SKILL_INDEX,
   MYTHOS_COGNITIVE_LAYERS,
   MYTHOS_DECISION_TRACE_SCHEMA,
   MYTHOS_FEATURED_SKILLS,
+  MYTHOS_FLIGHT_RECORDER_EVENTS,
+  MYTHOS_MEMORY_REPLAY_ENGINE,
   MYTHOS_PRODUCTIZATION_STEPS,
   MYTHOS_READINESS_ITEMS,
   MYTHOS_RUNTIME_PROOF,
+  MYTHOS_SAFE_EXECUTION_LADDER,
   MYTHOS_SKILL_CATEGORIES,
+  MYTHOS_SOLANA_COPILOT_MODES,
   MYTHOS_UNIQUE_IDENTITY_PILLARS,
 } from '../mythos';
 
@@ -208,6 +213,19 @@ const PT = {
   alreadyExists: 'Ja existe',
   nextStep: 'Proximo passo',
   productOwner: 'Responsavel',
+  marketEyebrow: 'Diferencial de mercado',
+  marketTitle: 'O que faz Mythos parecer acima de Eliza, OpenClaw e Hermes',
+  marketCopy:
+    'A proposta central e transformar acoes de agente em memoria verificavel: cada decisao importante pode ser explicada, limitada, reutilizada e auditada.',
+  flightRecorder: 'Caixa-preta cognitiva',
+  memoryReplay: 'Replay de memoria',
+  agentStandard: 'Padrao agent-to-agent',
+  executionLadder: 'Escada de execucao segura',
+  solanaCopilot: 'Copilot Solana',
+  artifact: 'Artefato',
+  proof: 'Prova',
+  level: 'Nivel',
+  rule: 'Regra',
 };
 
 const EN = {
@@ -323,6 +341,19 @@ const EN = {
   alreadyExists: 'Already exists',
   nextStep: 'Next step',
   productOwner: 'Owner',
+  marketEyebrow: 'Market differentiator',
+  marketTitle: 'What makes Mythos feel above Eliza, OpenClaw, and Hermes',
+  marketCopy:
+    'The core thesis is turning agent actions into verifiable memory: every important decision can be explained, bounded, reused, and audited.',
+  flightRecorder: 'Cognitive flight recorder',
+  memoryReplay: 'Memory replay',
+  agentStandard: 'Agent-to-agent standard',
+  executionLadder: 'Safe execution ladder',
+  solanaCopilot: 'Solana copilot',
+  artifact: 'Artifact',
+  proof: 'Proof',
+  level: 'Level',
+  rule: 'Rule',
 };
 
 function shortHash(value: string, size = 10) {
@@ -822,6 +853,118 @@ export default function MythosAgentConsole() {
                     {doctorLoading ? copy.checking : 'Doctor data unavailable.'}
                   </p>
                 )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#76FF03]/20 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.10),transparent_30%),linear-gradient(180deg,rgba(7,15,8,0.88),rgba(5,5,11,0.96))] p-4">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">{copy.marketEyebrow}</p>
+              <h2 className="mt-1 max-w-4xl text-2xl font-black">{copy.marketTitle}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-white/50">{copy.marketCopy}</p>
+            </div>
+            <a
+              href="/mythos/solana"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#76FF03]/20 bg-[#76FF03]/10 px-3 text-xs font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/15"
+            >
+              <Sparkles className="h-4 w-4" />
+              {copy.solanaCopilot}
+            </a>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div className="rounded-2xl border border-white/8 bg-black/24 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#14F195]">{copy.flightRecorder}</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {MYTHOS_FLIGHT_RECORDER_EVENTS.map(event => (
+                  <article key={event.stage} className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
+                    <p className="text-sm font-black text-white">{event.stage}</p>
+                    <div className="mt-3 grid gap-2">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/30">{copy.artifact}</p>
+                        <p className="mt-1 text-xs leading-5 text-white/54">{event.artifact}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#14F195]/80">{copy.proof}</p>
+                        <p className="mt-1 text-xs leading-5 text-white/54">{event.proof}</p>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-[#A855F7]/18 bg-[#A855F7]/[0.045] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#C084FC]">{copy.memoryReplay}</p>
+                <h3 className="mt-2 text-lg font-black text-white">{MYTHOS_MEMORY_REPLAY_ENGINE.name}</h3>
+                <p className="mt-2 text-xs leading-5 text-white/52">{MYTHOS_MEMORY_REPLAY_ENGINE.thesis}</p>
+                <div className="mt-4 grid gap-2">
+                  {MYTHOS_MEMORY_REPLAY_ENGINE.examples.map(example => (
+                    <div key={example} className="rounded-xl border border-white/8 bg-black/22 p-3 text-xs leading-5 text-white/56">
+                      {example}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 rounded-xl border border-[#A855F7]/14 bg-black/20 p-3 text-[11px] leading-5 text-white/48">
+                  {MYTHOS_MEMORY_REPLAY_ENGINE.output}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.045] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7DE4FF]">{copy.agentStandard}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {MYTHOS_AGENT_MEMORY_STANDARD.map(field => (
+                    <span key={field} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold text-white/58">
+                      {field}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs leading-5 text-white/50">
+                  {language === 'pt'
+                    ? 'Hermes, Eliza, OpenClaw e Mythos podem escrever no mesmo contrato, mas cada agente fica isolado por source, agentId, vault e safety.'
+                    : 'Hermes, Eliza, OpenClaw, and Mythos can write to the same contract while staying isolated by source, agentId, vault, and safety metadata.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+            <div className="rounded-2xl border border-[#FACC15]/18 bg-[#FACC15]/[0.045] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#FACC15]">{copy.executionLadder}</p>
+              <div className="mt-4 grid gap-2">
+                {MYTHOS_SAFE_EXECUTION_LADDER.map(step => (
+                  <div key={step.level} className="grid gap-3 rounded-xl border border-white/8 bg-black/22 p-3 sm:grid-cols-[54px_1fr]">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#FACC15]/20 bg-[#FACC15]/10 text-xs font-black text-[#FACC15]">
+                      {step.level}
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-white">{step.name}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/52">{step.rule}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#14F195]/18 bg-[#14F195]/[0.045] p-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#14F195]">{copy.solanaCopilot}</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {MYTHOS_SOLANA_COPILOT_MODES.map(mode => (
+                  <article key={mode.name} className="rounded-xl border border-white/8 bg-black/22 p-3">
+                    <p className="text-sm font-black text-white">{mode.name}</p>
+                    <p className="mt-2 text-xs leading-5 text-white/52">{mode.result}</p>
+                  </article>
+                ))}
+              </div>
+              <div className="mt-4 rounded-xl border border-[#14F195]/16 bg-black/20 p-3">
+                <p className="text-xs leading-5 text-white/54">
+                  {language === 'pt'
+                    ? 'Diferencial central: Solscan mostra o que aconteceu; Mythos explica o que significa, cria trilha cognitiva e pode salvar a investigacao como memoria verificavel.'
+                    : 'Core difference: Solscan shows what happened; Mythos explains what it means, creates a cognitive trace, and can save the investigation as verifiable memory.'}
+                </p>
               </div>
             </div>
           </div>
