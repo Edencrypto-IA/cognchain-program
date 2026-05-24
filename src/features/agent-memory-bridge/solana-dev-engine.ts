@@ -105,6 +105,15 @@ type AccountInfoResult = {
   } | null;
 };
 
+type SignatureStatusesResult = {
+  value?: Array<{
+    slot?: number;
+    confirmations?: number | null;
+    confirmationStatus?: string;
+    err?: unknown;
+  } | null>;
+};
+
 const BASE58_LONG = /\b[1-9A-HJ-NP-Za-km-z]{32,88}\b/;
 const BASE58_PUBKEY = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -244,6 +253,14 @@ function fallbackAnalysis(input: {
   return lines.join('\n');
 }
 
+function cleanModelText(value: string): string {
+  return value
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/```/g, '')
+    .trim();
+}
+
 async function modelAnalysis(input: {
   model: string;
   mode: MythosSolanaMode;
@@ -294,11 +311,37 @@ async function buildTransactionEvidence(subject: string, cluster: MythosSolanaCl
   ]);
 
   if (!tx) {
+    let statusSummary = 'not available';
+    let statusState: MythosSolanaEvidenceItem['status'] = 'review';
+
+    try {
+      const status = await jsonRpc<SignatureStatusesResult>(cluster, 'getSignatureStatuses', [
+        [signature],
+        { searchTransactionHistory: true },
+      ]);
+      const item = status.value?.[0];
+
+      if (item) {
+        statusSummary = [
+          `slot ${item.slot ?? 'unknown'}`,
+          `confirmation ${item.confirmationStatus || 'unknown'}`,
+          `confirmations ${item.confirmations ?? 'finalized or unavailable'}`,
+          `err ${item.err ? JSON.stringify(item.err).slice(0, 180) : 'none'}`,
+        ].join(', ');
+        statusState = item.err ? 'review' : 'ready';
+      } else {
+        statusSummary = 'signature status not found, even with searchTransactionHistory=true';
+      }
+    } catch (error) {
+      statusSummary = error instanceof Error ? error.message : 'signature status lookup failed';
+    }
+
     return {
       subject: signature,
       evidence: [
         value('Signature', signature),
         value('RPC result', 'transaction not found', 'review'),
+        value('Signature status', statusSummary, statusState),
         value('Cluster', cluster, 'review'),
       ],
     };
@@ -413,7 +456,7 @@ export async function runMythosSolanaEngine(input: {
       evidence: evidenceResult.evidence,
       skill,
     });
-    analysis = result.content;
+    analysis = cleanModelText(result.content);
     modelLabel = result.modelLabel;
   } catch {
     fallbackUsed = true;
