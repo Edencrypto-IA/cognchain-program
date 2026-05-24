@@ -9,6 +9,7 @@ import {
   Database,
   KeyRound,
   Loader2,
+  Network,
   Plus,
   Save,
   Send,
@@ -21,6 +22,7 @@ import {
   MYTHOS_FEATURED_SKILLS,
   MYTHOS_SKILL_CATEGORIES,
 } from '../mythos';
+import type { MythosSkillRouteResult } from '../skill-router';
 
 type MythosLabMessage = {
   id: string;
@@ -52,6 +54,7 @@ type MythosLabSession = {
   messages: MythosLabMessage[];
   lastTrace?: MythosCognitiveTrace;
   lastObservability?: MythosObservability;
+  lastSkillRoute?: MythosSkillRouteResult;
 };
 
 type MythosObservability = {
@@ -213,6 +216,7 @@ export default function MythosLabConsole() {
       selectedSkill: selectedSkill?.name,
       skillPath: selectedSkill?.path,
       sessionId: activeSession?.id,
+      skillRoute: activeSession?.lastSkillRoute,
       cognitiveTrace: activeSession?.lastTrace,
       observability: activeSession?.lastObservability,
       origin: 'mythos-lab',
@@ -224,7 +228,7 @@ export default function MythosLabConsole() {
         requiresHumanReview: true,
       },
     },
-  }), [activeSession?.id, activeSession?.lastObservability, activeSession?.lastTrace, lastAssistant?.content, profile.identity.namespace, selectedSkill?.name, selectedSkill?.path]);
+  }), [activeSession?.id, activeSession?.lastObservability, activeSession?.lastSkillRoute, activeSession?.lastTrace, lastAssistant?.content, profile.identity.namespace, selectedSkill?.name, selectedSkill?.path]);
 
   function updateActive(updater: (session: MythosLabSession) => MythosLabSession) {
     setSessions(current => current.map(session => session.id === activeSession?.id ? updater(session) : session));
@@ -240,6 +244,46 @@ export default function MythosLabConsole() {
 
   function setSessionField<K extends keyof MythosLabSession>(key: K, value: MythosLabSession[K]) {
     updateActive(session => ({ ...session, [key]: value, updatedAt: nowIso() }));
+  }
+
+  async function routeSkillForPrompt(content: string) {
+    const response = await fetch('/api/mythos/skill-router', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: content,
+        currentSkillId: selectedSkill?.id,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Mythos could not route this skill.');
+    return data as MythosSkillRouteResult;
+  }
+
+  async function routeCurrentDraft() {
+    if (!activeSession || loading) return;
+    const content = input.trim();
+    if (!content) {
+      setNotice('Write a task first, then Mythos can select the governing skill.');
+      return;
+    }
+
+    setLoading(true);
+    setNotice('');
+    try {
+      const route = await routeSkillForPrompt(content);
+      updateActive(session => ({
+        ...session,
+        skillId: route.selectedSkill.id,
+        lastSkillRoute: route,
+        updatedAt: nowIso(),
+      }));
+      setNotice(`Skill routed to ${route.selectedSkill.name}. Review it before sending.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Mythos could not route this skill.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function sendMessage(prompt?: string) {
@@ -269,14 +313,25 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
+      const route = await routeSkillForPrompt(content);
+      const routedSkill =
+        MYTHOS_FEATURED_SKILLS.find(skill => skill.id === route.selectedSkill.id) ||
+        selectedSkill;
+      updateActive(session => ({
+        ...session,
+        skillId: route.selectedSkill.id,
+        lastSkillRoute: route,
+        updatedAt: nowIso(),
+      }));
+
       const response = await fetch('/api/mythos/test-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: activeSession.model,
           mode: activeSession.mode,
-          selectedSkill: selectedSkill?.name,
-          skillPath: selectedSkill?.path,
+          selectedSkill: routedSkill?.name,
+          skillPath: routedSkill?.path,
           messages: nextMessages
             .filter(message => message.role !== 'system')
             .map(message => ({ role: message.role, content: message.content })),
@@ -581,15 +636,26 @@ export default function MythosLabConsole() {
                           </button>
                         ))}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => sendMessage()}
-                        disabled={!input.trim() || loading}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/85 text-black transition hover:bg-[#A7FF3D] disabled:cursor-not-allowed disabled:opacity-45"
-                        aria-label="Send message to Mythos"
-                      >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={routeCurrentDraft}
+                          disabled={!input.trim() || loading}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#5AD7FF]/18 bg-[#5AD7FF]/10 px-4 text-xs font-bold text-[#7DE4FF] transition hover:bg-[#5AD7FF]/15 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          <Network className="h-4 w-4" />
+                          Route skill
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => sendMessage()}
+                          disabled={!input.trim() || loading}
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/85 text-black transition hover:bg-[#A7FF3D] disabled:cursor-not-allowed disabled:opacity-45"
+                          aria-label="Send message to Mythos"
+                        >
+                          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <p className="mt-3 text-center text-xs text-white/35">
@@ -601,6 +667,70 @@ export default function MythosLabConsole() {
 
             <aside className="border-t border-white/8 bg-black/38 p-5 xl:border-l xl:border-t-0">
               <div className="grid gap-4">
+                <section className="rounded-2xl border border-[#76FF03]/16 bg-[#76FF03]/6 p-4">
+                  <div className="flex items-center gap-2">
+                    <Network className="h-4 w-4 text-[#A7FF3D]" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Skill router</p>
+                  </div>
+                  {activeSession.lastSkillRoute ? (
+                    <div className="mt-3">
+                      <div className="rounded-xl border border-[#76FF03]/14 bg-black/32 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-black text-white">{activeSession.lastSkillRoute.selectedSkill.name}</p>
+                            <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-white/35">
+                              {activeSession.lastSkillRoute.categoryLabel} / {activeSession.lastSkillRoute.confidenceLabel} confidence
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-[#76FF03]/18 bg-[#76FF03]/10 px-2 py-1 text-[10px] font-black text-[#A7FF3D]">
+                            {Math.round(activeSession.lastSkillRoute.confidence * 100)}%
+                          </span>
+                        </div>
+                        <p className="mt-3 text-xs leading-5 text-white/55">{activeSession.lastSkillRoute.reason}</p>
+                        <button
+                          type="button"
+                          onClick={() => copyText(activeSession.lastSkillRoute?.command || '', 'skill-route-command')}
+                          className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-[#76FF03]/18 bg-[#76FF03]/10 px-3 text-xs font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/15"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          {copied === 'skill-route-command' ? 'Copied' : 'Copy skill command'}
+                        </button>
+                      </div>
+                      {activeSession.lastSkillRoute.alternatives.length > 0 && (
+                        <div className="mt-3 rounded-xl border border-white/8 bg-black/24 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/36">Alternatives</p>
+                          <div className="mt-2 grid gap-2">
+                            {activeSession.lastSkillRoute.alternatives.map(alternative => (
+                              <div key={alternative.id} className="flex items-center justify-between gap-2 text-xs text-white/55">
+                                <span className="truncate">{alternative.name}</span>
+                                <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 text-[10px] text-white/38">
+                                  score {alternative.score}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="mt-3 grid gap-2">
+                        {[
+                          'The router selects context before the answer.',
+                          'It does not execute skills automatically.',
+                          'The selected skill is attached to memory receipts.',
+                        ].map(item => (
+                          <div key={item} className="flex gap-2 text-xs leading-5 text-white/50">
+                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#14F195]" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs leading-5 text-white/48">
+                      Send a task or click Route skill. Mythos will choose the governing skill, explain why, and keep execution human-reviewed.
+                    </p>
+                  )}
+                </section>
+
                 <section className="rounded-2xl border border-[#5AD7FF]/16 bg-[#5AD7FF]/6 p-4">
                   <div className="flex items-center gap-2">
                     <Brain className="h-4 w-4 text-[#7DE4FF]" />

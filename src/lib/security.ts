@@ -26,6 +26,7 @@ export interface RateLimitConfig {
 const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/chat': { windowMs: 60_000, maxRequests: 20 },
   '/api/forge/chat': { windowMs: 60_000, maxRequests: 15 },
+  '/api/mythos/skill-router': { windowMs: 60_000, maxRequests: 30 },
   '/api/mythos/test-chat': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/analyze-transaction': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/analyze-wallet': { windowMs: 60_000, maxRequests: 12 },

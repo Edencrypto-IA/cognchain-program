@@ -88,6 +88,14 @@ The goal is simple: any serious autonomous agent should be able to create memory
   - safety boundaries;
   - English/PT toggle.
 - **Mythos Lab** at `/mythos/lab` for safe browser-based testing.
+  - automatic Mythos Skill Router that reads the user task, selects the most relevant governing skill, explains the route, and shows alternatives;
+  - selected-skill context is passed into the test terminal and attached to approved memory payloads;
+  - routing is advisory and auditable: it does not execute skills, write memory, sign payloads, or move funds automatically.
+
+New Mythos Lab endpoint:
+
+- `POST /api/mythos/skill-router`
+
 - **Mythos Solana Developer Console** at `/mythos/solana` with a real server-side engine for:
   - transaction signature analysis through read-only Solana RPC or Helius;
   - wallet intelligence for public Phantom/Solflare addresses, including SOL balance, recent activity, failed transactions, token exposure, and sampled program families;
