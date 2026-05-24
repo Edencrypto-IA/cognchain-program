@@ -60,6 +60,34 @@ Mythos is now the first official external agent integration for CognChain.
 
 The goal is simple: any serious autonomous agent should be able to create memory that is portable, authenticated, auditable, and safe to verify later. Mythos brings that idea into a real agent runtime instead of keeping it as a chat-only demo.
 
+### Current public surfaces
+
+| Surface | URL | What it proves |
+|---|---|---|
+| Main app | `https://cognchain-program-production.up.railway.app` | Multi-model AI chat with portable memory |
+| API Keys | `/dashboard/keys` | Authenticated keys for external agents such as Mythos, Hermes, OpenClaw, and Eliza |
+| Memory Brain | `/brain` | Visual memory graph with isolated agent routes |
+| Mythos Agent | `/mythos` | Official external-agent cockpit, readiness, skills, runtime proof, and safety contract |
+| Mythos Lab | `/mythos/lab` | Safe terminal-style test surface with automatic skill routing and memory save flow |
+| Mythos Solana | `/mythos/solana` | Read-only Solana transaction, wallet, token, Anchor, and RPC intelligence |
+
+### What is real today
+
+- External agents can create CognChain keys and write memory through authenticated APIs.
+- Mythos has a dedicated vault route using `source=mythos`, `agentId`, `contentType`, owner metadata, and hash-addressable records.
+- The Mythos runtime integration pack includes plugins, skills, an installer, and tests for connecting a real Mythos runtime to CognChain.
+- The Mythos Lab now includes an automatic Skill Router: a user asks a task, Mythos chooses the governing skill, explains why, and attaches that route to approved memory payloads.
+- The Solana console performs real read-only server-side RPC/Helius analysis for public transactions, wallets, token mints, Anchor/debug reports, and RPC health.
+- Approved Mythos answers can be saved as CognChain memory only through an explicit user action and an authenticated key.
+
+### What remains intentionally blocked
+
+- No API key, private key, seed phrase, signed payload, bot token, or wallet secret is stored in memory.
+- No skill selection executes hidden tools automatically.
+- No wallet signature is requested from Mythos Lab or the Solana console.
+- No buy, sell, pay, schedule, submit, or fund-moving action is performed.
+- No result is described as "on-chain" unless a real anchor transaction exists.
+
 ### What is live now
 
 - **Agent Memory Bridge APIs** for external agents:
@@ -229,6 +257,18 @@ The local Mythos lab is now being turned into a public, user-safe product flow:
 6. Public Mythos flow: choose skill, choose provider mode, run safely, inspect trace, save memory, verify hash.
 
 This is the bridge from "developer runtime works locally" to "every CognChain user can safely connect an external agent."
+
+### Why this matters for external agents
+
+Most agents can act, but their useful context disappears or remains locked inside one runtime. CognChain turns high-value agent work into portable, verifiable memory:
+
+- Mythos can write a task result once and recover it later by hash.
+- Hermes, OpenClaw, Eliza, and future agents can use the same API contract.
+- Each agent keeps an isolated vault so memory does not blur across runtimes.
+- Skill, model, provider, safety, and provenance metadata travel with the record.
+- Solana builders get a read-only AI copilot that can explain transactions, wallets, token risk, Anchor errors, and RPC issues while preserving the safety boundary.
+
+The product thesis is direct: AI agents should not only execute. They should remember, prove, and safely continue.
 
 ## CongChain Forge - AI IDE Sandbox
 

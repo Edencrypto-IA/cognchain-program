@@ -9,6 +9,44 @@ Objetivo:
 - manter cada agente em um vault logico separado;
 - preservar o limite de seguranca: sem secrets, sem private keys, sem signed payloads e sem movimento de fundos.
 
+## Status atual
+
+Este pacote representa a ponte oficial entre o Mythos runtime e a CongChain.
+No repositorio principal, a experiencia publica ja possui:
+
+- `/mythos`: cockpit do Mythos com capacidades, readiness, runtime proof,
+  skills, diferenciais e limites de seguranca;
+- `/mythos/lab`: terminal seguro com Skill Router automatico, trilha
+  cognitiva, observabilidade e gravacao explicita de memoria;
+- `/mythos/solana`: copilot Solana read-only para transacoes, carteiras,
+  tokens, Anchor/debug e RPC;
+- `/dashboard/keys`: criacao de keys `cog_live_*` para agentes externos;
+- `/api/memory/write`: escrita autenticada de memoria verificavel.
+
+O pacote local adiciona a parte runtime: adapter, plugins, skills, instalador e
+testes para que Mythos real observe sessoes, skills, tool calls, compressao,
+conclusao e bloqueios de seguranca sem remover as ferramentas originais do
+agente.
+
+O que esta pronto:
+
+- API contract para Mythos, Hermes, OpenClaw, Eliza e agentes externos;
+- vault isolado por owner, source e agent ID;
+- `congchain-adapter` com eventos de runtime mapeados para hooks reais;
+- `nvidia-router` v1 como recomendador auditavel de modelo, sem fingir troca
+  automatica;
+- skills CongChain para memoria, auditoria, rollback, export, Solana, Web3,
+  deploy e arquitetura de agentes;
+- Skill Router web em `/api/mythos/skill-router` para escolher a skill mais
+  provavel antes do terminal responder.
+
+O que continua bloqueado por desenho:
+
+- nenhum segredo ou chave privada deve ser enviado para memoria;
+- nenhuma skill executa ferramentas automaticamente apenas por ser selecionada;
+- nenhum fluxo assina, submete, compra, vende, paga, agenda ou move fundos;
+- "on-chain" so deve ser usado quando um anchor real confirmar a persistencia.
+
 ## Identidade Mythos
 
 Mythos pode nascer de um fork compativel com Hermes, mas este pacote trata
