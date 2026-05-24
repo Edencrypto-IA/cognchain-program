@@ -82,9 +82,32 @@ The goal is simple: any serious autonomous agent should be able to create memory
   - safety boundaries;
   - English/PT toggle.
 - **Mythos Lab** at `/mythos/lab` for safe browser-based testing.
+- **Mythos Solana Developer Console** at `/mythos/solana` with a real server-side engine for:
+  - transaction signature analysis through read-only Solana RPC or Helius;
+  - Anchor/program debugging from logs, program IDs, and account evidence;
+  - wallet/RPC issue explanation using live health, version, epoch, and blockhash checks;
+  - cognitive trace output covering perception, evidence, skill, decision, prediction, boundary, and next step;
+  - explicit "Save to CongChain" flow that writes only an approved summary through `POST /api/memory/write`.
 - **CongChain skill pack for Mythos** under `integrations/mythos/skills/congchain`.
 - **Runtime adapter skeleton** under `integrations/mythos/plugins/congchain-adapter`.
 - **NVIDIA router skill/plugin draft** for model-routing recommendations without pretending to override unsupported runtime internals.
+
+### Mythos Solana engine configuration
+
+The Solana console keeps provider credentials server-side. Configure one of these in Railway:
+
+```text
+HELIUS_API_KEY=...
+```
+
+or:
+
+```text
+SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=...
+SOLANA_DEVNET_RPC_URL=https://api.devnet.solana.com
+```
+
+The browser never receives the Helius key. The engine only performs read-only RPC calls such as `getTransaction`, `getAccountInfo`, `getHealth`, `getVersion`, `getEpochInfo`, and `getLatestBlockhash`. It does not sign, submit, simulate fund movement, request wallet approval, or store provider secrets.
 
 ### Mythos capability snapshot
 
