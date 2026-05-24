@@ -225,8 +225,8 @@ export default function MythosSolanaDevConsole() {
   }
 
   return (
-    <main className="min-h-screen bg-[#05050b] text-white">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-screen overflow-x-hidden bg-[#05050b] text-white">
+      <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <a href="/mythos" className="inline-flex items-center gap-2 text-sm text-white/45 transition hover:text-white/80">
             <ArrowLeft className="h-4 w-4" />
@@ -245,13 +245,13 @@ export default function MythosSolanaDevConsole() {
         </div>
 
         <section className="overflow-hidden rounded-3xl border border-[#76FF03]/25 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.15),transparent_34%),linear-gradient(135deg,rgba(7,20,8,0.96),rgba(4,5,10,0.98))]">
-          <div className="grid gap-6 p-5 lg:grid-cols-[220px_1fr] lg:p-7">
+          <div className="grid min-w-0 gap-6 p-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:p-7">
             <div className="flex items-center justify-center">
               <div className="h-44 w-44 overflow-hidden rounded-full border border-[#76FF03]/35 bg-black shadow-[0_0_60px_rgba(118,255,3,0.22)]">
                 <img src={MYTHOS_AGENT_PROFILE.image} alt="" className="h-full w-full object-cover" />
               </div>
             </div>
-            <div className="flex flex-col justify-center">
+            <div className="flex min-w-0 flex-col justify-center">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full border border-[#76FF03]/24 bg-[#76FF03]/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">
                   Real Solana engine
@@ -274,7 +274,7 @@ export default function MythosSolanaDevConsole() {
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-2xl border border-white/8 bg-black/26 p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">{label}</p>
-                    <p className="mt-1 text-sm font-bold text-white/78">{value}</p>
+                    <p className="mt-1 break-words text-sm font-bold text-white/78 [overflow-wrap:anywhere]">{value}</p>
                   </div>
                 ))}
               </div>
@@ -282,7 +282,7 @@ export default function MythosSolanaDevConsole() {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[360px_1fr]">
+        <section className="grid min-w-0 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
           <aside className="rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Choose a Solana workflow</p>
             <div className="mt-4 grid gap-3">
@@ -344,7 +344,7 @@ export default function MythosSolanaDevConsole() {
             </div>
           </aside>
 
-          <div className="grid gap-4">
+          <div className="grid min-w-0 gap-4">
             <section className="rounded-2xl border border-[#5AD7FF]/18 bg-[radial-gradient(circle_at_top_right,rgba(90,215,255,0.10),transparent_30%),rgba(5,10,14,0.90)] p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -399,12 +399,12 @@ export default function MythosSolanaDevConsole() {
             </section>
 
             {result ? (
-              <section className="grid gap-4 xl:grid-cols-[1fr_380px]">
-                <div className="rounded-2xl border border-white/8 bg-black/26 p-4">
+              <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="min-w-0 rounded-2xl border border-white/8 bg-black/26 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-white/38">Mythos analysis</p>
-                      <h3 className="mt-1 text-xl font-black">{result.subject}</h3>
+                      <h3 className="mt-1 break-words text-xl font-black [overflow-wrap:anywhere]">{result.subject}</h3>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="rounded-xl border border-[#14F195]/18 bg-[#14F195]/10 px-3 py-2 text-xs font-bold text-[#14F195]">
@@ -415,37 +415,37 @@ export default function MythosSolanaDevConsole() {
                       </span>
                     </div>
                   </div>
-                  <pre className="mt-4 whitespace-pre-wrap rounded-2xl border border-white/8 bg-[#030306] p-4 text-sm leading-6 text-white/72">
+                  <pre className="mt-4 max-w-full whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-[#030306] p-4 text-sm leading-6 text-white/72 [overflow-wrap:anywhere]">
                     {result.analysis}
                   </pre>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
                     {result.evidence.map(item => (
-                      <div key={`${item.label}-${item.value}`} className="rounded-2xl border border-white/8 bg-black/24 p-3">
+                      <div key={`${item.label}-${item.value}`} className="min-w-0 rounded-2xl border border-white/8 bg-black/24 p-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">{item.label}</p>
                           <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${statusClass(item.status)}`}>
                             {item.status}
                           </span>
                         </div>
-                        <p className="mt-2 break-words text-xs leading-5 text-white/58">{item.value}</p>
+                        <p className="mt-2 break-words text-xs leading-5 text-white/58 [overflow-wrap:anywhere]">{item.value}</p>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <aside className="grid gap-4">
+                <aside className="grid min-w-0 gap-4">
                   <div className="rounded-2xl border border-[#14F195]/18 bg-[#14F195]/[0.035] p-4">
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-[#14F195]">Cognitive trace</p>
                     {Object.entries(result.cognitiveTrace).map(([label, value]) => (
                       <div key={label} className="mt-3 rounded-xl border border-white/8 bg-black/20 p-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">{label}</p>
-                        <p className="mt-1 text-xs leading-5 text-white/58">{value}</p>
+                        <p className="mt-1 break-words text-xs leading-5 text-white/58 [overflow-wrap:anywhere]">{value}</p>
                       </div>
                     ))}
                   </div>
 
-                  <div className="rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
+                  <div className="min-w-0 rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Save as CongChain memory</p>
                     <p className="mt-2 text-xs leading-5 text-white/50">
                       Saving requires your CongChain agent key. The key is sent once to the server and is not displayed back.
@@ -469,7 +469,7 @@ export default function MythosSolanaDevConsole() {
                     {saved?.hash ? (
                       <div className="mt-3 rounded-xl border border-[#14F195]/18 bg-[#14F195]/[0.06] p-3">
                         <p className="text-xs font-bold text-[#14F195]">Memory saved</p>
-                        <p className="mt-1 break-all font-mono text-xs text-white/62">{saved.hash}</p>
+                        <p className="mt-1 break-all font-mono text-xs text-white/62 [overflow-wrap:anywhere]">{saved.hash}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {saved.readUrl ? <a className="text-xs font-bold text-[#7DE4FF]" href={saved.readUrl}>Read</a> : null}
                           {saved.verifyUrl ? <a className="text-xs font-bold text-[#7DE4FF]" href={saved.verifyUrl}>Verify</a> : null}
@@ -481,10 +481,10 @@ export default function MythosSolanaDevConsole() {
                 </aside>
               </section>
             ) : (
-              <section className="grid gap-4 xl:grid-cols-[1fr_380px]">
-                <div className="rounded-2xl border border-white/8 bg-black/26 p-4">
+              <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="min-w-0 rounded-2xl border border-white/8 bg-black/26 p-4">
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-white/38">Before running</p>
-                  <pre className="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-2xl border border-white/8 bg-[#030306] p-4 text-xs leading-6 text-white/64">
+                  <pre className="mt-4 max-h-[420px] max-w-full overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-[#030306] p-4 text-xs leading-6 text-white/64 [overflow-wrap:anywhere]">
                     {localBrief}
                   </pre>
                 </div>
