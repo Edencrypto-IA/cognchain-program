@@ -1,7 +1,7 @@
 import { callModel } from '@/services/ai';
 import { Limits, ValidationError, validateModel } from '@/lib/security';
 
-export type MythosSolanaMode = 'transaction' | 'anchor' | 'rpc';
+export type MythosSolanaMode = 'transaction' | 'wallet' | 'token' | 'anchor' | 'rpc';
 export type MythosSolanaCluster = 'mainnet' | 'devnet';
 
 type JsonRpcResponse<T> = {
@@ -27,6 +27,29 @@ export type MythosSolanaResult = {
   analysis: string;
   fallbackUsed: boolean;
   evidence: MythosSolanaEvidenceItem[];
+  risk: {
+    level: 'safe' | 'suspicious' | 'exploit_risk' | 'review';
+    score: number;
+    confidenceBps: number;
+    memoryMatchBps: number;
+    summary: string;
+    signals: string[];
+  };
+  chainMonitor: {
+    status: 'live' | 'degraded' | 'review';
+    cluster: MythosSolanaCluster;
+    provider: 'helius' | 'solana-rpc';
+    slotLabel: string;
+    blockHeightLabel: string;
+    versionLabel: string;
+  };
+  memoryReplay: {
+    pattern: string;
+    previousMatches: number;
+    likelyCause: string;
+    confidenceBps: number;
+  };
+  patchExample?: string;
   cognitiveTrace: {
     perception: string;
     evidenceUsed: string;
@@ -114,14 +137,88 @@ type SignatureStatusesResult = {
   } | null>;
 };
 
+type ParsedAccountInfoResult = {
+  value?: {
+    executable?: boolean;
+    lamports?: number;
+    owner?: string;
+    data?: {
+      parsed?: {
+        type?: string;
+        info?: Record<string, unknown>;
+      };
+      program?: string;
+      space?: number;
+    } | string[];
+  } | null;
+};
+
+type TokenSupplyResult = {
+  value?: {
+    amount?: string;
+    decimals?: number;
+    uiAmountString?: string;
+  };
+};
+
+type TokenLargestAccountsResult = {
+  value?: Array<{
+    address?: string;
+    amount?: string;
+    decimals?: number;
+    uiAmountString?: string;
+  }>;
+};
+
+type SignaturesForAddressResult = Array<{
+  signature: string;
+  slot?: number;
+  err?: unknown;
+  memo?: string | null;
+  blockTime?: number | null;
+  confirmationStatus?: string;
+}>;
+
+type TokenAccountsByOwnerResult = {
+  value?: Array<{
+    pubkey?: string;
+    account?: {
+      data?: {
+        parsed?: {
+          info?: {
+            mint?: string;
+            tokenAmount?: {
+              uiAmountString?: string;
+              amount?: string;
+              decimals?: number;
+            };
+          };
+        };
+      };
+    };
+  }>;
+};
+
+type EpochInfoResult = {
+  blockHeight?: number;
+  epoch?: number;
+  slotIndex?: number;
+  slotsInEpoch?: number;
+  absoluteSlot?: number;
+};
+
 const BASE58_LONG = /\b[1-9A-HJ-NP-Za-km-z]{32,88}\b/;
 const BASE58_PUBKEY = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 
 const SYSTEM_PROMPT = [
   'You are Mythos, CongChain Solana developer copilot.',
   'Use only the evidence provided by the server. Do not invent RPC facts.',
   'Write in clean English with short labeled sections. Do not use markdown tables.',
-  'Explain what failed, why it likely failed, what evidence supports it, and the next safe step.',
+  'Explain what failed or looks risky, why it likely happened, what evidence supports it, and the next safe step.',
+  'For wallets and tokens, classify risk without giving financial advice.',
+  'Never tell the user a token is safe to buy or safe to invest in. Say what evidence is ready, suspicious, missing, or blocked.',
+  'For developer failures, include a short patch example when the evidence suggests one.',
   'Never request API keys, private keys, seed phrases, signed payloads, or wallet secrets.',
   'Never claim funds moved, wallet signatures happened, or memory was saved unless explicit evidence says so.',
 ].join(' ');
@@ -221,6 +318,23 @@ function instructionSummary(tx: TransactionResult): string {
   }).join('; ');
 }
 
+function knownProgramSummary(tx: TransactionResult): string {
+  const text = instructionSummary(tx).toLowerCase();
+  const hits = [
+    ['jupiter', 'Jupiter'],
+    ['raydium', 'Raydium'],
+    ['orca', 'Orca'],
+    ['meteora', 'Meteora'],
+    ['token', 'SPL Token'],
+    ['system', 'System Program'],
+    ['associated', 'Associated Token'],
+    ['compute', 'Compute Budget'],
+  ]
+    .filter(([needle]) => text.includes(needle))
+    .map(([, label]) => label);
+  return hits.length ? Array.from(new Set(hits)).join(', ') : 'not classified from parsed instructions';
+}
+
 function computeHint(logs: string[]): string {
   const joined = logs.join(' ');
   const match = joined.match(/consumed\s+([0-9]+)\s+of\s+([0-9]+)\s+compute units/i);
@@ -259,6 +373,173 @@ function cleanModelText(value: string): string {
     .replace(/^#{1,6}\s*/gm, '')
     .replace(/```/g, '')
     .trim();
+}
+
+function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidenceItem[]) {
+  const review = evidence.filter(item => item.status === 'review').length;
+  const blocked = evidence.filter(item => item.status === 'blocked').length;
+  const joined = evidence.map(item => `${item.label} ${item.value}`).join(' ').toLowerCase();
+  let score = 18 + review * 12 + blocked * 30;
+  const signals: string[] = [];
+
+  if (/failed|error|not found|missing|unknown|invalid|freeze authority active|mint authority active|high concentration|very new/i.test(joined)) {
+    score += 18;
+    signals.push('Review signal found in RPC evidence.');
+  }
+  if (/success|err none|freeze authority none|mint authority none|healthy/i.test(joined)) {
+    score -= 8;
+    signals.push('Some evidence indicates normal execution or reduced authority risk.');
+  }
+  if (mode === 'token' && /largest holder share ([6-9][0-9]|100)/i.test(joined)) {
+    score += 22;
+    signals.push('Largest holder concentration is high.');
+  }
+  if (mode === 'token') {
+    const largestHolder = evidence.find(item => item.label.toLowerCase() === 'largest holder share');
+    const top10 = evidence.find(item => item.label.toLowerCase() === 'top 10 holder share');
+    const largestPct = Number(largestHolder?.value.match(/([0-9]+(?:\.[0-9]+)?)%/)?.[1] || 0);
+    const top10Pct = Number(top10?.value.match(/([0-9]+(?:\.[0-9]+)?)%/)?.[1] || 0);
+
+    if (largestPct >= 35) {
+      score += 20;
+      signals.push(`Largest holder controls ${largestPct.toFixed(2)}% of supply.`);
+    } else if (largestPct > 0 && largestPct <= 12) {
+      score -= 8;
+      signals.push('Largest holder concentration is relatively low from available RPC evidence.');
+    }
+
+    if (top10Pct >= 70) {
+      score += 18;
+      signals.push(`Top 10 holders control ${top10Pct.toFixed(2)}% of supply.`);
+    }
+
+    if (/mint authority [1-9a-hj-np-za-km-z]{20,}/i.test(joined)) {
+      score += 16;
+      signals.push('Mint authority appears active; supply can potentially change.');
+    }
+    if (/freeze authority [1-9a-hj-np-za-km-z]{20,}/i.test(joined)) {
+      score += 16;
+      signals.push('Freeze authority appears active; token accounts may be freezeable.');
+    }
+  }
+  if (mode === 'wallet' && /recent failed transactions [1-9]/i.test(joined)) {
+    score += 12;
+    signals.push('Recent wallet failures were detected.');
+  }
+  if (mode === 'wallet') {
+    const txs = Number(evidence.find(item => item.label.toLowerCase() === 'recent transactions')?.value || 0);
+    const tokenAccounts = Number(evidence.find(item => item.label.toLowerCase() === 'token accounts with balance')?.value || 0);
+    if (txs <= 2) {
+      score += 10;
+      signals.push('Wallet has very little recent activity in the sampled RPC window.');
+    }
+    if (tokenAccounts >= 20) {
+      score += 8;
+      signals.push('Wallet has broad token exposure that may need manual review.');
+    }
+  }
+
+  score = Math.max(1, Math.min(99, score));
+  const level = blocked > 0 || score >= 78
+    ? 'exploit_risk'
+    : score >= 52
+      ? 'suspicious'
+      : review > 0 || score >= 34
+        ? 'review'
+        : 'safe';
+
+  if (!signals.length) signals.push('No severe risk signal was detected from the available read-only evidence.');
+
+  return {
+    level,
+    score,
+    confidenceBps: Math.max(5200, Math.min(9400, 8700 - review * 700 - blocked * 1200)),
+    memoryMatchBps: Math.max(4200, Math.min(9100, 6200 + evidence.length * 180 - review * 220)),
+    summary: level === 'safe'
+      ? 'Evidence looks normal, but a human should still verify intent and counterparties.'
+      : level === 'review'
+        ? 'Some evidence is incomplete or needs a human Solana review.'
+        : level === 'suspicious'
+          ? 'Multiple risk signals deserve investigation before trusting this wallet, token, or transaction. This is not investment advice.'
+          : 'High-risk pattern. Treat as blocked until a human reviewer validates the evidence.',
+    signals: signals.slice(0, 5),
+  } as const;
+}
+
+async function buildChainMonitor(cluster: MythosSolanaCluster) {
+  const provider = rpcProviderLabel(cluster);
+  const [health, version, epoch] = await Promise.allSettled([
+    jsonRpc<string>(cluster, 'getHealth', []),
+    jsonRpc<{ 'solana-core'?: string; 'feature-set'?: number }>(cluster, 'getVersion', []),
+    jsonRpc<EpochInfoResult>(cluster, 'getEpochInfo', []),
+  ]);
+
+  return {
+    status: health.status === 'fulfilled' ? 'live' as const : 'review' as const,
+    cluster,
+    provider,
+    slotLabel: epoch.status === 'fulfilled'
+      ? `slot ${epoch.value.absoluteSlot ?? 'unknown'}`
+      : 'slot unavailable',
+    blockHeightLabel: epoch.status === 'fulfilled'
+      ? `height ${epoch.value.blockHeight ?? 'unknown'}`
+      : 'height unavailable',
+    versionLabel: version.status === 'fulfilled'
+      ? version.value['solana-core'] || 'version unavailable'
+      : 'version unavailable',
+  };
+}
+
+function memoryReplayFor(mode: MythosSolanaMode, risk: ReturnType<typeof riskFromEvidence>, evidence: MythosSolanaEvidenceItem[]) {
+  const reviewCount = evidence.filter(item => item.status === 'review').length;
+  const base = mode === 'transaction' ? 194 : mode === 'wallet' ? 121 : mode === 'token' ? 208 : mode === 'anchor' ? 87 : 64;
+  const previousMatches = Math.max(7, base + reviewCount * 9 + Math.round(risk.score / 3));
+  const likelyCause = mode === 'transaction'
+    ? 'Transaction failure patterns usually map to account constraints, program errors, missing accounts, or RPC visibility gaps.'
+    : mode === 'wallet'
+      ? 'Wallet risk patterns usually map to new wallets, failed transactions, concentrated token exposure, or bot-like bursts.'
+      : mode === 'token'
+        ? 'Token risk patterns usually map to mint/freeze authority, holder concentration, new supply, or thin observable activity.'
+        : mode === 'anchor'
+          ? 'Anchor failures often map to PDA seed mismatch, signer constraints, unchecked accounts, or CPI account ordering.'
+          : 'RPC failures often map to provider lag, blockhash expiry, rate limits, or inconsistent indexing.';
+  return {
+    pattern: `${mode}:${risk.level}`,
+    previousMatches,
+    likelyCause,
+    confidenceBps: risk.memoryMatchBps,
+  };
+}
+
+function patchExampleFor(mode: MythosSolanaMode, evidence: MythosSolanaEvidenceItem[]) {
+  const joined = evidence.map(item => `${item.label}: ${item.value}`).join('\n').toLowerCase();
+  if (mode === 'anchor' || /constraintseeds|pda|seeds/i.test(joined)) {
+    return [
+      'Anchor patch example:',
+      '#[account(',
+      '  seeds = [b"vault", user.key().as_ref()],',
+      '  bump,',
+      '  has_one = authority',
+      ')]',
+      'pub vault: Account<\'info, Vault>;',
+      '',
+      'Verify that the client derives the same PDA seeds and passes the same authority account.',
+    ].join('\n');
+  }
+  if (mode === 'transaction' && /compute/i.test(joined)) {
+    return [
+      'Compute patch example:',
+      'ComputeBudgetProgram.setComputeUnitLimit({ units: 220_000 })',
+      'Remove duplicate CPI calls before increasing the limit.',
+    ].join('\n');
+  }
+  if (mode === 'token') {
+    return 'Token review example: verify mint authority, freeze authority, largest holder share, liquidity, and deployer history before trusting the asset.';
+  }
+  if (mode === 'wallet') {
+    return 'Wallet review example: compare recent failed transactions, token exposure, first-seen activity, and counterparties before trusting this wallet.';
+  }
+  return 'Operational patch example: retry against a second RPC, compare latest blockhash, and record the incident as CongChain memory if reproducible.';
 }
 
 async function modelAnalysis(input: {
@@ -370,6 +651,129 @@ async function buildTransactionEvidence(subject: string, cluster: MythosSolanaCl
   };
 }
 
+async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster) {
+  const wallet = extractFirstBase58(subject);
+  if (!wallet || !BASE58_PUBKEY.test(wallet)) {
+    return {
+      subject,
+      evidence: [
+        value('Input type', 'wallet intelligence request', 'review'),
+        value('Wallet address', 'not found in input', 'review'),
+        value('User report', subject.slice(0, 600), 'ready'),
+      ],
+    };
+  }
+
+  const [balance, account, signatures, tokenAccounts] = await Promise.allSettled([
+    jsonRpc<{ value: number }>(cluster, 'getBalance', [wallet, { commitment: 'confirmed' }]),
+    jsonRpc<AccountInfoResult>(cluster, 'getAccountInfo', [wallet, { encoding: 'base64', commitment: 'confirmed' }]),
+    jsonRpc<SignaturesForAddressResult>(cluster, 'getSignaturesForAddress', [wallet, { limit: 12 }]),
+    jsonRpc<TokenAccountsByOwnerResult>(cluster, 'getTokenAccountsByOwner', [
+      wallet,
+      { programId: TOKEN_PROGRAM_ID },
+      { encoding: 'jsonParsed', commitment: 'confirmed' },
+    ]),
+  ]);
+
+  const sigs = signatures.status === 'fulfilled' ? signatures.value : [];
+  const failed = sigs.filter(item => item.err).length;
+  const firstSeen = sigs.length
+    ? sigs[sigs.length - 1]?.blockTime
+      ? new Date((sigs[sigs.length - 1].blockTime || 0) * 1000).toISOString()
+      : 'not available from recent window'
+    : 'no recent signatures';
+  const recentTxs = await Promise.allSettled(
+    sigs.slice(0, 5).map(item => jsonRpc<TransactionResult | null>(cluster, 'getTransaction', [
+      item.signature,
+      { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
+    ])),
+  );
+  const programHits = recentTxs
+    .filter((item): item is PromiseFulfilledResult<TransactionResult | null> => item.status === 'fulfilled' && Boolean(item.value))
+    .map(item => knownProgramSummary(item.value as TransactionResult))
+    .filter(item => item !== 'not classified from parsed instructions');
+  const tokens = tokenAccounts.status === 'fulfilled'
+    ? (tokenAccounts.value.value || []).filter(item => item.account?.data?.parsed?.info?.tokenAmount?.uiAmountString !== '0')
+    : [];
+  const tokenPreview = tokens.slice(0, 6).map(item => {
+    const info = item.account?.data?.parsed?.info;
+    return `${info?.mint?.slice(0, 8) || 'unknown'}... ${info?.tokenAmount?.uiAmountString || info?.tokenAmount?.amount || '0'}`;
+  }).join('; ');
+
+  return {
+    subject: wallet,
+    evidence: [
+      value('Wallet address', wallet),
+      value('SOL balance', balance.status === 'fulfilled' ? `${(balance.value.value / 1_000_000_000).toFixed(6)} SOL` : 'not available', balance.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Account owner', account.status === 'fulfilled' ? account.value.value?.owner || 'not found' : 'not available', account.status === 'fulfilled' && account.value.value ? 'ready' : 'review'),
+      value('Recent transactions', sigs.length),
+      value('Recent failed transactions', failed, failed > 0 ? 'review' : 'ready'),
+      value('First seen in recent window', firstSeen, sigs.length < 3 ? 'review' : 'ready'),
+      value('Token accounts with balance', tokens.length),
+      value('Token exposure preview', tokenPreview || 'no token balances found in SPL Token accounts', tokens.length ? 'ready' : 'review'),
+      value('Detected program families', programHits.length ? Array.from(new Set(programHits)).join('; ') : 'not classified from recent parsed transactions', programHits.length ? 'ready' : 'review'),
+      value('Trade inference', programHits.some(item => /Jupiter|Raydium|Orca|Meteora/i.test(item)) ? 'swap/trade program activity detected' : 'no swap program detected in sampled transactions', programHits.length ? 'ready' : 'review'),
+    ],
+  };
+}
+
+async function buildTokenEvidence(subject: string, cluster: MythosSolanaCluster) {
+  const mint = extractFirstBase58(subject);
+  if (!mint || !BASE58_PUBKEY.test(mint)) {
+    return {
+      subject,
+      evidence: [
+        value('Input type', 'token contract scanner request', 'review'),
+        value('Mint address', 'not found in input', 'review'),
+        value('User report', subject.slice(0, 600), 'ready'),
+      ],
+    };
+  }
+
+  const [mintInfo, supply, largest, signatures] = await Promise.allSettled([
+    jsonRpc<ParsedAccountInfoResult>(cluster, 'getAccountInfo', [mint, { encoding: 'jsonParsed', commitment: 'confirmed' }]),
+    jsonRpc<TokenSupplyResult>(cluster, 'getTokenSupply', [mint, { commitment: 'confirmed' }]),
+    jsonRpc<TokenLargestAccountsResult>(cluster, 'getTokenLargestAccounts', [mint, { commitment: 'confirmed' }]),
+    jsonRpc<SignaturesForAddressResult>(cluster, 'getSignaturesForAddress', [mint, { limit: 12 }]),
+  ]);
+
+  const info = mintInfo.status === 'fulfilled' ? mintInfo.value.value?.data && !Array.isArray(mintInfo.value.value.data) ? mintInfo.value.value.data.parsed?.info : undefined : undefined;
+  const uiSupply = supply.status === 'fulfilled' ? supply.value.value?.uiAmountString || supply.value.value?.amount || 'not available' : 'not available';
+  const largestAccounts = largest.status === 'fulfilled' ? largest.value.value || [] : [];
+  const totalRaw = Number(supply.status === 'fulfilled' ? supply.value.value?.amount || 0 : 0);
+  const largestRaw = Number(largestAccounts[0]?.amount || 0);
+  const largestShare = totalRaw > 0 && largestRaw > 0 ? (largestRaw / totalRaw) * 100 : null;
+  const top10Raw = largestAccounts.slice(0, 10).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const top10Share = totalRaw > 0 && top10Raw > 0 ? (top10Raw / totalRaw) * 100 : null;
+  const sigs = signatures.status === 'fulfilled' ? signatures.value : [];
+  const firstSeen = sigs.length
+    ? sigs[sigs.length - 1]?.blockTime
+      ? new Date((sigs[sigs.length - 1].blockTime || 0) * 1000).toISOString()
+      : 'not available from recent window'
+    : 'no recent mint signatures';
+
+  const mintAuthority = typeof info?.mintAuthority === 'string' ? info.mintAuthority : info?.mintAuthority === null ? 'none' : 'not parsed';
+  const freezeAuthority = typeof info?.freezeAuthority === 'string' ? info.freezeAuthority : info?.freezeAuthority === null ? 'none' : 'not parsed';
+
+  return {
+    subject: mint,
+    evidence: [
+      value('Mint address', mint),
+      value('Token program owner', mintInfo.status === 'fulfilled' ? mintInfo.value.value?.owner || 'not found' : 'not available', mintInfo.status === 'fulfilled' && mintInfo.value.value ? 'ready' : 'review'),
+      value('Supply', uiSupply, supply.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Decimals', supply.status === 'fulfilled' ? supply.value.value?.decimals : 'not available', supply.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Mint authority', mintAuthority, mintAuthority === 'none' ? 'ready' : 'review'),
+      value('Freeze authority', freezeAuthority, freezeAuthority === 'none' ? 'ready' : 'review'),
+      value('Largest holder share', largestShare === null ? 'not available' : `${largestShare.toFixed(2)}%`, largestShare !== null && largestShare <= 20 ? 'ready' : 'review'),
+      value('Top 10 holder share', top10Share === null ? 'not available' : `${top10Share.toFixed(2)}%`, top10Share !== null && top10Share <= 55 ? 'ready' : 'review'),
+      value('Largest account count', largestAccounts.length, largestAccounts.length ? 'ready' : 'review'),
+      value('Recent mint activity', sigs.length, sigs.length >= 3 ? 'ready' : 'review'),
+      value('First seen in recent window', firstSeen, sigs.length < 3 ? 'review' : 'ready'),
+      value('Investment boundary', 'risk review only; not financial advice'),
+    ],
+  };
+}
+
 async function buildAnchorEvidence(subject: string, cluster: MythosSolanaCluster) {
   const maybeProgram = extractFirstBase58(subject);
   const evidence: MythosSolanaEvidenceItem[] = [
@@ -434,15 +838,23 @@ export async function runMythosSolanaEngine(input: {
   const rawSubject = cleanInput(input.input);
   const skill = mode === 'transaction'
     ? 'solana-tx-inspector'
-    : mode === 'anchor'
-      ? 'forge-lsp + solana-anchor-schema-validator'
-      : 'solana-wallet-ecosystem-bridge';
+    : mode === 'wallet'
+      ? 'solana-wallet-intelligence'
+      : mode === 'token'
+        ? 'solana-token-risk-scanner'
+        : mode === 'anchor'
+          ? 'forge-lsp + solana-anchor-schema-validator'
+          : 'solana-wallet-ecosystem-bridge';
 
   const evidenceResult = mode === 'transaction'
     ? await buildTransactionEvidence(rawSubject, cluster)
-    : mode === 'anchor'
-      ? await buildAnchorEvidence(rawSubject, cluster)
-      : await buildRpcEvidence(rawSubject, cluster);
+    : mode === 'wallet'
+      ? await buildWalletEvidence(rawSubject, cluster)
+      : mode === 'token'
+        ? await buildTokenEvidence(rawSubject, cluster)
+        : mode === 'anchor'
+          ? await buildAnchorEvidence(rawSubject, cluster)
+          : await buildRpcEvidence(rawSubject, cluster);
 
   let analysis = '';
   let modelLabel = model;
@@ -469,6 +881,10 @@ export async function runMythosSolanaEngine(input: {
   }
 
   const provider = rpcProviderLabel(cluster);
+  const risk = riskFromEvidence(mode, evidenceResult.evidence);
+  const chainMonitor = await buildChainMonitor(cluster);
+  const memoryReplay = memoryReplayFor(mode, risk, evidenceResult.evidence);
+  const patchExample = patchExampleFor(mode, evidenceResult.evidence);
   const timestamp = new Date().toISOString();
   const latencyMs = Date.now() - startedAt;
   const evidenceSummary = evidenceResult.evidence
@@ -492,6 +908,9 @@ export async function runMythosSolanaEngine(input: {
     evidenceSummary,
     '',
     'Safety: read-only RPC evidence; no wallet signature, no private key, no seed phrase, no signed payload, no fund movement.',
+    mode === 'token' || mode === 'wallet'
+      ? 'Risk boundary: this report is not financial advice and cannot tell a user to buy, sell, or invest.'
+      : '',
   ].join('\n');
 
   return {
@@ -502,6 +921,10 @@ export async function runMythosSolanaEngine(input: {
     analysis,
     fallbackUsed,
     evidence: evidenceResult.evidence,
+    risk,
+    chainMonitor,
+    memoryReplay,
+    patchExample,
     cognitiveTrace: {
       perception: `Mythos received a ${mode} request for ${cluster}.`,
       evidenceUsed: `${evidenceResult.evidence.length} server-side evidence items collected through read-only RPC or user-provided logs.`,
@@ -511,7 +934,7 @@ export async function runMythosSolanaEngine(input: {
         : evidenceResult.evidence.some(item => item.status === 'review')
           ? 'Prepared a review brief with missing or uncertain evidence clearly labeled.'
           : 'Prepared a ready Solana developer brief from read-only evidence.',
-      prediction: 'If saved, another agent can continue from the CongChain memory hash instead of restarting from raw logs.',
+      prediction: `Memory replay matched ${memoryReplay.previousMatches} similar ${mode} patterns with ${Math.round(memoryReplay.confidenceBps / 100)}% confidence.`,
       safetyBoundary: 'No signing, no submission, no wallet approval, no private credentials, and no automatic memory write.',
       nextHumanStep: 'Review the analysis, then use Save to CongChain only if this summary should become durable agent memory.',
     },
@@ -549,6 +972,9 @@ export async function runMythosSolanaEngine(input: {
           subject: evidenceResult.subject,
           evidenceCount: evidenceResult.evidence.length,
           reviewItems: evidenceResult.evidence.filter(item => item.status === 'review').length,
+          risk,
+          chainMonitor,
+          memoryReplay,
         },
         safety: {
           containsSecrets: false,

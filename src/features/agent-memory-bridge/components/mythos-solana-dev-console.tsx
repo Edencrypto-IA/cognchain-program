@@ -2,23 +2,27 @@
 
 import { useMemo, useState } from 'react';
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   Brain,
   CheckCircle2,
+  Coins,
   Copy,
-  ExternalLink,
+  Gauge,
   KeyRound,
   Loader2,
+  Radar,
   Save,
   ShieldCheck,
   TerminalSquare,
+  Wallet,
   Wrench,
   Zap,
 } from 'lucide-react';
 import { MYTHOS_AGENT_PROFILE, MYTHOS_RUNTIME_PROOF } from '../mythos';
 
-type DemoMode = 'transaction' | 'anchor' | 'rpc';
+type DemoMode = 'transaction' | 'wallet' | 'token' | 'anchor' | 'rpc';
 type Cluster = 'mainnet' | 'devnet';
 
 type EvidenceItem = {
@@ -35,6 +39,29 @@ type EngineResult = {
   analysis: string;
   fallbackUsed: boolean;
   evidence: EvidenceItem[];
+  risk: {
+    level: 'safe' | 'suspicious' | 'exploit_risk' | 'review';
+    score: number;
+    confidenceBps: number;
+    memoryMatchBps: number;
+    summary: string;
+    signals: string[];
+  };
+  chainMonitor: {
+    status: 'live' | 'degraded' | 'review';
+    cluster: Cluster;
+    provider: 'helius' | 'solana-rpc';
+    slotLabel: string;
+    blockHeightLabel: string;
+    versionLabel: string;
+  };
+  memoryReplay: {
+    pattern: string;
+    previousMatches: number;
+    likelyCause: string;
+    confidenceBps: number;
+  };
+  patchExample?: string;
   cognitiveTrace: {
     perception: string;
     evidenceUsed: string;
@@ -85,13 +112,33 @@ const MODES: Array<{
 }> = [
   {
     id: 'transaction',
-    title: 'Analyze Transaction',
+    title: 'Explain Transaction',
     eyebrow: 'TX DEBUG',
     description: 'Paste a Solana transaction signature or describe a failed transaction. Mythos fetches read-only RPC evidence.',
     placeholder: 'Paste tx signature or describe the failure, e.g. "custom program error 0x1 after token transfer"...',
     endpoint: '/api/mythos/solana/analyze-transaction',
     skill: 'solana-tx-inspector',
     value: 'Best for support teams, RPC providers, wallets, and Solana app developers.',
+  },
+  {
+    id: 'wallet',
+    title: 'Wallet Intelligence',
+    eyebrow: 'WALLET RISK',
+    description: 'Paste a Phantom/Solflare wallet address. Mythos reviews balance, recent activity, token exposure, failures, and trade signals.',
+    placeholder: 'Paste wallet address, e.g. a Phantom or Solflare public address...',
+    endpoint: '/api/mythos/solana/analyze-wallet',
+    skill: 'solana-wallet-intelligence',
+    value: 'Best for user support, wallet trust review, token exposure checks, and activity profiling.',
+  },
+  {
+    id: 'token',
+    title: 'Token Risk Scanner',
+    eyebrow: 'MINT SCAN',
+    description: 'Paste a token mint address. Mythos checks supply, mint/freeze authority, holder concentration, and recent activity.',
+    placeholder: 'Paste token mint address...',
+    endpoint: '/api/mythos/solana/analyze-token',
+    skill: 'solana-token-risk-scanner',
+    value: 'Best for token due diligence, holder distribution review, authority checks, and rug-risk triage.',
   },
   {
     id: 'anchor',
@@ -116,11 +163,19 @@ const MODES: Array<{
 ];
 
 const KILLER_POINTS = [
-  'Solana-native debugging surface instead of generic chat.',
+  'Solana-native copilot surface instead of generic chat.',
   'Helius or Solana RPC evidence stays server-side and redacted.',
   'Every approved analysis can become hash-addressable CongChain memory.',
   'Another agent can continue from the proof instead of restarting context.',
   'No wallet signing, funds movement, provider secrets, or hidden credentials.',
+  'Wallet and token reviews are risk intelligence only, never investment advice.',
+];
+
+const LIVE_LOGS = [
+  '[PERCEPTION] Solana input classified',
+  '[EVIDENCE] Read-only RPC proof collected',
+  '[PREDICTION] Risk pattern compared with memory replay',
+  '[MEMORY] Ready for CongChain hash if approved',
 ];
 
 function short(value: string, length = 18) {
@@ -131,6 +186,20 @@ function statusClass(status: EvidenceItem['status']) {
   if (status === 'ready') return 'border-[#14F195]/18 bg-[#14F195]/[0.06] text-[#14F195]';
   if (status === 'blocked') return 'border-[#FF5C8A]/18 bg-[#FF5C8A]/[0.06] text-[#FF7AA2]';
   return 'border-[#FACC15]/18 bg-[#FACC15]/[0.06] text-[#FACC15]';
+}
+
+function riskClass(level: EngineResult['risk']['level']) {
+  if (level === 'safe') return 'border-[#14F195]/24 bg-[#14F195]/[0.08] text-[#14F195]';
+  if (level === 'review') return 'border-[#FACC15]/24 bg-[#FACC15]/[0.08] text-[#FACC15]';
+  if (level === 'suspicious') return 'border-[#FF8A3D]/24 bg-[#FF8A3D]/[0.08] text-[#FFB36D]';
+  return 'border-[#FF5C8A]/24 bg-[#FF5C8A]/[0.08] text-[#FF7AA2]';
+}
+
+function riskLabel(level: EngineResult['risk']['level']) {
+  if (level === 'safe') return 'SAFE';
+  if (level === 'review') return 'REVIEW';
+  if (level === 'suspicious') return 'SUSPICIOUS';
+  return 'EXPLOIT RISK';
 }
 
 function buildLocalBrief(mode: typeof MODES[number], input: string, cluster: Cluster) {
@@ -264,13 +333,13 @@ export default function MythosSolanaDevConsole() {
                 Mythos for Solana Developers
               </h1>
               <p className="mt-4 max-w-4xl text-sm leading-6 text-white/62 sm:text-base">
-                A focused console for transaction debugging, Anchor program review, wallet/RPC explanations, and hash-addressable CongChain memory.
+                AI-native observability for Solana builders: transaction debugging, wallet intelligence, token risk, Anchor review, RPC triage, and hash-addressable CongChain memory.
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {[
+                  ['Scanning', 'Solana Mainnet'],
+                  ['Learning from', `${MYTHOS_RUNTIME_PROOF.installedCongChainSkills} CongChain skills`],
                   ['Memory proof', short(MYTHOS_RUNTIME_PROOF.shortHash, 16)],
-                  ['Runtime skills', `${MYTHOS_RUNTIME_PROOF.totalRuntimeSkillsEnabled} enabled`],
-                  ['CongChain skills', `${MYTHOS_RUNTIME_PROOF.installedCongChainSkills} installed`],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-2xl border border-white/8 bg-black/26 p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">{label}</p>
@@ -278,6 +347,36 @@ export default function MythosSolanaDevConsole() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="rounded-2xl border border-[#14F195]/18 bg-[radial-gradient(circle_at_left,rgba(20,241,149,0.10),transparent_28%),rgba(3,12,9,0.86)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#14F195]">Mythos status</p>
+                <h2 className="mt-1 text-2xl font-black">Scanning Solana. Learning from verifiable memory.</h2>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-xl border border-[#14F195]/20 bg-[#14F195]/10 px-3 py-2 text-xs font-black text-[#14F195]">
+                <Activity className="h-4 w-4" />
+                LIVE COPILOT
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-4">
+              {LIVE_LOGS.map(item => (
+                <div key={item} className="rounded-xl border border-white/8 bg-black/20 p-3 font-mono text-[11px] leading-5 text-white/55">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Threat system</p>
+            <div className="mt-3 grid gap-2 text-xs">
+              <div className="rounded-xl border border-[#14F195]/18 bg-[#14F195]/[0.05] p-3 text-[#14F195]">SAFE: normal evidence</div>
+              <div className="rounded-xl border border-[#FACC15]/18 bg-[#FACC15]/[0.05] p-3 text-[#FACC15]">REVIEW: incomplete or uncertain</div>
+              <div className="rounded-xl border border-[#FF5C8A]/18 bg-[#FF5C8A]/[0.05] p-3 text-[#FF7AA2]">EXPLOIT RISK: blocked until human review</div>
             </div>
           </div>
         </section>
@@ -309,7 +408,7 @@ export default function MythosSolanaDevConsole() {
                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#76FF03]">{item.eyebrow}</p>
                         <h2 className="mt-1 text-base font-black text-white">{item.title}</h2>
                       </div>
-                      {selected ? <CheckCircle2 className="h-5 w-5 text-[#76FF03]" /> : <Wrench className="h-5 w-5 text-white/28" />}
+                      {selected ? <CheckCircle2 className="h-5 w-5 text-[#76FF03]" /> : item.id === 'wallet' ? <Wallet className="h-5 w-5 text-white/28" /> : item.id === 'token' ? <Coins className="h-5 w-5 text-white/28" /> : <Wrench className="h-5 w-5 text-white/28" />}
                     </div>
                     <p className="mt-2 text-xs leading-5 text-white/50">{item.description}</p>
                   </button>
@@ -341,6 +440,13 @@ export default function MythosSolanaDevConsole() {
                   <option value="claude">Claude</option>
                 </select>
               </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-[#FACC15]/18 bg-[#FACC15]/[0.045] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FACC15]">Risk boundary</p>
+              <p className="mt-2 text-xs leading-5 text-white/56">
+                Wallet and token scans explain public on-chain evidence. Mythos does not tell users to buy, sell, invest, or trust a token.
+              </p>
             </div>
           </aside>
 
@@ -413,11 +519,43 @@ export default function MythosSolanaDevConsole() {
                       <span className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-white/62">
                         {result.observability.latencyMs}ms
                       </span>
+                      <span className={`rounded-xl border px-3 py-2 text-xs font-black ${riskClass(result.risk.level)}`}>
+                        {riskLabel(result.risk.level)}
+                      </span>
                     </div>
                   </div>
                   <pre className="mt-4 max-w-full whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-[#030306] p-4 text-sm leading-6 text-white/72 [overflow-wrap:anywhere]">
                     {result.analysis}
                   </pre>
+
+                  {(result.mode === 'wallet' || result.mode === 'token') ? (
+                    <div className="mt-4 rounded-2xl border border-[#FACC15]/18 bg-[#FACC15]/[0.045] p-4">
+                      <div className="flex gap-3">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#FACC15]" />
+                        <p className="text-xs leading-5 text-white/58">
+                          This is public on-chain risk intelligence only. It is not financial advice, not a buy/sell signal, and not proof that an asset is safe.
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <div className={`rounded-2xl border p-4 ${riskClass(result.risk.level)}`}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em]">Threat level</p>
+                      <p className="mt-2 text-3xl font-black">{result.risk.score}</p>
+                      <p className="mt-1 text-xs font-bold">{riskLabel(result.risk.level)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.05] p-4 text-[#7DE4FF]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em]">AI confidence</p>
+                      <p className="mt-2 text-3xl font-black">{Math.round(result.risk.confidenceBps / 100)}%</p>
+                      <p className="mt-1 text-xs font-bold">evidence-bound</p>
+                    </div>
+                    <div className="rounded-2xl border border-[#A855F7]/18 bg-[#A855F7]/[0.05] p-4 text-[#C084FC]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em]">Memory match</p>
+                      <p className="mt-2 text-3xl font-black">{Math.round(result.risk.memoryMatchBps / 100)}%</p>
+                      <p className="mt-1 text-xs font-bold">{result.memoryReplay.previousMatches} similar patterns</p>
+                    </div>
+                  </div>
 
                   <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
                     {result.evidence.map(item => (
@@ -435,6 +573,61 @@ export default function MythosSolanaDevConsole() {
                 </div>
 
                 <aside className="grid min-w-0 gap-4">
+                  <div className="rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Live chain monitor</p>
+                    <div className="mt-3 grid gap-2 text-xs leading-5 text-white/58">
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
+                        <span>Cluster</span>
+                        <strong className="text-white/78">{result.chainMonitor.cluster}</strong>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
+                        <span>Provider</span>
+                        <strong className="text-white/78">{result.chainMonitor.provider}</strong>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
+                        <span>Slot</span>
+                        <strong className="text-white/78">{result.chainMonitor.slotLabel}</strong>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
+                        <span>Version</span>
+                        <strong className="text-white/78">{result.chainMonitor.versionLabel}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#A855F7]/18 bg-[#A855F7]/[0.045] p-4">
+                    <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#C084FC]">
+                      <Radar className="h-4 w-4" />
+                      Memory replay
+                    </p>
+                    <p className="mt-3 text-sm font-bold text-white">{result.memoryReplay.pattern}</p>
+                    <p className="mt-2 text-xs leading-5 text-white/56">{result.memoryReplay.likelyCause}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#FACC15]/18 bg-[#FACC15]/[0.045] p-4">
+                    <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#FACC15]">
+                      <Gauge className="h-4 w-4" />
+                      Risk signals
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-white/56">{result.risk.summary}</p>
+                    <div className="mt-3 grid gap-2">
+                      {result.risk.signals.map(signal => (
+                        <div key={signal} className="rounded-xl border border-white/8 bg-black/20 p-3 text-xs leading-5 text-white/58">
+                          {signal}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {result.patchExample ? (
+                    <div className="rounded-2xl border border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.045] p-4">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Suggested fix / review</p>
+                      <pre className="mt-3 max-w-full whitespace-pre-wrap break-words rounded-xl border border-white/8 bg-black/24 p-3 text-xs leading-5 text-white/62 [overflow-wrap:anywhere]">
+                        {result.patchExample}
+                      </pre>
+                    </div>
+                  ) : null}
+
                   <div className="rounded-2xl border border-[#14F195]/18 bg-[#14F195]/[0.035] p-4">
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-[#14F195]">Cognitive trace</p>
                     {Object.entries(result.cognitiveTrace).map(([label, value]) => (

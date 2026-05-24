@@ -84,10 +84,23 @@ The goal is simple: any serious autonomous agent should be able to create memory
 - **Mythos Lab** at `/mythos/lab` for safe browser-based testing.
 - **Mythos Solana Developer Console** at `/mythos/solana` with a real server-side engine for:
   - transaction signature analysis through read-only Solana RPC or Helius;
+  - wallet intelligence for public Phantom/Solflare addresses, including SOL balance, recent activity, failed transactions, token exposure, and sampled program families;
+  - token mint risk scanning, including supply, decimals, mint authority, freeze authority, holder concentration, and recent mint activity;
   - Anchor/program debugging from logs, program IDs, and account evidence;
   - wallet/RPC issue explanation using live health, version, epoch, and blockhash checks;
+  - threat level, AI confidence, memory match, live chain monitor, and memory replay cards;
   - cognitive trace output covering perception, evidence, skill, decision, prediction, boundary, and next step;
   - explicit "Save to CongChain" flow that writes only an approved summary through `POST /api/memory/write`.
+
+New Solana copilot endpoints:
+
+- `POST /api/mythos/solana/analyze-transaction`
+- `POST /api/mythos/solana/analyze-wallet`
+- `POST /api/mythos/solana/analyze-token`
+- `POST /api/mythos/solana/debug-anchor`
+- `POST /api/mythos/solana/explain-rpc`
+
+Wallet and token scans are public on-chain risk intelligence only. They do not provide financial advice, trading instructions, wallet signatures, transaction submission, or fund movement.
 - **CongChain skill pack for Mythos** under `integrations/mythos/skills/congchain`.
 - **Runtime adapter skeleton** under `integrations/mythos/plugins/congchain-adapter`.
 - **NVIDIA router skill/plugin draft** for model-routing recommendations without pretending to override unsupported runtime internals.

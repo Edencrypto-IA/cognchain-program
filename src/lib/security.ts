@@ -28,6 +28,8 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/forge/chat': { windowMs: 60_000, maxRequests: 15 },
   '/api/mythos/test-chat': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/analyze-transaction': { windowMs: 60_000, maxRequests: 12 },
+  '/api/mythos/solana/analyze-wallet': { windowMs: 60_000, maxRequests: 12 },
+  '/api/mythos/solana/analyze-token': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/debug-anchor': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/explain-rpc': { windowMs: 60_000, maxRequests: 12 },
   '/api/compare': { windowMs: 60_000, maxRequests: 5 },
