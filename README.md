@@ -116,7 +116,7 @@ Current audited inventory for the Mythos integration:
 | Area | Count | Meaning |
 |---|---:|---|
 | Skills | 168 | Core and optional skills available to the Mythos runtime |
-| CongChain skills | 18 | Official skills for bridge, audit, memory search, Solana review, routing, export, rollback, and governance |
+| CongChain skills | 22 | Official skills for bridge, audit, memory search, Solana review, Web3 research, deployment, orchestration, export, rollback, and governance |
 | Memory providers | 9 | 8 original memory providers plus CognChain as the verifiable memory layer |
 | LLM providers | 28 | Multi-provider model access for reasoning, coding, research, and long-context work |
 | Messaging platforms | 19 | External channels supported by the Mythos ecosystem when configured |
