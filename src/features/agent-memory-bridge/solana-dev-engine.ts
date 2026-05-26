@@ -229,6 +229,51 @@ type DasAssetsByOwnerResult = {
   }>;
 };
 
+type SolscanAccountDetailResult = {
+  success?: boolean;
+  data?: {
+    sol_balance?: number;
+    lamports?: number;
+    token_count?: number;
+    total_value?: number;
+    type?: string;
+    owner_program?: string;
+    is_oncurve?: boolean;
+  };
+};
+
+type SolscanAccountPortfolioResult = {
+  success?: boolean;
+  data?: {
+    total_value?: number;
+    tokens?: Array<{
+      token_address?: string;
+      token_name?: string;
+      token_symbol?: string;
+      amount?: number | string;
+      value?: number;
+    }>;
+  } | Array<{
+    tokenAddress?: string;
+    tokenName?: string;
+    tokenSymbol?: string;
+    amount?: number | string;
+    value?: number;
+  }>;
+};
+
+type SolscanAccountTransactionsResult = {
+  success?: boolean;
+  data?: Array<{
+    trans_id?: string;
+    block_time?: number;
+    activity_type?: string;
+    token_address?: string;
+    amount?: number | string;
+    value?: number;
+  }>;
+};
+
 type EpochInfoResult = {
   blockHeight?: number;
   epoch?: number;
@@ -327,6 +372,33 @@ async function jsonRpc<T>(cluster: MythosSolanaCluster, method: string, params: 
   return data.result as T;
 }
 
+function solscanBaseUrl(): string {
+  return (process.env.SOLSCAN_API_BASE || 'https://pro-api.solscan.io/v2.0').replace(/\/$/, '');
+}
+
+async function solscanGet<T>(path: string, params: Record<string, string | number>): Promise<T> {
+  const url = new URL(`${solscanBaseUrl()}${path}`);
+  Object.entries(params).forEach(([key, input]) => url.searchParams.set(key, String(input)));
+
+  const headers: HeadersInit = { accept: 'application/json' };
+  if (process.env.SOLSCAN_API_KEY) {
+    headers.token = process.env.SOLSCAN_API_KEY;
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers,
+    cache: 'no-store',
+    signal: AbortSignal.timeout(12_000),
+  });
+
+  const data = await response.json().catch(() => null) as T | null;
+  if (!response.ok || !data) {
+    throw new Error(`Solscan ${path} failed with ${response.status}`);
+  }
+  return data;
+}
+
 function value(label: string, input: unknown, status: MythosSolanaEvidenceItem['status'] = 'ready'): MythosSolanaEvidenceItem {
   const rendered = input === undefined || input === null || input === ''
     ? 'not available'
@@ -342,6 +414,12 @@ function tokenAmountIsNonZero(value: string | undefined): boolean {
   if (!value) return false;
   if (/^0(?:\.0+)?$/.test(value)) return false;
   return Number(value) > 0 || /^[1-9]/.test(value);
+}
+
+function solscanPortfolioItems(input: SolscanAccountPortfolioResult | undefined) {
+  const data = input?.data;
+  if (!data || Array.isArray(data)) return Array.isArray(data) ? data : [];
+  return data.tokens || [];
 }
 
 function normalizeLogs(logs: string[] | null | undefined): string[] {
@@ -753,7 +831,7 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
     };
   }
 
-  const [balance, account, signatures, tokenAccounts, token2022Accounts, indexedAssets] = await Promise.allSettled([
+  const [balance, account, signatures, tokenAccounts, token2022Accounts, indexedAssets, solscanDetail, solscanPortfolio, solscanTransactions] = await Promise.allSettled([
     jsonRpc<{ value: number }>(cluster, 'getBalance', [wallet, { commitment: 'confirmed' }]),
     jsonRpc<AccountInfoResult>(cluster, 'getAccountInfo', [wallet, { encoding: 'base64', commitment: 'confirmed' }]),
     jsonRpc<SignaturesForAddressResult>(cluster, 'getSignaturesForAddress', [wallet, { limit: 20, commitment: 'confirmed' }]),
@@ -779,6 +857,21 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
         },
       },
     ]),
+    cluster === 'mainnet'
+      ? solscanGet<SolscanAccountDetailResult>('/account/detail', { address: wallet })
+      : Promise.reject(new Error('Solscan mainnet only')),
+    cluster === 'mainnet'
+      ? solscanGet<SolscanAccountPortfolioResult>('/account/portfolio', { address: wallet })
+      : Promise.reject(new Error('Solscan mainnet only')),
+    cluster === 'mainnet'
+      ? solscanGet<SolscanAccountTransactionsResult>('/account/transactions', {
+        address: wallet,
+        page: 1,
+        page_size: 10,
+        sort_by: 'block_time',
+        sort_order: 'desc',
+      })
+      : Promise.reject(new Error('Solscan mainnet only')),
   ]);
 
   const sigs = signatures.status === 'fulfilled' ? signatures.value : [];
@@ -825,9 +918,28 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
       : '';
     return `${symbol} ${balanceLabel}${valueLabel}`;
   }).join('; ');
-  const tokenCount = Math.max(tokens.length, indexedTokens.length);
+  const solscanDetailData = solscanDetail.status === 'fulfilled' ? solscanDetail.value.data : undefined;
+  const solscanPortfolioData = solscanPortfolio.status === 'fulfilled' ? solscanPortfolio.value : undefined;
+  const solscanTokens = solscanPortfolioItems(solscanPortfolioData).filter(item => {
+    const amount = 'amount' in item ? item.amount : undefined;
+    return tokenAmountIsNonZero(String(amount || '0'));
+  });
+  const solscanTokenPreview = solscanTokens.slice(0, 6).map(item => {
+    const symbol = 'token_symbol' in item
+      ? item.token_symbol || item.token_name || item.token_address?.slice(0, 8)
+      : item.tokenSymbol || item.tokenName || item.tokenAddress?.slice(0, 8);
+    const amount = 'amount' in item ? item.amount : '0';
+    const valueAmount = 'value' in item && typeof item.value === 'number' ? ` ~$${item.value.toFixed(2)}` : '';
+    return `${symbol || 'asset'} ${String(amount || '0')}${valueAmount}`;
+  }).join('; ');
+  const solscanRecentTxs = solscanTransactions.status === 'fulfilled'
+    ? solscanTransactions.value.data || []
+    : [];
+  const tokenCount = Math.max(tokens.length, indexedTokens.length, solscanTokens.length, Number(solscanDetailData?.token_count || 0));
   const tokenEvidenceSource = indexedTokens.length > tokens.length
     ? 'Helius DAS indexed assets'
+    : solscanTokens.length > tokens.length
+      ? 'Solscan portfolio index'
     : tokens.length
       ? 'Solana parsed token accounts'
       : indexedAssets.status === 'fulfilled'
@@ -837,10 +949,20 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
     ? Number(indexedAssets.value.nativeBalance?.lamports || 0)
     : 0;
   const rpcLamports = balance.status === 'fulfilled' ? Number(balance.value.value || 0) : 0;
-  const bestLamports = Math.max(rpcLamports, indexedNativeLamports);
-  const solBalanceLabel = balance.status === 'fulfilled' || indexedNativeLamports > 0
+  const solscanLamports = Number(solscanDetailData?.lamports || 0);
+  const solscanSolBalance = Number(solscanDetailData?.sol_balance || 0);
+  const solscanBalanceLamports = solscanLamports || Math.round(solscanSolBalance * 1_000_000_000);
+  const bestLamports = Math.max(rpcLamports, indexedNativeLamports, solscanBalanceLamports);
+  const solBalanceLabel = balance.status === 'fulfilled' || indexedNativeLamports > 0 || solscanBalanceLamports > 0
     ? `${(bestLamports / 1_000_000_000).toFixed(6)} SOL`
     : 'not available';
+  const crossCheckStatus = [
+    balance.status === 'fulfilled' ? 'RPC balance ready' : 'RPC balance unavailable',
+    indexedAssets.status === 'fulfilled' ? 'Helius DAS ready' : 'Helius DAS unavailable',
+    solscanDetail.status === 'fulfilled' || solscanPortfolio.status === 'fulfilled' || solscanTransactions.status === 'fulfilled'
+      ? 'Solscan cross-check ready'
+      : 'Solscan cross-check unavailable',
+  ].join('; ');
 
   return {
     subject: wallet,
@@ -848,14 +970,20 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
       value('Wallet address', wallet),
       value('Cluster checked', cluster),
       value('RPC source', rpcProviderLabel(cluster)),
-      value('SOL balance', solBalanceLabel, balance.status === 'fulfilled' || indexedNativeLamports > 0 ? 'ready' : 'review'),
-      value('Account owner', account.status === 'fulfilled' ? account.value.value?.owner || 'not found' : 'not available', account.status === 'fulfilled' && account.value.value ? 'ready' : 'review'),
-      value('Recent transactions', sigs.length),
+      value('Cross-source check', crossCheckStatus, solscanDetail.status === 'fulfilled' || indexedAssets.status === 'fulfilled' || balance.status === 'fulfilled' ? 'ready' : 'review'),
+      value('SOL balance', solBalanceLabel, balance.status === 'fulfilled' || indexedNativeLamports > 0 || solscanBalanceLamports > 0 ? 'ready' : 'review'),
+      value('Portfolio value', typeof solscanDetailData?.total_value === 'number'
+        ? `$${solscanDetailData.total_value.toFixed(2)}`
+        : solscanPortfolio.status === 'fulfilled' && !Array.isArray(solscanPortfolio.value.data) && typeof solscanPortfolio.value.data?.total_value === 'number'
+          ? `$${solscanPortfolio.value.data.total_value.toFixed(2)}`
+          : 'not available', solscanDetailData?.total_value || (solscanPortfolio.status === 'fulfilled' && !Array.isArray(solscanPortfolio.value.data) && solscanPortfolio.value.data?.total_value) ? 'ready' : 'review'),
+      value('Account owner', account.status === 'fulfilled' ? account.value.value?.owner || solscanDetailData?.owner_program || 'not found' : solscanDetailData?.owner_program || 'not available', account.status === 'fulfilled' && account.value.value || solscanDetailData?.owner_program ? 'ready' : 'review'),
+      value('Recent transactions', Math.max(sigs.length, solscanRecentTxs.length)),
       value('Recent failed transactions', failed, failed > 0 ? 'review' : 'ready'),
       value('First seen in recent window', firstSeen, sigs.length < 3 ? 'review' : 'ready'),
       value('Token accounts with balance', tokenCount),
       value('Token evidence source', tokenEvidenceSource, indexedAssets.status === 'fulfilled' || tokens.length ? 'ready' : 'review'),
-      value('Token exposure preview', indexedTokenPreview || tokenPreview || 'no token balances found in indexed or SPL Token accounts', tokenCount ? 'ready' : 'review'),
+      value('Token exposure preview', solscanTokenPreview || indexedTokenPreview || tokenPreview || 'no token balances found in indexed or SPL Token accounts', tokenCount ? 'ready' : 'review'),
       value('Detected program families', programHits.length ? Array.from(new Set(programHits)).join('; ') : 'not classified from recent parsed transactions', programHits.length ? 'ready' : 'review'),
       value('Trade inference', programHits.some(item => /Jupiter|Raydium|Orca|Meteora/i.test(item)) ? 'swap/trade program activity detected' : 'no swap program detected in sampled transactions', programHits.length ? 'ready' : 'review'),
     ],
