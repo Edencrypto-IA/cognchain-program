@@ -1,5 +1,6 @@
 import { callModel } from '@/services/ai';
 import { Limits, ValidationError, validateModel } from '@/lib/security';
+import { solscanGet } from '@/lib/solana/solscan';
 
 export type MythosSolanaMode = 'transaction' | 'wallet' | 'token' | 'anchor' | 'rpc';
 export type MythosSolanaCluster = 'mainnet' | 'devnet';
@@ -370,33 +371,6 @@ async function jsonRpc<T>(cluster: MythosSolanaCluster, method: string, params: 
     throw new Error(data.error?.message || `RPC ${method} failed`);
   }
   return data.result as T;
-}
-
-function solscanBaseUrl(): string {
-  return (process.env.SOLSCAN_API_BASE || 'https://pro-api.solscan.io/v2.0').replace(/\/$/, '');
-}
-
-async function solscanGet<T>(path: string, params: Record<string, string | number>): Promise<T> {
-  const url = new URL(`${solscanBaseUrl()}${path}`);
-  Object.entries(params).forEach(([key, input]) => url.searchParams.set(key, String(input)));
-
-  const headers: HeadersInit = { accept: 'application/json' };
-  if (process.env.SOLSCAN_API_KEY) {
-    headers.token = process.env.SOLSCAN_API_KEY;
-  }
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers,
-    cache: 'no-store',
-    signal: AbortSignal.timeout(12_000),
-  });
-
-  const data = await response.json().catch(() => null) as T | null;
-  if (!response.ok || !data) {
-    throw new Error(`Solscan ${path} failed with ${response.status}`);
-  }
-  return data;
 }
 
 function settledErrorLabel(result: PromiseSettledResult<unknown>): string {
