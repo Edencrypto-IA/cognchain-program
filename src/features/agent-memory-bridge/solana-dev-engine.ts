@@ -202,6 +202,33 @@ type TokenAccountsByOwnerResult = {
   }>;
 };
 
+type DasAssetsByOwnerResult = {
+  total?: number;
+  nativeBalance?: {
+    lamports?: number;
+    price_per_sol?: number;
+    total_price?: number;
+  };
+  items?: Array<{
+    id?: string;
+    interface?: string;
+    content?: {
+      metadata?: {
+        name?: string;
+        symbol?: string;
+      };
+    };
+    token_info?: {
+      symbol?: string;
+      balance?: number | string;
+      decimals?: number;
+      price_info?: {
+        total_price?: number;
+      };
+    };
+  }>;
+};
+
 type EpochInfoResult = {
   blockHeight?: number;
   epoch?: number;
@@ -213,6 +240,7 @@ type EpochInfoResult = {
 const BASE58_LONG = /\b[1-9A-HJ-NP-Za-km-z]{32,88}\b/;
 const BASE58_PUBKEY = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP5VEhdkAS6EPFXCWuBvf9Ss623VQ5DA';
 
 const SYSTEM_PROMPT = [
   'You are Mythos, CongChain Solana developer copilot.',
@@ -250,18 +278,28 @@ function cleanInput(value: unknown): string {
 }
 
 function rpcProviderLabel(cluster: MythosSolanaCluster): 'helius' | 'solana-rpc' {
-  if (cluster === 'mainnet' && (process.env.HELIUS_API_KEY || process.env.HELIUS_RPC_URL)) return 'helius';
-  if (cluster === 'mainnet' && process.env.SOLANA_RPC_URL?.includes('helius')) return 'helius';
+  if (cluster === 'mainnet' && (process.env.HELIUS_API_KEY || process.env.HELIUS_MAINNET_RPC_URL)) return 'helius';
+  if (cluster === 'mainnet' && process.env.HELIUS_RPC_URL && !isDevnetRpcUrl(process.env.HELIUS_RPC_URL)) return 'helius';
+  if (cluster === 'mainnet' && process.env.SOLANA_RPC_URL?.includes('helius') && !isDevnetRpcUrl(process.env.SOLANA_RPC_URL)) return 'helius';
+  if (cluster === 'devnet' && (process.env.HELIUS_DEVNET_RPC_URL || isDevnetRpcUrl(process.env.HELIUS_RPC_URL))) return 'helius';
   return 'solana-rpc';
+}
+
+function isDevnetRpcUrl(value: string | undefined): boolean {
+  return Boolean(value && /devnet/i.test(value));
 }
 
 function rpcUrl(cluster: MythosSolanaCluster): string {
   if (cluster === 'devnet') {
+    if (process.env.HELIUS_DEVNET_RPC_URL) return process.env.HELIUS_DEVNET_RPC_URL;
+    if (isDevnetRpcUrl(process.env.HELIUS_RPC_URL)) return process.env.HELIUS_RPC_URL as string;
     return process.env.SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com';
   }
 
-  if (process.env.HELIUS_RPC_URL) return process.env.HELIUS_RPC_URL;
-  if (process.env.SOLANA_RPC_URL) return process.env.SOLANA_RPC_URL;
+  if (process.env.HELIUS_MAINNET_RPC_URL) return process.env.HELIUS_MAINNET_RPC_URL;
+  if (process.env.HELIUS_RPC_URL && !isDevnetRpcUrl(process.env.HELIUS_RPC_URL)) return process.env.HELIUS_RPC_URL;
+  if (process.env.SOLANA_MAINNET_RPC_URL) return process.env.SOLANA_MAINNET_RPC_URL;
+  if (process.env.SOLANA_RPC_URL && !isDevnetRpcUrl(process.env.SOLANA_RPC_URL)) return process.env.SOLANA_RPC_URL;
   if (process.env.HELIUS_API_KEY) {
     return `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
   }
@@ -298,6 +336,12 @@ function value(label: string, input: unknown, status: MythosSolanaEvidenceItem['
 
 function extractFirstBase58(input: string): string | null {
   return input.match(BASE58_LONG)?.[0] || null;
+}
+
+function tokenAmountIsNonZero(value: string | undefined): boolean {
+  if (!value) return false;
+  if (/^0(?:\.0+)?$/.test(value)) return false;
+  return Number(value) > 0 || /^[1-9]/.test(value);
 }
 
 function normalizeLogs(logs: string[] | null | undefined): string[] {
@@ -709,14 +753,31 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
     };
   }
 
-  const [balance, account, signatures, tokenAccounts] = await Promise.allSettled([
+  const [balance, account, signatures, tokenAccounts, token2022Accounts, indexedAssets] = await Promise.allSettled([
     jsonRpc<{ value: number }>(cluster, 'getBalance', [wallet, { commitment: 'confirmed' }]),
     jsonRpc<AccountInfoResult>(cluster, 'getAccountInfo', [wallet, { encoding: 'base64', commitment: 'confirmed' }]),
-    jsonRpc<SignaturesForAddressResult>(cluster, 'getSignaturesForAddress', [wallet, { limit: 12 }]),
+    jsonRpc<SignaturesForAddressResult>(cluster, 'getSignaturesForAddress', [wallet, { limit: 20, commitment: 'confirmed' }]),
     jsonRpc<TokenAccountsByOwnerResult>(cluster, 'getTokenAccountsByOwner', [
       wallet,
       { programId: TOKEN_PROGRAM_ID },
       { encoding: 'jsonParsed', commitment: 'confirmed' },
+    ]),
+    jsonRpc<TokenAccountsByOwnerResult>(cluster, 'getTokenAccountsByOwner', [
+      wallet,
+      { programId: TOKEN_2022_PROGRAM_ID },
+      { encoding: 'jsonParsed', commitment: 'confirmed' },
+    ]),
+    jsonRpc<DasAssetsByOwnerResult>(cluster, 'getAssetsByOwner', [
+      {
+        ownerAddress: wallet,
+        page: 1,
+        limit: 20,
+        displayOptions: {
+          showFungible: true,
+          showNativeBalance: true,
+          showCollectionMetadata: false,
+        },
+      },
     ]),
   ]);
 
@@ -737,25 +798,64 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
     .filter((item): item is PromiseFulfilledResult<TransactionResult | null> => item.status === 'fulfilled' && Boolean(item.value))
     .map(item => knownProgramSummary(item.value as TransactionResult))
     .filter(item => item !== 'not classified from parsed instructions');
-  const tokens = tokenAccounts.status === 'fulfilled'
-    ? (tokenAccounts.value.value || []).filter(item => item.account?.data?.parsed?.info?.tokenAmount?.uiAmountString !== '0')
+  const classicTokens = tokenAccounts.status === 'fulfilled'
+    ? (tokenAccounts.value.value || []).filter(item => {
+      const amount = item.account?.data?.parsed?.info?.tokenAmount;
+      return tokenAmountIsNonZero(amount?.uiAmountString || amount?.amount);
+    })
     : [];
+  const token2022Tokens = token2022Accounts.status === 'fulfilled'
+    ? (token2022Accounts.value.value || []).filter(item => {
+      const amount = item.account?.data?.parsed?.info?.tokenAmount;
+      return tokenAmountIsNonZero(amount?.uiAmountString || amount?.amount);
+    })
+    : [];
+  const indexedItems = indexedAssets.status === 'fulfilled' ? indexedAssets.value.items || [] : [];
+  const indexedTokens = indexedItems.filter(item => tokenAmountIsNonZero(String(item.token_info?.balance || '0')));
+  const tokens = [...classicTokens, ...token2022Tokens];
   const tokenPreview = tokens.slice(0, 6).map(item => {
     const info = item.account?.data?.parsed?.info;
     return `${info?.mint?.slice(0, 8) || 'unknown'}... ${info?.tokenAmount?.uiAmountString || info?.tokenAmount?.amount || '0'}`;
   }).join('; ');
+  const indexedTokenPreview = indexedTokens.slice(0, 6).map(item => {
+    const symbol = item.token_info?.symbol || item.content?.metadata?.symbol || item.content?.metadata?.name || item.id?.slice(0, 8) || 'asset';
+    const balanceLabel = String(item.token_info?.balance || '0');
+    const valueLabel = typeof item.token_info?.price_info?.total_price === 'number'
+      ? ` ~$${item.token_info.price_info.total_price.toFixed(2)}`
+      : '';
+    return `${symbol} ${balanceLabel}${valueLabel}`;
+  }).join('; ');
+  const tokenCount = Math.max(tokens.length, indexedTokens.length);
+  const tokenEvidenceSource = indexedTokens.length > tokens.length
+    ? 'Helius DAS indexed assets'
+    : tokens.length
+      ? 'Solana parsed token accounts'
+      : indexedAssets.status === 'fulfilled'
+        ? 'Helius DAS returned no owned assets with balance'
+        : 'Solana parsed token accounts only';
+  const indexedNativeLamports = indexedAssets.status === 'fulfilled'
+    ? Number(indexedAssets.value.nativeBalance?.lamports || 0)
+    : 0;
+  const rpcLamports = balance.status === 'fulfilled' ? Number(balance.value.value || 0) : 0;
+  const bestLamports = Math.max(rpcLamports, indexedNativeLamports);
+  const solBalanceLabel = balance.status === 'fulfilled' || indexedNativeLamports > 0
+    ? `${(bestLamports / 1_000_000_000).toFixed(6)} SOL`
+    : 'not available';
 
   return {
     subject: wallet,
     evidence: [
       value('Wallet address', wallet),
-      value('SOL balance', balance.status === 'fulfilled' ? `${(balance.value.value / 1_000_000_000).toFixed(6)} SOL` : 'not available', balance.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Cluster checked', cluster),
+      value('RPC source', rpcProviderLabel(cluster)),
+      value('SOL balance', solBalanceLabel, balance.status === 'fulfilled' || indexedNativeLamports > 0 ? 'ready' : 'review'),
       value('Account owner', account.status === 'fulfilled' ? account.value.value?.owner || 'not found' : 'not available', account.status === 'fulfilled' && account.value.value ? 'ready' : 'review'),
       value('Recent transactions', sigs.length),
       value('Recent failed transactions', failed, failed > 0 ? 'review' : 'ready'),
       value('First seen in recent window', firstSeen, sigs.length < 3 ? 'review' : 'ready'),
-      value('Token accounts with balance', tokens.length),
-      value('Token exposure preview', tokenPreview || 'no token balances found in SPL Token accounts', tokens.length ? 'ready' : 'review'),
+      value('Token accounts with balance', tokenCount),
+      value('Token evidence source', tokenEvidenceSource, indexedAssets.status === 'fulfilled' || tokens.length ? 'ready' : 'review'),
+      value('Token exposure preview', indexedTokenPreview || tokenPreview || 'no token balances found in indexed or SPL Token accounts', tokenCount ? 'ready' : 'review'),
       value('Detected program families', programHits.length ? Array.from(new Set(programHits)).join('; ') : 'not classified from recent parsed transactions', programHits.length ? 'ready' : 'review'),
       value('Trade inference', programHits.some(item => /Jupiter|Raydium|Orca|Meteora/i.test(item)) ? 'swap/trade program activity detected' : 'no swap program detected in sampled transactions', programHits.length ? 'ready' : 'review'),
     ],
