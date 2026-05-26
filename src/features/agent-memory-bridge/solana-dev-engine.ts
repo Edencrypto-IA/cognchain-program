@@ -570,6 +570,7 @@ function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidence
     const tokenAccounts = Number(evidence.find(item => item.label.toLowerCase() === 'token accounts with balance')?.value || 0);
     const balance = Number(balanceText.match(/([0-9]+(?:\.[0-9]+)?)/)?.[1] || 0);
     const emptyOrInactive = balance === 0 && txs === 0 && tokenAccounts === 0 && failedTxs === 0;
+    const failureRate = txs > 0 ? failedTxs / txs : 0;
 
     if (emptyOrInactive) {
       score = 24;
@@ -583,6 +584,13 @@ function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidence
       signals.push('Wallet has limited recent activity in the sampled RPC window.');
       plainEnglish = 'The wallet has some public data, but not enough recent history to classify behavior with high confidence.';
       nextSafeStep = 'Verify the address source and review more history in an explorer before treating this as a known wallet.';
+    }
+    if (!emptyOrInactive && failureRate >= 0.4) {
+      plainEnglish = `This wallet has real mainnet activity: ${balance.toFixed(6)} SOL, ${tokenAccounts} token account${tokenAccounts === 1 ? '' : 's'} with balance, and ${txs} sampled recent transaction${txs === 1 ? '' : 's'}. Mythos also found ${failedTxs} failed transaction${failedTxs === 1 ? '' : 's'}, so this is not a blank wallet and not automatic proof of compromise, but the failure pattern deserves review.`;
+      nextSafeStep = 'Open a few failed transaction hashes and compare the error logs. Look for repeated causes such as insufficient funds, expired blockhash, account constraints, slippage, priority-fee problems, or bot-like retry behavior.';
+    } else if (!emptyOrInactive && tokenAccounts > 0 && balance > 0) {
+      plainEnglish = `This wallet has visible mainnet activity: ${balance.toFixed(6)} SOL and ${tokenAccounts} token account${tokenAccounts === 1 ? '' : 's'} with balance. Mythos did not see direct wallet-control evidence, but this is still public activity only, not proof of ownership or safety.`;
+      nextSafeStep = 'Verify the wallet source, review token exposure, and compare recent counterparties before trusting the address operationally.';
     }
     if (tokenAccounts >= 20) {
       score += 8;
