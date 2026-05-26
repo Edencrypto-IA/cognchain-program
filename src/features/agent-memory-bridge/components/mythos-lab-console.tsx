@@ -15,7 +15,9 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
+  TerminalSquare,
 } from 'lucide-react';
+import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_COGNITIVE_LAYERS,
@@ -76,20 +78,55 @@ const STORAGE_KEY = 'congchain:mythos-lab:sessions:v1';
 
 const STARTER_PROMPTS = [
   {
-    label: 'Analyze',
-    prompt: 'Analyze a real task and explain which Mythos skill should govern it.',
+    label: 'Help',
+    prompt: '/help',
   },
   {
-    label: 'Research',
-    prompt: 'Research how Mythos should evaluate an AI agent idea before saving memory.',
+    label: 'Wallet',
+    prompt: '/analyze wallet 2snAwv3rui3kcjBZbwN2uigN7yYTNnhEsZh6k5ZAg1Vs',
   },
   {
-    label: 'Reason',
-    prompt: 'Reason about a 401 API error and show the safe next debugging steps.',
+    label: 'Quote',
+    prompt: '/quote swap 0.1 SOL to USDC',
   },
   {
-    label: 'Create',
-    prompt: 'Create a production-safe plan to connect an external agent to CongChain.',
+    label: 'Plan',
+    prompt: '/plan swap 0.1 SOL to USDC with Phantom review',
+  },
+];
+
+const TERMINAL_COMMANDS = [
+  {
+    command: '/analyze tx <signature>',
+    detail: 'Explain a Solana transaction with evidence, risk, next step, and memory draft.',
+  },
+  {
+    command: '/analyze wallet <address>',
+    detail: 'Read a public wallet profile: balance, recent activity, failures, token exposure, and risk.',
+  },
+  {
+    command: '/analyze token <mint>',
+    detail: 'Review token metadata, holder/distribution context, listings, and safe-risk signals.',
+  },
+  {
+    command: '/debug anchor <error or program context>',
+    detail: 'Turn Anchor logs or program errors into cause, fix, and review checklist.',
+  },
+  {
+    command: '/explain rpc <issue>',
+    detail: 'Diagnose RPC, wallet, webhook, priority-fee, or indexing problems.',
+  },
+  {
+    command: '/quote swap <amount> <token> to <token>',
+    detail: 'Fetch a read-only Jupiter route quote. No swap transaction is created.',
+  },
+  {
+    command: '/plan <wallet command>',
+    detail: 'Create the safe six-phase Wallet Agent plan for payments, swaps, schedules, and memory.',
+  },
+  {
+    command: '/memory save last',
+    detail: 'Save the last approved Mythos answer to CongChain when a full cog_live key is pasted.',
   },
 ];
 
@@ -125,6 +162,167 @@ function cleanTerminalText(value: string) {
     .replace(/^\s*[-*]\s+/gm, '- ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function terminalSection(title: string, body: string | string[]) {
+  const content = Array.isArray(body) ? body.filter(Boolean).join('\n') : body;
+  return `${title}\n${content || 'No data available.'}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function asString(value: unknown, fallback = 'not available') {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+}
+
+function asNumber(value: unknown, fallback = 0) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function getRecord(value: unknown, key: string) {
+  return isRecord(value) && isRecord(value[key]) ? value[key] as Record<string, unknown> : {};
+}
+
+function getArray(value: unknown, key: string) {
+  return isRecord(value) && Array.isArray(value[key]) ? value[key] as unknown[] : [];
+}
+
+function formatEvidenceItems(evidence: unknown[]) {
+  if (evidence.length === 0) return 'No evidence cards returned.';
+  return evidence
+    .slice(0, 10)
+    .map(item => {
+      if (!isRecord(item)) return '';
+      return `- ${asString(item.label, 'Evidence')}: ${asString(item.value)} (${asString(item.status, 'review')})`;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatMythosSolanaResponse(data: Record<string, unknown>) {
+  const risk = getRecord(data, 'risk');
+  const monitor = getRecord(data, 'chainMonitor');
+  const trace = getRecord(data, 'cognitiveTrace');
+  const memoryReplay = getRecord(data, 'memoryReplay');
+  const observability = getRecord(data, 'observability');
+  const evidence = getArray(data, 'evidence');
+
+  return cleanTerminalText([
+    terminalSection('Intent', `${asString(data.mode, 'solana')} analysis for ${asString(data.subject, 'provided input')}`),
+    terminalSection('Plain-English readout', [
+      asString(risk.userLabel, 'Review required'),
+      asString(risk.plainEnglish, asString(risk.summary, 'Mythos reviewed public on-chain evidence.')),
+    ]),
+    terminalSection('Evidence', formatEvidenceItems(evidence)),
+    terminalSection('Risk', [
+      `Threat level: ${asNumber(risk.score)} / 100`,
+      `Label: ${asString(risk.level, 'review')}`,
+      `AI confidence: ${Math.round(asNumber(risk.confidenceBps) / 100)}%`,
+      `Memory match: ${Math.round(asNumber(risk.memoryMatchBps) / 100)}%`,
+      `Signals: ${getArray(risk, 'signals').map(signal => asString(signal)).join('; ') || 'none'}`,
+    ]),
+    terminalSection('Decision', asString(trace.decision, asString(data.analysis, 'Review the evidence before acting.'))),
+    terminalSection('Next safe step', asString(risk.nextSafeStep, asString(trace.nextHumanStep, 'Review manually before saving memory.'))),
+    terminalSection('Memory replay', [
+      `Pattern: ${asString(memoryReplay.pattern, 'no pattern')}`,
+      `Similar memories: ${asNumber(memoryReplay.previousMatches)}`,
+      `Likely cause: ${asString(memoryReplay.likelyCause, 'not available')}`,
+    ]),
+    terminalSection('Observability', [
+      `Provider: ${asString(observability.provider, asString(monitor.provider, 'server'))}`,
+      `Cluster: ${asString(monitor.cluster, 'mainnet')}`,
+      `Slot: ${asString(monitor.slotLabel, 'not available')}`,
+      `Latency: ${asString(observability.latencyMs, 'not available')} ms`,
+    ]),
+    terminalSection('Safety boundary', [
+      'Read-only public chain intelligence.',
+      'No private keys, seed phrases, signatures, or wallet secrets are requested.',
+      'No buy, sell, payment, swap, or submission is executed from this terminal.',
+    ]),
+  ].join('\n\n'));
+}
+
+function parseQuoteCommand(content: string) {
+  const match = content.match(/^\/quote\s+swap\s+(\d+(?:[.,]\d+)?)\s+([a-z0-9]+)\s+(?:to|for)\s+([a-z0-9]+)$/i);
+  if (!match) return null;
+  return {
+    amountUi: Number(match[1].replace(',', '.')),
+    inputSymbol: match[2].toUpperCase(),
+    outputSymbol: match[3].toUpperCase(),
+  };
+}
+
+function formatJupiterQuoteResponse(data: Record<string, unknown>) {
+  const quote = getRecord(data, 'quote');
+  const safety = getRecord(data, 'safety');
+  return cleanTerminalText([
+    terminalSection('Intent', `Read-only Jupiter quote: ${asString(quote.amountUi)} ${asString(quote.inputSymbol)} to ${asString(quote.outputSymbol)}`),
+    terminalSection('Route evidence', [
+      `Input mint: ${asString(quote.inputMint)}`,
+      `Output mint: ${asString(quote.outputMint)}`,
+      `Output raw amount: ${asString(quote.outAmountRaw)}`,
+      `Minimum output raw: ${asString(quote.otherAmountThresholdRaw)}`,
+      `Route legs: ${asNumber(quote.routePlanCount)}`,
+      `Price impact: ${asString(quote.priceImpactPct, 'not reported')}`,
+      `Context slot: ${asString(quote.contextSlot)}`,
+    ]),
+    terminalSection('Decision', 'Quote is ready for human review. It is not a transaction.'),
+    terminalSection('Next safe step', 'If the route looks acceptable, continue only through a future audited wallet-signature flow.'),
+    terminalSection('Safety boundary', [
+      asString(safety.note, 'Read-only quote only.'),
+      `Transaction payload created: ${asString(safety.transactionPayloadCreated, 'false')}`,
+      `Wallet signature requested: ${asString(safety.walletSignatureRequested, 'false')}`,
+      `Submitted to Solana: ${asString(safety.submittedToSolana, 'false')}`,
+    ]),
+  ].join('\n\n'));
+}
+
+function formatWalletPlanResponse(command: string) {
+  const plan = createMythosWalletCommandPlan({
+    prompt: command,
+    network: 'solana-mainnet',
+  });
+  return cleanTerminalText([
+    terminalSection('Intent', `${plan.intentType} / ${plan.routeKind}`),
+    terminalSection('Route status', [
+      `Status: ${plan.routeStatus}`,
+      `Confirmation allowed: ${plan.confirmation.allowed}`,
+      `Reason: ${plan.confirmation.reason}`,
+      plan.jupiterQuoteRequest
+        ? `Jupiter quote: ${plan.jupiterQuoteRequest.status} - ${plan.jupiterQuoteRequest.reason}`
+        : 'Jupiter quote: not required for this command',
+    ]),
+    terminalSection('Execution ladder', plan.phases.map(phase => `- ${phase.title}: ${phase.status} - ${phase.detail}`)),
+    terminalSection('Wallet actions required', plan.walletActions.map(action => `- ${action}`)),
+    terminalSection('Blocked actions', plan.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Memory candidate', [
+      plan.memoryCandidate.title,
+      plan.memoryCandidate.content,
+    ]),
+    terminalSection('Safety boundary', plan.safety.notes.map(note => `- ${note}`)),
+  ].join('\n\n'));
+}
+
+function helpResponse() {
+  return cleanTerminalText([
+    'Mythos Command Terminal',
+    'Use slash commands for the same Solana, Wallet Agent, Jupiter, and CongChain memory logic from one place.',
+    '',
+    ...TERMINAL_COMMANDS.map(item => `${item.command}\n${item.detail}\n`),
+    'Examples',
+    '/analyze tx 5ycrKxWCw4Px...',
+    '/analyze wallet 2snAwv3rui3kcjBZbwN2uigN7yYTNnhEsZh6k5ZAg1Vs',
+    '/analyze token EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    '/quote swap 0.1 SOL to USDC',
+    '/plan pay 0.05 SOL to <wallet>',
+    '',
+    'Safety',
+    'Commands explain, prepare, quote, and save reviewed memory. They do not sign, submit, buy, sell, pay, schedule, or move funds automatically.',
+  ].join('\n'));
 }
 
 function makeSession(): MythosLabSession {
@@ -286,6 +484,216 @@ export default function MythosLabConsole() {
     }
   }
 
+  async function runTerminalCommand(content: string, nextMessages: MythosLabMessage[], started: number) {
+    const command = content.trim();
+    const lower = command.toLowerCase();
+
+    function appendTerminalResponse(responseContent: string, extra?: {
+      trace?: MythosCognitiveTrace;
+      observability?: MythosObservability;
+    }) {
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: cleanTerminalText(responseContent),
+      };
+      updateActive(session => ({
+        ...session,
+        messages: [...nextMessages, assistantMessage],
+        lastTrace: extra?.trace || session.lastTrace,
+        lastObservability: {
+          ...session.lastObservability,
+          ...extra?.observability,
+          latencyMs: extra?.observability?.latencyMs ?? Date.now() - started,
+        },
+        updatedAt: nowIso(),
+      }));
+    }
+
+    if (lower === '/help' || lower === '/commands') {
+      appendTerminalResponse(helpResponse(), {
+        trace: {
+          perception: 'User asked for the command surface.',
+          selectedSkill: 'Mythos Command Terminal',
+          decision: 'Show the available safe commands and execution boundaries.',
+          prediction: 'User can now run Solana, Wallet Agent, Jupiter, and memory commands from one place.',
+          safetyBoundary: 'Help is local and cannot execute transactions.',
+          nextHumanStep: 'Choose one command and paste public on-chain data only.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: activeSession.model,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-command-terminal/v1',
+          latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    if (lower === '/memory save last') {
+      if (!lastAssistant?.content) {
+        appendTerminalResponse([
+          terminalSection('Intent', 'Save last Mythos answer as CongChain memory'),
+          terminalSection('Decision', 'Blocked because there is no assistant answer to save yet.'),
+          terminalSection('Next safe step', 'Run a command or ask Mythos a question first, then type /memory save last.'),
+        ].join('\n\n'));
+        return;
+      }
+      if (!apiKey.trim().startsWith('cog_live_')) {
+        appendTerminalResponse([
+          terminalSection('Intent', 'Save last Mythos answer as CongChain memory'),
+          terminalSection('Decision', 'Blocked until a full CongChain key is pasted in the memory panel.'),
+          terminalSection('Safety boundary', 'The terminal never guesses keys and never stores secrets in output.'),
+        ].join('\n\n'));
+        return;
+      }
+
+      const response = await fetch(profile.endpoints.writeMemory, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(memoryPayload),
+      });
+      const data = await response.json() as MemoryWriteResponse;
+      if (!response.ok) throw new Error(data.error || 'Could not save Mythos memory.');
+      updateActive(session => ({
+        ...session,
+        lastObservability: {
+          ...session.lastObservability,
+          memoryHash: data.hash,
+          savedAt: nowIso(),
+          latencyMs: Date.now() - started,
+        },
+        updatedAt: nowIso(),
+      }));
+      appendTerminalResponse([
+        terminalSection('Intent', 'Save last Mythos answer as CongChain memory'),
+        terminalSection('Decision', `Memory saved to the isolated Mythos vault: ${shortHash(data.hash, 18)}`),
+        terminalSection('Next safe step', data.hash ? `/api/memory/${data.hash}` : 'Open the Memory Brain to review the saved record.'),
+        terminalSection('Safety boundary', 'Only metadata-approved Mythos content was sent. No secrets, private keys, signed payloads, or fund actions.'),
+      ].join('\n\n'), {
+        observability: {
+          memoryHash: data.hash,
+          savedAt: nowIso(),
+          model: activeSession.model,
+          modelLabel: activeSession.model,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-memory-command/v1',
+          latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    const quoteRequest = parseQuoteCommand(command);
+    if (quoteRequest) {
+      const response = await fetch('/api/wallet-agent/jupiter/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...quoteRequest, slippageBps: 50 }),
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) throw new Error(isRecord(data) ? asString(data.error, 'Jupiter quote failed.') : 'Jupiter quote failed.');
+      appendTerminalResponse(formatJupiterQuoteResponse(data), {
+        trace: {
+          perception: `User requested a read-only Jupiter quote for ${quoteRequest.amountUi} ${quoteRequest.inputSymbol} to ${quoteRequest.outputSymbol}.`,
+          selectedSkill: 'Jupiter safe quote contract',
+          decision: 'Return quote context only, without creating a swap transaction.',
+          prediction: 'If the user proceeds later, a separate audited wallet-signature phase is required.',
+          safetyBoundary: 'No swap payload, no wallet signature, no submission.',
+          nextHumanStep: 'Review the quote and continue only through a visible wallet approval path in a future phase.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: activeSession.model,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-jupiter-command/v1',
+          latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    if (lower.startsWith('/plan ')) {
+      const planCommand = command.slice('/plan '.length).trim();
+      appendTerminalResponse(formatWalletPlanResponse(planCommand), {
+        trace: {
+          perception: 'User requested a Wallet Agent command plan.',
+          selectedSkill: 'Wallet Agent safety planner',
+          decision: 'Create an auditable six-phase plan and block automatic execution.',
+          prediction: 'Value-moving work will require explicit wallet approval in a separate phase.',
+          safetyBoundary: 'No signing, no mainnet submission, no fund movement.',
+          nextHumanStep: 'Review the route status, missing fields, and blocked actions.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: activeSession.model,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-wallet-plan-command/v1',
+          latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    const solanaCommand = [
+      { pattern: /^\/analyze\s+tx\s+(.+)$/i, endpoint: '/api/mythos/solana/analyze-transaction', mode: 'transaction' },
+      { pattern: /^\/analyze\s+wallet\s+(.+)$/i, endpoint: '/api/mythos/solana/analyze-wallet', mode: 'wallet' },
+      { pattern: /^\/analyze\s+token\s+(.+)$/i, endpoint: '/api/mythos/solana/analyze-token', mode: 'token' },
+      { pattern: /^\/debug\s+anchor\s+([\s\S]+)$/i, endpoint: '/api/mythos/solana/debug-anchor', mode: 'anchor' },
+      { pattern: /^\/explain\s+rpc\s+([\s\S]+)$/i, endpoint: '/api/mythos/solana/explain-rpc', mode: 'rpc' },
+    ].map(item => ({ ...item, match: command.match(item.pattern) })).find(item => item.match);
+
+    if (solanaCommand?.match) {
+      const subject = solanaCommand.match[1].trim();
+      const response = await fetch(solanaCommand.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: subject,
+          cluster: 'mainnet',
+          model: activeSession.model,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) throw new Error(isRecord(data) ? asString(data.error, 'Mythos Solana command failed.') : 'Mythos Solana command failed.');
+      const trace = getRecord(data, 'cognitiveTrace');
+      const observability = getRecord(data, 'observability');
+      appendTerminalResponse(formatMythosSolanaResponse(data), {
+        trace: {
+          perception: asString(trace.perception, `User requested ${solanaCommand.mode} analysis.`),
+          memoryContext: asString(getRecord(data, 'memoryReplay').likelyCause, 'Memory replay is evidence-bound.'),
+          selectedSkill: asString(trace.skill, `Solana ${solanaCommand.mode} intelligence`),
+          reasoningPath: asString(trace.evidenceUsed, 'Public chain evidence was reviewed.'),
+          prediction: asString(trace.prediction, 'Manual review remains required.'),
+          decision: asString(trace.decision, 'Review the evidence before acting.'),
+          confidence: asNumber(getRecord(data, 'risk').confidenceBps) / 100,
+          safetyBoundary: asString(trace.safetyBoundary, 'Read-only analysis only.'),
+          nextHumanStep: asString(trace.nextHumanStep, 'Review manually before saving memory.'),
+        },
+        observability: {
+          model: asString(observability.model, activeSession.model),
+          modelLabel: asString(observability.modelLabel, activeSession.model),
+          latencyMs: asNumber(observability.latencyMs, Date.now() - started),
+          mode: activeSession.mode,
+          traceSchema: 'mythos-solana-command/v1',
+        },
+      });
+      return;
+    }
+
+    appendTerminalResponse([
+      terminalSection('Intent', 'Unknown command'),
+      terminalSection('Decision', 'Mythos did not recognize this terminal command.'),
+      terminalSection('Next safe step', 'Type /help to see supported commands, or send a normal message without a slash for skill-routed chat.'),
+      terminalSection('Safety boundary', 'Unknown commands are not executed.'),
+    ].join('\n\n'));
+  }
+
   async function sendMessage(prompt?: string) {
     if (!activeSession || loading) return;
     const content = (prompt || input).trim();
@@ -313,6 +721,11 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
+      if (content.startsWith('/')) {
+        await runTerminalCommand(content, nextMessages, started);
+        return;
+      }
+
       const route = await routeSkillForPrompt(content);
       const routedSkill =
         MYTHOS_FEATURED_SKILLS.find(skill => skill.id === route.selectedSkill.id) ||
@@ -619,7 +1032,7 @@ export default function MythosLabConsole() {
                         }
                       }}
                       rows={3}
-                      placeholder="Message Mythos..."
+                      placeholder="Message Mythos or use /help, /analyze wallet, /analyze tx, /quote swap, /plan..."
                       className="w-full resize-none bg-transparent px-1 text-base leading-6 text-white outline-none placeholder:text-white/34"
                     />
                     <div className="flex items-center justify-between gap-3">
@@ -667,6 +1080,29 @@ export default function MythosLabConsole() {
 
             <aside className="border-t border-white/8 bg-black/38 p-5 xl:border-l xl:border-t-0">
               <div className="grid gap-4">
+                <section className="rounded-2xl border border-[#76FF03]/16 bg-[#76FF03]/6 p-4">
+                  <div className="flex items-center gap-2">
+                    <TerminalSquare className="h-4 w-4 text-[#A7FF3D]" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Command terminal</p>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-white/50">
+                    One terminal for Solana analysis, wallet planning, read-only Jupiter quotes, and CongChain memory.
+                  </p>
+                  <div className="mt-3 grid gap-2">
+                    {TERMINAL_COMMANDS.slice(0, 6).map(item => (
+                      <button
+                        key={item.command}
+                        type="button"
+                        onClick={() => setInput(item.command)}
+                        className="rounded-xl border border-white/8 bg-black/26 p-3 text-left transition hover:border-[#76FF03]/20 hover:bg-[#76FF03]/8"
+                      >
+                        <p className="font-mono text-[11px] font-bold text-[#A7FF3D]">{item.command}</p>
+                        <p className="mt-1 text-xs leading-5 text-white/44">{item.detail}</p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
                 <section className="rounded-2xl border border-[#76FF03]/16 bg-[#76FF03]/6 p-4">
                   <div className="flex items-center gap-2">
                     <Network className="h-4 w-4 text-[#A7FF3D]" />

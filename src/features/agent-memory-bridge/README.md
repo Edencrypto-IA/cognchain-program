@@ -265,3 +265,33 @@ This quote step:
 - never submits to Solana.
 
 The quote is evidence for human review, not execution permission.
+
+## Mythos command terminal
+
+The Mythos Lab now exposes a safe command terminal for the main bridge flows.
+
+Supported commands:
+
+- `/help` lists the command surface and safety boundary;
+- `/analyze tx <signature>` explains a Solana transaction with evidence,
+  risk, decision, and next safe step;
+- `/analyze wallet <address>` reviews public wallet activity, token exposure,
+  recent failures, and risk signals;
+- `/analyze token <mint>` reviews token metadata, distribution/listing context,
+  and safe-risk evidence;
+- `/debug anchor <error or program context>` turns Anchor/program evidence into
+  a debugging path;
+- `/explain rpc <issue>` diagnoses wallet, RPC, priority-fee, webhook, or
+  indexing issues;
+- `/quote swap <amount> <token> to <token>` fetches a read-only Jupiter quote;
+- `/plan <wallet command>` creates the Wallet Agent six-phase safety plan;
+- `/memory save last` saves the last approved Mythos response only when the
+  user explicitly provides a full CongChain key.
+
+The terminal still cannot:
+
+- execute unknown commands;
+- sign, submit, buy, sell, pay, schedule, or move funds;
+- create Jupiter swap payloads;
+- read private keys, seed phrases, wallet secrets, or hidden prompts;
+- save memory without an explicit user command and key-backed request.

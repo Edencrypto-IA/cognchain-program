@@ -2496,3 +2496,23 @@ It still cannot:
 - open Phantom or Solflare from the quote;
 - support arbitrary token mints without a future reviewed allowlist or token-risk check;
 - treat a quote as permission to buy, sell, pay, schedule, submit, or move funds.
+
+## Phase 16.3 Mythos command terminal
+
+Wallet Agent planning is now available from the Mythos Lab command terminal.
+
+It can:
+
+- accept `/plan <wallet command>` and produce the same six-phase safety ladder;
+- accept `/quote swap <amount> <token> to <token>` and call the safe Jupiter quote endpoint;
+- keep wallet-command responses organized as intent, evidence, decision, next safe step, blocked actions, and safety boundary;
+- make wallet automation understandable from one terminal-like interface instead of separate panels;
+- keep memory saving as an explicit `/memory save last` or side-panel action.
+
+It still cannot:
+
+- turn terminal text into an automatic wallet action;
+- open Phantom or Solflare by itself;
+- create, sign, serialize, or submit mainnet transactions;
+- execute arbitrary terminal commands from the browser UI;
+- store wallet secrets, seed phrases, private keys, signed payloads, or hidden prompts.
