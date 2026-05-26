@@ -28,12 +28,15 @@ export type MythosSolanaResult = {
   fallbackUsed: boolean;
   evidence: MythosSolanaEvidenceItem[];
   risk: {
-    level: 'safe' | 'suspicious' | 'exploit_risk' | 'review';
+    level: 'safe' | 'low_data' | 'suspicious' | 'exploit_risk' | 'review';
     score: number;
     confidenceBps: number;
     memoryMatchBps: number;
+    userLabel: string;
     summary: string;
     signals: string[];
+    plainEnglish: string;
+    nextSafeStep: string;
   };
   chainMonitor: {
     status: 'live' | 'degraded' | 'review';
@@ -217,6 +220,8 @@ const SYSTEM_PROMPT = [
   'Write in clean English with short labeled sections. Do not use markdown tables.',
   'Explain what failed or looks risky, why it likely happened, what evidence supports it, and the next safe step.',
   'For wallets and tokens, classify risk without giving financial advice.',
+  'An empty, inactive, zero-balance wallet is not exploit evidence by itself. Label it as low data or needs review, not exploit risk.',
+  'Explain wallet findings like a senior wallet support engineer: balance, recent activity, token exposure, failed transactions, what it means, and what a non-crypto user should do next.',
   'Never tell the user a token is safe to buy or safe to invest in. Say what evidence is ready, suspicious, missing, or blocked.',
   'For developer failures, include a short patch example when the evidence suggests one.',
   'Never request API keys, private keys, seed phrases, signed payloads, or wallet secrets.',
@@ -379,12 +384,21 @@ function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidence
   const review = evidence.filter(item => item.status === 'review').length;
   const blocked = evidence.filter(item => item.status === 'blocked').length;
   const joined = evidence.map(item => `${item.label} ${item.value}`).join(' ').toLowerCase();
-  let score = 18 + review * 12 + blocked * 30;
+  let score = 18 + review * 8 + blocked * 30;
   const signals: string[] = [];
+  let plainEnglish = 'Mythos reviewed public on-chain evidence and found no direct wallet-control risk in the available data.';
+  let nextSafeStep = 'Review the evidence cards, then save this report only if it should become reusable CongChain memory.';
+  let forcedLevel: MythosSolanaResult['risk']['level'] | null = null;
 
-  if (/failed|error|not found|missing|unknown|invalid|freeze authority active|mint authority active|high concentration|very new/i.test(joined)) {
+  if (/failed|error|missing|unknown|invalid|freeze authority active|mint authority active|high concentration|very new/i.test(joined)) {
     score += 18;
     signals.push('Review signal found in RPC evidence.');
+  }
+  if (/not found/i.test(joined)) {
+    score += mode === 'wallet' ? 4 : 12;
+    signals.push(mode === 'wallet'
+      ? 'Wallet account was not found as a funded system account; this often means a new, empty, or unused address.'
+      : 'RPC could not find one of the requested records.');
   }
   if (/success|err none|freeze authority none|mint authority none|healthy/i.test(joined)) {
     score -= 8;
@@ -427,26 +441,44 @@ function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidence
     signals.push('Recent wallet failures were detected.');
   }
   if (mode === 'wallet') {
+    const balanceText = evidence.find(item => item.label.toLowerCase() === 'sol balance')?.value || '';
+    const accountOwner = evidence.find(item => item.label.toLowerCase() === 'account owner')?.value || '';
     const txs = Number(evidence.find(item => item.label.toLowerCase() === 'recent transactions')?.value || 0);
+    const failedTxs = Number(evidence.find(item => item.label.toLowerCase() === 'recent failed transactions')?.value || 0);
     const tokenAccounts = Number(evidence.find(item => item.label.toLowerCase() === 'token accounts with balance')?.value || 0);
-    if (txs <= 2) {
-      score += 10;
-      signals.push('Wallet has very little recent activity in the sampled RPC window.');
+    const balance = Number(balanceText.match(/([0-9]+(?:\.[0-9]+)?)/)?.[1] || 0);
+    const emptyOrInactive = balance === 0 && txs === 0 && tokenAccounts === 0 && failedTxs === 0;
+
+    if (emptyOrInactive) {
+      score = 24;
+      forcedLevel = 'low_data';
+      signals.push('No SOL, token balances, recent transactions, or recent failures were found.');
+      signals.push('This looks like an inactive, new, unused, or test wallet rather than exploit evidence.');
+      plainEnglish = 'This address has almost no public activity. For a non-crypto user, that means Mythos cannot build a strong trust profile yet. Empty does not mean dangerous; it means there is not enough history to judge.';
+      nextSafeStep = 'Ask the user to confirm the address and network. If this is their wallet, send only a tiny test amount first and wait for normal activity before trusting it operationally.';
+    } else if (txs <= 2) {
+      score += 2;
+      signals.push('Wallet has limited recent activity in the sampled RPC window.');
+      plainEnglish = 'The wallet has some public data, but not enough recent history to classify behavior with high confidence.';
+      nextSafeStep = 'Verify the address source and review more history in an explorer before treating this as a known wallet.';
     }
     if (tokenAccounts >= 20) {
       score += 8;
       signals.push('Wallet has broad token exposure that may need manual review.');
     }
+    if (/not found/i.test(accountOwner) && !emptyOrInactive) {
+      signals.push('The base wallet account is not funded, but derived token accounts or history may still exist.');
+    }
   }
 
   score = Math.max(1, Math.min(99, score));
-  const level = blocked > 0 || score >= 78
+  const level = forcedLevel || (blocked > 0 || score >= 78
     ? 'exploit_risk'
     : score >= 52
       ? 'suspicious'
       : review > 0 || score >= 34
         ? 'review'
-        : 'safe';
+        : 'safe');
 
   if (!signals.length) signals.push('No severe risk signal was detected from the available read-only evidence.');
 
@@ -455,14 +487,27 @@ function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidence
     score,
     confidenceBps: Math.max(5200, Math.min(9400, 8700 - review * 700 - blocked * 1200)),
     memoryMatchBps: Math.max(4200, Math.min(9100, 6200 + evidence.length * 180 - review * 220)),
+    userLabel: level === 'safe'
+      ? 'Looks normal'
+      : level === 'low_data'
+        ? 'Not enough history'
+        : level === 'review'
+          ? 'Needs review'
+          : level === 'suspicious'
+            ? 'Suspicious signals'
+            : 'Exploit risk',
     summary: level === 'safe'
       ? 'Evidence looks normal, but a human should still verify intent and counterparties.'
-      : level === 'review'
-        ? 'Some evidence is incomplete or needs a human Solana review.'
-        : level === 'suspicious'
-          ? 'Multiple risk signals deserve investigation before trusting this wallet, token, or transaction. This is not investment advice.'
-          : 'High-risk pattern. Treat as blocked until a human reviewer validates the evidence.',
+      : level === 'low_data'
+        ? 'This wallet has too little public activity to judge. Treat it as unverified, not exploited.'
+        : level === 'review'
+          ? 'Some evidence is incomplete or needs a human Solana review.'
+          : level === 'suspicious'
+            ? 'Multiple risk signals deserve investigation before trusting this wallet, token, or transaction. This is not investment advice.'
+            : 'High-risk pattern. Treat as blocked until a human reviewer validates the evidence.',
     signals: signals.slice(0, 5),
+    plainEnglish,
+    nextSafeStep,
   } as const;
 }
 

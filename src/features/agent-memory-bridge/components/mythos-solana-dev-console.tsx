@@ -40,12 +40,15 @@ type EngineResult = {
   fallbackUsed: boolean;
   evidence: EvidenceItem[];
   risk: {
-    level: 'safe' | 'suspicious' | 'exploit_risk' | 'review';
+    level: 'safe' | 'low_data' | 'suspicious' | 'exploit_risk' | 'review';
     score: number;
     confidenceBps: number;
     memoryMatchBps: number;
+    userLabel: string;
     summary: string;
     signals: string[];
+    plainEnglish: string;
+    nextSafeStep: string;
   };
   chainMonitor: {
     status: 'live' | 'degraded' | 'review';
@@ -190,6 +193,7 @@ function statusClass(status: EvidenceItem['status']) {
 
 function riskClass(level: EngineResult['risk']['level']) {
   if (level === 'safe') return 'border-[#14F195]/24 bg-[#14F195]/[0.08] text-[#14F195]';
+  if (level === 'low_data') return 'border-[#5AD7FF]/24 bg-[#5AD7FF]/[0.08] text-[#7DE4FF]';
   if (level === 'review') return 'border-[#FACC15]/24 bg-[#FACC15]/[0.08] text-[#FACC15]';
   if (level === 'suspicious') return 'border-[#FF8A3D]/24 bg-[#FF8A3D]/[0.08] text-[#FFB36D]';
   return 'border-[#FF5C8A]/24 bg-[#FF5C8A]/[0.08] text-[#FF7AA2]';
@@ -197,9 +201,44 @@ function riskClass(level: EngineResult['risk']['level']) {
 
 function riskLabel(level: EngineResult['risk']['level']) {
   if (level === 'safe') return 'SAFE';
+  if (level === 'low_data') return 'LOW DATA';
   if (level === 'review') return 'REVIEW';
   if (level === 'suspicious') return 'SUSPICIOUS';
   return 'EXPLOIT RISK';
+}
+
+function walletMeaning(result: EngineResult) {
+  if (result.mode !== 'wallet') return null;
+  if (result.risk.level === 'low_data') {
+    return {
+      title: 'This wallet is mostly blank',
+      tone: 'border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.055] text-[#7DE4FF]',
+      copy:
+        'For a normal user, this means Mythos found almost no public history: no SOL, no token balances, and no recent transactions. That is not an exploit signal by itself. It is simply not enough evidence to trust or profile the wallet yet.',
+    };
+  }
+  if (result.risk.level === 'safe') {
+    return {
+      title: 'No obvious wallet danger from sampled data',
+      tone: 'border-[#14F195]/18 bg-[#14F195]/[0.055] text-[#14F195]',
+      copy:
+        'Mythos found enough normal public evidence to avoid a warning label. Still verify the address source before sending funds or linking it to an account.',
+    };
+  }
+  if (result.risk.level === 'suspicious' || result.risk.level === 'exploit_risk') {
+    return {
+      title: 'Wallet needs careful review',
+      tone: 'border-[#FF8A3D]/18 bg-[#FF8A3D]/[0.055] text-[#FFB36D]',
+      copy:
+        'Mythos saw signals that deserve human review, such as failures, broad token exposure, unusual program activity, or incomplete RPC evidence. Do not treat this as a buy/sell decision.',
+    };
+  }
+  return {
+    title: 'Wallet review is incomplete',
+    tone: 'border-[#FACC15]/18 bg-[#FACC15]/[0.055] text-[#FACC15]',
+    copy:
+      'Some public evidence is missing or uncertain. Verify the address, network, and recent activity in a trusted explorer before relying on the result.',
+  };
 }
 
 function buildLocalBrief(mode: typeof MODES[number], input: string, cluster: Cluster) {
@@ -234,6 +273,7 @@ export default function MythosSolanaDevConsole() {
   const active = MODES.find(item => item.id === mode) || MODES[0];
   const localBrief = useMemo(() => buildLocalBrief(active, input, cluster), [active, input, cluster]);
   const copyText = result ? result.memoryDraft.content : localBrief;
+  const walletExplainer = result ? walletMeaning(result) : null;
 
   async function runAnalysis() {
     setError('');
@@ -375,6 +415,7 @@ export default function MythosSolanaDevConsole() {
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Threat system</p>
             <div className="mt-3 grid gap-2 text-xs">
               <div className="rounded-xl border border-[#14F195]/18 bg-[#14F195]/[0.05] p-3 text-[#14F195]">SAFE: normal evidence</div>
+              <div className="rounded-xl border border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.05] p-3 text-[#7DE4FF]">LOW DATA: too little history</div>
               <div className="rounded-xl border border-[#FACC15]/18 bg-[#FACC15]/[0.05] p-3 text-[#FACC15]">REVIEW: incomplete or uncertain</div>
               <div className="rounded-xl border border-[#FF5C8A]/18 bg-[#FF5C8A]/[0.05] p-3 text-[#FF7AA2]">EXPLOIT RISK: blocked until human review</div>
             </div>
@@ -527,6 +568,33 @@ export default function MythosSolanaDevConsole() {
                   <pre className="mt-4 max-w-full whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-[#030306] p-4 text-sm leading-6 text-white/72 [overflow-wrap:anywhere]">
                     {result.analysis}
                   </pre>
+
+                  {walletExplainer ? (
+                    <div className={`mt-4 rounded-2xl border p-4 ${walletExplainer.tone}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-80">Wallet readout</p>
+                          <h4 className="mt-1 text-lg font-black text-white">{walletExplainer.title}</h4>
+                        </div>
+                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase ${riskClass(result.risk.level)}`}>
+                          {result.risk.userLabel}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-white/68">{walletExplainer.copy}</p>
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        {[
+                          ['What Mythos knows', result.risk.plainEnglish],
+                          ['What it does not know', 'Mythos cannot see private keys, seed phrases, off-chain identity, intent, or whether this address belongs to the user.'],
+                          ['Best next step', result.risk.nextSafeStep],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-xl border border-white/8 bg-black/24 p-3">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+                            <p className="mt-2 text-xs leading-5 text-white/62">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {(result.mode === 'wallet' || result.mode === 'token') ? (
                     <div className="mt-4 rounded-2xl border border-[#FACC15]/18 bg-[#FACC15]/[0.045] p-4">
