@@ -1,6 +1,10 @@
 import { isValueMovingIntent } from './security-policy';
 import { createWalletAgentTransactionProposal } from './transaction-proposal';
-import type { WalletAgentCoreResult, WalletAgentInternalConfirmation } from './types';
+import type {
+  WalletAgentApprovalStep,
+  WalletAgentCoreResult,
+  WalletAgentInternalConfirmation,
+} from './types';
 
 export function canConfirmWalletAgentIntent(result: WalletAgentCoreResult) {
   const valueMoving = isValueMovingIntent(result.draft.type);
@@ -44,7 +48,7 @@ export function confirmWalletAgentIntent(
     return result;
   }
 
-  const nextApprovalStep = isValueMovingIntent(result.draft.type)
+  const nextApprovalStep: WalletAgentApprovalStep = isValueMovingIntent(result.draft.type)
     ? 'wallet_signature_required'
     : 'user_confirmed_in_app';
   const confirmation: WalletAgentInternalConfirmation = {

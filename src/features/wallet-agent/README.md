@@ -2454,3 +2454,25 @@ It still cannot:
 - bypass admin access checks or endpoint rate limits;
 - expose API keys, database URLs, RPC URLs, session secrets, wallet keys, seed phrases, signatures, or signed payloads;
 - send email, buy, sell, pay, schedule, sign, submit, or move funds.
+
+## Phase 16.1 Mythos wallet command planner
+
+Wallet Agent now exposes the six-phase safety ladder to Mythos for future Phantom/Solflare command flows.
+
+It can:
+
+- turn natural-language wallet commands into typed Wallet Agent intents;
+- show the six phases: command intent, secure preview, route/proposal, wallet signature, controlled submission, and CongChain memory;
+- classify swap, SOL transfer, scheduled payment, payroll, privacy transfer, and read-only review routes;
+- show which fields are missing before any wallet request can exist;
+- explain that Jupiter/swap and mainnet routes are preview-only until future audited wallet phases;
+- create a metadata-only memory candidate for reviewed command context.
+
+It still cannot:
+
+- open Phantom or Solflare from the Mythos planner;
+- create Jupiter swap payloads;
+- sign with a wallet key;
+- submit mainnet transactions;
+- store signed payloads, private keys, seed phrases, or hidden wallet data;
+- buy, sell, pay, schedule, retry, submit, or move funds automatically.

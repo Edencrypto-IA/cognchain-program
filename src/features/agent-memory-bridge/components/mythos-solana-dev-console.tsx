@@ -21,6 +21,11 @@ import {
   Zap,
 } from 'lucide-react';
 import { MYTHOS_AGENT_PROFILE, MYTHOS_RUNTIME_PROOF } from '../mythos';
+import {
+  createMythosWalletCommandPlan,
+  type MythosWalletCommandPhaseStatus,
+  type MythosWalletCommandPlan,
+} from '@/features/wallet-agent';
 
 type DemoMode = 'transaction' | 'wallet' | 'token' | 'anchor' | 'rpc';
 type Cluster = 'mainnet' | 'devnet';
@@ -221,6 +226,13 @@ function riskClass(level: EngineResult['risk']['level']) {
   if (level === 'review') return 'border-[#FACC15]/24 bg-[#FACC15]/[0.08] text-[#FACC15]';
   if (level === 'suspicious') return 'border-[#FF8A3D]/24 bg-[#FF8A3D]/[0.08] text-[#FFB36D]';
   return 'border-[#FF5C8A]/24 bg-[#FF5C8A]/[0.08] text-[#FF7AA2]';
+}
+
+function walletPhaseClass(status: MythosWalletCommandPhaseStatus) {
+  if (status === 'ready') return 'border-[#14F195]/18 bg-[#14F195]/[0.06] text-[#14F195]';
+  if (status === 'blocked') return 'border-[#FF5C8A]/18 bg-[#FF5C8A]/[0.06] text-[#FF7AA2]';
+  if (status === 'review') return 'border-[#FACC15]/18 bg-[#FACC15]/[0.06] text-[#FACC15]';
+  return 'border-[#7C3AED]/18 bg-[#7C3AED]/[0.06] text-[#C084FC]';
 }
 
 function riskLabel(level: EngineResult['risk']['level']) {
@@ -522,6 +534,9 @@ export default function MythosSolanaDevConsole() {
   const [apiKey, setApiKey] = useState('');
   const [result, setResult] = useState<EngineResult | null>(null);
   const [saved, setSaved] = useState<SaveResult | null>(null);
+  const [walletCommand, setWalletCommand] = useState('Swap 0.1 SOL for USDC with a safe review before Phantom signs.');
+  const [walletAddress, setWalletAddress] = useState('');
+  const [walletPlan, setWalletPlan] = useState<MythosWalletCommandPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -596,6 +611,14 @@ export default function MythosSolanaDevConsole() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function planWalletCommand() {
+    setWalletPlan(createMythosWalletCommandPlan({
+      prompt: walletCommand,
+      network: cluster === 'devnet' ? 'solana-devnet' : 'solana-mainnet',
+      walletAddress: walletAddress.trim() || null,
+    }));
   }
 
   return (
@@ -712,6 +735,95 @@ export default function MythosSolanaDevConsole() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 rounded-3xl border border-[#5AD7FF]/18 bg-[radial-gradient(circle_at_top_right,rgba(90,215,255,0.10),transparent_34%),rgba(3,8,14,0.92)] p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Mythos wallet command planner</p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight">Tell Mythos what you want. The wallet still decides.</h2>
+            <p className="mt-3 text-sm leading-6 text-white/58">
+              This is the six-phase path for future Phantom/Solflare commands: intent, preview, route, signature, submit, and memory. It plans the action without signing, submitting, or moving funds.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <textarea
+                value={walletCommand}
+                onChange={event => setWalletCommand(event.target.value)}
+                rows={4}
+                className="min-h-28 rounded-2xl border border-white/10 bg-black/34 p-4 text-sm leading-6 text-white outline-none placeholder:text-white/25"
+                placeholder="Example: Pay 0.05 SOL to this address after I review the fee, or swap SOL to USDC with Phantom approval."
+              />
+              <input
+                value={walletAddress}
+                onChange={event => setWalletAddress(event.target.value)}
+                className="h-12 rounded-2xl border border-white/10 bg-black/34 px-4 text-sm text-white outline-none placeholder:text-white/25"
+                placeholder="Optional connected wallet public address"
+              />
+              <button
+                type="button"
+                onClick={planWalletCommand}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#5AD7FF]/25 bg-[#5AD7FF]/12 px-4 text-sm font-black text-[#7DE4FF] transition hover:bg-[#5AD7FF]/18"
+              >
+                <Wallet className="h-4 w-4" />
+                Preview wallet command
+              </button>
+            </div>
+          </div>
+
+          <div className="min-w-0 rounded-2xl border border-white/8 bg-black/24 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/34">Six-phase safety contract</p>
+                <h3 className="mt-1 text-xl font-black text-white">
+                  {walletPlan ? walletPlan.intentType.replaceAll('_', ' ') : 'No command planned yet'}
+                </h3>
+              </div>
+              <span className="rounded-full border border-[#FACC15]/18 bg-[#FACC15]/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#FACC15]">
+                Preview only
+              </span>
+            </div>
+
+            {walletPlan ? (
+              <>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {walletPlan.phases.map(phase => (
+                    <div key={phase.id} className="rounded-2xl border border-white/8 bg-black/22 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-black text-white">{phase.title}</p>
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${walletPhaseClass(phase.status)}`}>
+                          {phase.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-white/52">{phase.detail}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-[#14F195]/14 bg-[#14F195]/[0.04] p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-[#14F195]">Wallet actions</p>
+                    <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
+                      {walletPlan.walletActions.map(item => <li key={item}>- {item}</li>)}
+                    </ul>
+                  </div>
+                  <div className="rounded-2xl border border-[#FF5C8A]/14 bg-[#FF5C8A]/[0.04] p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FF7AA2]">Blocked forever</p>
+                    <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
+                      {walletPlan.blockedActions.map(item => <li key={item}>- {item}</li>)}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-[#7C3AED]/16 bg-[#7C3AED]/[0.045] p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[#C084FC]">Memory candidate</p>
+                  <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-white/56">{walletPlan.memoryCandidate.content}</p>
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-white/8 bg-black/22 p-4 text-sm leading-6 text-white/52">
+                Plan a command to see how Mythos converts it into a safe wallet-signature workflow. Nothing is sent to Phantom, Solflare, Jupiter, or Solana from this planner.
+              </div>
+            )}
           </div>
         </section>
 

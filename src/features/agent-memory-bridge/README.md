@@ -220,3 +220,32 @@ It should not:
 - call unverified CongChain endpoints;
 - treat memory anchoring as execution approval;
 - sign, submit, buy, sell, pay, schedule, or move funds.
+
+## Mythos wallet command safety ladder
+
+The Mythos Solana surface can now preview future wallet commands without giving
+the agent custody.
+
+The six phases are:
+
+1. Command intent: classify a user request such as buy, sell, pay, swap,
+   schedule, payroll, privacy transfer, price alert, or risk review.
+2. Secure preview: explain network, wallet, token, amount, route, risk, and
+   missing fields before a wallet request exists.
+3. Route/proposal: create an auditable route contract. Jupiter and mainnet
+   routes remain preview-only until future audited phases.
+4. Wallet signature: require explicit Phantom/Solflare approval for any
+   value-moving action.
+5. Controlled submit: submit only after the signed payload and network are
+   visible to the user.
+6. CongChain memory: save metadata-only reviewed context, hash, proof routes,
+   and safety notes for future agents.
+
+The ladder cannot:
+
+- open a wallet by itself;
+- sign or submit mainnet transactions automatically;
+- store signed payloads, private keys, seed phrases, or wallet secrets;
+- turn memory writes into execution approval;
+- buy, sell, pay, schedule, retry, submit, or move funds without visible wallet
+  approval.

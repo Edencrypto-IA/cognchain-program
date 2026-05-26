@@ -56,6 +56,13 @@ export type {
 export { createWalletAgentCore } from './core';
 export { canConfirmWalletAgentIntent, confirmWalletAgentIntent } from './confirmation';
 export {
+  createMythosWalletCommandPlan,
+  type MythosWalletCommandPhase,
+  type MythosWalletCommandPhaseStatus,
+  type MythosWalletCommandPlan,
+  type MythosWalletCommandRouteKind,
+} from './mythos-wallet-command';
+export {
   confirmWalletAgentDevnetTransaction,
   prepareWalletAgentDevnetTransaction,
   signWalletAgentDevnetTransaction,
