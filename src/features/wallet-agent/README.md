@@ -2476,3 +2476,23 @@ It still cannot:
 - submit mainnet transactions;
 - store signed payloads, private keys, seed phrases, or hidden wallet data;
 - buy, sell, pay, schedule, retry, submit, or move funds automatically.
+
+## Phase 16.2 read-only Jupiter quote
+
+Wallet Agent now lets Mythos request a safe Jupiter quote for clear swap commands.
+
+It can:
+
+- expose `POST /api/wallet-agent/jupiter/quote` as a server-side read-only quote endpoint;
+- support a small allowlist of known tokens for the first phase: SOL, USDC, USDT, JUP, and BONK;
+- fetch `/swap/v1/quote` from Jupiter without creating a swap transaction payload;
+- show input token, output token, slippage, route leg count, output amount, price impact, context slot, and quote timing;
+- keep the quote inside the Mythos six-phase wallet command planner.
+
+It still cannot:
+
+- call Jupiter `/swap`;
+- create, serialize, sign, or submit a swap transaction;
+- open Phantom or Solflare from the quote;
+- support arbitrary token mints without a future reviewed allowlist or token-risk check;
+- treat a quote as permission to buy, sell, pay, schedule, submit, or move funds.

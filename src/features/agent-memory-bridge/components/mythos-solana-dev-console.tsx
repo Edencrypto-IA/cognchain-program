@@ -113,6 +113,29 @@ type InfoRow = {
   value: string;
 };
 
+type JupiterQuoteState = {
+  loading: boolean;
+  error: string;
+  data: null | {
+    ok: true;
+    quote: {
+      inputSymbol: string;
+      outputSymbol: string;
+      amountUi: number;
+      outAmountRaw: string;
+      otherAmountThresholdRaw?: string;
+      slippageBps: number;
+      priceImpactPct?: string;
+      routePlanCount: number;
+      contextSlot?: number;
+      timeTaken?: number;
+    };
+    safety: {
+      note: string;
+    };
+  };
+};
+
 const MODES: Array<{
   id: DemoMode;
   title: string;
@@ -537,6 +560,7 @@ export default function MythosSolanaDevConsole() {
   const [walletCommand, setWalletCommand] = useState('Swap 0.1 SOL for USDC with a safe review before Phantom signs.');
   const [walletAddress, setWalletAddress] = useState('');
   const [walletPlan, setWalletPlan] = useState<MythosWalletCommandPlan | null>(null);
+  const [jupiterQuote, setJupiterQuote] = useState<JupiterQuoteState>({ loading: false, error: '', data: null });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -619,6 +643,29 @@ export default function MythosSolanaDevConsole() {
       network: cluster === 'devnet' ? 'solana-devnet' : 'solana-mainnet',
       walletAddress: walletAddress.trim() || null,
     }));
+    setJupiterQuote({ loading: false, error: '', data: null });
+  }
+
+  async function fetchJupiterQuote() {
+    if (!walletPlan?.jupiterQuoteRequest || walletPlan.jupiterQuoteRequest.status !== 'ready') return;
+    setJupiterQuote({ loading: true, error: '', data: null });
+
+    try {
+      const response = await fetch('/api/wallet-agent/jupiter/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(walletPlan.jupiterQuoteRequest),
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) throw new Error(data.error || 'Jupiter quote failed.');
+      setJupiterQuote({ loading: false, error: '', data });
+    } catch (issue) {
+      setJupiterQuote({
+        loading: false,
+        error: issue instanceof Error ? issue.message : 'Jupiter quote failed.',
+        data: null,
+      });
+    }
   }
 
   return (
@@ -818,6 +865,65 @@ export default function MythosSolanaDevConsole() {
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-[#C084FC]">Memory candidate</p>
                   <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-white/56">{walletPlan.memoryCandidate.content}</p>
                 </div>
+
+                {walletPlan.jupiterQuoteRequest ? (
+                  <div className="mt-4 rounded-2xl border border-[#FACC15]/16 bg-[#FACC15]/[0.04] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#FACC15]">Jupiter quote</p>
+                        <p className="mt-2 text-xs leading-5 text-white/56">{walletPlan.jupiterQuoteRequest.reason}</p>
+                      </div>
+                      <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${walletPhaseClass(walletPlan.jupiterQuoteRequest.status === 'ready' ? 'ready' : 'review')}`}>
+                        {walletPlan.jupiterQuoteRequest.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      {[
+                        ['Input', `${walletPlan.jupiterQuoteRequest.amountUi || '-'} ${walletPlan.jupiterQuoteRequest.inputSymbol}`],
+                        ['Output', walletPlan.jupiterQuoteRequest.outputSymbol],
+                        ['Slippage', `${walletPlan.jupiterQuoteRequest.slippageBps} bps`],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-xl border border-white/8 bg-black/22 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">{label}</p>
+                          <p className="mt-1 break-words text-sm font-bold text-white/72">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={fetchJupiterQuote}
+                      disabled={jupiterQuote.loading || walletPlan.jupiterQuoteRequest.status !== 'ready'}
+                      className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#FACC15]/22 bg-[#FACC15]/10 px-4 text-sm font-black text-[#FACC15] transition hover:bg-[#FACC15]/16 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {jupiterQuote.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                      {jupiterQuote.loading ? 'Fetching quote' : 'Fetch read-only quote'}
+                    </button>
+                    {jupiterQuote.error ? (
+                      <p className="mt-3 rounded-xl border border-[#FF5C8A]/16 bg-[#FF5C8A]/[0.05] p-3 text-xs text-[#FF7AA2]">{jupiterQuote.error}</p>
+                    ) : null}
+                    {jupiterQuote.data ? (
+                      <div className="mt-3 rounded-xl border border-[#14F195]/16 bg-[#14F195]/[0.05] p-3">
+                        <p className="text-xs font-black text-[#14F195]">Quote received. No transaction payload was created.</p>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {[
+                            ['Route legs', String(jupiterQuote.data.quote.routePlanCount)],
+                            ['Price impact', jupiterQuote.data.quote.priceImpactPct || 'not returned'],
+                            ['Out amount raw', jupiterQuote.data.quote.outAmountRaw],
+                            ['Min out raw', jupiterQuote.data.quote.otherAmountThresholdRaw || 'not returned'],
+                            ['Context slot', String(jupiterQuote.data.quote.contextSlot || 'not returned')],
+                            ['Time taken', jupiterQuote.data.quote.timeTaken === undefined ? 'not returned' : `${jupiterQuote.data.quote.timeTaken}s`],
+                          ].map(([label, value]) => (
+                            <div key={label} className="rounded-lg border border-white/8 bg-black/22 p-2">
+                              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/34">{label}</p>
+                              <p className="mt-1 break-all font-mono text-xs text-white/68">{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-xs leading-5 text-white/50">{jupiterQuote.data.safety.note}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             ) : (
               <div className="mt-4 rounded-2xl border border-white/8 bg-black/22 p-4 text-sm leading-6 text-white/52">

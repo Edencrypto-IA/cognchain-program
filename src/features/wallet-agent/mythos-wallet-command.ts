@@ -31,6 +31,14 @@ export type MythosWalletCommandPlan = {
   intentType: WalletAgentIntentType;
   routeKind: MythosWalletCommandRouteKind;
   routeStatus: 'preview_only' | 'needs_wallet' | 'needs_fields' | 'devnet_ready' | 'blocked';
+  jupiterQuoteRequest?: {
+    inputSymbol: string;
+    outputSymbol: string;
+    amountUi: number;
+    slippageBps: number;
+    status: 'ready' | 'needs_more_details' | 'unsupported';
+    reason: string;
+  };
   walletAgent: WalletAgentCoreResult;
   confirmation: {
     allowed: boolean;
@@ -55,6 +63,8 @@ export type MythosWalletCommandPlan = {
   };
 };
 
+const JUPITER_SAFE_SYMBOLS = ['SOL', 'USDC', 'USDT', 'JUP', 'BONK'];
+
 function routeKindForIntent(type: WalletAgentIntentType): MythosWalletCommandRouteKind {
   if (type === 'BUY_TOKEN' || type === 'SELL_TOKEN') return 'swap_quote';
   if (type === 'SCHEDULE_PAYMENT') return 'scheduled_payment';
@@ -74,6 +84,88 @@ function routeStatusFor(result: WalletAgentCoreResult): MythosWalletCommandPlan[
   if (result.draft.network === 'solana-devnet' && proposal?.kind === 'transfer_intent') return 'devnet_ready';
 
   return 'preview_only';
+}
+
+function extractSwapSymbols(command: string) {
+  const upper = command.toUpperCase();
+  const symbols = JUPITER_SAFE_SYMBOLS.filter(symbol => new RegExp(`\\b${symbol}\\b`).test(upper));
+  const amountMatch = upper.match(/(\d+(?:[,.]\d+)?)\s*(SOL)\b/);
+
+  if (symbols.length >= 2) {
+    return {
+      inputSymbol: symbols[0],
+      outputSymbol: symbols[1],
+      amountUi: amountMatch ? Number(amountMatch[1].replace(',', '.')) : undefined,
+    };
+  }
+
+  if (symbols.length === 1 && symbols[0] !== 'SOL') {
+    return {
+      inputSymbol: 'SOL',
+      outputSymbol: symbols[0],
+      amountUi: amountMatch ? Number(amountMatch[1].replace(',', '.')) : undefined,
+    };
+  }
+
+  if (/\bUSDC\b/.test(upper)) {
+    return {
+      inputSymbol: 'SOL',
+      outputSymbol: 'USDC',
+      amountUi: amountMatch ? Number(amountMatch[1].replace(',', '.')) : undefined,
+    };
+  }
+
+  return null;
+}
+
+function createJupiterQuoteRequest(
+  command: string,
+  result: WalletAgentCoreResult
+): MythosWalletCommandPlan['jupiterQuoteRequest'] {
+  if (routeKindForIntent(result.draft.type) !== 'swap_quote') return undefined;
+
+  const parsed = extractSwapSymbols(command);
+  if (!parsed) {
+    return {
+      inputSymbol: 'SOL',
+      outputSymbol: result.draft.entities.tokenSymbol || 'UNKNOWN',
+      amountUi: result.draft.entities.amountSol || 0,
+      slippageBps: 50,
+      status: 'needs_more_details',
+      reason: 'Tell Mythos the exact input token, output token, and SOL amount before fetching a Jupiter quote.',
+    };
+  }
+
+  if (!parsed.amountUi || !Number.isFinite(parsed.amountUi) || parsed.amountUi <= 0) {
+    return {
+      inputSymbol: parsed.inputSymbol,
+      outputSymbol: parsed.outputSymbol,
+      amountUi: 0,
+      slippageBps: 50,
+      status: 'needs_more_details',
+      reason: 'A positive SOL amount is required before fetching a Jupiter quote.',
+    };
+  }
+
+  if (!JUPITER_SAFE_SYMBOLS.includes(parsed.inputSymbol) || !JUPITER_SAFE_SYMBOLS.includes(parsed.outputSymbol)) {
+    return {
+      inputSymbol: parsed.inputSymbol,
+      outputSymbol: parsed.outputSymbol,
+      amountUi: parsed.amountUi,
+      slippageBps: 50,
+      status: 'unsupported',
+      reason: 'This token is not enabled in the safe Jupiter quote allowlist yet.',
+    };
+  }
+
+  return {
+    inputSymbol: parsed.inputSymbol,
+    outputSymbol: parsed.outputSymbol,
+    amountUi: parsed.amountUi,
+    slippageBps: 50,
+    status: 'ready',
+    reason: 'Safe read-only Jupiter quote can be fetched. No swap transaction will be created.',
+  };
 }
 
 function statusFromRoute(routeStatus: MythosWalletCommandPlan['routeStatus']) {
@@ -161,6 +253,7 @@ export function createMythosWalletCommandPlan(input: WalletAgentCommandInput): M
   const routeStatus = routeStatusFor(confirmed);
   const routeKind = routeKindForIntent(confirmed.draft.type);
   const valueMoving = isValueMovingIntent(confirmed.draft.type);
+  const jupiterQuoteRequest = createJupiterQuoteRequest(input.prompt, confirmed);
 
   return {
     ok: true,
@@ -169,6 +262,7 @@ export function createMythosWalletCommandPlan(input: WalletAgentCommandInput): M
     intentType: confirmed.draft.type,
     routeKind,
     routeStatus,
+    jupiterQuoteRequest,
     walletAgent: confirmed,
     confirmation: {
       allowed: confirmationCheck.allowed,

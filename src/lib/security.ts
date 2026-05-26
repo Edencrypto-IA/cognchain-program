@@ -56,6 +56,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/wallet-agent/production/status': { windowMs: 60_000, maxRequests: 20 },
   '/api/nft/mint': { windowMs: 60_000, maxRequests: 3 },
   '/api/solscan': { windowMs: 60_000, maxRequests: 20 },
+  '/api/wallet-agent/jupiter/quote': { windowMs: 60_000, maxRequests: 20 },
 };
 
 const GLOBAL_DEFAULT: RateLimitConfig = { windowMs: 60_000, maxRequests: 60 };

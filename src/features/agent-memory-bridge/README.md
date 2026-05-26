@@ -249,3 +249,19 @@ The ladder cannot:
 - turn memory writes into execution approval;
 - buy, sell, pay, schedule, retry, submit, or move funds without visible wallet
   approval.
+
+### Jupiter quote boundary
+
+Mythos can ask the Wallet Agent server for a Jupiter quote when a command clearly
+names an allowed pair such as `SOL -> USDC`.
+
+This quote step:
+
+- uses Jupiter `/swap/v1/quote`;
+- returns route, output, slippage, price-impact, slot, and timing metadata;
+- never calls Jupiter `/swap`;
+- never creates an unsigned transaction;
+- never opens Phantom/Solflare;
+- never submits to Solana.
+
+The quote is evidence for human review, not execution permission.
