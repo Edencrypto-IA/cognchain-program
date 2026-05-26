@@ -399,6 +399,12 @@ async function solscanGet<T>(path: string, params: Record<string, string | numbe
   return data;
 }
 
+function settledErrorLabel(result: PromiseSettledResult<unknown>): string {
+  if (result.status === 'fulfilled') return 'ready';
+  if (result.reason instanceof Error) return result.reason.message.slice(0, 160);
+  return 'request failed';
+}
+
 function value(label: string, input: unknown, status: MythosSolanaEvidenceItem['status'] = 'ready'): MythosSolanaEvidenceItem {
   const rendered = input === undefined || input === null || input === ''
     ? 'not available'
@@ -971,6 +977,14 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
       ? 'Solscan cross-check ready'
       : 'Solscan cross-check unavailable',
   ].join('; ');
+  const solscanStatus = cluster !== 'mainnet'
+    ? 'Solscan cross-check is mainnet only'
+    : [
+      process.env.SOLSCAN_API_KEY ? 'SOLSCAN_API_KEY configured' : 'SOLSCAN_API_KEY not configured',
+      `detail: ${settledErrorLabel(solscanDetail)}`,
+      `portfolio: ${settledErrorLabel(solscanPortfolio)}`,
+      `transactions: ${settledErrorLabel(solscanTransactions)}`,
+    ].join('; ');
 
   return {
     subject: wallet,
@@ -979,6 +993,7 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
       value('Cluster checked', cluster),
       value('RPC source', rpcProviderLabel(cluster)),
       value('Cross-source check', crossCheckStatus, solscanDetail.status === 'fulfilled' || indexedAssets.status === 'fulfilled' || balance.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Solscan status', solscanStatus, solscanDetail.status === 'fulfilled' || solscanPortfolio.status === 'fulfilled' || solscanTransactions.status === 'fulfilled' ? 'ready' : 'review'),
       value('SOL balance', solBalanceLabel, balance.status === 'fulfilled' || indexedNativeLamports > 0 || solscanBalanceLamports > 0 ? 'ready' : 'review'),
       value('Portfolio value', typeof solscanDetailData?.total_value === 'number'
         ? `$${solscanDetailData.total_value.toFixed(2)}`
