@@ -103,6 +103,11 @@ type SaveResult = {
   message?: string;
 };
 
+type InfoRow = {
+  label: string;
+  value: string;
+};
+
 const MODES: Array<{
   id: DemoMode;
   title: string;
@@ -249,6 +254,13 @@ function evidenceStatus(result: EngineResult, label: string): EvidenceItem['stat
   return result.evidence.find(item => item.label.toLowerCase() === label.toLowerCase())?.status || 'review';
 }
 
+function cleanModelText(value: string) {
+  return value
+    .replace(/\*\*/g, '')
+    .replace(/^\s*[-*]\s+/gm, '- ')
+    .trim();
+}
+
 function modeExplainer(result: EngineResult) {
   if (result.mode === 'transaction') {
     return {
@@ -311,6 +323,113 @@ function sourceStack(result: EngineResult) {
   }));
 }
 
+function humanReadout(result: EngineResult) {
+  if (result.mode === 'transaction') {
+    const status = evidenceValue(result, 'Status');
+    const impact = evidenceValue(result, 'User impact');
+    return {
+      title: status === 'success' ? 'This transaction appears confirmed' : 'This transaction needs review',
+      body: status === 'success'
+        ? `For a normal user, this means the transaction was found on ${result.cluster} and the chain reported a successful status. ${impact}`
+        : `For a normal user, this means Mythos found a problem or missing evidence before treating this transaction as reliable. ${impact}`,
+      cannotKnow: 'Mythos cannot know the user intent, off-chain agreement, hidden app UI, private keys, or whether the user meant to approve this exact action.',
+    };
+  }
+
+  if (result.mode === 'wallet') {
+    return {
+      title: result.risk.userLabel,
+      body: result.risk.plainEnglish,
+      cannotKnow: 'Mythos cannot prove who owns this wallet, cannot see private keys or seed phrases, and cannot tell whether the wallet owner intends to trade, hold, or transfer.',
+    };
+  }
+
+  if (result.mode === 'token') {
+    return {
+      title: evidenceValue(result, 'Market listing verdict'),
+      body: `For a normal user, this token review checks public evidence: supply, authorities, holder concentration, listing metadata, market data, and recent mint activity. ${result.risk.summary}`,
+      cannotKnow: 'Mythos cannot prove future price, team intent, private liquidity agreements, undisclosed market makers, or whether buying this token is safe.',
+    };
+  }
+
+  return {
+    title: result.risk.userLabel,
+    body: result.risk.plainEnglish,
+    cannotKnow: 'Mythos only uses visible evidence and user-provided context. It cannot inspect private repos, private logs, secrets, or hidden infrastructure.',
+  };
+}
+
+function developerReadout(result: EngineResult): InfoRow[] {
+  if (result.mode === 'transaction') {
+    return [
+      { label: 'Failure class', value: evidenceValue(result, 'Failure class') },
+      { label: 'Program families', value: evidenceValue(result, 'Program families') },
+      { label: 'Compute profile', value: evidenceValue(result, 'Compute profile') },
+      { label: 'Instruction path', value: evidenceValue(result, 'Instructions') },
+    ];
+  }
+
+  if (result.mode === 'wallet') {
+    return [
+      { label: 'Account owner', value: evidenceValue(result, 'Account owner') },
+      { label: 'Failure rate', value: evidenceValue(result, 'Failure rate') },
+      { label: 'Program families', value: evidenceValue(result, 'Detected program families') },
+      { label: 'Trade inference', value: evidenceValue(result, 'Trade inference') },
+    ];
+  }
+
+  if (result.mode === 'token') {
+    return [
+      { label: 'Token program owner', value: evidenceValue(result, 'Token program owner') },
+      { label: 'Authority verdict', value: evidenceValue(result, 'Token security verdict') },
+      { label: 'Holder distribution', value: evidenceValue(result, 'Distribution verdict') },
+      { label: 'Market pairs', value: evidenceValue(result, 'CMC market pairs') },
+    ];
+  }
+
+  return [
+    { label: 'Skill', value: result.cognitiveTrace.skill },
+    { label: 'Evidence used', value: result.cognitiveTrace.evidenceUsed },
+    { label: 'Decision', value: result.cognitiveTrace.decision },
+    { label: 'Safety boundary', value: result.cognitiveTrace.safetyBoundary },
+  ];
+}
+
+function memoryReplayRows(result: EngineResult): InfoRow[] {
+  return [
+    { label: 'Pattern', value: result.memoryReplay.pattern },
+    { label: 'Previous cases', value: `${result.memoryReplay.previousMatches} similar patterns` },
+    { label: 'Match confidence', value: `${Math.round(result.memoryReplay.confidenceBps / 100)}%` },
+    { label: 'Likely cause', value: result.memoryReplay.likelyCause },
+    { label: 'Replay action', value: 'Save the report only after human review so future Mythos runs can compare against this evidence.' },
+  ];
+}
+
+function proofRows(result: EngineResult, saved: SaveResult | null): InfoRow[] {
+  return [
+    { label: 'Model', value: result.observability.modelLabel || result.observability.model },
+    { label: 'Provider', value: result.observability.provider },
+    { label: 'Latency', value: `${result.observability.latencyMs}ms` },
+    { label: 'Evidence items', value: String(result.evidence.length) },
+    { label: 'Memory status', value: saved?.hash ? 'saved to CongChain' : 'draft only' },
+    { label: 'Memory hash', value: saved?.hash ? short(saved.hash, 24) : 'not saved yet' },
+    { label: 'Read URL', value: saved?.readUrl || 'available after save' },
+    { label: 'Verify URL', value: saved?.verifyUrl || 'available after save' },
+    { label: 'Proof URL', value: saved?.proofUrl || 'available after save' },
+  ];
+}
+
+function liveMonitorRows(result: EngineResult): InfoRow[] {
+  return [
+    { label: 'Cluster', value: result.chainMonitor.cluster },
+    { label: 'Provider', value: result.chainMonitor.provider },
+    { label: 'Slot', value: result.chainMonitor.slotLabel },
+    { label: 'Block height', value: result.chainMonitor.blockHeightLabel },
+    { label: 'Version', value: result.chainMonitor.versionLabel },
+    { label: 'Runtime', value: result.chainMonitor.status },
+  ];
+}
+
 function buildLocalBrief(mode: typeof MODES[number], input: string, cluster: Cluster) {
   return [
     'Mythos Solana Developer Brief',
@@ -346,6 +465,11 @@ export default function MythosSolanaDevConsole() {
   const walletExplainer = result ? walletMeaning(result) : null;
   const resultExplainer = result ? modeExplainer(result) : null;
   const resultSources = result ? sourceStack(result) : [];
+  const resultHumanReadout = result ? humanReadout(result) : null;
+  const resultDeveloperReadout = result ? developerReadout(result) : [];
+  const resultReplayRows = result ? memoryReplayRows(result) : [];
+  const resultProofRows = result ? proofRows(result, saved) : [];
+  const resultLiveRows = result ? liveMonitorRows(result) : [];
 
   async function runAnalysis() {
     setError('');
@@ -679,8 +803,54 @@ export default function MythosSolanaDevConsole() {
                     ))}
                   </div>
 
+                  {resultHumanReadout ? (
+                    <div className="mt-4 rounded-2xl border border-[#5AD7FF]/18 bg-[radial-gradient(circle_at_top_left,rgba(90,215,255,0.09),transparent_34%),rgba(4,12,18,0.72)] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7DE4FF]">Human explanation</p>
+                          <h4 className="mt-1 text-lg font-black text-white">{resultHumanReadout.title}</h4>
+                        </div>
+                        <span className="rounded-full border border-[#5AD7FF]/18 bg-[#5AD7FF]/10 px-3 py-1 text-[10px] font-black uppercase text-[#7DE4FF]">
+                          plain language
+                        </span>
+                      </div>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                        {[
+                          ['What this means', resultHumanReadout.body],
+                          ['What Mythos cannot know', resultHumanReadout.cannotKnow],
+                          ['Best next step', result.risk.nextSafeStep],
+                        ].map(([label, text]) => (
+                          <div key={label} className="rounded-xl border border-white/8 bg-black/24 p-3">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+                            <p className="mt-2 text-xs leading-5 text-white/64">{text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 rounded-2xl border border-[#A855F7]/18 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.10),transparent_32%),rgba(12,6,20,0.62)] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C084FC]">Solana developer view</p>
+                        <h4 className="mt-1 text-lg font-black text-white">Debuggable evidence, not generic AI prose</h4>
+                      </div>
+                      <span className="rounded-full border border-[#A855F7]/18 bg-[#A855F7]/10 px-3 py-1 text-[10px] font-black uppercase text-[#C084FC]">
+                        dev mode
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {resultDeveloperReadout.map(({ label, value }) => (
+                        <div key={label} className="rounded-xl border border-white/8 bg-black/24 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+                          <p className="mt-2 break-words font-mono text-xs leading-5 text-white/64 [overflow-wrap:anywhere]">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <pre className="mt-4 max-w-full whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-[#030306] p-4 text-sm leading-6 text-white/72 [overflow-wrap:anywhere]">
-                    {result.analysis}
+                    {cleanModelText(result.analysis)}
                   </pre>
 
                   {walletExplainer ? (
@@ -757,23 +927,19 @@ export default function MythosSolanaDevConsole() {
                 <aside className="grid min-w-0 gap-4">
                   <div className="rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Live chain monitor</p>
+                    <p className="mt-2 text-xs leading-5 text-white/50">
+                      Mythos checks live chain context before explaining. This is read-only infrastructure telemetry, not a background monitor.
+                    </p>
                     <div className="mt-3 grid gap-2 text-xs leading-5 text-white/58">
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
-                        <span>Cluster</span>
-                        <strong className="text-white/78">{result.chainMonitor.cluster}</strong>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
-                        <span>Provider</span>
-                        <strong className="text-white/78">{result.chainMonitor.provider}</strong>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
-                        <span>Slot</span>
-                        <strong className="text-white/78">{result.chainMonitor.slotLabel}</strong>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
-                        <span>Version</span>
-                        <strong className="text-white/78">{result.chainMonitor.versionLabel}</strong>
-                      </div>
+                      {resultLiveRows.map(({ label, value }) => (
+                        <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
+                          <span>{label}</span>
+                          <strong className="break-words text-right text-white/78 [overflow-wrap:anywhere]">{value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-xl border border-[#14F195]/12 bg-[#14F195]/[0.04] p-3 font-mono text-[11px] leading-5 text-[#14F195]/80">
+                      [LIVE] evidence captured at {new Date(result.observability.timestamp).toLocaleString()}
                     </div>
                   </div>
 
@@ -782,8 +948,32 @@ export default function MythosSolanaDevConsole() {
                       <Radar className="h-4 w-4" />
                       Memory replay
                     </p>
-                    <p className="mt-3 text-sm font-bold text-white">{result.memoryReplay.pattern}</p>
-                    <p className="mt-2 text-xs leading-5 text-white/56">{result.memoryReplay.likelyCause}</p>
+                    <div className="mt-3 grid gap-2">
+                      {resultReplayRows.map(({ label, value }) => (
+                        <div key={label} className="rounded-xl border border-white/8 bg-black/20 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">{label}</p>
+                          <p className="mt-1 break-words text-xs leading-5 text-white/62 [overflow-wrap:anywhere]">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 rounded-xl border border-white/8 bg-black/20 p-3 text-xs leading-5 text-white/50">
+                      Replay is currently derived from bounded CongChain pattern metadata. Saving this analysis makes future comparisons more useful.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.04] p-4">
+                    <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#7DE4FF]">
+                      <ShieldCheck className="h-4 w-4" />
+                      Runtime proof
+                    </p>
+                    <div className="mt-3 grid gap-2">
+                      {resultProofRows.map(({ label, value }) => (
+                        <div key={label} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 p-3 text-xs leading-5 text-white/58">
+                          <span>{label}</span>
+                          <strong className="break-words text-right text-white/78 [overflow-wrap:anywhere]">{value}</strong>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-[#FACC15]/18 bg-[#FACC15]/[0.045] p-4">
@@ -823,7 +1013,7 @@ export default function MythosSolanaDevConsole() {
                   <div className="min-w-0 rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Save as CongChain memory</p>
                     <p className="mt-2 text-xs leading-5 text-white/50">
-                      Saving requires your CongChain agent key. The key is sent once to the server and is not displayed back.
+                      Write this reviewed analysis into the Mythos vault as hash-addressable CongChain memory. The key is sent once to the server and is not displayed back.
                     </p>
                     <input
                       type="password"
@@ -839,11 +1029,11 @@ export default function MythosSolanaDevConsole() {
                       className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#76FF03]/25 bg-[#76FF03]/12 px-4 text-sm font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/18 disabled:cursor-wait disabled:opacity-60"
                     >
                       {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      {saving ? 'Saving memory' : 'Save to CongChain'}
+                      {saving ? 'Saving memory' : 'Write verified memory'}
                     </button>
                     {saved?.hash ? (
                       <div className="mt-3 rounded-xl border border-[#14F195]/18 bg-[#14F195]/[0.06] p-3">
-                        <p className="text-xs font-bold text-[#14F195]">Memory saved</p>
+                        <p className="text-xs font-bold text-[#14F195]">Hash-addressable memory created</p>
                         <p className="mt-1 break-all font-mono text-xs text-white/62 [overflow-wrap:anywhere]">{saved.hash}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {saved.readUrl ? <a className="text-xs font-bold text-[#7DE4FF]" href={saved.readUrl}>Read</a> : null}
@@ -851,7 +1041,11 @@ export default function MythosSolanaDevConsole() {
                           {saved.proofUrl ? <a className="text-xs font-bold text-[#7DE4FF]" href={saved.proofUrl}>Proof</a> : null}
                         </div>
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="mt-3 rounded-xl border border-white/8 bg-black/20 p-3 text-xs leading-5 text-white/46">
+                        No memory has been written yet. Run the analysis, review the evidence, then write only reports worth reusing.
+                      </div>
+                    )}
                   </div>
                 </aside>
               </section>
