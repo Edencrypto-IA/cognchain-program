@@ -130,9 +130,24 @@ New Mythos Lab endpoint:
   - token mint risk scanning, including supply, decimals, mint authority, freeze authority, holder concentration, and recent mint activity;
   - Anchor/program debugging from logs, program IDs, and account evidence;
   - wallet/RPC issue explanation using live health, version, epoch, and blockhash checks;
-  - threat level, AI confidence, memory match, live chain monitor, and memory replay cards;
+  - human-readable explanations for non-crypto users and developer evidence cards for Solana builders;
+  - threat level, AI confidence, memory match, live chain monitor, runtime proof, and memory replay cards;
   - cognitive trace output covering perception, evidence, skill, decision, prediction, boundary, and next step;
-  - explicit "Save to CongChain" flow that writes only an approved summary through `POST /api/memory/write`.
+  - human decision checklist that keeps wallet control, evidence quality, review triggers, and next action visible;
+  - copyable handoff report with risk, evidence, replay, runtime proof, and safety boundary;
+  - explicit "Write verified memory" flow that writes only an approved summary through `POST /api/memory/write`.
+
+Mythos Solana is positioned as AI-native observability for Solana builders: wallets can sign, but they cannot explain risk, failure causes, program behavior, or memory context by themselves. Mythos adds that intelligence layer without replacing Phantom, Solflare, or human approval.
+
+What the Solana console makes visible:
+
+| Layer | What it shows | Safety boundary |
+|---|---|---|
+| Human explanation | Plain-language meaning, what Mythos knows, what it cannot know, and the best next step | Not financial advice |
+| Developer view | Failure class, program families, compute profile, token authorities, wallet owner, or trade inference | Read-only evidence |
+| Memory replay | Similar past patterns, confidence, likely cause, and whether saving would improve future comparisons | User-approved memory only |
+| Runtime proof | Model, provider, latency, evidence count, saved hash, read URL, verify URL, and proof URL | No hidden provider keys |
+| Decision checklist | User control, evidence quality, review trigger, and human decision | No signature or fund movement |
 
 New Solana copilot endpoints:
 

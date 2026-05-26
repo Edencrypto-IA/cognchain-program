@@ -186,6 +186,25 @@ const LIVE_LOGS = [
   '[MEMORY] Ready for CongChain hash if approved',
 ];
 
+const CONTROL_LAYERS = [
+  {
+    title: 'Connect',
+    copy: 'Paste a public transaction, wallet, token mint, Anchor log, or RPC issue. No private key or wallet signature is requested.',
+  },
+  {
+    title: 'Analyze',
+    copy: 'Mythos reads public chain evidence, provider status, program signals, token exposure, and memory patterns.',
+  },
+  {
+    title: 'Explain',
+    copy: 'The result is split into human explanation, Solana developer evidence, risk signals, and a next safe step.',
+  },
+  {
+    title: 'Remember',
+    copy: 'Only after review, the user can write a hash-addressable CongChain memory for future agents to reuse.',
+  },
+];
+
 function short(value: string, length = 18) {
   return value.length > length ? `${value.slice(0, length)}...` : value;
 }
@@ -430,6 +449,55 @@ function liveMonitorRows(result: EngineResult): InfoRow[] {
   ];
 }
 
+function decisionRows(result: EngineResult): InfoRow[] {
+  return [
+    { label: 'User control', value: 'No wallet signature, transaction submission, or fund movement happened in this analysis.' },
+    { label: 'Evidence quality', value: `${result.evidence.filter(item => item.status === 'ready').length}/${result.evidence.length} evidence cards are ready.` },
+    { label: 'Review trigger', value: result.risk.signals[0] || result.risk.summary },
+    { label: 'Human decision', value: result.risk.nextSafeStep },
+  ];
+}
+
+function buildHandoffReport(result: EngineResult, saved: SaveResult | null) {
+  const readyCount = result.evidence.filter(item => item.status === 'ready').length;
+  const reviewCount = result.evidence.filter(item => item.status === 'review').length;
+  const blockedCount = result.evidence.filter(item => item.status === 'blocked').length;
+
+  return [
+    'Mythos Solana Intelligence Report',
+    `Subject: ${result.subject}`,
+    `Mode: ${result.mode}`,
+    `Cluster: ${result.cluster}`,
+    `Risk: ${riskLabel(result.risk.level)} (${result.risk.score}/100)`,
+    `AI confidence: ${Math.round(result.risk.confidenceBps / 100)}%`,
+    `Memory match: ${Math.round(result.risk.memoryMatchBps / 100)}%`,
+    '',
+    'Plain-language explanation:',
+    cleanModelText(humanReadout(result).body),
+    '',
+    'Developer evidence:',
+    ...developerReadout(result).map(item => `- ${item.label}: ${item.value}`),
+    '',
+    'Evidence status:',
+    `- Ready: ${readyCount}`,
+    `- Review: ${reviewCount}`,
+    `- Blocked: ${blockedCount}`,
+    '',
+    'Memory replay:',
+    ...memoryReplayRows(result).map(item => `- ${item.label}: ${item.value}`),
+    '',
+    'Runtime proof:',
+    ...proofRows(result, saved).map(item => `- ${item.label}: ${item.value}`),
+    '',
+    'Safety boundary:',
+    '- Read-only public chain intelligence only.',
+    '- No wallet signature requested.',
+    '- No transaction submitted.',
+    '- No buy, sell, pay, schedule, or fund movement.',
+    '- Not financial advice.',
+  ].join('\n');
+}
+
 function buildLocalBrief(mode: typeof MODES[number], input: string, cluster: Cluster) {
   return [
     'Mythos Solana Developer Brief',
@@ -461,7 +529,7 @@ export default function MythosSolanaDevConsole() {
 
   const active = MODES.find(item => item.id === mode) || MODES[0];
   const localBrief = useMemo(() => buildLocalBrief(active, input, cluster), [active, input, cluster]);
-  const copyText = result ? result.memoryDraft.content : localBrief;
+  const copyText = result ? buildHandoffReport(result, saved) : localBrief;
   const walletExplainer = result ? walletMeaning(result) : null;
   const resultExplainer = result ? modeExplainer(result) : null;
   const resultSources = result ? sourceStack(result) : [];
@@ -470,6 +538,7 @@ export default function MythosSolanaDevConsole() {
   const resultReplayRows = result ? memoryReplayRows(result) : [];
   const resultProofRows = result ? proofRows(result, saved) : [];
   const resultLiveRows = result ? liveMonitorRows(result) : [];
+  const resultDecisionRows = result ? decisionRows(result) : [];
 
   async function runAnalysis() {
     setError('');
@@ -618,6 +687,34 @@ export default function MythosSolanaDevConsole() {
           </div>
         </section>
 
+        <section className="rounded-3xl border border-[#76FF03]/20 bg-[radial-gradient(circle_at_center,rgba(118,255,3,0.09),transparent_32%),linear-gradient(135deg,rgba(4,10,5,0.92),rgba(4,5,10,0.96))] p-5">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Wallets can sign. Mythos helps them understand.</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight">Information first. Signature second. Control always stays with the user.</h2>
+              <p className="mt-3 text-sm leading-6 text-white/58">
+                This Solana surface is designed as an intelligence layer beside Phantom, Solflare, explorers, and RPC providers. It explains public evidence before a human decides what to trust.
+              </p>
+              <div className="mt-4 rounded-2xl border border-[#14F195]/14 bg-[#14F195]/[0.045] p-4">
+                <p className="text-sm font-black text-[#14F195]">CognChain never accesses wallet keys, never signs for the user, and never controls funds.</p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {CONTROL_LAYERS.map((item, index) => (
+                <div key={item.title} className="rounded-2xl border border-white/8 bg-black/24 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#76FF03]/24 bg-[#76FF03]/10 text-xs font-black text-[#A7FF3D]">
+                      {index + 1}
+                    </span>
+                    <h3 className="text-base font-black text-white">{item.title}</h3>
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-white/56">{item.copy}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="grid min-w-0 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
           <aside className="rounded-2xl border border-[#76FF03]/18 bg-[#071008] p-4">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Choose a Solana workflow</p>
@@ -729,7 +826,7 @@ export default function MythosSolanaDevConsole() {
                   className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-bold text-white/68 transition hover:bg-white/[0.07]"
                 >
                   <Copy className="h-4 w-4" />
-                  {copied ? 'Copied' : 'Copy report'}
+                  {copied ? 'Copied' : 'Copy handoff report'}
                 </button>
                 <a
                   href="/dashboard/keys"
@@ -921,6 +1018,26 @@ export default function MythosSolanaDevConsole() {
                         <p className="mt-2 break-words text-xs leading-5 text-white/58 [overflow-wrap:anywhere]">{item.value}</p>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-[#76FF03]/18 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.08),transparent_32%),rgba(5,14,8,0.72)] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">Decision checklist</p>
+                        <h4 className="mt-1 text-lg font-black text-white">What a human should verify before acting</h4>
+                      </div>
+                      <span className="rounded-full border border-[#76FF03]/18 bg-[#76FF03]/10 px-3 py-1 text-[10px] font-black uppercase text-[#A7FF3D]">
+                        human controlled
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {resultDecisionRows.map(({ label, value }) => (
+                        <div key={label} className="rounded-xl border border-white/8 bg-black/24 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+                          <p className="mt-2 text-xs leading-5 text-white/64">{value}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
