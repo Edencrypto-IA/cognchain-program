@@ -280,6 +280,25 @@ type SolscanAccountTransactionsResult = {
   }>;
 };
 
+type SolscanTransactionDetailResult = {
+  success?: boolean;
+  data?: {
+    trans_id?: string;
+    block_time?: number;
+    slot?: number;
+    fee?: number;
+    status?: string;
+    signer?: string[];
+    parsed_instructions?: Array<{
+      type?: string;
+      program?: string;
+      program_id?: string;
+    }>;
+    token_balances?: unknown[];
+    sol_bal_change?: unknown[];
+  };
+};
+
 type EpochInfoResult = {
   blockHeight?: number;
   epoch?: number;
@@ -454,6 +473,96 @@ function computeHint(logs: string[]): string {
   return 'not reported';
 }
 
+function computeProfile(value: number | string | undefined): string {
+  if (typeof value === 'number') {
+    if (value >= 180_000) return `${value} units, high compute pressure`;
+    if (value >= 80_000) return `${value} units, medium compute profile`;
+    return `${value} units, light compute profile`;
+  }
+
+  const text = String(value || '');
+  const match = text.match(/([0-9]+)\s+of\s+([0-9]+)/);
+  if (!match) return text || 'not reported';
+  const used = Number(match[1]);
+  const limit = Number(match[2]);
+  const pct = limit > 0 ? used / limit : 0;
+  if (pct >= 0.85) return `${used} of ${limit}, near compute limit`;
+  if (pct >= 0.45) return `${used} of ${limit}, medium compute profile`;
+  return `${used} of ${limit}, light compute profile`;
+}
+
+function transactionFailureClass(err: string, logs: string[]): string {
+  const joined = `${err} ${logs.join(' ')}`.toLowerCase();
+  if (err === 'none') return 'successful execution';
+  if (/constraintseeds|seeds/i.test(joined)) return 'Anchor PDA seed mismatch';
+  if (/custom program error|instructionerror/i.test(joined)) return 'program-level instruction error';
+  if (/blockhash/i.test(joined)) return 'expired or invalid blockhash';
+  if (/insufficient funds/i.test(joined)) return 'insufficient funds or fee balance';
+  if (/compute/i.test(joined)) return 'compute budget or CPI pressure';
+  return 'failed transaction; inspect logs and program accounts';
+}
+
+function walletActivityProfile(input: {
+  balance: number;
+  txs: number;
+  failedTxs: number;
+  tokenCount: number;
+  portfolioValue?: number;
+}) {
+  const failureRate = input.txs > 0 ? input.failedTxs / input.txs : 0;
+  const valueLabel = typeof input.portfolioValue === 'number' && input.portfolioValue > 0
+    ? `$${input.portfolioValue.toFixed(2)} portfolio`
+    : 'portfolio value unavailable';
+
+  if (input.balance === 0 && input.txs === 0 && input.tokenCount === 0) {
+    return {
+      profile: 'blank or newly created wallet',
+      temperature: 'cold',
+      failureRateLabel: '0%',
+      digest: 'No recent public activity, SOL, or token balances were found.',
+      valueLabel,
+    };
+  }
+
+  const temperature = input.txs >= 15 || input.tokenCount >= 6
+    ? 'active'
+    : input.txs >= 3 || input.tokenCount > 0
+      ? 'warming'
+      : 'low activity';
+  const profile = failureRate >= 0.4
+    ? 'active wallet with repeated failed transactions'
+    : input.tokenCount >= 10
+      ? 'active wallet with broad token exposure'
+      : input.tokenCount > 0 || input.balance > 0
+        ? 'funded wallet with observable activity'
+        : 'low-activity wallet';
+
+  return {
+    profile,
+    temperature,
+    failureRateLabel: `${Math.round(failureRate * 100)}%`,
+    digest: `${input.txs} sampled transaction${input.txs === 1 ? '' : 's'}, ${input.failedTxs} failure${input.failedTxs === 1 ? '' : 's'}, ${input.tokenCount} token account${input.tokenCount === 1 ? '' : 's'} with balance.`,
+    valueLabel,
+  };
+}
+
+function distributionVerdict(largestShare: number | null, top10Share: number | null): string {
+  if (largestShare === null && top10Share === null) return 'distribution unavailable';
+  if ((largestShare || 0) >= 35 || (top10Share || 0) >= 70) return 'concentrated holder distribution';
+  if ((largestShare || 0) <= 12 && (top10Share || 0) <= 55) return 'healthier holder spread from available data';
+  return 'mixed holder distribution; review top accounts';
+}
+
+function authorityVerdict(mintAuthority: string, freezeAuthority: string): string {
+  const mintActive = mintAuthority !== 'none' && mintAuthority !== 'not parsed';
+  const freezeActive = freezeAuthority !== 'none' && freezeAuthority !== 'not parsed';
+  if (mintActive && freezeActive) return 'mint and freeze authorities active';
+  if (mintActive) return 'mint authority active';
+  if (freezeActive) return 'freeze authority active';
+  if (mintAuthority === 'none' && freezeAuthority === 'none') return 'mint and freeze authorities disabled';
+  return 'authority data incomplete';
+}
+
 function fallbackAnalysis(input: {
   mode: MythosSolanaMode;
   subject: string;
@@ -547,6 +656,14 @@ function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidence
     score += 12;
     signals.push('Recent wallet failures were detected.');
   }
+  if (mode === 'wallet' && /failure rate ([4-9][0-9]|100)%/i.test(joined)) {
+    score += 10;
+    signals.push('A high sampled failure rate suggests repeated transaction or wallet-operation issues.');
+  }
+  if (mode === 'transaction' && /program-level instruction error|anchor pda seed mismatch|compute budget|expired or invalid blockhash/i.test(joined)) {
+    score += 12;
+    signals.push('Transaction evidence maps to a developer-debuggable failure class.');
+  }
   if (mode === 'wallet') {
     const balanceText = evidence.find(item => item.label.toLowerCase() === 'sol balance')?.value || '';
     const accountOwner = evidence.find(item => item.label.toLowerCase() === 'account owner')?.value || '';
@@ -584,6 +701,14 @@ function riskFromEvidence(mode: MythosSolanaMode, evidence: MythosSolanaEvidence
     if (/not found/i.test(accountOwner) && !emptyOrInactive) {
       signals.push('The base wallet account is not funded, but derived token accounts or history may still exist.');
     }
+  }
+  if (mode === 'token' && /coinmarketcap listing not listed|market data source not available|listed markets preview not available/i.test(joined)) {
+    score += 8;
+    signals.push('Market/listing evidence is missing or incomplete.');
+  }
+  if (mode === 'token' && /mint and freeze authorities disabled|healthier holder spread/i.test(joined)) {
+    score -= 8;
+    signals.push('Token authority or distribution evidence lowers the immediate review pressure.');
   }
 
   score = Math.max(1, Math.min(99, score));
@@ -792,20 +917,44 @@ async function buildTransactionEvidence(subject: string, cluster: MythosSolanaCl
   const err = tx.meta?.err ? JSON.stringify(tx.meta.err).slice(0, 300) : 'none';
   const blockTime = tx.blockTime ? new Date(tx.blockTime * 1000).toISOString() : 'not available';
   const accounts = tx.transaction?.message?.accountKeys?.length || 0;
+  const compute = tx.meta?.computeUnitsConsumed || computeHint(logs);
+  const programFamilies = knownProgramSummary(tx);
+  const solscanTx = cluster === 'mainnet'
+    ? await Promise.allSettled([
+      solscanGet<SolscanTransactionDetailResult>('/transaction/detail', { tx: signature }),
+    ]).then(([result]) => result)
+    : { status: 'rejected', reason: new Error('Solscan mainnet only') } as PromiseRejectedResult;
+  const solscanTxData = solscanTx.status === 'fulfilled' ? solscanTx.value.data : undefined;
+  const solscanInstructionPreview = solscanTxData?.parsed_instructions
+    ?.slice(0, 6)
+    .map(item => `${item.program || item.program_id || 'program'}${item.type ? `/${item.type}` : ''}`)
+    .join('; ');
+  const impact = tx.meta?.err
+    ? 'failed before confirmed state changes; review logs and accounts'
+    : tx.meta?.postTokenBalances?.length || tx.meta?.preTokenBalances?.length
+      ? 'confirmed transaction with token balance records'
+      : 'confirmed transaction; inspect account and SOL balance changes for business impact';
 
   return {
     subject: signature,
     evidence: [
       value('Signature', signature),
+      value('Transaction source', solscanTx.status === 'fulfilled' ? 'Solana RPC + Solscan detail' : 'Solana RPC', solscanTx.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Solscan transaction status', solscanTx.status === 'fulfilled' ? solscanTxData?.status || 'ready' : settledErrorLabel(solscanTx), solscanTx.status === 'fulfilled' ? 'ready' : 'review'),
       value('Status', tx.meta?.err ? 'failed' : 'success', tx.meta?.err ? 'review' : 'ready'),
       value('Error', err, tx.meta?.err ? 'review' : 'ready'),
+      value('Failure class', transactionFailureClass(err, logs), tx.meta?.err ? 'review' : 'ready'),
       value('Slot', tx.slot),
       value('Block time', blockTime),
       value('Fee lamports', tx.meta?.fee),
       value('Account keys', accounts),
+      value('Program families', programFamilies, programFamilies === 'not classified from parsed instructions' ? 'review' : 'ready'),
       value('Instructions', instructionSummary(tx)),
-      value('Compute units', tx.meta?.computeUnitsConsumed || computeHint(logs)),
+      value('Solscan instruction preview', solscanInstructionPreview || 'not available', solscanInstructionPreview ? 'ready' : 'review'),
+      value('Compute units', compute),
+      value('Compute profile', computeProfile(compute)),
       value('Token balance records', `${tx.meta?.preTokenBalances?.length || 0} pre / ${tx.meta?.postTokenBalances?.length || 0} post`),
+      value('User impact', impact, tx.meta?.err ? 'review' : 'ready'),
       value('Log sample', logs.length ? logs.join(' | ') : 'not available', logs.length ? 'ready' : 'review'),
     ],
   };
@@ -946,9 +1095,22 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
   const solscanSolBalance = Number(solscanDetailData?.sol_balance || 0);
   const solscanBalanceLamports = solscanLamports || Math.round(solscanSolBalance * 1_000_000_000);
   const bestLamports = Math.max(rpcLamports, indexedNativeLamports, solscanBalanceLamports);
+  const bestSolBalance = bestLamports / 1_000_000_000;
   const solBalanceLabel = balance.status === 'fulfilled' || indexedNativeLamports > 0 || solscanBalanceLamports > 0
-    ? `${(bestLamports / 1_000_000_000).toFixed(6)} SOL`
+    ? `${bestSolBalance.toFixed(6)} SOL`
     : 'not available';
+  const portfolioValue = typeof solscanDetailData?.total_value === 'number'
+    ? solscanDetailData.total_value
+    : solscanPortfolio.status === 'fulfilled' && !Array.isArray(solscanPortfolio.value.data) && typeof solscanPortfolio.value.data?.total_value === 'number'
+      ? solscanPortfolio.value.data.total_value
+      : undefined;
+  const activity = walletActivityProfile({
+    balance: bestSolBalance,
+    txs: Math.max(sigs.length, solscanRecentTxs.length),
+    failedTxs: failed,
+    tokenCount,
+    portfolioValue,
+  });
   const crossCheckStatus = [
     balance.status === 'fulfilled' ? 'RPC balance ready' : 'RPC balance unavailable',
     indexedAssets.status === 'fulfilled' ? 'Helius DAS ready' : 'Helius DAS unavailable',
@@ -973,17 +1135,18 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
       value('RPC source', rpcProviderLabel(cluster)),
       value('Cross-source check', crossCheckStatus, solscanDetail.status === 'fulfilled' || indexedAssets.status === 'fulfilled' || balance.status === 'fulfilled' ? 'ready' : 'review'),
       value('Solscan status', solscanStatus, solscanDetail.status === 'fulfilled' || solscanPortfolio.status === 'fulfilled' || solscanTransactions.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Wallet profile', activity.profile, activity.profile.includes('failed') ? 'review' : 'ready'),
+      value('Activity temperature', activity.temperature, activity.temperature === 'cold' ? 'review' : 'ready'),
+      value('Wallet digest', activity.digest, activity.temperature === 'cold' ? 'review' : 'ready'),
       value('SOL balance', solBalanceLabel, balance.status === 'fulfilled' || indexedNativeLamports > 0 || solscanBalanceLamports > 0 ? 'ready' : 'review'),
-      value('Portfolio value', typeof solscanDetailData?.total_value === 'number'
-        ? `$${solscanDetailData.total_value.toFixed(2)}`
-        : solscanPortfolio.status === 'fulfilled' && !Array.isArray(solscanPortfolio.value.data) && typeof solscanPortfolio.value.data?.total_value === 'number'
-          ? `$${solscanPortfolio.value.data.total_value.toFixed(2)}`
-          : 'not available', solscanDetailData?.total_value || (solscanPortfolio.status === 'fulfilled' && !Array.isArray(solscanPortfolio.value.data) && solscanPortfolio.value.data?.total_value) ? 'ready' : 'review'),
+      value('Portfolio value', typeof portfolioValue === 'number' ? `$${portfolioValue.toFixed(2)}` : 'not available', typeof portfolioValue === 'number' ? 'ready' : 'review'),
       value('Account owner', account.status === 'fulfilled' ? account.value.value?.owner || solscanDetailData?.owner_program || 'not found' : solscanDetailData?.owner_program || 'not available', account.status === 'fulfilled' && account.value.value || solscanDetailData?.owner_program ? 'ready' : 'review'),
       value('Recent transactions', Math.max(sigs.length, solscanRecentTxs.length)),
       value('Recent failed transactions', failed, failed > 0 ? 'review' : 'ready'),
+      value('Failure rate', activity.failureRateLabel, failed > 0 ? 'review' : 'ready'),
       value('First seen in recent window', firstSeen, sigs.length < 3 ? 'review' : 'ready'),
       value('Token accounts with balance', tokenCount),
+      value('Token diversity', tokenCount >= 10 ? 'broad token exposure' : tokenCount > 0 ? 'limited token exposure' : 'no token exposure found', tokenCount >= 10 ? 'review' : 'ready'),
       value('Token evidence source', tokenEvidenceSource, indexedAssets.status === 'fulfilled' || tokens.length ? 'ready' : 'review'),
       value('Token exposure preview', solscanTokenPreview || indexedTokenPreview || tokenPreview || 'no token balances found in indexed or SPL Token accounts', tokenCount ? 'ready' : 'review'),
       value('Detected program families', programHits.length ? Array.from(new Set(programHits)).join('; ') : 'not classified from recent parsed transactions', programHits.length ? 'ready' : 'review'),
@@ -1085,6 +1248,15 @@ async function buildTokenEvidence(subject: string, cluster: MythosSolanaCluster)
     : solscanMetaValue
       ? 'Solscan token metadata'
       : 'not available';
+  const tokenAuthorityVerdict = authorityVerdict(mintAuthority, freezeAuthority);
+  const tokenDistributionVerdict = distributionSource === 'not available'
+    ? 'distribution unavailable'
+    : distributionVerdict(largestShare, top10Share);
+  const marketListingVerdict = cmcInfoValue
+    ? `listed on CoinMarketCap${cmcQuoteValue?.cmc_rank ? `, rank ${cmcQuoteValue.cmc_rank}` : ''}`
+    : solscanMetaValue
+      ? 'visible in Solscan metadata, not matched to CoinMarketCap'
+      : 'not listed in configured market data sources';
 
   return {
     subject: mint,
@@ -1092,6 +1264,9 @@ async function buildTokenEvidence(subject: string, cluster: MythosSolanaCluster)
       value('Mint address', mint),
       value('Token name', tokenName, tokenName === 'not available' ? 'review' : 'ready'),
       value('Token symbol', tokenSymbol, tokenSymbol === 'not available' ? 'review' : 'ready'),
+      value('Token security verdict', tokenAuthorityVerdict, tokenAuthorityVerdict.includes('active') || tokenAuthorityVerdict.includes('incomplete') ? 'review' : 'ready'),
+      value('Distribution verdict', tokenDistributionVerdict, tokenDistributionVerdict.includes('concentrated') || tokenDistributionVerdict.includes('unavailable') ? 'review' : 'ready'),
+      value('Market listing verdict', marketListingVerdict, cmcInfoValue ? 'ready' : 'review'),
       value('Token program owner', mintInfo.status === 'fulfilled' ? mintInfo.value.value?.owner || 'not found' : 'not available', mintInfo.status === 'fulfilled' && mintInfo.value.value ? 'ready' : 'review'),
       value('Supply', uiSupply, supply.status === 'fulfilled' ? 'ready' : 'review'),
       value('Circulating supply', cmcQuoteValue?.circulating_supply ? cmcQuoteValue.circulating_supply.toLocaleString('en-US') : 'not available', cmcQuoteValue?.circulating_supply ? 'ready' : 'review'),
@@ -1111,6 +1286,7 @@ async function buildTokenEvidence(subject: string, cluster: MythosSolanaCluster)
       value('CMC market pairs', cmcMarketPairCount || 'not available', cmcMarketPairCount ? 'ready' : 'review'),
       value('Listed markets preview', cmcListings || 'not available', cmcListings ? 'ready' : 'review'),
       value('Price USD', typeof cmcUsd?.price === 'number' ? `$${cmcUsd.price.toPrecision(8)}` : typeof solscanMetaValue?.price === 'number' ? `$${solscanMetaValue.price.toPrecision(8)}` : 'not available', typeof cmcUsd?.price === 'number' || typeof solscanMetaValue?.price === 'number' ? 'ready' : 'review'),
+      value('Price change 24h', typeof cmcUsd?.percent_change_24h === 'number' ? `${cmcUsd.percent_change_24h.toFixed(2)}%` : typeof solscanMetaValue?.price_change_24h === 'number' ? `${solscanMetaValue.price_change_24h.toFixed(2)}%` : 'not available', typeof cmcUsd?.percent_change_24h === 'number' || typeof solscanMetaValue?.price_change_24h === 'number' ? 'ready' : 'review'),
       value('Market cap', typeof cmcUsd?.market_cap === 'number' ? `$${cmcUsd.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.market_cap === 'number' ? `$${solscanMetaValue.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.market_cap === 'number' || typeof solscanMetaValue?.market_cap === 'number' ? 'ready' : 'review'),
       value('Volume 24h', typeof cmcUsd?.volume_24h === 'number' ? `$${cmcUsd.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.volume_24h === 'number' ? `$${solscanMetaValue.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.volume_24h === 'number' || typeof solscanMetaValue?.volume_24h === 'number' ? 'ready' : 'review'),
       value('Largest account count', largestAccounts.length, largestAccounts.length ? 'ready' : 'review'),

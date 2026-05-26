@@ -241,6 +241,76 @@ function walletMeaning(result: EngineResult) {
   };
 }
 
+function evidenceValue(result: EngineResult, label: string) {
+  return result.evidence.find(item => item.label.toLowerCase() === label.toLowerCase())?.value || 'not available';
+}
+
+function evidenceStatus(result: EngineResult, label: string): EvidenceItem['status'] {
+  return result.evidence.find(item => item.label.toLowerCase() === label.toLowerCase())?.status || 'review';
+}
+
+function modeExplainer(result: EngineResult) {
+  if (result.mode === 'transaction') {
+    return {
+      title: 'Transaction readout',
+      subtitle: evidenceValue(result, 'Failure class'),
+      primary: 'What happened',
+      primaryValue: evidenceValue(result, 'User impact'),
+      secondary: 'Programs involved',
+      secondaryValue: evidenceValue(result, 'Program families'),
+      action: result.risk.nextSafeStep,
+    };
+  }
+
+  if (result.mode === 'wallet') {
+    return {
+      title: 'Wallet readout',
+      subtitle: evidenceValue(result, 'Wallet profile'),
+      primary: 'Public activity',
+      primaryValue: evidenceValue(result, 'Wallet digest'),
+      secondary: 'Token exposure',
+      secondaryValue: evidenceValue(result, 'Token diversity'),
+      action: result.risk.nextSafeStep,
+    };
+  }
+
+  if (result.mode === 'token') {
+    return {
+      title: 'Token readout',
+      subtitle: evidenceValue(result, 'Market listing verdict'),
+      primary: 'Authority check',
+      primaryValue: evidenceValue(result, 'Token security verdict'),
+      secondary: 'Holder distribution',
+      secondaryValue: evidenceValue(result, 'Distribution verdict'),
+      action: 'Review authority, holder concentration, market listing, and liquidity before trusting the token operationally.',
+    };
+  }
+
+  return {
+    title: 'Developer readout',
+    subtitle: result.risk.userLabel,
+    primary: 'Evidence state',
+    primaryValue: result.risk.summary,
+    secondary: 'Skill used',
+    secondaryValue: result.cognitiveTrace.skill,
+    action: result.risk.nextSafeStep,
+  };
+}
+
+function sourceStack(result: EngineResult) {
+  const sourceLabels = result.mode === 'token'
+    ? ['Market data source', 'CoinMarketCap listing', 'Distribution source']
+    : result.mode === 'wallet'
+      ? ['RPC source', 'Solscan status', 'Token evidence source']
+      : ['Transaction source', 'Solscan transaction status', 'Program families'];
+
+  return sourceLabels.map(label => ({
+    label,
+    value: evidenceValue(result, label),
+    status: evidenceStatus(result, label),
+  }));
+}
+
 function buildLocalBrief(mode: typeof MODES[number], input: string, cluster: Cluster) {
   return [
     'Mythos Solana Developer Brief',
@@ -274,6 +344,8 @@ export default function MythosSolanaDevConsole() {
   const localBrief = useMemo(() => buildLocalBrief(active, input, cluster), [active, input, cluster]);
   const copyText = result ? result.memoryDraft.content : localBrief;
   const walletExplainer = result ? walletMeaning(result) : null;
+  const resultExplainer = result ? modeExplainer(result) : null;
+  const resultSources = result ? sourceStack(result) : [];
 
   async function runAnalysis() {
     setError('');
@@ -565,6 +637,48 @@ export default function MythosSolanaDevConsole() {
                       </span>
                     </div>
                   </div>
+
+                  {resultExplainer ? (
+                    <div className="mt-4 rounded-2xl border border-[#76FF03]/20 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.12),transparent_34%),rgba(5,16,8,0.72)] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">{resultExplainer.title}</p>
+                          <h4 className="mt-1 text-xl font-black text-white">{resultExplainer.subtitle}</h4>
+                        </div>
+                        <div className={`rounded-2xl border px-4 py-3 text-right ${riskClass(result.risk.level)}`}>
+                          <p className="text-[10px] font-black uppercase tracking-[0.12em]">Risk score</p>
+                          <p className="mt-1 text-3xl font-black">{result.risk.score}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                        {[
+                          [resultExplainer.primary, resultExplainer.primaryValue],
+                          [resultExplainer.secondary, resultExplainer.secondaryValue],
+                          ['Human next step', resultExplainer.action],
+                        ].map(([label, text]) => (
+                          <div key={label} className="rounded-xl border border-white/8 bg-black/24 p-3">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+                            <p className="mt-2 break-words text-xs leading-5 text-white/66 [overflow-wrap:anywhere]">{text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    {resultSources.map(item => (
+                      <div key={item.label} className="rounded-2xl border border-white/8 bg-black/22 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/34">{item.label}</p>
+                          <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${statusClass(item.status)}`}>
+                            {item.status}
+                          </span>
+                        </div>
+                        <p className="mt-2 break-words text-xs leading-5 text-white/62 [overflow-wrap:anywhere]">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
                   <pre className="mt-4 max-w-full whitespace-pre-wrap break-words rounded-2xl border border-white/8 bg-[#030306] p-4 text-sm leading-6 text-white/72 [overflow-wrap:anywhere]">
                     {result.analysis}
                   </pre>
