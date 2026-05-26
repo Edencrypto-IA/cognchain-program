@@ -1,6 +1,11 @@
 import { callModel } from '@/services/ai';
 import { Limits, ValidationError, validateModel } from '@/lib/security';
 import { solscanGet } from '@/lib/solana/solscan';
+import {
+  getCoinMarketCapInfoByAddress,
+  getCoinMarketCapMarketPairsById,
+  getCoinMarketCapQuoteById,
+} from '@/lib/market/coinmarketcap';
 
 export type MythosSolanaMode = 'transaction' | 'wallet' | 'token' | 'anchor' | 'rpc';
 export type MythosSolanaCluster = 'mainnet' | 'devnet';
@@ -1024,18 +1029,90 @@ async function buildTokenEvidence(subject: string, cluster: MythosSolanaCluster)
 
   const mintAuthority = typeof info?.mintAuthority === 'string' ? info.mintAuthority : info?.mintAuthority === null ? 'none' : 'not parsed';
   const freezeAuthority = typeof info?.freezeAuthority === 'string' ? info.freezeAuthority : info?.freezeAuthority === null ? 'none' : 'not parsed';
+  const [solscanMeta, solscanHolders, cmcInfo] = await Promise.allSettled([
+    cluster === 'mainnet'
+      ? solscanGet<{ success?: boolean; data?: { name?: string; symbol?: string; icon?: string; holder?: number; price?: number; market_cap?: number; volume_24h?: number } }>('/token/meta', { address: mint })
+      : Promise.reject(new Error('Solscan mainnet only')),
+    cluster === 'mainnet'
+      ? solscanGet<{ success?: boolean; data?: Array<{ address?: string; amount?: string; owner?: string; rank?: number }> }>('/token/holders', {
+        address: mint,
+        page: 1,
+        page_size: 10,
+      })
+      : Promise.reject(new Error('Solscan mainnet only')),
+    cluster === 'mainnet'
+      ? getCoinMarketCapInfoByAddress(mint)
+      : Promise.reject(new Error('CoinMarketCap mainnet only')),
+  ]);
+  const cmcInfoValue = cmcInfo.status === 'fulfilled' ? cmcInfo.value : null;
+  const [cmcQuote, cmcPairs] = cmcInfoValue?.id
+    ? await Promise.allSettled([
+      getCoinMarketCapQuoteById(cmcInfoValue.id),
+      getCoinMarketCapMarketPairsById(cmcInfoValue.id, 8),
+    ])
+    : [
+      { status: 'rejected', reason: new Error('CoinMarketCap token not listed') },
+      { status: 'rejected', reason: new Error('CoinMarketCap token not listed') },
+    ] as [
+      PromiseRejectedResult,
+      PromiseRejectedResult,
+    ];
+  const cmcQuoteValue = cmcQuote.status === 'fulfilled' ? cmcQuote.value : null;
+  const cmcPairsValue = cmcPairs.status === 'fulfilled' ? cmcPairs.value : [];
+  const solscanMetaValue = solscanMeta.status === 'fulfilled' ? solscanMeta.value.data : undefined;
+  const solscanHoldersValue = solscanHolders.status === 'fulfilled' ? solscanHolders.value.data || [] : [];
+  const tokenName = cmcInfoValue?.name || solscanMetaValue?.name || 'not available';
+  const tokenSymbol = cmcInfoValue?.symbol || solscanMetaValue?.symbol || 'not available';
+  const cmcUrl = cmcInfoValue?.slug ? `https://coinmarketcap.com/currencies/${cmcInfoValue.slug}/` : 'not listed or not available';
+  const cmcUsd = cmcQuoteValue?.quote?.USD;
+  const cmcListings = cmcPairsValue
+    .slice(0, 8)
+    .map(item => `${item.exchange?.name || 'Unknown'} ${item.market_pair || ''}`.trim())
+    .filter(Boolean)
+    .join('; ');
+  const cmcMarketPairCount = cmcQuoteValue?.num_market_pairs ?? cmcPairsValue.length;
+  const holderPreview = solscanHoldersValue
+    .slice(0, 5)
+    .map(item => `#${item.rank || '?'} ${(item.owner || item.address || 'unknown').slice(0, 8)}... ${item.amount || '0'}`)
+    .join('; ');
+  const distributionSource = solscanHoldersValue.length
+    ? 'Solscan holders + Solana largest accounts'
+    : largestAccounts.length
+      ? 'Solana largest token accounts'
+      : 'not available';
+  const marketSource = cmcInfoValue
+    ? 'CoinMarketCap'
+    : solscanMetaValue
+      ? 'Solscan token metadata'
+      : 'not available';
 
   return {
     subject: mint,
     evidence: [
       value('Mint address', mint),
+      value('Token name', tokenName, tokenName === 'not available' ? 'review' : 'ready'),
+      value('Token symbol', tokenSymbol, tokenSymbol === 'not available' ? 'review' : 'ready'),
       value('Token program owner', mintInfo.status === 'fulfilled' ? mintInfo.value.value?.owner || 'not found' : 'not available', mintInfo.status === 'fulfilled' && mintInfo.value.value ? 'ready' : 'review'),
       value('Supply', uiSupply, supply.status === 'fulfilled' ? 'ready' : 'review'),
+      value('Circulating supply', cmcQuoteValue?.circulating_supply ? cmcQuoteValue.circulating_supply.toLocaleString('en-US') : 'not available', cmcQuoteValue?.circulating_supply ? 'ready' : 'review'),
+      value('Max supply', cmcQuoteValue?.max_supply ? cmcQuoteValue.max_supply.toLocaleString('en-US') : 'not available', cmcQuoteValue?.max_supply ? 'ready' : 'review'),
       value('Decimals', supply.status === 'fulfilled' ? supply.value.value?.decimals : 'not available', supply.status === 'fulfilled' ? 'ready' : 'review'),
       value('Mint authority', mintAuthority, mintAuthority === 'none' ? 'ready' : 'review'),
       value('Freeze authority', freezeAuthority, freezeAuthority === 'none' ? 'ready' : 'review'),
+      value('Holder count', solscanMetaValue?.holder ?? 'not available', solscanMetaValue?.holder ? 'ready' : 'review'),
       value('Largest holder share', largestShare === null ? 'not available' : `${largestShare.toFixed(2)}%`, largestShare !== null && largestShare <= 20 ? 'ready' : 'review'),
       value('Top 10 holder share', top10Share === null ? 'not available' : `${top10Share.toFixed(2)}%`, top10Share !== null && top10Share <= 55 ? 'ready' : 'review'),
+      value('Distribution source', distributionSource, distributionSource === 'not available' ? 'review' : 'ready'),
+      value('Top holders preview', holderPreview || 'not available', holderPreview ? 'ready' : 'review'),
+      value('Market data source', marketSource, marketSource === 'not available' ? 'review' : 'ready'),
+      value('CoinMarketCap listing', cmcInfoValue ? `${cmcInfoValue.name} (${cmcInfoValue.symbol})` : 'not listed or API unavailable', cmcInfoValue ? 'ready' : 'review'),
+      value('CoinMarketCap URL', cmcUrl, cmcInfoValue?.slug ? 'ready' : 'review'),
+      value('CMC rank', cmcQuoteValue?.cmc_rank ?? 'not available', cmcQuoteValue?.cmc_rank ? 'ready' : 'review'),
+      value('CMC market pairs', cmcMarketPairCount || 'not available', cmcMarketPairCount ? 'ready' : 'review'),
+      value('Listed markets preview', cmcListings || 'not available', cmcListings ? 'ready' : 'review'),
+      value('Price USD', typeof cmcUsd?.price === 'number' ? `$${cmcUsd.price.toPrecision(8)}` : typeof solscanMetaValue?.price === 'number' ? `$${solscanMetaValue.price.toPrecision(8)}` : 'not available', typeof cmcUsd?.price === 'number' || typeof solscanMetaValue?.price === 'number' ? 'ready' : 'review'),
+      value('Market cap', typeof cmcUsd?.market_cap === 'number' ? `$${cmcUsd.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.market_cap === 'number' ? `$${solscanMetaValue.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.market_cap === 'number' || typeof solscanMetaValue?.market_cap === 'number' ? 'ready' : 'review'),
+      value('Volume 24h', typeof cmcUsd?.volume_24h === 'number' ? `$${cmcUsd.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.volume_24h === 'number' ? `$${solscanMetaValue.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.volume_24h === 'number' || typeof solscanMetaValue?.volume_24h === 'number' ? 'ready' : 'review'),
       value('Largest account count', largestAccounts.length, largestAccounts.length ? 'ready' : 'review'),
       value('Recent mint activity', sigs.length, sigs.length >= 3 ? 'ready' : 'review'),
       value('First seen in recent window', firstSeen, sigs.length < 3 ? 'review' : 'ready'),
