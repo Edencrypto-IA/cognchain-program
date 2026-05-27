@@ -419,9 +419,9 @@ function formatMarketReportText(report: MythosCryptoMarketReport) {
 
 function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
   const list = report.mode === 'memes'
-    ? report.assets.memeLeaders.map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
+    ? (report.assets?.memeLeaders ?? []).map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
     : report.mode === 'volume'
-      ? report.assets.volumeLeaders.map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
+      ? (report.assets?.volumeLeaders ?? []).map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
       : report.mode === 'protocols'
         ? report.defi.topProtocols.map((protocol, index) => `${index + 1}. ${protocol.name} - ${protocol.tvlLabel} TVL (${protocol.category})`)
         : [
