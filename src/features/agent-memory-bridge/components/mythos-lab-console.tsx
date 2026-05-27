@@ -1023,17 +1023,12 @@ export default function MythosLabConsole() {
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
               <div className={`flex flex-1 flex-col ${hasConversation ? 'justify-start pt-6' : 'justify-center'}`}>
                 {!hasConversation ? (
-                  <div className="mx-auto flex w-full max-w-3xl flex-col items-center text-center">
-                    <div className="relative h-72 w-72 sm:h-96 sm:w-96">
-                      <div className="absolute inset-0 rounded-full bg-[#76FF03]/10 blur-3xl" />
-                      <img src={profile.image} alt="" className="relative h-full w-full object-contain opacity-90 drop-shadow-[0_0_46px_rgba(118,255,3,0.22)]" />
-                    </div>
-                    <p className="mt-2 text-5xl font-black uppercase tracking-[0.34em] text-[#A7FF3D] drop-shadow-[0_0_24px_rgba(118,255,3,0.28)] sm:text-6xl">
-                      Mythos
-                    </p>
-                    <p className="mt-3 text-sm font-medium uppercase tracking-[0.28em] text-white/50">
-                      The 1st autonomous external agent
-                    </p>
+                  <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
+                    <img
+                      src="/agents/mythos-terminal.png"
+                      alt="Mythos, the first autonomous external agent"
+                      className="w-full max-w-[720px] object-contain opacity-95 drop-shadow-[0_0_58px_rgba(118,255,3,0.18)]"
+                    />
                   </div>
                 ) : (
                   <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 pb-6">
