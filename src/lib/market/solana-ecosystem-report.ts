@@ -12,10 +12,29 @@ export type SolanaProtocolSummary = {
   chains: string[];
 };
 
+export type SolanaAssetSummary = {
+  id: string;
+  symbol: string;
+  name: string;
+  image?: string;
+  price: number | null;
+  priceLabel: string;
+  marketCapUsd: number | null;
+  marketCapLabel: string;
+  volume24hUsd: number | null;
+  volume24hLabel: string;
+  change24h: number | null;
+  change24hLabel: string;
+  rank: number | null;
+};
+
+export type MythosSolanaReportMode = 'price' | 'protocols' | 'volume' | 'memes';
+
 export type MythosSolanaEcosystemReport = {
   ok: true;
   generatedAt: string;
   symbol: 'SOL';
+  mode: MythosSolanaReportMode;
   sources: string[];
   price: {
     usd: number | null;
@@ -37,6 +56,10 @@ export type MythosSolanaEcosystemReport = {
     totalTvlLabel: string;
     protocolCount: number;
     topProtocols: SolanaProtocolSummary[];
+  };
+  assets: {
+    volumeLeaders: SolanaAssetSummary[];
+    memeLeaders: SolanaAssetSummary[];
   };
   readout: {
     sentiment: 'bullish' | 'neutral' | 'risk_off';
@@ -71,6 +94,18 @@ type DefiLlamaProtocol = {
   change_1d?: number;
   change_7d?: number;
   url?: string;
+};
+
+type CoinGeckoMarketAsset = {
+  id?: string;
+  symbol?: string;
+  name?: string;
+  image?: string;
+  current_price?: number;
+  market_cap?: number;
+  market_cap_rank?: number;
+  total_volume?: number;
+  price_change_percentage_24h?: number;
 };
 
 async function safeFetchJson<T>(url: string, timeoutMs = 8000): Promise<T | null> {
@@ -122,6 +157,17 @@ function categoryFor(protocol: DefiLlamaProtocol) {
   return raw;
 }
 
+function isRealSolanaProtocol(protocol: DefiLlamaProtocol) {
+  const chains = Array.isArray(protocol.chains) ? protocol.chains : [];
+  const category = String(protocol.category || '').toLowerCase();
+  const name = String(protocol.name || '').toLowerCase();
+  if (!chains.includes('Solana')) return false;
+  if (!Number(protocol.tvl) || Number(protocol.tvl) <= 0) return false;
+  if (category === 'cex' || category.includes('centralized')) return false;
+  if (/binance|okx|bitfinex|bybit|coinbase|kraken|kucoin|mexc|gate\.?io|crypto\.com/.test(name)) return false;
+  return true;
+}
+
 function protocolToSummary(protocol: DefiLlamaProtocol): SolanaProtocolSummary {
   const tvl = typeof protocol.tvl === 'number' ? protocol.tvl : 0;
   return {
@@ -136,49 +182,94 @@ function protocolToSummary(protocol: DefiLlamaProtocol): SolanaProtocolSummary {
   };
 }
 
-function readoutFor(change24h: number | null, totalTvl: number, protocols: SolanaProtocolSummary[]) {
+function assetToSummary(asset: CoinGeckoMarketAsset): SolanaAssetSummary {
+  const price = typeof asset.current_price === 'number' ? asset.current_price : null;
+  const marketCap = typeof asset.market_cap === 'number' ? asset.market_cap : null;
+  const volume = typeof asset.total_volume === 'number' ? asset.total_volume : null;
+  const change24h = typeof asset.price_change_percentage_24h === 'number' ? asset.price_change_percentage_24h : null;
+  return {
+    id: asset.id || asset.symbol || 'unknown',
+    symbol: String(asset.symbol || '---').toUpperCase(),
+    name: asset.name || 'Unknown asset',
+    image: asset.image,
+    price,
+    priceLabel: fmtUsd(price),
+    marketCapUsd: marketCap,
+    marketCapLabel: fmtUsd(marketCap),
+    volume24hUsd: volume,
+    volume24hLabel: fmtUsd(volume),
+    change24h,
+    change24hLabel: fmtPct(change24h),
+    rank: typeof asset.market_cap_rank === 'number' ? asset.market_cap_rank : null,
+  };
+}
+
+function readoutFor(mode: MythosSolanaReportMode, change24h: number | null, totalTvl: number, protocols: SolanaProtocolSummary[], volumeLeaders: SolanaAssetSummary[], memeLeaders: SolanaAssetSummary[]) {
   const sentiment = change24h !== null && change24h > 2
     ? 'bullish'
     : change24h !== null && change24h < -2
       ? 'risk_off'
       : 'neutral';
   const leader = protocols[0]?.name || 'the top protocol';
-  const headline = sentiment === 'bullish'
-    ? 'SOL has positive short-term momentum while Solana DeFi remains active.'
-    : sentiment === 'risk_off'
-      ? 'SOL is under pressure, so protocol strength matters more than price alone.'
-      : 'SOL is near neutral momentum; ecosystem TVL gives the better context.';
+  const volumeLeader = volumeLeaders[0]?.symbol || 'the leading asset';
+  const memeLeader = memeLeaders[0]?.symbol || 'the leading meme coin';
+  const headline = mode === 'protocols'
+    ? `Top Solana protocols are ranked by DeFi TVL, excluding centralized exchanges.`
+    : mode === 'volume'
+      ? `${volumeLeader} leads the sampled Solana ecosystem by 24h spot volume.`
+      : mode === 'memes'
+        ? `${memeLeader} leads the sampled Solana meme market, but meme risk stays high.`
+        : sentiment === 'bullish'
+          ? 'SOL has positive short-term momentum while Solana DeFi remains active.'
+          : sentiment === 'risk_off'
+            ? 'SOL is under pressure, so protocol strength matters more than price alone.'
+            : 'SOL is near neutral momentum; ecosystem context matters more than price alone.';
+
+  const plainEnglish = mode === 'protocols'
+    ? `For a non-crypto user: this report shows real Solana DeFi applications, not exchanges. TVL means how much value is sitting inside those applications. ${leader} is currently the largest sampled protocol, and the top 10 protocols represent ${fmtUsd(totalTvl)} in visible DeFi activity.`
+    : mode === 'volume'
+      ? `For a non-crypto user: this report shows which Solana ecosystem assets are moving the most trading volume. Volume means attention and liquidity, but it does not prove safety or quality.`
+      : mode === 'memes'
+        ? `For a non-crypto user: this report shows Solana meme coins by market activity. Meme coins can move fast, but they also carry high liquidity, concentration, and narrative risk.`
+        : `For a non-crypto user: this report focuses on SOL price first. Price shows what the market pays for SOL now. Use the separate protocol, volume, or meme reports when you want ecosystem detail.`;
 
   return {
     sentiment,
     headline,
-    plainEnglish: `For a non-crypto user: this card combines SOL price with Solana DeFi usage. Price shows what the market pays for SOL now. TVL shows how much value is sitting inside Solana applications. ${leader} is currently the largest sampled protocol, and the top 10 protocols represent ${fmtUsd(totalTvl)} in visible DeFi activity.`,
-    nextSafeStep: 'If you are researching Solana, review the largest protocols first, then run token, wallet, and transaction checks before making any financial decision.',
+    plainEnglish,
+    nextSafeStep: mode === 'price'
+      ? 'Use this for SOL market context. If you want projects, run the protocol report; if you want speculative tokens, run the meme report.'
+      : 'Pick one item from the list and run a token, wallet, transaction, or contract check before trusting it.',
   };
 }
 
-export async function getMythosSolanaEcosystemReport(): Promise<MythosSolanaEcosystemReport> {
-  const [solana, protocolsRaw] = await Promise.all([
+export async function getMythosSolanaEcosystemReport(mode: MythosSolanaReportMode = 'price'): Promise<MythosSolanaEcosystemReport> {
+  const [solana, protocolsRaw, solanaAssetsRaw, memeAssetsRaw] = await Promise.all([
     safeFetchJson<CoinGeckoSolana>(`${COINGECKO_API}/coins/solana?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`),
     safeFetchJson<DefiLlamaProtocol[]>(`${DEFILLAMA_API}/protocols`),
+    safeFetchJson<CoinGeckoMarketAsset[]>(`${COINGECKO_API}/coins/markets?vs_currency=usd&category=solana-ecosystem&order=volume_desc&per_page=10&page=1&price_change_percentage=24h`),
+    safeFetchJson<CoinGeckoMarketAsset[]>(`${COINGECKO_API}/coins/markets?vs_currency=usd&category=solana-meme-coins&order=volume_desc&per_page=10&page=1&price_change_percentage=24h`),
   ]);
 
   const market = solana?.market_data;
   const protocols = Array.isArray(protocolsRaw)
     ? protocolsRaw
-        .filter(protocol => Array.isArray(protocol.chains) && protocol.chains.includes('Solana') && Number(protocol.tvl) > 0)
+        .filter(isRealSolanaProtocol)
         .map(protocolToSummary)
         .sort((a, b) => b.tvlUsd - a.tvlUsd)
         .slice(0, 10)
     : [];
+  const volumeLeaders = Array.isArray(solanaAssetsRaw) ? solanaAssetsRaw.map(assetToSummary).slice(0, 10) : [];
+  const memeLeaders = Array.isArray(memeAssetsRaw) ? memeAssetsRaw.map(assetToSummary).slice(0, 10) : [];
   const totalTvl = protocols.reduce((sum, protocol) => sum + protocol.tvlUsd, 0);
   const change24h = typeof market?.price_change_percentage_24h === 'number' ? market.price_change_percentage_24h : null;
-  const readout = readoutFor(change24h, totalTvl, protocols);
+  const readout = readoutFor(mode, change24h, totalTvl, protocols, volumeLeaders, memeLeaders);
 
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
     symbol: 'SOL',
+    mode,
     sources: ['CoinGecko public API', 'DeFiLlama protocols API'],
     price: {
       usd: market?.current_price?.usd ?? null,
@@ -200,6 +291,10 @@ export async function getMythosSolanaEcosystemReport(): Promise<MythosSolanaEcos
       totalTvlLabel: fmtUsd(totalTvl),
       protocolCount: protocols.length,
       topProtocols: protocols,
+    },
+    assets: {
+      volumeLeaders,
+      memeLeaders,
     },
     readout,
     safety: {

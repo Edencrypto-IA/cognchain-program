@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMythosSolanaEcosystemReport } from '@/lib/market/solana-ecosystem-report';
+import { getMythosSolanaEcosystemReport, type MythosSolanaReportMode } from '@/lib/market/solana-ecosystem-report';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
 
 function getIp(request: NextRequest) {
@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const report = await getMythosSolanaEcosystemReport();
+    const rawMode = request.nextUrl.searchParams.get('mode');
+    const mode: MythosSolanaReportMode = rawMode === 'protocols' || rawMode === 'volume' || rawMode === 'memes' ? rawMode : 'price';
+    const report = await getMythosSolanaEcosystemReport(mode);
     return NextResponse.json(report);
   } catch (error) {
     return NextResponse.json({ error: safeErrorMessage(error) }, { status: 500 });

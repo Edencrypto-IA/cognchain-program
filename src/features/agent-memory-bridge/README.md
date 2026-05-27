@@ -287,7 +287,11 @@ Supported commands:
 - `/market report` generates a visual crypto market intelligence report from
   CoinGecko public market data;
 - `/solana report` shows SOL price, market cap, volume, ATH, and the top 10
-  Solana protocols by DeFiLlama TVL;
+  clean SOL market context;
+- `/solana protocols` shows the top 10 Solana DeFi protocols by DeFiLlama TVL,
+  excluding centralized exchanges;
+- `/solana volume` shows Solana ecosystem assets ranked by 24h trading volume;
+- `/solana memes` shows Solana meme coins with high-risk market framing;
 - `/plan <wallet command>` creates the Wallet Agent six-phase safety plan;
 - `/memory save last` saves the last approved Mythos response only when the
   user explicitly provides a full CongChain key.
@@ -326,16 +330,19 @@ It still cannot:
 
 ### Solana ecosystem report
 
-The Mythos Lab can answer beginner-friendly Solana ecosystem questions such as
-"show SOL price and the 10 biggest Solana protocols" with a visual report.
+The Mythos Lab can answer beginner-friendly Solana ecosystem questions with
+separate visual reports for SOL price, protocols, volume, and memes.
 
 It can:
 
 - call `GET /api/mythos/market/solana`;
+- accept `mode=price`, `mode=protocols`, `mode=volume`, or `mode=memes`;
 - fetch SOL price, market cap, 24h volume, ATH, circulating supply, and rank
   from CoinGecko;
-- fetch Solana protocol TVL from DeFiLlama and show the top 10 protocols with
-  category tags and proportional TVL bars;
+- fetch Solana protocol TVL from DeFiLlama and show the top 10 real DeFi
+  protocols with CEX entries filtered out;
+- fetch Solana ecosystem and meme market activity from CoinGecko categories
+  when those modes are requested;
 - explain the difference between SOL price and DeFi usage in plain English;
 - keep the same read-only, non-custodial, no-trade safety boundary.
 

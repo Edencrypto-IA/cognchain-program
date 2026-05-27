@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
-import type { MythosSolanaEcosystemReport } from '@/lib/market/solana-ecosystem-report';
+import type { MythosSolanaEcosystemReport, MythosSolanaReportMode } from '@/lib/market/solana-ecosystem-report';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_COGNITIVE_LAYERS,
@@ -104,6 +104,10 @@ const STARTER_PROMPTS = [
     prompt: '/solana report',
   },
   {
+    label: 'Protocols',
+    prompt: '/solana protocols',
+  },
+  {
     label: 'Plan',
     prompt: '/plan swap 0.1 SOL to USDC with Phantom review',
   },
@@ -140,7 +144,19 @@ const TERMINAL_COMMANDS = [
   },
   {
     command: '/solana report',
-    detail: 'Show SOL price, market cap, 24h volume, ATH, and the 10 largest Solana protocols by TVL.',
+    detail: 'Show a clean SOL price report: market cap, 24h volume, ATH, supply, and safe context.',
+  },
+  {
+    command: '/solana protocols',
+    detail: 'Show the top 10 Solana DeFi protocols by TVL, excluding centralized exchanges.',
+  },
+  {
+    command: '/solana volume',
+    detail: 'Show the top Solana ecosystem assets by 24h trading volume.',
+  },
+  {
+    command: '/solana memes',
+    detail: 'Show the top Solana meme coins by market activity with high-risk framing.',
   },
   {
     command: '/plan <wallet command>',
@@ -341,6 +357,9 @@ function helpResponse() {
     '/analyze token EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     '/market report',
     '/solana report',
+    '/solana protocols',
+    '/solana volume',
+    '/solana memes',
     '/quote swap 0.1 SOL to USDC',
     '/plan pay 0.05 SOL to <wallet>',
     '',
@@ -357,12 +376,23 @@ function isMarketReportRequest(content: string) {
 
 function isSolanaEcosystemRequest(content: string) {
   const normalized = content.trim().toLowerCase();
-  if (/^\/solana\s+report$/.test(normalized) || /^\/sol\s+report$/.test(normalized)) return true;
+  if (/^\/solana\s+(report|price|preco|preço|protocols|protocolos|volume|memes?)$/.test(normalized)) return true;
+  if (/^\/sol\s+(report|price|preco|preço|protocols|protocolos|volume|memes?)$/.test(normalized)) return true;
   const asksSolana = /\b(sol|solana)\b/i.test(content);
   const asksPrice = /\b(price|preco|preço|cotacao|cotação|valor)\b/i.test(content);
   const asksProtocols = /\b(protocol|protocolo|protocolos|protocols|tvl|defi)\b/i.test(content);
+  const asksVolume = /\b(volume|liquidez|liquidity)\b/i.test(content);
+  const asksMemes = /\b(meme|memes|memecoin|memecoins)\b/i.test(content);
   const asksTop = /\b(top|maiores|principais|10|dez)\b/i.test(content);
-  return asksSolana && asksPrice && asksProtocols && asksTop;
+  return asksSolana && ((asksPrice && !asksProtocols && !asksVolume && !asksMemes) || (asksProtocols && asksTop) || (asksVolume && asksTop) || (asksMemes && asksTop));
+}
+
+function solanaReportModeFor(content: string): MythosSolanaReportMode {
+  const normalized = content.trim().toLowerCase();
+  if (/\b(memes?|memecoin|memecoins)\b/.test(normalized)) return 'memes';
+  if (/\b(volume|liquidez|liquidity)\b/.test(normalized)) return 'volume';
+  if (/\b(protocols?|protocolos?|protocolo|tvl|defi)\b/.test(normalized)) return 'protocols';
+  return 'price';
 }
 
 function formatMarketReportText(report: MythosCryptoMarketReport) {
@@ -388,8 +418,22 @@ function formatMarketReportText(report: MythosCryptoMarketReport) {
 }
 
 function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
+  const list = report.mode === 'memes'
+    ? report.assets.memeLeaders.map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
+    : report.mode === 'volume'
+      ? report.assets.volumeLeaders.map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
+      : report.mode === 'protocols'
+        ? report.defi.topProtocols.map((protocol, index) => `${index + 1}. ${protocol.name} - ${protocol.tvlLabel} TVL (${protocol.category})`)
+        : [
+            `SOL price: ${report.price.label}`,
+            `24h move: ${report.price.change24hLabel}`,
+            `Market cap: ${report.price.marketCapLabel}`,
+            `24h volume: ${report.price.volume24hLabel}`,
+            `ATH: ${report.price.athLabel}`,
+          ];
+
   return cleanTerminalText([
-    terminalSection('Intent', 'Solana ecosystem intelligence report'),
+    terminalSection('Intent', `Solana ${report.mode} intelligence report`),
     terminalSection('SOL market readout', [
       `SOL price: ${report.price.label}`,
       `24h move: ${report.price.change24hLabel}`,
@@ -397,9 +441,7 @@ function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
       `24h volume: ${report.price.volume24hLabel}`,
       `ATH: ${report.price.athLabel}`,
     ]),
-    terminalSection('Top Solana protocols', report.defi.topProtocols.map((protocol, index) =>
-      `${index + 1}. ${protocol.name} - ${protocol.tvlLabel} TVL (${protocol.category})`
-    )),
+    terminalSection(report.mode === 'protocols' ? 'Top Solana protocols' : report.mode === 'volume' ? 'Top Solana volume leaders' : report.mode === 'memes' ? 'Top Solana memes' : 'SOL price context', list),
     terminalSection('Decision', report.readout.headline),
     terminalSection('Plain English', report.readout.plainEnglish),
     terminalSection('Next safe step', report.readout.nextSafeStep),
@@ -662,7 +704,8 @@ export default function MythosLabConsole() {
     }
 
     if (isSolanaEcosystemRequest(command)) {
-      const response = await fetch('/api/mythos/market/solana', {
+      const mode = solanaReportModeFor(command);
+      const response = await fetch(`/api/mythos/market/solana?mode=${mode}`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
       });
@@ -682,10 +725,10 @@ export default function MythosLabConsole() {
         ...session,
         messages: [...nextMessages, assistantMessage],
         lastTrace: {
-          perception: 'User requested SOL price and the largest Solana protocols.',
+          perception: `User requested a Solana ${mode} market report.`,
           memoryContext: 'No private wallet memory was used. This uses public market and DeFi data only.',
           selectedSkill: 'Solana Ecosystem Intelligence',
-          reasoningPath: 'CoinGecko SOL market data and DeFiLlama Solana protocol TVL were fetched server-side.',
+          reasoningPath: 'CoinGecko and DeFiLlama public data were fetched server-side and rendered as a read-only Mythos report.',
           prediction: 'User can pick one protocol for deeper token, wallet, or transaction analysis.',
           decision: 'Render a beginner-friendly Solana ecosystem card with safety boundaries.',
           confidence: 84,
