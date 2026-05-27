@@ -62,6 +62,14 @@ function CoinRow({ coin, mode }: { coin: MythosCryptoCoin; mode: 'up' | 'down' |
   );
 }
 
+function EmptyMarketList({ label }: { label: string }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-sm leading-6 text-white/46">
+      {label}
+    </div>
+  );
+}
+
 function OpportunityCard({ item }: { item: MythosCryptoOpportunity }) {
   const color = item.conviction === 'high' ? '#76FF03' : item.conviction === 'medium' ? '#5AD7FF' : '#FACC15';
   const label = item.conviction === 'high' ? 'High conviction' : item.conviction === 'medium' ? 'Medium conviction' : 'Wait for confirmation';
@@ -74,7 +82,7 @@ function OpportunityCard({ item }: { item: MythosCryptoOpportunity }) {
             {label}
           </span>
           <h4 className="mt-3 text-lg font-black text-white">{item.coin.symbol}</h4>
-          <p className="text-xs text-white/48">{item.coin.name} · {fmtUsd(item.coin.price)}</p>
+          <p className="text-xs text-white/48">{item.coin.name} - {fmtUsd(item.coin.price)}</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-[0.12em] text-white/32">Risk</p>
@@ -107,7 +115,7 @@ export default function MythosCryptoReportCard({ report }: { report: MythosCrypt
           </div>
           <h3 className="mt-3 text-2xl font-black text-white">Crypto market report</h3>
           <p className="mt-1 text-sm leading-6 text-white/54">
-            Data via CoinGecko public API · {new Date(report.generatedAt).toLocaleString('en-US')}
+            Data via {report.safety.sources.join(' + ')} - {new Date(report.generatedAt).toLocaleString('en-US')}
           </p>
         </div>
         <div className="rounded-2xl border border-[#FACC15]/22 bg-[#FACC15]/8 px-4 py-3 text-right">
@@ -127,17 +135,25 @@ export default function MythosCryptoReportCard({ report }: { report: MythosCrypt
         <section className="rounded-2xl border border-[#76FF03]/16 bg-black/30 p-4">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-[#76FF03]" />
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#76FF03]">Top gainers · 7d</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#76FF03]">Top gainers - 7d</p>
           </div>
-          <div className="mt-3">{report.gainers.slice(0, 6).map(coin => <CoinRow key={coin.id} coin={coin} mode="up" />)}</div>
+          <div className="mt-3">
+            {report.gainers.length > 0
+              ? report.gainers.slice(0, 6).map(coin => <CoinRow key={coin.id} coin={coin} mode="up" />)
+              : <EmptyMarketList label="No strong 7d gainers found in this market sample. Mythos is holding the watchlist instead of inventing winners." />}
+          </div>
         </section>
 
         <section className="rounded-2xl border border-[#FF5C8A]/16 bg-black/30 p-4">
           <div className="flex items-center gap-2">
             <TrendingDown className="h-4 w-4 text-[#FF5C8A]" />
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FF5C8A]">Weak names · 7d</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FF5C8A]">Weak names - 7d</p>
           </div>
-          <div className="mt-3">{report.losers.slice(0, 6).map(coin => <CoinRow key={coin.id} coin={coin} mode="down" />)}</div>
+          <div className="mt-3">
+            {report.losers.length > 0
+              ? report.losers.slice(0, 6).map(coin => <CoinRow key={coin.id} coin={coin} mode="down" />)
+              : <EmptyMarketList label="No clear 7d losers found in this market sample. That can happen during broad positive rotations or incomplete provider data." />}
+          </div>
         </section>
 
         <section className="rounded-2xl border border-[#5AD7FF]/16 bg-black/30 p-4">
@@ -150,7 +166,7 @@ export default function MythosCryptoReportCard({ report }: { report: MythosCrypt
       </div>
 
       <section className="mt-5">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Opportunity watchlist · not buy signals</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Opportunity watchlist - not buy signals</p>
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {report.opportunities.map(item => <OpportunityCard key={item.coin.id} item={item} />)}
         </div>
