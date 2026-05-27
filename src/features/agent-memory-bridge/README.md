@@ -284,6 +284,8 @@ Supported commands:
 - `/explain rpc <issue>` diagnoses wallet, RPC, priority-fee, webhook, or
   indexing issues;
 - `/quote swap <amount> <token> to <token>` fetches a read-only Jupiter quote;
+- `/market report` generates a visual crypto market intelligence report from
+  CoinGecko public market data;
 - `/plan <wallet command>` creates the Wallet Agent six-phase safety plan;
 - `/memory save last` saves the last approved Mythos response only when the
   user explicitly provides a full CongChain key.
@@ -293,5 +295,29 @@ The terminal still cannot:
 - execute unknown commands;
 - sign, submit, buy, sell, pay, schedule, or move funds;
 - create Jupiter swap payloads;
+- treat market opportunity cards as financial advice;
 - read private keys, seed phrases, wallet secrets, or hidden prompts;
 - save memory without an explicit user command and key-backed request.
+
+### Market report experience
+
+The Mythos Lab market report is a visual, read-only research surface.
+
+It can:
+
+- call `GET /api/mythos/market/report`;
+- fetch CoinGecko global market data, top assets, trending assets, and selected
+  opportunity watchlist data server-side;
+- render global market metrics, top gainers, weak names, trending attention,
+  opportunity watchlist cards, macro pressure, catalysts, and executive summary;
+- keep the user experience close to a research terminal rather than raw JSON;
+- attach a clear safety boundary that the report is not financial advice and
+  cannot execute trades.
+
+It still cannot:
+
+- guarantee provider availability or exact exchange execution price;
+- know a user's private portfolio unless the user explicitly connects a future
+  reviewed wallet context;
+- recommend buys or sells as instructions;
+- open a wallet, sign, submit, swap, pay, schedule, or move funds.

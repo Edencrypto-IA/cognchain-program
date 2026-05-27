@@ -18,6 +18,7 @@ import {
   TerminalSquare,
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
+import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_COGNITIVE_LAYERS,
@@ -25,12 +26,14 @@ import {
   MYTHOS_SKILL_CATEGORIES,
 } from '../mythos';
 import type { MythosSkillRouteResult } from '../skill-router';
+import MythosCryptoReportCard from './mythos-crypto-report-card';
 
 type MythosLabMessage = {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: string;
+  cryptoReport?: MythosCryptoMarketReport;
 };
 
 type MythosCognitiveTrace = {
@@ -90,6 +93,10 @@ const STARTER_PROMPTS = [
     prompt: '/quote swap 0.1 SOL to USDC',
   },
   {
+    label: 'Market',
+    prompt: '/market report',
+  },
+  {
     label: 'Plan',
     prompt: '/plan swap 0.1 SOL to USDC with Phantom review',
   },
@@ -119,6 +126,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/quote swap <amount> <token> to <token>',
     detail: 'Fetch a read-only Jupiter route quote. No swap transaction is created.',
+  },
+  {
+    command: '/market report',
+    detail: 'Generate a visual crypto market report with CoinGecko data, gainers, losers, trends, and opportunity watchlist.',
   },
   {
     command: '/plan <wallet command>',
@@ -317,12 +328,41 @@ function helpResponse() {
     '/analyze tx 5ycrKxWCw4Px...',
     '/analyze wallet 2snAwv3rui3kcjBZbwN2uigN7yYTNnhEsZh6k5ZAg1Vs',
     '/analyze token EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    '/market report',
     '/quote swap 0.1 SOL to USDC',
     '/plan pay 0.05 SOL to <wallet>',
     '',
     'Safety',
     'Commands explain, prepare, quote, and save reviewed memory. They do not sign, submit, buy, sell, pay, schedule, or move funds automatically.',
   ].join('\n'));
+}
+
+function isMarketReportRequest(content: string) {
+  return /^\/(?:market|crypto)\s+report$/i.test(content.trim()) ||
+    /\b(relatorio|relatório|report|market|mercado|oportunidades)\b/i.test(content) &&
+    /\b(crypto|cripto|bitcoin|solana|altcoin|tokens?)\b/i.test(content);
+}
+
+function formatMarketReportText(report: MythosCryptoMarketReport) {
+  return cleanTerminalText([
+    terminalSection('Intent', 'Crypto market intelligence report'),
+    terminalSection('Market pulse', [
+      `Sentiment: ${report.sentiment.replace('_', '-')}`,
+      `Market cap: ${report.global.marketCapLabel}`,
+      `BTC dominance: ${report.global.btcDominanceLabel}`,
+      `24h volume: ${report.global.volume24hLabel}`,
+    ]),
+    terminalSection('Opportunity watchlist', report.opportunities.slice(0, 5).map(item =>
+      `- ${item.coin.symbol}: ${item.conviction} conviction, risk ${item.riskLevel}/100. ${item.thesis}`
+    )),
+    terminalSection('Decision', report.executiveSummary),
+    terminalSection('Next safe step', 'Use Mythos token, wallet, and transaction analysis before making any real decision. This report is a watchlist, not a buy/sell instruction.'),
+    terminalSection('Safety boundary', [
+      'Read-only public market data.',
+      'No trading, wallet signature, or fund movement.',
+      'Not financial advice.',
+    ]),
+  ].join('\n\n'));
 }
 
 function makeSession(): MythosLabSession {
@@ -532,6 +572,49 @@ export default function MythosLabConsole() {
       return;
     }
 
+    if (isMarketReportRequest(command)) {
+      const response = await fetch('/api/mythos/market/report', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        throw new Error(isRecord(data) ? asString(data.error, 'Mythos market report failed.') : 'Mythos market report failed.');
+      }
+      const report = data as MythosCryptoMarketReport;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: formatMarketReportText(report),
+        cryptoReport: report,
+      };
+      updateActive(session => ({
+        ...session,
+        messages: [...nextMessages, assistantMessage],
+        lastTrace: {
+          perception: 'User requested a crypto market report.',
+          memoryContext: 'No private portfolio or wallet memory was used automatically.',
+          selectedSkill: 'Mythos Market Intelligence',
+          reasoningPath: 'CoinGecko global, top market, trending, and selected opportunity datasets were fetched server-side.',
+          prediction: 'User may use the watchlist to choose deeper token or wallet analysis next.',
+          decision: 'Return a visual report and clearly mark it as read-only market intelligence.',
+          confidence: 82,
+          safetyBoundary: 'No financial advice and no trade execution.',
+          nextHumanStep: 'Pick one token or wallet and run a focused Mythos analysis before acting.',
+        },
+        lastObservability: {
+          model: activeSession.model,
+          modelLabel: 'CoinGecko + Mythos report renderer',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-market-report/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      return;
+    }
+
     if (lower === '/memory save last') {
       if (!lastAssistant?.content) {
         appendTerminalResponse([
@@ -721,7 +804,7 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
-      if (content.startsWith('/')) {
+      if (content.startsWith('/') || isMarketReportRequest(content)) {
         await runTerminalCommand(content, nextMessages, started);
         return;
       }
@@ -1008,6 +1091,7 @@ export default function MythosLabConsole() {
                         {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'Mythos' : 'System'}
                       </p>
                       <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
                     </div>
                   ))}
                   {loading && (
@@ -1089,7 +1173,7 @@ export default function MythosLabConsole() {
                     One terminal for Solana analysis, wallet planning, read-only Jupiter quotes, and CongChain memory.
                   </p>
                   <div className="mt-3 grid gap-2">
-                    {TERMINAL_COMMANDS.slice(0, 6).map(item => (
+                    {TERMINAL_COMMANDS.slice(0, 7).map(item => (
                       <button
                         key={item.command}
                         type="button"

@@ -33,6 +33,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/mythos/solana/analyze-token': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/debug-anchor': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/explain-rpc': { windowMs: 60_000, maxRequests: 12 },
+  '/api/mythos/market/report': { windowMs: 60_000, maxRequests: 8 },
   '/api/compare': { windowMs: 60_000, maxRequests: 5 },
   '/api/translate': { windowMs: 60_000, maxRequests: 15 },
   '/api/save-memory': { windowMs: 60_000, maxRequests: 30 },
