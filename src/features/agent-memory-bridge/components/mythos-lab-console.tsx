@@ -28,6 +28,11 @@ type MythosLabMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: string;
+  htmlArtifact?: {
+    title: string;
+    html: string;
+    model?: string;
+  };
   cryptoReport?: MythosCryptoMarketReport;
   solanaReport?: MythosSolanaEcosystemReport;
   memoryHash?: string;
@@ -134,6 +139,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/memory save last',
     detail: 'Save the last approved Mythos answer to CongChain when a full cog_live key is pasted.',
+  },
+  {
+    command: '/artifact <visual request>',
+    detail: 'Admin-only: ask Anthropic to generate a read-only HTML artifact preview. The Claude key stays on the server.',
   },
 ];
 
@@ -618,12 +627,14 @@ export default function MythosLabConsole() {
     function appendTerminalResponse(responseContent: string, extra?: {
       trace?: MythosCognitiveTrace;
       observability?: MythosObservability;
+      htmlArtifact?: MythosLabMessage['htmlArtifact'];
     }) {
       const assistantMessage: MythosLabMessage = {
         id: createId('msg'),
         role: 'assistant',
         createdAt: nowIso(),
         content: cleanTerminalText(responseContent),
+        htmlArtifact: extra?.htmlArtifact,
       };
       updateActive(session => ({
         ...session,
@@ -653,6 +664,60 @@ export default function MythosLabConsole() {
           modelLabel: activeSession.model,
           mode: activeSession.mode,
           traceSchema: 'mythos-command-terminal/v1',
+          latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    if (lower.startsWith('/artifact ')) {
+      const prompt = command.slice('/artifact '.length).trim();
+      if (!prompt) {
+        appendTerminalResponse([
+          terminalSection('Intent', 'Generate a Mythos HTML artifact'),
+          terminalSection('Decision', 'Blocked because no artifact request was provided.'),
+          terminalSection('Next safe step', 'Try: /artifact create a compact SOL price dashboard'),
+        ].join('\n\n'));
+        return;
+      }
+
+      const response = await fetch('/api/mythos/html-artifact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        throw new Error(isRecord(data) ? asString(data.error, 'Mythos artifact request failed.') : 'Mythos artifact request failed.');
+      }
+      const artifact = getRecord(data, 'artifact');
+      appendTerminalResponse([
+        terminalSection('Intent', 'Generate a read-only Mythos HTML artifact'),
+        terminalSection('Decision', asString(data.text, 'Artifact generated for admin review.')),
+        terminalSection('Safety boundary', [
+          'Admin-only route.',
+          'ANTHROPIC_API_KEY stays on the server.',
+          'Artifact iframe is sandboxed and cannot sign, buy, sell, pay, schedule, or move funds.',
+        ]),
+      ].join('\n\n'), {
+        htmlArtifact: asString(artifact.html, '') ? {
+          title: asString(artifact.title, 'Mythos Artifact'),
+          html: asString(artifact.html, ''),
+          model: asString(data.model, 'anthropic'),
+        } : undefined,
+        trace: {
+          perception: 'Admin requested a visual HTML artifact.',
+          selectedSkill: 'Mythos HTML Artifact Renderer',
+          decision: 'Generate and sandbox a read-only preview.',
+          prediction: 'The artifact can become a polished Mythos interface pattern after human review.',
+          safetyBoundary: 'Admin-only, server-side Anthropic key, sandboxed preview, no execution authority.',
+          nextHumanStep: 'Review the preview and copy HTML only if it is safe for productization.',
+        },
+        observability: {
+          model: asString(data.model, 'anthropic'),
+          modelLabel: 'Anthropic HTML artifact renderer',
+          mode: activeSession.mode,
+          traceSchema: 'mythos-html-artifact/v1',
           latencyMs: Date.now() - started,
         },
       });
@@ -1018,8 +1083,8 @@ export default function MythosLabConsole() {
   const hasConversation = visibleMessages.length > 0;
 
   return (
-    <main className="min-h-screen bg-black p-3 text-white sm:p-4">
-      <div className="mx-auto flex min-h-[calc(100vh-24px)] w-full max-w-[1540px] overflow-hidden rounded-[28px] border border-white/10 bg-[#020402] shadow-[0_0_90px_rgba(0,0,0,0.8)] sm:min-h-[calc(100vh-32px)] lg:flex-row">
+    <main className="min-h-screen bg-black text-white">
+      <div className="flex min-h-screen w-full overflow-hidden bg-[#020402] lg:flex-row">
         <aside className="relative hidden w-[320px] shrink-0 flex-col border-r border-white/10 bg-[linear-gradient(180deg,rgba(4,10,4,0.98),rgba(0,0,0,0.98))] p-6 lg:flex">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_4%,rgba(118,255,3,0.16),transparent_26%)]" />
           <div className="relative flex items-center justify-between gap-4">
@@ -1108,7 +1173,7 @@ export default function MythosLabConsole() {
           </div>
         </aside>
 
-        <section className="relative flex min-h-[calc(100vh-24px)] flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_52%_18%,rgba(118,255,3,0.13),transparent_28%),linear-gradient(180deg,rgba(2,5,2,0.99),rgba(0,0,0,1))] sm:min-h-[calc(100vh-32px)]">
+        <section className="relative flex min-h-screen flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_52%_18%,rgba(118,255,3,0.13),transparent_28%),linear-gradient(180deg,rgba(2,5,2,0.99),rgba(0,0,0,1))]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(118,255,3,0.08),transparent_20%),radial-gradient(circle_at_70%_10%,rgba(118,255,3,0.06),transparent_18%)]" />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(180deg,rgba(118,255,3,0.06),transparent)]" />
 
@@ -1140,6 +1205,9 @@ export default function MythosLabConsole() {
                       alt="Mythos, the first autonomous external agent"
                       className="w-full max-w-[720px] object-contain opacity-95 drop-shadow-[0_0_58px_rgba(118,255,3,0.18)]"
                     />
+                    <p className="-mt-4 text-[11px] font-black uppercase tracking-[0.34em] text-white/42 sm:-mt-8">
+                      Developed by <span className="text-[#A7FF3D]">CongChain</span>
+                    </p>
                   </div>
                 ) : (
                   <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 pb-6">
@@ -1156,6 +1224,29 @@ export default function MythosLabConsole() {
                           {message.role === 'user' ? 'You' : 'Mythos'}
                         </p>
                         <p className="whitespace-pre-wrap">{message.content}</p>
+                        {message.htmlArtifact ? (
+                          <div className="mt-4 overflow-hidden rounded-2xl border border-[#76FF03]/18 bg-black/70">
+                            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.035] px-4 py-3">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">HTML artifact</p>
+                                <p className="mt-1 text-xs text-white/52">{message.htmlArtifact.title}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => navigator.clipboard.writeText(message.htmlArtifact?.html || '')}
+                                className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-bold text-white/62 transition hover:border-[#76FF03]/24 hover:text-[#A7FF3D]"
+                              >
+                                Copy HTML
+                              </button>
+                            </div>
+                            <iframe
+                              title={message.htmlArtifact.title}
+                              sandbox="allow-scripts"
+                              srcDoc={message.htmlArtifact.html}
+                              className="h-[520px] w-full border-0 bg-black"
+                            />
+                          </div>
+                        ) : null}
                         {message.role === 'assistant' ? (
                           <div className="mt-4 border-t border-white/8 pt-3">
                             <div className="flex flex-wrap items-center gap-2">
