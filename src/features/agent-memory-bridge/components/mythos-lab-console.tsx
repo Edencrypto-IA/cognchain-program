@@ -8,9 +8,11 @@ import {
   Loader2,
   Network,
   Plus,
+  Save,
   Send,
   Sparkles,
   TerminalSquare,
+  Trash2,
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
@@ -28,6 +30,10 @@ type MythosLabMessage = {
   createdAt: string;
   cryptoReport?: MythosCryptoMarketReport;
   solanaReport?: MythosSolanaEcosystemReport;
+  memoryHash?: string;
+  readUrl?: string;
+  verifyUrl?: string;
+  proofUrl?: string;
 };
 
 type MythosCognitiveTrace = {
@@ -68,6 +74,9 @@ type MythosObservability = {
 
 type MemoryWriteResponse = {
   hash?: string;
+  readUrl?: string;
+  verifyUrl?: string;
+  proofUrl?: string;
   error?: string;
 };
 
@@ -443,7 +452,9 @@ export default function MythosLabConsole() {
   const [sessions, setSessions] = useState<MythosLabSession[]>([]);
   const [activeId, setActiveId] = useState('');
   const [input, setInput] = useState('');
-  const [apiKey] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [pendingSaveMessageId, setPendingSaveMessageId] = useState('');
+  const [savingMemoryId, setSavingMemoryId] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
 
@@ -503,6 +514,87 @@ export default function MythosLabConsole() {
     setActiveId(session.id);
     setInput('');
     setNotice('');
+    setPendingSaveMessageId('');
+  }
+
+  function deleteSession(sessionId: string) {
+    setSessions(current => {
+      const remaining = current.filter(session => session.id !== sessionId);
+      const next = remaining.length > 0 ? remaining : [makeSession()];
+      if (sessionId === activeId) setActiveId(next[0]?.id || '');
+      return next;
+    });
+    setPendingSaveMessageId('');
+    setNotice('');
+  }
+
+  function clearHistory() {
+    const session = makeSession();
+    setSessions([session]);
+    setActiveId(session.id);
+    setInput('');
+    setNotice('');
+    setPendingSaveMessageId('');
+  }
+
+  function markMessageSaved(messageId: string, data: MemoryWriteResponse) {
+    updateActive(session => ({
+      ...session,
+      messages: session.messages.map(message => message.id === messageId
+        ? {
+          ...message,
+          memoryHash: data.hash,
+          readUrl: data.readUrl,
+          verifyUrl: data.verifyUrl,
+          proofUrl: data.proofUrl,
+        }
+        : message),
+      lastObservability: {
+        ...session.lastObservability,
+        memoryHash: data.hash,
+        savedAt: nowIso(),
+      },
+      updatedAt: nowIso(),
+    }));
+  }
+
+  async function saveMessageAsMemory(message: MythosLabMessage) {
+    if (!message.content) return;
+    if (!apiKey.trim().startsWith('cog_live_')) {
+      setPendingSaveMessageId(message.id);
+      setNotice('Paste a full CongChain key under this Mythos answer, then save. The key is sent once and never displayed back.');
+      return;
+    }
+
+    setSavingMemoryId(message.id);
+    setNotice('');
+    try {
+      const response = await fetch(profile.endpoints.writeMemory, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...memoryPayload,
+          content: message.content,
+          metadata: {
+            ...memoryPayload.metadata,
+            messageId: message.id,
+            messageCreatedAt: message.createdAt,
+          },
+        }),
+      });
+      const data = await response.json() as MemoryWriteResponse;
+      if (!response.ok) throw new Error(data.error || 'Could not save Mythos memory.');
+      markMessageSaved(message.id, data);
+      setPendingSaveMessageId('');
+      setNotice(`Memory saved to Mythos vault: ${shortHash(data.hash, 18)}`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not save Mythos memory.');
+    } finally {
+      setSavingMemoryId('');
+    }
   }
 
   async function routeSkillForPrompt(content: string) {
@@ -664,9 +756,10 @@ export default function MythosLabConsole() {
         return;
       }
       if (!apiKey.trim().startsWith('cog_live_')) {
+        setPendingSaveMessageId(lastAssistant.id);
         appendTerminalResponse([
           terminalSection('Intent', 'Save last Mythos answer as CongChain memory'),
-          terminalSection('Decision', 'Blocked until a full CongChain key is pasted in the memory panel.'),
+          terminalSection('Decision', 'Blocked until a full CongChain key is pasted under the Mythos answer.'),
           terminalSection('Safety boundary', 'The terminal never guesses keys and never stores secrets in output.'),
         ].join('\n\n'));
         return;
@@ -682,6 +775,7 @@ export default function MythosLabConsole() {
       });
       const data = await response.json() as MemoryWriteResponse;
       if (!response.ok) throw new Error(data.error || 'Could not save Mythos memory.');
+      markMessageSaved(lastAssistant.id, data);
       updateActive(session => ({
         ...session,
         lastObservability: {
@@ -960,20 +1054,37 @@ export default function MythosLabConsole() {
           </div>
 
           <div className="relative mt-10">
-            <p className="text-sm text-white/45">Today</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-white/45">Today</p>
+              <button
+                type="button"
+                onClick={clearHistory}
+                className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/32 transition hover:text-[#A7FF3D]"
+              >
+                Clear
+              </button>
+            </div>
             <div className="mt-4 grid gap-2">
               {sessions.map(session => (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => setActiveId(session.id)}
-                  className={`flex items-center justify-between gap-3 rounded-xl px-1 py-2 text-left text-sm transition ${
-                    session.id === activeId ? 'text-white' : 'text-white/58 hover:text-white/80'
-                  }`}
-                >
-                  <span className="line-clamp-1">{session.title}</span>
-                  <span className="text-white/40">...</span>
-                </button>
+                <div key={session.id} className="group flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(session.id)}
+                    className={`min-w-0 flex-1 rounded-xl px-1 py-2 text-left text-sm transition ${
+                      session.id === activeId ? 'text-white' : 'text-white/58 hover:text-white/80'
+                    }`}
+                  >
+                    <span className="line-clamp-1">{session.title}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteSession(session.id)}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/22 opacity-0 transition hover:bg-white/8 hover:text-[#FF5C7A] group-hover:opacity-100"
+                    aria-label={`Delete ${session.title}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -1045,6 +1156,50 @@ export default function MythosLabConsole() {
                           {message.role === 'user' ? 'You' : 'Mythos'}
                         </p>
                         <p className="whitespace-pre-wrap">{message.content}</p>
+                        {message.role === 'assistant' ? (
+                          <div className="mt-4 border-t border-white/8 pt-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => saveMessageAsMemory(message)}
+                                disabled={savingMemoryId === message.id}
+                                className="inline-flex h-8 items-center gap-2 rounded-full border border-[#76FF03]/18 bg-[#76FF03]/8 px-3 text-[11px] font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/14 disabled:opacity-50"
+                              >
+                                {savingMemoryId === message.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                {message.memoryHash ? 'Saved' : 'Save'}
+                              </button>
+                              {message.memoryHash ? (
+                                <>
+                                  <span className="rounded-full border border-white/8 bg-white/[0.035] px-3 py-1 text-[11px] font-mono text-white/48">
+                                    {shortHash(message.memoryHash, 18)}
+                                  </span>
+                                  {message.readUrl ? <a className="text-[11px] font-bold text-[#7DE4FF]" href={message.readUrl}>Read</a> : null}
+                                  {message.verifyUrl ? <a className="text-[11px] font-bold text-[#7DE4FF]" href={message.verifyUrl}>Verify</a> : null}
+                                  {message.proofUrl ? <a className="text-[11px] font-bold text-[#7DE4FF]" href={message.proofUrl}>Proof</a> : null}
+                                </>
+                              ) : null}
+                            </div>
+                            {pendingSaveMessageId === message.id && !message.memoryHash ? (
+                              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                <input
+                                  type="password"
+                                  value={apiKey}
+                                  onChange={event => setApiKey(event.target.value)}
+                                  placeholder="cog_live_..."
+                                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/45 px-3 py-2 text-xs text-white outline-none placeholder:text-white/25 focus:border-[#76FF03]/35"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => saveMessageAsMemory(message)}
+                                  disabled={savingMemoryId === message.id}
+                                  className="rounded-xl border border-[#76FF03]/18 bg-[#76FF03]/10 px-4 py-2 text-xs font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/15 disabled:opacity-50"
+                                >
+                                  Confirm save
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                     {loading && (
