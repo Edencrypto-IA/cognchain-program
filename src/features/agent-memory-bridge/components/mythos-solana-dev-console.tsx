@@ -308,6 +308,34 @@ function evidenceStatus(result: EngineResult, label: string): EvidenceItem['stat
   return result.evidence.find(item => item.label.toLowerCase() === label.toLowerCase())?.status || 'review';
 }
 
+function evidenceBadge(result: EngineResult, label: string) {
+  return {
+    label,
+    value: evidenceValue(result, label),
+    status: evidenceStatus(result, label),
+  };
+}
+
+function isEmptyEvidence(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return !normalized || normalized === 'not available' || normalized === 'unknown' || normalized === 'none' || normalized === 'not found';
+}
+
+function splitEvidencePreview(value: string, limit = 6) {
+  if (isEmptyEvidence(value) || value.toLowerCase().includes('no token balances')) return [];
+  return value
+    .split(';')
+    .map(item => item.trim())
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function evidenceTone(status: EvidenceItem['status']) {
+  if (status === 'ready') return 'border-[#14F195]/22 bg-[#14F195]/[0.065]';
+  if (status === 'blocked') return 'border-[#FF5C8A]/22 bg-[#FF5C8A]/[0.065]';
+  return 'border-[#FACC15]/22 bg-[#FACC15]/[0.055]';
+}
+
 function cleanModelText(value: string) {
   return value
     .replace(/\*\*/g, '')
@@ -547,6 +575,225 @@ function buildLocalBrief(mode: typeof MODES[number], input: string, cluster: Clu
     'Safety:',
     'Read-only RPC only. No wallet signing, no transaction submission, no private keys, no seed phrases, no automatic memory write.',
   ].join('\n');
+}
+
+function PremiumMetric({
+  icon: Icon,
+  label,
+  value,
+  note,
+  status,
+}: {
+  icon: typeof Activity;
+  label: string;
+  value: string;
+  note?: string;
+  status: EvidenceItem['status'];
+}) {
+  return (
+    <div className={`min-w-0 rounded-2xl border p-4 ${evidenceTone(status)}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/24 text-[#A7FF3D]">
+          <Icon className="h-4 w-4" />
+        </div>
+        <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${statusClass(status)}`}>
+          {status}
+        </span>
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+      <p className="mt-2 break-words text-2xl font-black leading-tight text-white [overflow-wrap:anywhere]">{value}</p>
+      {note ? <p className="mt-2 text-xs leading-5 text-white/50">{note}</p> : null}
+    </div>
+  );
+}
+
+function PillList({
+  title,
+  empty,
+  items,
+  tone = 'green',
+}: {
+  title: string;
+  empty: string;
+  items: string[];
+  tone?: 'green' | 'cyan' | 'purple' | 'yellow';
+}) {
+  const color = tone === 'cyan'
+    ? 'border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.06] text-[#7DE4FF]'
+    : tone === 'purple'
+      ? 'border-[#A855F7]/18 bg-[#A855F7]/[0.06] text-[#C084FC]'
+      : tone === 'yellow'
+        ? 'border-[#FACC15]/18 bg-[#FACC15]/[0.06] text-[#FACC15]'
+        : 'border-[#14F195]/18 bg-[#14F195]/[0.06] text-[#14F195]';
+
+  return (
+    <div className="rounded-2xl border border-white/8 bg-black/22 p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">{title}</p>
+      {items.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {items.map(item => (
+            <span key={item} className={`max-w-full break-words rounded-full border px-3 py-2 text-xs font-bold leading-4 [overflow-wrap:anywhere] ${color}`}>
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-xl border border-white/8 bg-black/24 p-3 text-xs leading-5 text-white/48">{empty}</p>
+      )}
+    </div>
+  );
+}
+
+function WalletIntelligenceCard({ result }: { result: EngineResult }) {
+  const tokens = splitEvidencePreview(evidenceValue(result, 'Token exposure preview'), 8);
+  const programs = splitEvidencePreview(evidenceValue(result, 'Detected program families').replaceAll(',', ';'), 6);
+  const meaning = walletMeaning(result);
+
+  const metrics = [
+    { icon: Wallet, label: 'SOL balance', value: evidenceValue(result, 'SOL balance'), note: 'Native SOL available in this public account.', status: evidenceStatus(result, 'SOL balance') },
+    { icon: Coins, label: 'Portfolio value', value: evidenceValue(result, 'Portfolio value'), note: 'Estimated public token value when provider data exists.', status: evidenceStatus(result, 'Portfolio value') },
+    { icon: Activity, label: 'Recent activity', value: evidenceValue(result, 'Recent transactions'), note: `Failed transactions: ${evidenceValue(result, 'Recent failed transactions')}`, status: evidenceStatus(result, 'Recent transactions') },
+    { icon: Gauge, label: 'Failure rate', value: evidenceValue(result, 'Failure rate'), note: 'High failure rates can mean bad routes, bots, or user-facing friction.', status: evidenceStatus(result, 'Failure rate') },
+    { icon: ShieldCheck, label: 'Account owner', value: short(evidenceValue(result, 'Account owner'), 24), note: 'System Program is normal for basic wallets.', status: evidenceStatus(result, 'Account owner') },
+    { icon: Radar, label: 'Activity temperature', value: evidenceValue(result, 'Activity temperature'), note: evidenceValue(result, 'Wallet profile'), status: evidenceStatus(result, 'Activity temperature') },
+  ];
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-3xl border border-[#14F195]/22 bg-[radial-gradient(circle_at_top_left,rgba(20,241,149,0.14),transparent_34%),linear-gradient(135deg,rgba(3,18,11,0.95),rgba(3,5,9,0.98))] p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14F195]">Wallet intelligence cockpit</p>
+          <h4 className="mt-2 break-words text-2xl font-black text-white [overflow-wrap:anywhere]">{short(result.subject, 28)}</h4>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-white/58">
+            A human-readable wallet profile built from public chain evidence: balances, token exposure, failed activity, owner program, and recent behavior.
+          </p>
+        </div>
+        <div className={`rounded-2xl border p-4 text-right ${riskClass(result.risk.level)}`}>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em]">Threat level</p>
+          <p className="mt-1 text-4xl font-black">{result.risk.score}</p>
+          <p className="text-xs font-black">{riskLabel(result.risk.level)}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {metrics.map(item => <PremiumMetric key={item.label} {...item} />)}
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="rounded-2xl border border-white/8 bg-black/24 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">Plain-English readout</p>
+          <h5 className="mt-2 text-xl font-black text-white">{meaning?.title || result.risk.userLabel}</h5>
+          <p className="mt-3 text-sm leading-6 text-white/64">{meaning?.copy || result.risk.plainEnglish}</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-[#14F195]/12 bg-[#14F195]/[0.04] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#14F195]">What Mythos knows</p>
+              <p className="mt-2 text-xs leading-5 text-white/58">{result.risk.plainEnglish}</p>
+            </div>
+            <div className="rounded-xl border border-[#FACC15]/12 bg-[#FACC15]/[0.04] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FACC15]">What Mythos cannot know</p>
+              <p className="mt-2 text-xs leading-5 text-white/58">Private keys, seed phrases, off-chain identity, owner intent, hidden app UI, or whether this address belongs to the user.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          <div className="rounded-2xl border border-[#5AD7FF]/16 bg-[#5AD7FF]/[0.045] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7DE4FF]">Best next step</p>
+            <p className="mt-2 text-sm leading-6 text-white/62">{result.risk.nextSafeStep}</p>
+          </div>
+          <div className="rounded-2xl border border-[#A855F7]/16 bg-[#A855F7]/[0.045] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C084FC]">Trade inference</p>
+            <p className="mt-2 text-sm leading-6 text-white/62">{evidenceValue(result, 'Trade inference')}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <PillList title="Token exposure preview" empty="No token balances were returned by the sampled providers." items={tokens} tone="cyan" />
+        <PillList title="Detected program families" empty="No program family could be classified from recent parsed transactions." items={programs} tone="purple" />
+      </div>
+    </div>
+  );
+}
+
+function TokenIntelligenceCard({ result }: { result: EngineResult }) {
+  const topHolders = splitEvidencePreview(evidenceValue(result, 'Top holders preview'), 8);
+  const markets = splitEvidencePreview(evidenceValue(result, 'Listed markets preview'), 8);
+  const tokenName = evidenceValue(result, 'Token name');
+  const symbol = evidenceValue(result, 'Token symbol');
+  const displayName = isEmptyEvidence(tokenName) ? short(result.subject, 26) : tokenName;
+
+  const marketMetrics = [
+    { icon: Coins, label: 'Price USD', value: evidenceValue(result, 'Price USD'), note: evidenceValue(result, 'Price change 24h'), status: evidenceStatus(result, 'Price USD') },
+    { icon: Activity, label: 'Market cap', value: evidenceValue(result, 'Market cap'), note: 'CoinMarketCap when configured, otherwise provider fallback.', status: evidenceStatus(result, 'Market cap') },
+    { icon: Gauge, label: 'Volume 24h', value: evidenceValue(result, 'Volume 24h'), note: 'Liquidity attention across listed markets.', status: evidenceStatus(result, 'Volume 24h') },
+    { icon: Radar, label: 'Holder count', value: evidenceValue(result, 'Holder count'), note: `Top 10: ${evidenceValue(result, 'Top 10 holder share')}`, status: evidenceStatus(result, 'Holder count') },
+    { icon: ShieldCheck, label: 'Mint authority', value: evidenceValue(result, 'Mint authority'), note: `Freeze: ${evidenceValue(result, 'Freeze authority')}`, status: evidenceStatus(result, 'Mint authority') },
+    { icon: KeyRound, label: 'CMC rank', value: evidenceValue(result, 'CMC rank'), note: evidenceValue(result, 'Market listing verdict'), status: evidenceStatus(result, 'CMC rank') },
+  ];
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-3xl border border-[#5AD7FF]/22 bg-[radial-gradient(circle_at_top_right,rgba(90,215,255,0.14),transparent_34%),linear-gradient(135deg,rgba(3,11,18,0.95),rgba(3,5,9,0.98))] p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Token intelligence cockpit</p>
+          <h4 className="mt-2 break-words text-2xl font-black text-white [overflow-wrap:anywhere]">
+            {displayName}{!isEmptyEvidence(symbol) ? ` (${symbol})` : ''}
+          </h4>
+          <p className="mt-2 max-w-3xl break-words font-mono text-xs leading-5 text-white/42 [overflow-wrap:anywhere]">
+            Mint: {result.subject}
+          </p>
+        </div>
+        <div className={`rounded-2xl border p-4 text-right ${riskClass(result.risk.level)}`}>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em]">Token risk</p>
+          <p className="mt-1 text-4xl font-black">{result.risk.score}</p>
+          <p className="text-xs font-black">{riskLabel(result.risk.level)}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {marketMetrics.map(item => <PremiumMetric key={item.label} {...item} />)}
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        {[
+          evidenceBadge(result, 'Token security verdict'),
+          evidenceBadge(result, 'Distribution verdict'),
+          evidenceBadge(result, 'CoinMarketCap listing'),
+        ].map(item => (
+          <div key={item.label} className={`rounded-2xl border p-4 ${evidenceTone(item.status)}`}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{item.label}</p>
+              <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${statusClass(item.status)}`}>{item.status}</span>
+            </div>
+            <p className="mt-3 break-words text-sm font-bold leading-6 text-white/72 [overflow-wrap:anywhere]">{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <PillList title="Top holder preview" empty="Holder distribution was not returned by the configured providers." items={topHolders} tone="yellow" />
+        <PillList title="Listed markets preview" empty="No market listing preview was returned. Configure CoinMarketCap/Solscan for richer coverage." items={markets} tone="cyan" />
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="rounded-2xl border border-white/8 bg-black/24 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">Investor-safe explanation</p>
+          <h5 className="mt-2 text-xl font-black text-white">What the contract evidence says</h5>
+          <p className="mt-3 text-sm leading-6 text-white/64">{result.risk.summary}</p>
+          <p className="mt-3 text-xs leading-5 text-white/46">
+            Mythos explains public token evidence. It does not predict price, endorse buying, or prove that a token is safe.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[#FACC15]/16 bg-[#FACC15]/[0.045] p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FACC15]">Best next step</p>
+          <p className="mt-2 text-sm leading-6 text-white/62">
+            Review authorities, top holder concentration, real listings, liquidity venues, and recent mint activity before trusting this token operationally.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function MythosSolanaDevConsole() {
@@ -1118,6 +1365,9 @@ export default function MythosSolanaDevConsole() {
                     ))}
                   </div>
 
+                  {result.mode === 'wallet' ? <WalletIntelligenceCard result={result} /> : null}
+                  {result.mode === 'token' ? <TokenIntelligenceCard result={result} /> : null}
+
                   {resultHumanReadout ? (
                     <div className="mt-4 rounded-2xl border border-[#5AD7FF]/18 bg-[radial-gradient(circle_at_top_left,rgba(90,215,255,0.09),transparent_34%),rgba(4,12,18,0.72)] p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1168,7 +1418,7 @@ export default function MythosSolanaDevConsole() {
                     {cleanModelText(result.analysis)}
                   </pre>
 
-                  {walletExplainer ? (
+                  {walletExplainer && result.mode !== 'wallet' ? (
                     <div className={`mt-4 rounded-2xl border p-4 ${walletExplainer.tone}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
