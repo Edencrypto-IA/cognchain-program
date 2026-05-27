@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
+import type { MythosSolanaEcosystemReport } from '@/lib/market/solana-ecosystem-report';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_COGNITIVE_LAYERS,
@@ -27,6 +28,7 @@ import {
 } from '../mythos';
 import type { MythosSkillRouteResult } from '../skill-router';
 import MythosCryptoReportCard from './mythos-crypto-report-card';
+import MythosSolanaEcosystemCard from './mythos-solana-ecosystem-card';
 
 type MythosLabMessage = {
   id: string;
@@ -34,6 +36,7 @@ type MythosLabMessage = {
   content: string;
   createdAt: string;
   cryptoReport?: MythosCryptoMarketReport;
+  solanaReport?: MythosSolanaEcosystemReport;
 };
 
 type MythosCognitiveTrace = {
@@ -97,6 +100,10 @@ const STARTER_PROMPTS = [
     prompt: '/market report',
   },
   {
+    label: 'SOL',
+    prompt: '/solana report',
+  },
+  {
     label: 'Plan',
     prompt: '/plan swap 0.1 SOL to USDC with Phantom review',
   },
@@ -130,6 +137,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/market report',
     detail: 'Generate a visual crypto market report with CoinGecko data, gainers, losers, trends, and opportunity watchlist.',
+  },
+  {
+    command: '/solana report',
+    detail: 'Show SOL price, market cap, 24h volume, ATH, and the 10 largest Solana protocols by TVL.',
   },
   {
     command: '/plan <wallet command>',
@@ -329,6 +340,7 @@ function helpResponse() {
     '/analyze wallet 2snAwv3rui3kcjBZbwN2uigN7yYTNnhEsZh6k5ZAg1Vs',
     '/analyze token EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     '/market report',
+    '/solana report',
     '/quote swap 0.1 SOL to USDC',
     '/plan pay 0.05 SOL to <wallet>',
     '',
@@ -341,6 +353,16 @@ function isMarketReportRequest(content: string) {
   return /^\/(?:market|crypto)\s+report$/i.test(content.trim()) ||
     /\b(relatorio|relatório|report|market|mercado|oportunidades)\b/i.test(content) &&
     /\b(crypto|cripto|bitcoin|solana|altcoin|tokens?)\b/i.test(content);
+}
+
+function isSolanaEcosystemRequest(content: string) {
+  const normalized = content.trim().toLowerCase();
+  if (/^\/solana\s+report$/.test(normalized) || /^\/sol\s+report$/.test(normalized)) return true;
+  const asksSolana = /\b(sol|solana)\b/i.test(content);
+  const asksPrice = /\b(price|preco|preço|cotacao|cotação|valor)\b/i.test(content);
+  const asksProtocols = /\b(protocol|protocolo|protocolos|protocols|tvl|defi)\b/i.test(content);
+  const asksTop = /\b(top|maiores|principais|10|dez)\b/i.test(content);
+  return asksSolana && asksPrice && asksProtocols && asksTop;
 }
 
 function formatMarketReportText(report: MythosCryptoMarketReport) {
@@ -361,6 +383,30 @@ function formatMarketReportText(report: MythosCryptoMarketReport) {
       'Read-only public market data.',
       'No trading, wallet signature, or fund movement.',
       'Not financial advice.',
+    ]),
+  ].join('\n\n'));
+}
+
+function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
+  return cleanTerminalText([
+    terminalSection('Intent', 'Solana ecosystem intelligence report'),
+    terminalSection('SOL market readout', [
+      `SOL price: ${report.price.label}`,
+      `24h move: ${report.price.change24hLabel}`,
+      `Market cap: ${report.price.marketCapLabel}`,
+      `24h volume: ${report.price.volume24hLabel}`,
+      `ATH: ${report.price.athLabel}`,
+    ]),
+    terminalSection('Top Solana protocols', report.defi.topProtocols.map((protocol, index) =>
+      `${index + 1}. ${protocol.name} - ${protocol.tvlLabel} TVL (${protocol.category})`
+    )),
+    terminalSection('Decision', report.readout.headline),
+    terminalSection('Plain English', report.readout.plainEnglish),
+    terminalSection('Next safe step', report.readout.nextSafeStep),
+    terminalSection('Safety boundary', [
+      'Read-only CoinGecko and DeFiLlama market intelligence.',
+      'Not financial advice.',
+      'No wallet connection, signature, swap, payment, or fund movement.',
     ]),
   ].join('\n\n'));
 }
@@ -615,6 +661,49 @@ export default function MythosLabConsole() {
       return;
     }
 
+    if (isSolanaEcosystemRequest(command)) {
+      const response = await fetch('/api/mythos/market/solana', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        throw new Error(isRecord(data) ? asString(data.error, 'Mythos Solana ecosystem report failed.') : 'Mythos Solana ecosystem report failed.');
+      }
+      const report = data as MythosSolanaEcosystemReport;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: formatSolanaReportText(report),
+        solanaReport: report,
+      };
+      updateActive(session => ({
+        ...session,
+        messages: [...nextMessages, assistantMessage],
+        lastTrace: {
+          perception: 'User requested SOL price and the largest Solana protocols.',
+          memoryContext: 'No private wallet memory was used. This uses public market and DeFi data only.',
+          selectedSkill: 'Solana Ecosystem Intelligence',
+          reasoningPath: 'CoinGecko SOL market data and DeFiLlama Solana protocol TVL were fetched server-side.',
+          prediction: 'User can pick one protocol for deeper token, wallet, or transaction analysis.',
+          decision: 'Render a beginner-friendly Solana ecosystem card with safety boundaries.',
+          confidence: 84,
+          safetyBoundary: 'Read-only market intelligence. Not financial advice.',
+          nextHumanStep: 'Choose one protocol or token and run a focused Mythos analysis before acting.',
+        },
+        lastObservability: {
+          model: activeSession.model,
+          modelLabel: 'CoinGecko + DeFiLlama + Mythos renderer',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-solana-ecosystem/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      return;
+    }
+
     if (lower === '/memory save last') {
       if (!lastAssistant?.content) {
         appendTerminalResponse([
@@ -804,7 +893,7 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
-      if (content.startsWith('/') || isMarketReportRequest(content)) {
+      if (content.startsWith('/') || isMarketReportRequest(content) || isSolanaEcosystemRequest(content)) {
         await runTerminalCommand(content, nextMessages, started);
         return;
       }
@@ -1092,6 +1181,7 @@ export default function MythosLabConsole() {
                       </p>
                       <p className="whitespace-pre-wrap">{message.content}</p>
                       {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
+                      {message.solanaReport ? <MythosSolanaEcosystemCard report={message.solanaReport} /> : null}
                     </div>
                   ))}
                   {loading && (
@@ -1173,7 +1263,7 @@ export default function MythosLabConsole() {
                     One terminal for Solana analysis, wallet planning, read-only Jupiter quotes, and CongChain memory.
                   </p>
                   <div className="mt-3 grid gap-2">
-                    {TERMINAL_COMMANDS.slice(0, 7).map(item => (
+                    {TERMINAL_COMMANDS.slice(0, 8).map(item => (
                       <button
                         key={item.command}
                         type="button"

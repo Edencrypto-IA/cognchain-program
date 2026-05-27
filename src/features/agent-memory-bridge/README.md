@@ -286,6 +286,8 @@ Supported commands:
 - `/quote swap <amount> <token> to <token>` fetches a read-only Jupiter quote;
 - `/market report` generates a visual crypto market intelligence report from
   CoinGecko public market data;
+- `/solana report` shows SOL price, market cap, volume, ATH, and the top 10
+  Solana protocols by DeFiLlama TVL;
 - `/plan <wallet command>` creates the Wallet Agent six-phase safety plan;
 - `/memory save last` saves the last approved Mythos response only when the
   user explicitly provides a full CongChain key.
@@ -321,3 +323,25 @@ It still cannot:
   reviewed wallet context;
 - recommend buys or sells as instructions;
 - open a wallet, sign, submit, swap, pay, schedule, or move funds.
+
+### Solana ecosystem report
+
+The Mythos Lab can answer beginner-friendly Solana ecosystem questions such as
+"show SOL price and the 10 biggest Solana protocols" with a visual report.
+
+It can:
+
+- call `GET /api/mythos/market/solana`;
+- fetch SOL price, market cap, 24h volume, ATH, circulating supply, and rank
+  from CoinGecko;
+- fetch Solana protocol TVL from DeFiLlama and show the top 10 protocols with
+  category tags and proportional TVL bars;
+- explain the difference between SOL price and DeFi usage in plain English;
+- keep the same read-only, non-custodial, no-trade safety boundary.
+
+It still cannot:
+
+- tell the user what to buy or sell;
+- prove a protocol is safe only from TVL;
+- connect a wallet, sign, swap, pay, schedule, or move funds from the report;
+- replace deeper token, wallet, transaction, or contract analysis.
