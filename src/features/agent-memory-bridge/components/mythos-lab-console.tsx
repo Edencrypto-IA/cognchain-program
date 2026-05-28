@@ -207,9 +207,9 @@ const MYTHOS_MODEL_OPTIONS = [
   },
   {
     id: 'gemini',
-    label: 'Gemini PRO',
-    provider: 'GOOGLE PRO',
-    detail: 'Direct Google paid API route for multimodal-friendly reasoning and broad synthesis.',
+    label: 'Gemini',
+    provider: 'GOOGLE API',
+    detail: 'Google model route for multimodal-friendly reasoning and broad synthesis.',
   },
   {
     id: 'deepseek',
@@ -219,21 +219,21 @@ const MYTHOS_MODEL_OPTIONS = [
   },
   {
     id: 'glm',
-    label: 'GLM PRO',
-    provider: 'ZHIPU AI PRO',
-    detail: 'Direct Zhipu AI paid API route for GLM multilingual reasoning and structured analysis.',
+    label: 'GLM',
+    provider: 'FREE/API',
+    detail: 'GLM route for multilingual reasoning and structured analysis.',
   },
   {
     id: 'minimax',
-    label: 'MiniMax PRO',
-    provider: 'MINIMAX PRO',
-    detail: 'Direct MiniMax paid API route for fast conversational and lightweight drafting work.',
+    label: 'MiniMax',
+    provider: 'FREE/API',
+    detail: 'MiniMax route for fast conversational and lightweight drafting work.',
   },
   {
     id: 'qwen',
-    label: 'Qwen PRO',
-    provider: 'QWEN PRO',
-    detail: 'Direct Qwen paid API route for repository analysis, coding tasks, and long-context work.',
+    label: 'Qwen',
+    provider: 'FREE/API',
+    detail: 'Qwen route for repository analysis, coding tasks, and long-context work.',
   },
 ];
 
