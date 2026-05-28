@@ -4,15 +4,20 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Brain,
+  Coins,
+  Gauge,
   KeyRound,
   Loader2,
   Network,
   Plus,
+  Radar,
   Save,
   Send,
+  ShieldCheck,
   Sparkles,
   TerminalSquare,
   Trash2,
+  Wallet,
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
@@ -35,6 +40,7 @@ type MythosLabMessage = {
   };
   cryptoReport?: MythosCryptoMarketReport;
   solanaReport?: MythosSolanaEcosystemReport;
+  solanaAnalysis?: Record<string, unknown>;
   memoryHash?: string;
   readUrl?: string;
   verifyUrl?: string;
@@ -210,6 +216,205 @@ function formatEvidenceItems(evidence: unknown[]) {
     })
     .filter(Boolean)
     .join('\n');
+}
+
+function getEvidenceItems(data: Record<string, unknown>) {
+  return getArray(data, 'evidence').filter(isRecord) as Record<string, unknown>[];
+}
+
+function findEvidence(data: Record<string, unknown>, label: string) {
+  const target = label.toLowerCase();
+  return getEvidenceItems(data).find(item => asString(item.label, '').toLowerCase() === target);
+}
+
+function evidenceValue(data: Record<string, unknown>, label: string, fallback = 'not available') {
+  return asString(findEvidence(data, label)?.value, fallback);
+}
+
+function evidenceStatus(data: Record<string, unknown>, label: string) {
+  const status = asString(findEvidence(data, label)?.status, 'review');
+  return status === 'ready' || status === 'blocked' ? status : 'review';
+}
+
+function splitEvidencePreview(value: string, limit = 8) {
+  if (!value || /not available|none|unavailable|no token/i.test(value)) return [];
+  return value
+    .split(/[;,]\s*/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function solanaRiskTone(level: string) {
+  if (level === 'safe') return 'border-[#14F195]/24 bg-[#14F195]/[0.08] text-[#14F195]';
+  if (level === 'low_data') return 'border-[#5AD7FF]/24 bg-[#5AD7FF]/[0.08] text-[#7DE4FF]';
+  if (level === 'suspicious') return 'border-[#FACC15]/24 bg-[#FACC15]/[0.08] text-[#FACC15]';
+  if (level === 'exploit_risk') return 'border-[#FF5C8A]/24 bg-[#FF5C8A]/[0.08] text-[#FF7AA2]';
+  return 'border-white/10 bg-white/[0.045] text-white/72';
+}
+
+function evidenceTone(status: string) {
+  if (status === 'ready') return 'border-[#14F195]/16 bg-[#14F195]/[0.055]';
+  if (status === 'blocked') return 'border-[#FF5C8A]/16 bg-[#FF5C8A]/[0.055]';
+  return 'border-[#FACC15]/16 bg-[#FACC15]/[0.045]';
+}
+
+function statusPill(status: string) {
+  if (status === 'ready') return 'border-[#14F195]/18 bg-[#14F195]/[0.08] text-[#14F195]';
+  if (status === 'blocked') return 'border-[#FF5C8A]/18 bg-[#FF5C8A]/[0.08] text-[#FF7AA2]';
+  return 'border-[#FACC15]/18 bg-[#FACC15]/[0.08] text-[#FACC15]';
+}
+
+function SolanaMetricCard({
+  icon: Icon,
+  label,
+  value,
+  note,
+  status,
+}: {
+  icon: typeof Activity;
+  label: string;
+  value: string;
+  note?: string;
+  status: string;
+}) {
+  return (
+    <div className={`min-w-0 rounded-2xl border p-4 ${evidenceTone(status)}`}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/24 text-[#A7FF3D]">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${statusPill(status)}`}>
+          {status}
+        </span>
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.14em] text-white/38">{label}</p>
+      <p className="mt-2 break-words text-xl font-black leading-tight text-white [overflow-wrap:anywhere]">{value}</p>
+      {note ? <p className="mt-2 text-xs leading-5 text-white/50">{note}</p> : null}
+    </div>
+  );
+}
+
+function SolanaPillList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return (
+    <div className="rounded-2xl border border-white/8 bg-black/22 p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7DE4FF]">{title}</p>
+      {items.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {items.map(item => (
+            <span key={item} className="max-w-full break-words rounded-full border border-[#5AD7FF]/18 bg-[#5AD7FF]/[0.06] px-3 py-2 text-xs font-bold leading-4 text-[#7DE4FF] [overflow-wrap:anywhere]">
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-xl border border-white/8 bg-black/24 p-3 text-xs leading-5 text-white/48">{empty}</p>
+      )}
+    </div>
+  );
+}
+
+function MythosSolanaAnalysisCard({ data }: { data: Record<string, unknown> }) {
+  const mode = asString(data.mode, 'solana');
+  const risk = getRecord(data, 'risk');
+  const monitor = getRecord(data, 'chainMonitor');
+  const trace = getRecord(data, 'cognitiveTrace');
+  const memoryReplay = getRecord(data, 'memoryReplay');
+  const riskLevel = asString(risk.level, 'review');
+  const score = asNumber(risk.score);
+  const subject = asString(data.subject, 'provided input');
+  const tokens = splitEvidencePreview(evidenceValue(data, 'Token exposure preview'), 8);
+  const programs = splitEvidencePreview(evidenceValue(data, 'Detected program families').replaceAll(',', ';'), 6);
+
+  const walletMetrics = [
+    { icon: Wallet, label: 'SOL balance', value: evidenceValue(data, 'SOL balance'), note: 'Native SOL visible in this public account.', status: evidenceStatus(data, 'SOL balance') },
+    { icon: Coins, label: 'Portfolio value', value: evidenceValue(data, 'Portfolio value'), note: 'Provider estimate when Solscan/Helius portfolio data is available.', status: evidenceStatus(data, 'Portfolio value') },
+    { icon: Activity, label: 'Recent activity', value: evidenceValue(data, 'Recent transactions'), note: `Failed transactions: ${evidenceValue(data, 'Recent failed transactions')}`, status: evidenceStatus(data, 'Recent transactions') },
+    { icon: Gauge, label: 'Failure rate', value: evidenceValue(data, 'Failure rate'), note: 'High failure rates can mean bad routes, bots, or wallet friction.', status: evidenceStatus(data, 'Failure rate') },
+    { icon: ShieldCheck, label: 'Account owner', value: shortHash(evidenceValue(data, 'Account owner'), 24), note: 'System Program is normal for regular wallets.', status: evidenceStatus(data, 'Account owner') },
+    { icon: Radar, label: 'Activity temperature', value: evidenceValue(data, 'Activity temperature'), note: evidenceValue(data, 'Wallet profile'), status: evidenceStatus(data, 'Activity temperature') },
+  ];
+
+  const genericMetrics = getEvidenceItems(data).slice(0, 8).map((item, index) => ({
+    icon: [Activity, ShieldCheck, Gauge, Coins][index % 4],
+    label: asString(item.label, 'Evidence'),
+    value: asString(item.value),
+    status: asString(item.status, 'review'),
+  }));
+
+  const metrics = mode === 'wallet' ? walletMetrics : genericMetrics;
+  const title = mode === 'wallet'
+    ? 'Wallet intelligence cockpit'
+    : mode === 'token'
+      ? 'Token intelligence cockpit'
+      : mode === 'transaction'
+        ? 'Transaction intelligence cockpit'
+        : 'Solana intelligence cockpit';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-3xl border border-[#14F195]/22 bg-[radial-gradient(circle_at_top_left,rgba(20,241,149,0.14),transparent_34%),linear-gradient(135deg,rgba(3,18,11,0.96),rgba(3,5,9,0.98))] p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14F195]">{title}</p>
+          <h4 className="mt-2 break-words text-2xl font-black text-white [overflow-wrap:anywhere]">{shortHash(subject, 34)}</h4>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-white/58">
+            Mythos turns public Solana evidence into a beginner-readable report: what happened, what it means, what is risky, and what to review next.
+          </p>
+        </div>
+        <div className={`rounded-2xl border p-4 text-right ${solanaRiskTone(riskLevel)}`}>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em]">Threat level</p>
+          <p className="mt-1 text-4xl font-black">{score}</p>
+          <p className="text-xs font-black uppercase">{riskLevel.replaceAll('_', ' ')}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {metrics.map(item => <SolanaMetricCard key={item.label} {...item} />)}
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="rounded-2xl border border-white/8 bg-black/24 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">Plain-English readout</p>
+          <h5 className="mt-2 text-xl font-black text-white">{asString(risk.userLabel, 'Review required')}</h5>
+          <p className="mt-3 text-sm leading-6 text-white/64">{asString(risk.plainEnglish, asString(risk.summary, 'Mythos reviewed public on-chain evidence.'))}</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-[#14F195]/12 bg-[#14F195]/[0.04] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#14F195]">What Mythos knows</p>
+              <p className="mt-2 text-xs leading-5 text-white/58">{asString(trace.evidenceUsed, 'Public chain evidence was reviewed.')}</p>
+            </div>
+            <div className="rounded-xl border border-[#FACC15]/12 bg-[#FACC15]/[0.04] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FACC15]">What it cannot know</p>
+              <p className="mt-2 text-xs leading-5 text-white/58">Private keys, seed phrases, off-chain identity, user intent, hidden wallet UI, or ownership of this address.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          <div className="rounded-2xl border border-[#5AD7FF]/16 bg-[#5AD7FF]/[0.045] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7DE4FF]">Best next step</p>
+            <p className="mt-2 text-sm leading-6 text-white/62">{asString(risk.nextSafeStep, asString(trace.nextHumanStep, 'Review manually before saving memory.'))}</p>
+          </div>
+          <div className="rounded-2xl border border-[#A855F7]/16 bg-[#A855F7]/[0.045] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#C084FC]">Memory replay</p>
+            <p className="mt-2 text-sm leading-6 text-white/62">{asString(memoryReplay.likelyCause, 'No reusable pattern found yet.')}</p>
+          </div>
+        </div>
+      </div>
+
+      {mode === 'wallet' ? (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <SolanaPillList title="Token exposure preview" empty="No token balances were returned by the sampled providers." items={tokens} />
+          <SolanaPillList title="Detected program families" empty="No program family could be classified from recent parsed transactions." items={programs} />
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <SolanaMetricCard icon={Network} label="Provider" value={asString(monitor.provider, 'solana-rpc')} note={asString(monitor.slotLabel, 'slot unavailable')} status="ready" />
+        <SolanaMetricCard icon={Brain} label="Confidence" value={`${Math.round(asNumber(risk.confidenceBps) / 100)}%`} note="Evidence-bound confidence, not certainty." status="ready" />
+        <SolanaMetricCard icon={KeyRound} label="Memory match" value={`${Math.round(asNumber(risk.memoryMatchBps) / 100)}%`} note={`${asNumber(memoryReplay.previousMatches)} similar patterns`} status="review" />
+      </div>
+    </div>
+  );
 }
 
 function formatMythosSolanaResponse(data: Record<string, unknown>) {
@@ -808,6 +1013,7 @@ export default function MythosLabConsole() {
       trace?: MythosCognitiveTrace;
       observability?: MythosObservability;
       htmlArtifact?: MythosLabMessage['htmlArtifact'];
+      solanaAnalysis?: Record<string, unknown>;
     }) {
       const assistantMessage: MythosLabMessage = {
         id: createId('msg'),
@@ -815,6 +1021,7 @@ export default function MythosLabConsole() {
         createdAt: nowIso(),
         content: cleanTerminalText(responseContent),
         htmlArtifact: extra?.htmlArtifact,
+        solanaAnalysis: extra?.solanaAnalysis,
       };
       updateActive(session => ({
         ...session,
@@ -1125,6 +1332,7 @@ export default function MythosLabConsole() {
       const trace = getRecord(data, 'cognitiveTrace');
       const observability = getRecord(data, 'observability');
       appendTerminalResponse(formatMythosSolanaResponse(data), {
+        solanaAnalysis: data,
         trace: {
           perception: asString(trace.perception, `User requested ${solanaCommand.mode} analysis.`),
           memoryContext: asString(getRecord(data, 'memoryReplay').likelyCause, 'Memory replay is evidence-bound.'),
@@ -1405,7 +1613,8 @@ export default function MythosLabConsole() {
                         </p>
                         {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
                         {message.solanaReport ? <MythosSolanaReportCard report={message.solanaReport} /> : null}
-                        {!message.cryptoReport && !message.solanaReport ? (
+                        {message.solanaAnalysis ? <MythosSolanaAnalysisCard data={message.solanaAnalysis} /> : null}
+                        {!message.cryptoReport && !message.solanaReport && !message.solanaAnalysis ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
                         {message.htmlArtifact ? (
