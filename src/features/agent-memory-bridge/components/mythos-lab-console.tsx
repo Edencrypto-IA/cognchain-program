@@ -45,10 +45,29 @@ type MythosLabMessage = {
   cryptoReport?: MythosCryptoMarketReport;
   solanaReport?: MythosSolanaEcosystemReport;
   solanaAnalysis?: Record<string, unknown>;
+  memecoinDraft?: MythosMemecoinDraft;
   memoryHash?: string;
   readUrl?: string;
   verifyUrl?: string;
   proofUrl?: string;
+};
+
+type MythosMemecoinDraft = {
+  name: string;
+  symbol: string;
+  description: string;
+  imagePrompt: string;
+  initialBuySol: number;
+  walletAddress?: string;
+  walletReady: boolean;
+  launchMode: 'preview_only';
+  phases: Array<{
+    title: string;
+    status: 'ready' | 'review' | 'blocked' | 'pending';
+    detail: string;
+  }>;
+  blockedActions: string[];
+  safetyNotes: string[];
 };
 
 type MythosCognitiveTrace = {
@@ -141,6 +160,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/solana memes',
     detail: 'Show the top Solana meme coins by market activity with high-risk framing.',
+  },
+  {
+    command: '/create meme <name> symbol <ticker> buy <amount> SOL',
+    detail: 'Create a safe Pump.fun-style memecoin launch draft. No mint, upload, signature, buy, or submission happens automatically.',
   },
   {
     command: '/plan <wallet command>',
@@ -532,6 +555,151 @@ function parseQuoteCommand(content: string) {
   };
 }
 
+function cleanTokenName(value: string) {
+  return value
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 42);
+}
+
+function inferMemecoinName(content: string) {
+  const explicit = content.match(/(?:name|nome|called|chamada|chamado)\s+["']?([a-z0-9][a-z0-9\s-]{1,42})["']?/i);
+  if (explicit?.[1]) return cleanTokenName(explicit[1]);
+
+  const slash = content.match(/^\/create\s+(?:meme|memecoin)\s+(.+)$/i);
+  if (slash?.[1]) {
+    const beforeKeyword = slash[1].split(/\b(symbol|ticker|buy|comprar|compra|description|descricao|descri[cç][aã]o|image|imagem)\b/i)[0];
+    const cleaned = cleanTokenName(beforeKeyword);
+    if (cleaned) return cleaned;
+  }
+
+  const portuguese = content.match(/crie\s+(?:uma\s+)?(?:meme\s*coin|memecoin|token)\s+(?:chamada|com\s+nome)?\s*["']?([a-z0-9][a-z0-9\s-]{1,42})["']?/i);
+  if (portuguese?.[1]) return cleanTokenName(portuguese[1]);
+
+  return 'Untitled Meme';
+}
+
+function inferMemecoinSymbol(content: string, name: string) {
+  const explicit = content.match(/(?:symbol|ticker|simbolo|s[ií]mbolo)\s+\$?([a-z0-9]{2,10})\b/i);
+  if (explicit?.[1]) return explicit[1].toUpperCase().slice(0, 10);
+
+  const dollar = content.match(/\$([a-z0-9]{2,10})\b/i);
+  if (dollar?.[1]) return dollar[1].toUpperCase().slice(0, 10);
+
+  const compact = name.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  return (compact || 'MEME').slice(0, 6);
+}
+
+function inferMemecoinDescription(content: string, name: string) {
+  const explicit = content.match(/(?:description|descri[cç][aã]o|bio)\s*[:=-]?\s*["']?([^"'\n]{8,180})/i);
+  if (explicit?.[1]) return explicit[1].trim();
+  return `${name} is a community meme token draft prepared by Mythos for human review before any wallet signature or launch action.`;
+}
+
+function inferMemecoinImagePrompt(content: string, name: string) {
+  const explicit = content.match(/(?:image|imagem|logo|foto)\s*[:=-]?\s*["']?([^"'\n]{8,180})/i);
+  if (explicit?.[1]) return explicit[1].trim();
+  return `Premium green-black Solana meme coin logo for ${name}, bold mascot, high contrast, clean circular icon, no text.`;
+}
+
+function parseMemecoinDraft(content: string, walletAddress?: string): MythosMemecoinDraft | null {
+  const lower = content.toLowerCase();
+  const isCommand = /^\/create\s+(?:meme|memecoin)\b/i.test(content.trim());
+  const isNatural = /\b(crie|criar|create|launch|lancar|lan[cç]ar)\b/i.test(content) && /\b(memecoin|meme\s*coin|meme|pump\.?fun|pump fun)\b/i.test(content);
+  if (!isCommand && !isNatural) return null;
+
+  const name = inferMemecoinName(content);
+  const symbol = inferMemecoinSymbol(content, name);
+  const amountMatch = lower.match(/(\d+(?:[,.]\d+)?)\s*sol\b/);
+  const initialBuySol = amountMatch ? Number(amountMatch[1].replace(',', '.')) : 0;
+  const description = inferMemecoinDescription(content, name);
+  const imagePrompt = inferMemecoinImagePrompt(content, name);
+  const walletReady = Boolean(walletAddress);
+
+  return {
+    name,
+    symbol,
+    description,
+    imagePrompt,
+    initialBuySol,
+    walletAddress,
+    walletReady,
+    launchMode: 'preview_only',
+    phases: [
+      {
+        title: '1. Token identity',
+        status: name === 'Untitled Meme' ? 'review' : 'ready',
+        detail: `Name ${name} and ticker ${symbol} are drafted for review.`,
+      },
+      {
+        title: '2. Visual metadata',
+        status: 'review',
+        detail: 'Image prompt and description are prepared, but no file is uploaded to IPFS or Pump.fun yet.',
+      },
+      {
+        title: '3. Wallet readiness',
+        status: walletReady ? 'ready' : 'review',
+        detail: walletReady
+          ? `Wallet ${walletAddress?.slice(0, 4)}...${walletAddress?.slice(-4)} is connected for future approval.`
+          : 'Connect Phantom or Solflare before any future launch transaction can be prepared.',
+      },
+      {
+        title: '4. First buy intent',
+        status: initialBuySol > 0 ? 'review' : 'pending',
+        detail: initialBuySol > 0
+          ? `User requested a first buy intent of ${initialBuySol} SOL. This is not executed.`
+          : 'No first-buy SOL amount was detected yet.',
+      },
+      {
+        title: '5. Pump.fun transaction',
+        status: 'blocked',
+        detail: 'No mint, bonding curve transaction, metadata upload, or buy transaction is created in this phase.',
+      },
+      {
+        title: '6. Wallet signature',
+        status: 'pending',
+        detail: 'A future phase must show the final transaction in Phantom/Solflare and require explicit user approval.',
+      },
+    ],
+    blockedActions: [
+      'Mythos cannot upload metadata to Pump.fun automatically in this phase.',
+      'Mythos cannot create or mint a token automatically.',
+      'Mythos cannot make the first buy without a visible wallet transaction.',
+      'Mythos cannot store private keys, seed phrases, signed payloads, or hidden transaction data.',
+    ],
+    safetyNotes: [
+      'This is a launch draft, not a live token.',
+      'The user keeps custody. Phantom/Solflare approval is required before any value movement.',
+      'Memecoin creation is high risk and can lose all funds. Mythos must explain fees, slippage, and irreversible actions before signing.',
+    ],
+  };
+}
+
+function isMemecoinLaunchRequest(content: string) {
+  return Boolean(parseMemecoinDraft(content));
+}
+
+function formatMemecoinDraftResponse(draft: MythosMemecoinDraft) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Prepare a Pump.fun-style memecoin launch draft for ${draft.name} (${draft.symbol}).`),
+    terminalSection('Launch fields', [
+      `Name: ${draft.name}`,
+      `Ticker: ${draft.symbol}`,
+      `Description: ${draft.description}`,
+      `Image prompt: ${draft.imagePrompt}`,
+      `First buy intent: ${draft.initialBuySol > 0 ? `${draft.initialBuySol} SOL` : 'not set'}`,
+      `Wallet: ${draft.walletReady ? draft.walletAddress : 'not connected'}`,
+    ]),
+    terminalSection('Execution ladder', draft.phases.map(phase => `- ${phase.title}: ${phase.status} - ${phase.detail}`)),
+    terminalSection('Blocked actions', draft.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Next safe step', draft.walletReady
+      ? 'Review the launch brief, add/confirm image and description, then continue only through a future wallet-signature flow.'
+      : 'Connect Phantom or Solflare, then review the launch brief again before any transaction preparation.'),
+    terminalSection('Safety boundary', draft.safetyNotes.map(note => `- ${note}`)),
+  ].join('\n\n'));
+}
+
 function formatJupiterQuoteResponse(data: Record<string, unknown>) {
   const quote = getRecord(data, 'quote');
   const safety = getRecord(data, 'safety');
@@ -598,6 +766,7 @@ function helpResponse() {
     '/solana protocols',
     '/solana volume',
     '/solana memes',
+    '/create meme Anubis Dog symbol ADOG buy 0.1 SOL image neon anubis dog mascot',
     '/quote swap 0.1 SOL to USDC',
     '/plan pay 0.05 SOL to <wallet>',
     '',
@@ -871,6 +1040,118 @@ function MythosSolanaReportCard({ report }: { report: MythosSolanaEcosystemRepor
   );
 }
 
+function MythosMemecoinDraftCard({
+  draft,
+  onConnectWallet,
+}: {
+  draft: MythosMemecoinDraft;
+  onConnectWallet: () => void;
+}) {
+  const statusTone = draft.walletReady ? 'Ready for review' : 'Wallet needed';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#76FF03]/24 bg-[linear-gradient(135deg,rgba(9,43,4,0.92),rgba(1,8,3,0.98))] p-5 shadow-[0_0_46px_rgba(118,255,3,0.055)]">
+      <div className="flex flex-col gap-5 lg:flex-row">
+        <div className="flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-[#76FF03]/24 bg-[#76FF03]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">
+              Memecoin Studio
+            </span>
+            <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+              draft.walletReady
+                ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
+                : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]'
+            }`}>
+              {statusTone}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-[140px_1fr]">
+            <div className="flex aspect-square items-center justify-center rounded-[32px] border border-[#76FF03]/26 bg-[radial-gradient(circle_at_50%_34%,rgba(118,255,3,0.22),transparent_42%),rgba(0,0,0,0.68)]">
+              <div className="text-center">
+                <Coins className="mx-auto h-9 w-9 text-[#A7FF3D]" />
+                <p className="mt-3 text-2xl font-black uppercase tracking-[0.18em] text-white">${draft.symbol}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">Launch draft</p>
+              <h3 className="mt-2 text-3xl font-black text-white">{draft.name}</h3>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/62">{draft.description}</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Ticker</p>
+                  <p className="mt-2 font-mono text-lg font-black text-[#A7FF3D]">${draft.symbol}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">First buy</p>
+                  <p className="mt-2 text-lg font-black text-white">{draft.initialBuySol > 0 ? `${draft.initialBuySol} SOL` : 'not set'}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Mode</p>
+                  <p className="mt-2 text-lg font-black text-white">Preview</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Image brief</p>
+            <p className="mt-2 text-sm leading-6 text-white/62">{draft.imagePrompt}</p>
+          </div>
+        </div>
+
+        <div className="w-full rounded-3xl border border-white/10 bg-black/36 p-4 lg:w-[340px]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Wallet</p>
+              <p className="mt-1 text-sm font-black text-white">{draft.walletReady ? 'Connected' : 'Not connected'}</p>
+            </div>
+            <Wallet className={draft.walletReady ? 'h-5 w-5 text-[#14F195]' : 'h-5 w-5 text-[#FFD166]'} />
+          </div>
+          <p className="mt-3 break-all rounded-2xl border border-white/8 bg-white/[0.035] p-3 font-mono text-xs text-white/48">
+            {draft.walletAddress || 'Connect Phantom or Solflare before transaction preparation.'}
+          </p>
+          {!draft.walletReady ? (
+            <button
+              type="button"
+              onClick={onConnectWallet}
+              className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#14F195]/22 bg-[#14F195]/10 text-xs font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/16"
+            >
+              Connect Phantom / Solflare
+            </button>
+          ) : null}
+
+          <div className="mt-5 space-y-2">
+            {draft.phases.map((phase, index) => (
+              <div key={`${phase.title}-${index}`} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-white">{phase.title}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                    phase.status === 'ready'
+                      ? 'bg-[#14F195]/12 text-[#8CFFD2]'
+                      : phase.status === 'blocked'
+                        ? 'bg-[#FF5C7A]/12 text-[#FF8FAB]'
+                        : 'bg-[#FFD166]/12 text-[#FFE08A]'
+                  }`}>
+                    {phase.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-white/48">{phase.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/6 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF8FAB]">Blocked until future signature phase</p>
+            <p className="mt-2 text-xs leading-5 text-white/54">No mint, Pump.fun upload, first buy, or Solana submission is executed from this preview.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function makeSession(): MythosLabSession {
   const createdAt = nowIso();
   return {
@@ -1102,6 +1383,7 @@ export default function MythosLabConsole() {
       observability?: MythosObservability;
       htmlArtifact?: MythosLabMessage['htmlArtifact'];
       solanaAnalysis?: Record<string, unknown>;
+      memecoinDraft?: MythosMemecoinDraft;
     }) {
       const assistantMessage: MythosLabMessage = {
         id: createId('msg'),
@@ -1110,6 +1392,7 @@ export default function MythosLabConsole() {
         content: cleanTerminalText(responseContent),
         htmlArtifact: extra?.htmlArtifact,
         solanaAnalysis: extra?.solanaAnalysis,
+        memecoinDraft: extra?.memecoinDraft,
       };
       updateActive(session => ({
         ...session,
@@ -1283,6 +1566,34 @@ export default function MythosLabConsole() {
         },
         updatedAt: nowIso(),
       }));
+      return;
+    }
+
+    const memecoinDraft = parseMemecoinDraft(command, connectedAddress);
+    if (memecoinDraft) {
+      appendTerminalResponse(formatMemecoinDraftResponse(memecoinDraft), {
+        memecoinDraft,
+        trace: {
+          perception: `User requested a memecoin launch draft for ${memecoinDraft.name}.`,
+          memoryContext: 'No private wallet memory was used. The draft only uses the visible prompt and connected public wallet address when available.',
+          selectedSkill: 'Mythos Memecoin Studio',
+          reasoningPath: 'Mythos extracted token identity, ticker, description, image prompt, first-buy intent, wallet readiness, and blocked execution boundaries.',
+          prediction: 'The safest next state is a human-reviewed launch brief before any Pump.fun metadata, mint, buy, or wallet transaction is prepared.',
+          decision: 'Render a preview-only launch card and block automatic execution.',
+          confidence: memecoinDraft.name === 'Untitled Meme' ? 62 : 78,
+          safetyBoundary: 'No mint, upload, signature, buy, sell, or fund movement. Future value movement requires Phantom/Solflare approval.',
+          nextHumanStep: memecoinDraft.walletReady
+            ? 'Review the brief and confirm image/metadata before the future transaction phase.'
+            : 'Connect Phantom or Solflare, then review the brief again.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: 'Mythos Memecoin Studio preview renderer',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-memecoin-draft/v1',
+        },
+      });
       return;
     }
 
@@ -1478,7 +1789,7 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
-      if (content.startsWith('/') || isMarketReportRequest(content) || isSolanaEcosystemRequest(content)) {
+      if (content.startsWith('/') || isMarketReportRequest(content) || isSolanaEcosystemRequest(content) || isMemecoinLaunchRequest(content)) {
         await runTerminalCommand(content, nextMessages, started);
         return;
       }
@@ -1753,7 +2064,8 @@ export default function MythosLabConsole() {
                         {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
                         {message.solanaReport ? <MythosSolanaReportCard report={message.solanaReport} /> : null}
                         {message.solanaAnalysis ? <MythosSolanaAnalysisCard data={message.solanaAnalysis} /> : null}
-                        {!message.cryptoReport && !message.solanaReport && !message.solanaAnalysis ? (
+                        {message.memecoinDraft ? <MythosMemecoinDraftCard draft={message.memecoinDraft} onConnectWallet={handleWalletAction} /> : null}
+                        {!message.cryptoReport && !message.solanaReport && !message.solanaAnalysis && !message.memecoinDraft ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
                         {message.htmlArtifact ? (
