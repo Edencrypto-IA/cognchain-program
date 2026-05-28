@@ -424,6 +424,186 @@ function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
   ].join('\n\n'));
 }
 
+function trendClass(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return 'text-white/52';
+  return value >= 0 ? 'text-[#76FF03]' : 'text-[#FF5C7A]';
+}
+
+function barWidth(value: number, max: number) {
+  if (!max || !Number.isFinite(max)) return '6%';
+  return `${Math.max(6, Math.min(100, (value / max) * 100))}%`;
+}
+
+function CoinRow({ coin, index, mode }: { coin: MythosCryptoCoin | SolanaAssetSummary; index: number; mode: 'gain' | 'loss' | 'trend' | 'volume' | 'meme' }) {
+  const change = 'change7d' in coin && mode !== 'volume' && mode !== 'meme' ? coin.change7d : coin.change24h;
+  const changeLabel = 'change7d' in coin && mode !== 'volume' && mode !== 'meme'
+    ? `${coin.change7d !== null && coin.change7d !== undefined ? coin.change7d.toFixed(2) : '0.00'}%`
+    : coin.change24hLabel;
+  const valueLabel = 'volume24hLabel' in coin ? coin.volume24hLabel : coin.price ? `$${coin.price.toLocaleString('en-US', { maximumSignificantDigits: 4 })}` : 'trending';
+
+  return (
+    <div className="grid grid-cols-[34px_1fr_auto] items-center gap-3 border-b border-white/8 py-3 last:border-b-0">
+      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/8">
+        {coin.image ? <img src={coin.image} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px] font-black text-white/52">#{index + 1}</span>}
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-black uppercase text-white">{coin.symbol}</p>
+          <span className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[9px] font-bold text-white/38">
+            #{coin.rank || index + 1}
+          </span>
+        </div>
+        <p className="truncate text-[11px] text-white/42">{coin.name}</p>
+      </div>
+      <div className="text-right">
+        <p className="text-xs font-black text-white">{valueLabel}</p>
+        <p className={`text-[11px] font-black ${trendClass(change)}`}>{mode === 'trend' ? 'trending' : changeLabel}</p>
+      </div>
+    </div>
+  );
+}
+
+function MythosCryptoReportCard({ report }: { report: MythosCryptoMarketReport }) {
+  return (
+    <div className="mt-2 overflow-hidden rounded-[28px] border border-[#76FF03]/22 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.18),transparent_34%),linear-gradient(180deg,rgba(11,38,5,0.92),rgba(1,8,3,0.96))] p-5 shadow-[0_0_50px_rgba(118,255,3,0.08)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#76FF03]">Mythos Market Intelligence</p>
+          <h3 className="mt-2 text-2xl font-black text-white">Crypto market report</h3>
+          <p className="mt-1 text-xs text-white/52">Data via {report.source.replace(/_/g, ' + ')} - {new Date(report.generatedAt).toLocaleString()}</p>
+        </div>
+        <span className="rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-4 py-3 text-sm font-black capitalize text-yellow-200">
+          {report.sentiment.replace('_', ' ')}
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ['Market cap', report.global.marketCapLabel],
+          ['BTC dominance', report.global.btcDominanceLabel],
+          ['24h volume', report.global.volume24hLabel],
+          ['Active assets', report.global.activeCryptos?.toLocaleString('en-US') || 'unavailable'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/28 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">{label}</p>
+            <p className="mt-3 text-xl font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-[#76FF03]/18 bg-black/24 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#76FF03]">Top gainers - 7d</p>
+          <div className="mt-3">{report.gainers.slice(0, 5).map((coin, index) => <CoinRow key={coin.id} coin={coin} index={index} mode="gain" />)}</div>
+        </div>
+        <div className="rounded-2xl border border-[#FF5C7A]/18 bg-black/24 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF5C7A]">Weak names - 7d</p>
+          <div className="mt-3">{report.losers.slice(0, 5).map((coin, index) => <CoinRow key={coin.id} coin={coin} index={index} mode="loss" />)}</div>
+        </div>
+        <div className="rounded-2xl border border-[#7DE4FF]/18 bg-black/24 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Trending attention</p>
+          <div className="mt-3">{report.trending.slice(0, 5).map((coin, index) => <CoinRow key={coin.id} coin={coin} index={index} mode="trend" />)}</div>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-white/10 bg-black/24 p-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">Mythos readout</p>
+        <p className="mt-2 text-sm leading-6 text-white/72">{report.executiveSummary}</p>
+      </div>
+    </div>
+  );
+}
+
+function MythosSolanaReportCard({ report }: { report: MythosSolanaEcosystemReport }) {
+  const protocols = report.defi.topProtocols;
+  const maxTvl = Math.max(...protocols.map(protocol => protocol.tvlUsd), 1);
+  const assetList = report.mode === 'memes' ? report.assets.memeLeaders : report.assets.volumeLeaders;
+  const heading = report.mode === 'protocols'
+    ? 'SOL price + top protocols'
+    : report.mode === 'volume'
+      ? 'Solana volume leaders'
+      : report.mode === 'memes'
+        ? 'Solana meme radar'
+        : 'SOL market pulse';
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-[28px] border border-[#76FF03]/22 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.18),transparent_34%),linear-gradient(180deg,rgba(3,36,21,0.92),rgba(1,8,3,0.96))] p-5 shadow-[0_0_50px_rgba(118,255,3,0.08)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#14F195]">Solana intelligence</p>
+          <h3 className="mt-2 text-2xl font-black text-white">{heading}</h3>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-white/52">{report.readout.plainEnglish}</p>
+        </div>
+        <span className={`rounded-2xl border px-4 py-3 text-sm font-black capitalize ${
+          report.readout.sentiment === 'bullish'
+            ? 'border-[#76FF03]/30 bg-[#76FF03]/10 text-[#A7FF3D]'
+            : report.readout.sentiment === 'risk_off'
+              ? 'border-[#FF5C7A]/30 bg-[#FF5C7A]/10 text-[#FF8DA3]'
+              : 'border-yellow-300/30 bg-yellow-300/10 text-yellow-200'
+        }`}>
+          {report.readout.sentiment.replace('_', ' ')}
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {[
+          ['SOL / USD', report.price.label, `Rank #${report.price.rank || '-'}`],
+          ['24h move', report.price.change24hLabel, 'spot momentum'],
+          ['Market cap', report.price.marketCapLabel, 'SOL network value'],
+          ['24h volume', report.price.volume24hLabel, 'spot market activity'],
+          ['Solana DeFi TVL', report.defi.totalTvlLabel, `${report.defi.protocolCount} protocols sampled`],
+        ].map(([label, value, detail]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/28 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">{label}</p>
+            <p className={`mt-3 text-xl font-black ${label === '24h move' ? trendClass(report.price.change24h) : 'text-white'}`}>{value}</p>
+            <p className="mt-1 text-[11px] text-white/36">{detail}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-2xl border border-[#76FF03]/18 bg-black/24 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#76FF03]">
+            {report.mode === 'protocols' || report.mode === 'price' ? 'Top 10 protocols by TVL' : report.mode === 'volume' ? 'Top Solana assets by volume' : 'Top Solana memes'}
+          </p>
+          <div className="mt-4 grid gap-3">
+            {(report.mode === 'protocols' || report.mode === 'price') ? protocols.slice(0, 10).map((protocol, index) => (
+              <div key={`${protocol.name}-${index}`} className="rounded-2xl border border-white/8 bg-black/26 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/8 text-[10px] font-black text-white/48">#{index + 1}</span>
+                      <p className="truncate text-sm font-black text-white">{protocol.name}</p>
+                      <span className="rounded-full border border-[#76FF03]/18 bg-[#76FF03]/8 px-2 py-0.5 text-[9px] font-bold uppercase text-[#A7FF3D]">{protocol.category}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-white/38">1d {protocol.change1d?.toFixed(2) ?? '0.00'}% - 7d {protocol.change7d?.toFixed(2) ?? '0.00'}%</p>
+                  </div>
+                  <p className="shrink-0 text-sm font-black text-white">{protocol.tvlLabel}</p>
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8">
+                  <div className="h-full rounded-full bg-[#76FF03]" style={{ width: barWidth(protocol.tvlUsd, maxTvl) }} />
+                </div>
+              </div>
+            )) : assetList.slice(0, 10).map((asset, index) => (
+              <CoinRow key={asset.id} coin={asset} index={index} mode={report.mode === 'memes' ? 'meme' : 'volume'} />
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#14F195]/18 bg-[#052519]/62 p-5">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14F195]">Mythos readout</p>
+          <h4 className="mt-4 text-xl font-black text-white">{report.readout.headline}</h4>
+          <p className="mt-4 text-sm leading-6 text-white/66">{report.readout.nextSafeStep}</p>
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/24 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Safety</p>
+            <p className="mt-2 text-xs leading-5 text-white/54">Read-only market intelligence. No wallet connection, signature, swap, payment, or fund movement.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function makeSession(): MythosLabSession {
   const createdAt = nowIso();
   return {
@@ -1223,7 +1403,11 @@ export default function MythosLabConsole() {
                         <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-white/32">
                           {message.role === 'user' ? 'You' : 'Mythos'}
                         </p>
-                        <p className="whitespace-pre-wrap">{message.content}</p>
+                        {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
+                        {message.solanaReport ? <MythosSolanaReportCard report={message.solanaReport} /> : null}
+                        {!message.cryptoReport && !message.solanaReport ? (
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                        ) : null}
                         {message.htmlArtifact ? (
                           <div className="mt-4 overflow-hidden rounded-2xl border border-[#76FF03]/18 bg-black/70">
                             <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.035] px-4 py-3">
