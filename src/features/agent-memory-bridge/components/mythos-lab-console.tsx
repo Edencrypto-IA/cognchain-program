@@ -1,12 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import {
   Activity,
   Brain,
+  ChevronDown,
   Coins,
   Gauge,
   KeyRound,
+  LogOut,
   Loader2,
   Network,
   Plus,
@@ -151,6 +155,64 @@ const TERMINAL_COMMANDS = [
     detail: 'Admin-only: ask Anthropic to generate a read-only HTML artifact preview. The Claude key stays on the server.',
   },
 ];
+
+const MYTHOS_MODEL_OPTIONS = [
+  {
+    id: 'nvidia',
+    label: 'NVIDIA',
+    provider: 'NVIDIA NIM',
+    detail: 'Default Mythos route for Nemotron and open model inference.',
+  },
+  {
+    id: 'gpt',
+    label: 'GPT',
+    provider: 'OpenAI',
+    detail: 'General reasoning, artifacts, and structured assistant work.',
+  },
+  {
+    id: 'claude',
+    label: 'Claude',
+    provider: 'Anthropic',
+    detail: 'Long-form analysis, careful planning, and admin HTML artifacts.',
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    provider: 'Google',
+    detail: 'Multimodal-friendly reasoning and broad synthesis.',
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    provider: 'DeepSeek',
+    detail: 'Code review, debugging, and technical reasoning.',
+  },
+  {
+    id: 'glm',
+    label: 'GLM',
+    provider: 'Zhipu AI',
+    detail: 'Strong multilingual reasoning and structured analysis.',
+  },
+  {
+    id: 'minimax',
+    label: 'MiniMax',
+    provider: 'MiniMax',
+    detail: 'Fast conversational and lightweight drafting route.',
+  },
+  {
+    id: 'qwen',
+    label: 'Qwen',
+    provider: 'Qwen',
+    detail: 'Repository analysis, coding tasks, and long-context work.',
+  },
+];
+
+function getModelOption(model?: string) {
+  const normalized = (model || '').toLowerCase();
+  return MYTHOS_MODEL_OPTIONS.find(option =>
+    option.id.toLowerCase() === normalized || option.label.toLowerCase() === normalized
+  ) || MYTHOS_MODEL_OPTIONS[0];
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -843,6 +905,8 @@ function safeLoadSessions(): MythosLabSession[] {
 
 export default function MythosLabConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
+  const { publicKey, connected, disconnect, wallet } = useWallet();
+  const { setVisible: setWalletModalVisible } = useWalletModal();
   const [sessions, setSessions] = useState<MythosLabSession[]>([]);
   const [activeId, setActiveId] = useState('');
   const [input, setInput] = useState('');
@@ -851,6 +915,7 @@ export default function MythosLabConsole() {
   const [savingMemoryId, setSavingMemoryId] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -871,6 +936,9 @@ export default function MythosLabConsole() {
     MYTHOS_FEATURED_SKILLS[0];
   const assistantMessages = activeSession?.messages.filter(message => message.role === 'assistant') || [];
   const lastAssistant = assistantMessages[assistantMessages.length - 1];
+  const currentModel = getModelOption(activeSession?.model);
+  const connectedAddress = publicKey?.toString() || '';
+  const walletShortAddress = connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : '';
 
   const memoryPayload = useMemo(() => ({
     content: lastAssistant?.content || '',
@@ -929,6 +997,26 @@ export default function MythosLabConsole() {
     setInput('');
     setNotice('');
     setPendingSaveMessageId('');
+  }
+
+  function selectModel(modelId: string) {
+    const model = getModelOption(modelId);
+    updateActive(session => ({
+      ...session,
+      model: model.id,
+      updatedAt: nowIso(),
+    }));
+    setModelMenuOpen(false);
+    setNotice(`Mythos model route set to ${model.label}. Server availability still depends on configured provider keys.`);
+  }
+
+  async function handleWalletAction() {
+    if (connected) {
+      await disconnect();
+      setNotice('Wallet disconnected from Mythos Lab. No transaction was signed or submitted.');
+      return;
+    }
+    setWalletModalVisible(true);
   }
 
   function markMessageSaved(messageId: string, data: MemoryWriteResponse) {
@@ -1474,7 +1562,7 @@ export default function MythosLabConsole() {
     <main className="min-h-screen bg-black text-white">
       <div className="flex min-h-screen w-full overflow-hidden bg-[#020402] lg:flex-row">
         <aside className="relative hidden w-[320px] shrink-0 flex-col border-r border-white/10 bg-[linear-gradient(180deg,rgba(4,10,4,0.98),rgba(0,0,0,0.98))] p-6 lg:flex">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_4%,rgba(118,255,3,0.16),transparent_26%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_4%,rgba(118,255,3,0.06),transparent_28%)]" />
           <div className="relative flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="h-16 w-16 overflow-hidden rounded-full border border-[#76FF03]/35 bg-black shadow-[0_0_32px_rgba(118,255,3,0.28)]">
@@ -1561,16 +1649,67 @@ export default function MythosLabConsole() {
           </div>
         </aside>
 
-        <section className="relative flex min-h-screen flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_52%_18%,rgba(118,255,3,0.13),transparent_28%),linear-gradient(180deg,rgba(2,5,2,0.99),rgba(0,0,0,1))]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(118,255,3,0.08),transparent_20%),radial-gradient(circle_at_70%_10%,rgba(118,255,3,0.06),transparent_18%)]" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(180deg,rgba(118,255,3,0.06),transparent)]" />
+        <section className="relative flex min-h-screen flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_52%_18%,rgba(118,255,3,0.045),transparent_30%),linear-gradient(180deg,rgba(2,5,2,0.99),rgba(0,0,0,1))]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(118,255,3,0.025),transparent_22%),radial-gradient(circle_at_70%_10%,rgba(118,255,3,0.018),transparent_20%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(180deg,rgba(118,255,3,0.025),transparent)]" />
 
           <header className="relative flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
             <a href="/mythos" className="text-xs text-white/45 transition hover:text-white/80">Back to Mythos</a>
             <div className="flex items-center gap-2">
-              <span className="hidden rounded-full border border-[#76FF03]/16 bg-[#76FF03]/8 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#A7FF3D] sm:inline-flex">
-                {activeSession.model}
-              </span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setModelMenuOpen(open => !open)}
+                  className="hidden h-10 items-center gap-2 rounded-full border border-[#76FF03]/16 bg-[#76FF03]/8 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-[#A7FF3D] transition hover:bg-[#76FF03]/13 sm:inline-flex"
+                  aria-expanded={modelMenuOpen}
+                  aria-label="Choose Mythos model route"
+                >
+                  {currentModel.label}
+                  <ChevronDown className={`h-3.5 w-3.5 transition ${modelMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {modelMenuOpen ? (
+                  <div className="absolute right-0 z-30 mt-3 w-[320px] overflow-hidden rounded-2xl border border-[#76FF03]/18 bg-[#030803]/95 p-2 shadow-[0_20px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+                    <div className="px-3 py-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Mythos model route</p>
+                      <p className="mt-1 text-[11px] leading-4 text-white/42">Choose the responder profile. Provider keys still stay server-side.</p>
+                    </div>
+                    <div className="max-h-[360px] overflow-y-auto pr-1">
+                      {MYTHOS_MODEL_OPTIONS.map(option => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => selectModel(option.id)}
+                          className={`w-full rounded-xl px-3 py-2.5 text-left transition ${
+                            option.id === currentModel.id
+                              ? 'border border-[#76FF03]/24 bg-[#76FF03]/10'
+                              : 'border border-transparent hover:bg-white/[0.055]'
+                          }`}
+                        >
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-black text-white">{option.label}</span>
+                            <span className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[9px] font-bold uppercase text-white/40">{option.provider}</span>
+                          </span>
+                          <span className="mt-1 block text-[11px] leading-4 text-white/45">{option.detail}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={handleWalletAction}
+                className="hidden h-10 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/13 md:inline-flex"
+                title={connected ? 'Disconnect wallet from Mythos Lab' : 'Connect Phantom or Solflare to Mythos Lab'}
+              >
+                {connected && wallet?.adapter.icon ? (
+                  <img src={wallet.adapter.icon} alt="" className="h-4 w-4 rounded-full" />
+                ) : (
+                  <Wallet className="h-4 w-4" />
+                )}
+                {connected ? `${wallet?.adapter.name || 'Wallet'} ${walletShortAddress}` : 'Connect Wallet'}
+                {connected ? <LogOut className="h-3.5 w-3.5" /> : null}
+              </button>
               <button
                 type="button"
                 onClick={() => sendMessage('/help')}
@@ -1591,7 +1730,7 @@ export default function MythosLabConsole() {
                     <img
                       src="/agents/mythos-terminal.png"
                       alt="Mythos, the first autonomous external agent"
-                      className="w-full max-w-[720px] object-contain opacity-95 drop-shadow-[0_0_58px_rgba(118,255,3,0.18)]"
+                      className="w-full max-w-[720px] object-contain opacity-95 drop-shadow-[0_0_42px_rgba(118,255,3,0.11)]"
                     />
                     <p className="-mt-4 text-[11px] font-black uppercase tracking-[0.34em] text-white/42 sm:-mt-8">
                       Developed by <span className="text-[#A7FF3D]">CongChain</span>
@@ -1604,8 +1743,8 @@ export default function MythosLabConsole() {
                         key={message.id}
                         className={`max-w-[92%] rounded-[22px] border px-5 py-4 text-sm leading-6 backdrop-blur ${
                           message.role === 'user'
-                            ? 'ml-auto border-[#76FF03]/30 bg-[#173b02]/80 text-white'
-                            : 'mr-auto border-white/10 bg-white/[0.055] text-white/78'
+                            ? 'ml-auto border-[#76FF03]/24 bg-[#0b2204]/72 text-white'
+                            : 'mr-auto border-white/10 bg-black/44 text-white/78'
                         }`}
                       >
                         <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-white/32">
@@ -1698,7 +1837,7 @@ export default function MythosLabConsole() {
 
               <footer className="sticky bottom-0 pb-4 pt-3">
                 <div className="mx-auto w-full max-w-3xl">
-                  <div className="rounded-[28px] border border-[#76FF03]/34 bg-black/56 p-4 shadow-[0_0_58px_rgba(118,255,3,0.09)] backdrop-blur-xl">
+                  <div className="rounded-[28px] border border-[#76FF03]/28 bg-black/62 p-4 shadow-[0_0_34px_rgba(118,255,3,0.045)] backdrop-blur-xl">
                     <textarea
                       value={input}
                       onChange={event => setInput(event.target.value)}
