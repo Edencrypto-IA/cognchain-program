@@ -60,12 +60,19 @@ type MythosMemecoinDraft = {
   initialBuySol: number;
   walletAddress?: string;
   walletReady: boolean;
-  launchMode: 'preview_only';
+  launchMode: 'preview_only' | 'launch_review_ready';
+  readinessScore: number;
+  estimatedCostSol: {
+    minimum: number;
+    maximum: number;
+    label: string;
+  };
   phases: Array<{
     title: string;
     status: 'ready' | 'review' | 'blocked' | 'pending';
     detail: string;
   }>;
+  reviewChecklist: string[];
   blockedActions: string[];
   safetyNotes: string[];
 };
@@ -616,6 +623,18 @@ function parseMemecoinDraft(content: string, walletAddress?: string): MythosMeme
   const description = inferMemecoinDescription(content, name);
   const imagePrompt = inferMemecoinImagePrompt(content, name);
   const walletReady = Boolean(walletAddress);
+  const hasName = name !== 'Untitled Meme';
+  const hasFirstBuy = initialBuySol > 0;
+  const readinessScore = [
+    hasName,
+    symbol.length >= 2,
+    description.length >= 24,
+    imagePrompt.length >= 18,
+    walletReady,
+    hasFirstBuy,
+  ].filter(Boolean).length * 14 + (walletReady && hasFirstBuy ? 16 : 0);
+  const minimumCost = Number((0.02 + Math.max(initialBuySol, 0)).toFixed(4));
+  const maximumCost = Number((0.08 + Math.max(initialBuySol, 0)).toFixed(4));
 
   return {
     name,
@@ -625,11 +644,17 @@ function parseMemecoinDraft(content: string, walletAddress?: string): MythosMeme
     initialBuySol,
     walletAddress,
     walletReady,
-    launchMode: 'preview_only',
+    launchMode: walletReady && hasName ? 'launch_review_ready' : 'preview_only',
+    readinessScore: Math.min(readinessScore, 100),
+    estimatedCostSol: {
+      minimum: minimumCost,
+      maximum: maximumCost,
+      label: `${minimumCost}-${maximumCost} SOL estimated review range`,
+    },
     phases: [
       {
         title: '1. Token identity',
-        status: name === 'Untitled Meme' ? 'review' : 'ready',
+        status: hasName ? 'ready' : 'review',
         detail: `Name ${name} and ticker ${symbol} are drafted for review.`,
       },
       {
@@ -646,8 +671,8 @@ function parseMemecoinDraft(content: string, walletAddress?: string): MythosMeme
       },
       {
         title: '4. First buy intent',
-        status: initialBuySol > 0 ? 'review' : 'pending',
-        detail: initialBuySol > 0
+        status: hasFirstBuy ? 'review' : 'pending',
+        detail: hasFirstBuy
           ? `User requested a first buy intent of ${initialBuySol} SOL. This is not executed.`
           : 'No first-buy SOL amount was detected yet.',
       },
@@ -661,6 +686,14 @@ function parseMemecoinDraft(content: string, walletAddress?: string): MythosMeme
         status: 'pending',
         detail: 'A future phase must show the final transaction in Phantom/Solflare and require explicit user approval.',
       },
+    ],
+    reviewChecklist: [
+      'Confirm token name, ticker, and description are final.',
+      'Confirm the image/logo file is owned by the creator and safe to publish.',
+      'Confirm launch wallet, network, SOL balance, priority fee, and first-buy amount.',
+      'Confirm Pump.fun terms, irreversible launch behavior, bonding curve mechanics, and slippage.',
+      'Confirm Mythos shows a final transaction preview before Phantom/Solflare signature.',
+      'Save the launch brief as CongChain memory only after human review.',
     ],
     blockedActions: [
       'Mythos cannot upload metadata to Pump.fun automatically in this phase.',
@@ -683,6 +716,11 @@ function isMemecoinLaunchRequest(content: string) {
 function formatMemecoinDraftResponse(draft: MythosMemecoinDraft) {
   return cleanTerminalText([
     terminalSection('Intent', `Prepare a Pump.fun-style memecoin launch draft for ${draft.name} (${draft.symbol}).`),
+    terminalSection('Launch readiness', [
+      `Mode: ${draft.launchMode === 'launch_review_ready' ? 'launch review ready' : 'preview only'}`,
+      `Readiness score: ${draft.readinessScore}/100`,
+      `Estimated review range: ${draft.estimatedCostSol.label}`,
+    ]),
     terminalSection('Launch fields', [
       `Name: ${draft.name}`,
       `Ticker: ${draft.symbol}`,
@@ -692,12 +730,58 @@ function formatMemecoinDraftResponse(draft: MythosMemecoinDraft) {
       `Wallet: ${draft.walletReady ? draft.walletAddress : 'not connected'}`,
     ]),
     terminalSection('Execution ladder', draft.phases.map(phase => `- ${phase.title}: ${phase.status} - ${phase.detail}`)),
+    terminalSection('Human review checklist', draft.reviewChecklist.map(item => `- ${item}`)),
     terminalSection('Blocked actions', draft.blockedActions.map(action => `- ${action}`)),
     terminalSection('Next safe step', draft.walletReady
-      ? 'Review the launch brief, add/confirm image and description, then continue only through a future wallet-signature flow.'
+      ? 'Press Arm launch review to create a local approval packet. A future executor must still require Phantom/Solflare signature.'
       : 'Connect Phantom or Solflare, then review the launch brief again before any transaction preparation.'),
     terminalSection('Safety boundary', draft.safetyNotes.map(note => `- ${note}`)),
   ].join('\n\n'));
+}
+
+function formatMemecoinLaunchReviewResponse(draft: MythosMemecoinDraft) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Arm a local launch review packet for ${draft.name} (${draft.symbol}).`),
+    terminalSection('Decision', 'Launch review is armed locally. Mythos still did not upload metadata, mint, sign, submit, or buy.'),
+    terminalSection('Approval gates', [
+      'Gate 1: Wallet connected and visible to the user.',
+      'Gate 2: Metadata and image reviewed by the user.',
+      'Gate 3: Pump.fun transaction payload generated by a future audited executor.',
+      'Gate 4: Phantom/Solflare opens a visible signature request.',
+      'Gate 5: User signs manually after reviewing fees, first buy, and irreversible launch behavior.',
+      'Gate 6: Submission and hash are shown, then saved as CongChain memory only after user approval.',
+    ]),
+    terminalSection('Launch packet', [
+      `Name: ${draft.name}`,
+      `Ticker: ${draft.symbol}`,
+      `Wallet: ${draft.walletAddress || 'not connected'}`,
+      `First buy intent: ${draft.initialBuySol > 0 ? `${draft.initialBuySol} SOL` : 'not set'}`,
+      `Estimated review range: ${draft.estimatedCostSol.label}`,
+      `Readiness: ${draft.readinessScore}/100`,
+    ]),
+    terminalSection('Blocked actions', draft.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Next safe step', 'Build the audited Pump.fun executor route only after we confirm metadata upload rules, payload format, slippage, wallet signature UX, and failure rollback states.'),
+  ].join('\n\n'));
+}
+
+function memecoinLaunchBrief(draft: MythosMemecoinDraft) {
+  return cleanTerminalText([
+    `MYTHOS MEMECOIN LAUNCH BRIEF`,
+    `Name: ${draft.name}`,
+    `Ticker: ${draft.symbol}`,
+    `Description: ${draft.description}`,
+    `Image prompt: ${draft.imagePrompt}`,
+    `Wallet: ${draft.walletAddress || 'not connected'}`,
+    `First buy intent: ${draft.initialBuySol > 0 ? `${draft.initialBuySol} SOL` : 'not set'}`,
+    `Readiness: ${draft.readinessScore}/100`,
+    `Estimated review range: ${draft.estimatedCostSol.label}`,
+    ``,
+    `Review checklist:`,
+    ...draft.reviewChecklist.map(item => `- ${item}`),
+    ``,
+    `Safety boundary:`,
+    ...draft.safetyNotes.map(note => `- ${note}`),
+  ].join('\n'));
 }
 
 function formatJupiterQuoteResponse(data: Record<string, unknown>) {
@@ -1043,11 +1127,16 @@ function MythosSolanaReportCard({ report }: { report: MythosSolanaEcosystemRepor
 function MythosMemecoinDraftCard({
   draft,
   onConnectWallet,
+  onArmLaunchReview,
+  onCopyLaunchBrief,
 }: {
   draft: MythosMemecoinDraft;
   onConnectWallet: () => void;
+  onArmLaunchReview: (draft: MythosMemecoinDraft) => void;
+  onCopyLaunchBrief: (draft: MythosMemecoinDraft) => void;
 }) {
   const statusTone = draft.walletReady ? 'Ready for review' : 'Wallet needed';
+  const readinessLabel = draft.launchMode === 'launch_review_ready' ? 'Launch review ready' : 'Preview only';
 
   return (
     <div className="mt-4 overflow-hidden rounded-[28px] border border-[#76FF03]/24 bg-[linear-gradient(135deg,rgba(9,43,4,0.92),rgba(1,8,3,0.98))] p-5 shadow-[0_0_46px_rgba(118,255,3,0.055)]">
@@ -1089,15 +1178,28 @@ function MythosMemecoinDraftCard({
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Mode</p>
-                  <p className="mt-2 text-lg font-black text-white">Preview</p>
+                  <p className="mt-2 text-lg font-black text-white">{readinessLabel}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Image brief</p>
-            <p className="mt-2 text-sm leading-6 text-white/62">{draft.imagePrompt}</p>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Image brief</p>
+              <p className="mt-2 text-sm leading-6 text-white/62">{draft.imagePrompt}</p>
+            </div>
+            <div className="rounded-2xl border border-[#76FF03]/18 bg-[#76FF03]/[0.045] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Launch readiness</p>
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <p className="text-4xl font-black text-white">{draft.readinessScore}</p>
+                <p className="pb-1 text-xs font-black uppercase tracking-[0.12em] text-white/38">/100</p>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
+                <div className="h-full rounded-full bg-[#76FF03]" style={{ width: `${draft.readinessScore}%` }} />
+              </div>
+              <p className="mt-3 text-xs leading-5 text-white/52">{draft.estimatedCostSol.label}. This is an estimate for review only, not a quote.</p>
+            </div>
           </div>
         </div>
 
@@ -1121,6 +1223,23 @@ function MythosMemecoinDraftCard({
               Connect Phantom / Solflare
             </button>
           ) : null}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            <button
+              type="button"
+              onClick={() => onCopyLaunchBrief(draft)}
+              className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] text-xs font-black uppercase tracking-[0.12em] text-white/68 transition hover:bg-white/[0.07]"
+            >
+              Copy launch brief
+            </button>
+            <button
+              type="button"
+              onClick={() => onArmLaunchReview(draft)}
+              disabled={!draft.walletReady}
+              className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#76FF03]/22 bg-[#76FF03]/12 text-xs font-black uppercase tracking-[0.12em] text-[#B8FF5C] transition hover:bg-[#76FF03]/18 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.035] disabled:text-white/30"
+            >
+              Arm launch review
+            </button>
+          </div>
 
           <div className="mt-5 space-y-2">
             {draft.phases.map((phase, index) => (
@@ -1145,6 +1264,12 @@ function MythosMemecoinDraftCard({
           <div className="mt-5 rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/6 p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF8FAB]">Blocked until future signature phase</p>
             <p className="mt-2 text-xs leading-5 text-white/54">No mint, Pump.fun upload, first buy, or Solana submission is executed from this preview.</p>
+          </div>
+          <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">Human review checklist</p>
+            <ul className="mt-3 space-y-2 text-[11px] leading-4 text-white/48">
+              {draft.reviewChecklist.slice(0, 4).map(item => <li key={item}>- {item}</li>)}
+            </ul>
           </div>
         </div>
       </div>
@@ -1298,6 +1423,55 @@ export default function MythosLabConsole() {
       return;
     }
     setWalletModalVisible(true);
+  }
+
+  async function copyMemecoinLaunchBrief(draft: MythosMemecoinDraft) {
+    try {
+      await navigator.clipboard.writeText(memecoinLaunchBrief(draft));
+      setNotice('Memecoin launch brief copied locally. No token was created and no wallet action was requested.');
+    } catch {
+      setNotice('Could not copy the launch brief from this browser.');
+    }
+  }
+
+  function armMemecoinLaunchReview(draft: MythosMemecoinDraft) {
+    if (!draft.walletReady) {
+      setNotice('Connect Phantom or Solflare before arming launch review. No wallet signature was requested.');
+      return;
+    }
+
+    const started = Date.now();
+    const assistantMessage: MythosLabMessage = {
+      id: createId('msg'),
+      role: 'assistant',
+      createdAt: nowIso(),
+      content: formatMemecoinLaunchReviewResponse(draft),
+    };
+
+    updateActive(session => ({
+      ...session,
+      messages: [...session.messages, assistantMessage],
+      lastTrace: {
+        perception: `Launch review armed for ${draft.name} (${draft.symbol}).`,
+        memoryContext: 'The launch packet uses the visible draft and connected public wallet address only.',
+        selectedSkill: 'Mythos Memecoin Studio - launch review',
+        reasoningPath: 'Mythos checked token identity, metadata readiness, wallet readiness, first-buy intent, blocked actions, and required approval gates.',
+        prediction: 'The next implementation stage should build an audited Pump.fun executor that prepares a visible transaction payload but still requires wallet signature.',
+        decision: 'Arm the local review packet and keep mint/upload/buy/submission blocked.',
+        confidence: draft.readinessScore,
+        safetyBoundary: 'No metadata upload, no mint, no signature request, no first buy, no Solana submission.',
+        nextHumanStep: 'Review the packet, save it as memory if approved, then build the audited executor route.',
+      },
+      lastObservability: {
+        model: session.model,
+        modelLabel: 'Mythos Memecoin Studio launch review',
+        latencyMs: Date.now() - started,
+        mode: session.mode,
+        traceSchema: 'mythos-memecoin-launch-review/v1',
+      },
+      updatedAt: nowIso(),
+    }));
+    setNotice('Launch review armed locally. Mythos still did not create, upload, sign, submit, buy, or move funds.');
   }
 
   function markMessageSaved(messageId: string, data: MemoryWriteResponse) {
@@ -2064,7 +2238,14 @@ export default function MythosLabConsole() {
                         {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
                         {message.solanaReport ? <MythosSolanaReportCard report={message.solanaReport} /> : null}
                         {message.solanaAnalysis ? <MythosSolanaAnalysisCard data={message.solanaAnalysis} /> : null}
-                        {message.memecoinDraft ? <MythosMemecoinDraftCard draft={message.memecoinDraft} onConnectWallet={handleWalletAction} /> : null}
+                        {message.memecoinDraft ? (
+                          <MythosMemecoinDraftCard
+                            draft={message.memecoinDraft}
+                            onConnectWallet={handleWalletAction}
+                            onArmLaunchReview={armMemecoinLaunchReview}
+                            onCopyLaunchBrief={copyMemecoinLaunchBrief}
+                          />
+                        ) : null}
                         {!message.cryptoReport && !message.solanaReport && !message.solanaAnalysis && !message.memecoinDraft ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
