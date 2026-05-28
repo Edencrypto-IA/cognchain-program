@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
 import {
   Activity,
   Brain,
@@ -190,52 +190,74 @@ const MYTHOS_MODEL_OPTIONS = [
   {
     id: 'nvidia',
     label: 'NVIDIA',
-    provider: 'NVIDIA NIM',
-    detail: 'Default Mythos route for Nemotron and open model inference.',
+    provider: 'NVIDIA NIM ROUTE',
+    detail: 'NVIDIA key route for Nemotron plus NVIDIA-hosted open models. This can include non-NVIDIA model families served through NIM.',
   },
   {
     id: 'gpt',
-    label: 'GPT',
-    provider: 'OpenAI',
-    detail: 'General reasoning, artifacts, and structured assistant work.',
+    label: 'GPT PRO',
+    provider: 'OPENAI PRO',
+    detail: 'Direct OpenAI paid API route for GPT-class reasoning, artifacts, and structured assistant work.',
   },
   {
     id: 'claude',
-    label: 'Claude',
-    provider: 'Anthropic',
-    detail: 'Long-form analysis, careful planning, and admin HTML artifacts.',
+    label: 'Claude PRO',
+    provider: 'ANTHROPIC PRO',
+    detail: 'Direct Anthropic paid API route for long-form analysis, careful planning, and admin HTML artifacts.',
   },
   {
     id: 'gemini',
-    label: 'Gemini',
-    provider: 'Google',
-    detail: 'Multimodal-friendly reasoning and broad synthesis.',
+    label: 'Gemini PRO',
+    provider: 'GOOGLE PRO',
+    detail: 'Direct Google paid API route for multimodal-friendly reasoning and broad synthesis.',
   },
   {
     id: 'deepseek',
-    label: 'DeepSeek',
-    provider: 'DeepSeek',
-    detail: 'Code review, debugging, and technical reasoning.',
+    label: 'DeepSeek PRO',
+    provider: 'DEEPSEEK PRO',
+    detail: 'Direct DeepSeek paid API route for code review, debugging, and technical reasoning.',
   },
   {
     id: 'glm',
-    label: 'GLM',
-    provider: 'Zhipu AI',
-    detail: 'Strong multilingual reasoning and structured analysis.',
+    label: 'GLM PRO',
+    provider: 'ZHIPU AI PRO',
+    detail: 'Direct Zhipu AI paid API route for GLM multilingual reasoning and structured analysis.',
   },
   {
     id: 'minimax',
-    label: 'MiniMax',
-    provider: 'MiniMax',
-    detail: 'Fast conversational and lightweight drafting route.',
+    label: 'MiniMax PRO',
+    provider: 'MINIMAX PRO',
+    detail: 'Direct MiniMax paid API route for fast conversational and lightweight drafting work.',
   },
   {
     id: 'qwen',
-    label: 'Qwen',
-    provider: 'Qwen',
-    detail: 'Repository analysis, coding tasks, and long-context work.',
+    label: 'Qwen PRO',
+    provider: 'QWEN PRO',
+    detail: 'Direct Qwen paid API route for repository analysis, coding tasks, and long-context work.',
   },
 ];
+
+const MYTHOS_WALLET_OPTIONS = [
+  {
+    key: 'phantom',
+    name: 'Phantom',
+    description: 'Primary Solana browser/mobile wallet for future Mythos approvals.',
+    installUrl: 'https://phantom.app/download',
+    mobileUrl: (url: string, ref: string) => `https://phantom.app/ul/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(ref)}`,
+  },
+  {
+    key: 'solflare',
+    name: 'Solflare',
+    description: 'Solana wallet for explicit review, signing, and future launch approval.',
+    installUrl: 'https://solflare.com/download',
+    mobileUrl: (url: string, ref: string) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(ref)}`,
+  },
+];
+
+function isMobileBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+}
 
 function getModelOption(model?: string) {
   const normalized = (model || '').toLowerCase();
@@ -1311,8 +1333,7 @@ function safeLoadSessions(): MythosLabSession[] {
 
 export default function MythosLabConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
-  const { publicKey, connected, disconnect, wallet } = useWallet();
-  const { setVisible: setWalletModalVisible } = useWalletModal();
+  const { publicKey, connected, disconnect, wallet, wallets, select, connecting } = useWallet();
   const [sessions, setSessions] = useState<MythosLabSession[]>([]);
   const [activeId, setActiveId] = useState('');
   const [input, setInput] = useState('');
@@ -1322,6 +1343,9 @@ export default function MythosLabConsole() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
+  const [walletConnectError, setWalletConnectError] = useState('');
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -1420,9 +1444,68 @@ export default function MythosLabConsole() {
     if (connected) {
       await disconnect();
       setNotice('Wallet disconnected from Mythos Lab. No transaction was signed or submitted.');
+      setWalletMenuOpen(false);
       return;
     }
-    setWalletModalVisible(true);
+    setWalletConnectError('');
+    setWalletMenuOpen(open => !open);
+  }
+
+  function openWalletFallback(option: typeof MYTHOS_WALLET_OPTIONS[number]) {
+    if (typeof window === 'undefined') return;
+    const currentUrl = window.location.href;
+    const ref = window.location.origin;
+    window.location.href = isMobileBrowser()
+      ? option.mobileUrl(currentUrl, ref)
+      : option.installUrl;
+  }
+
+  async function connectMythosWallet(option: typeof MYTHOS_WALLET_OPTIONS[number]) {
+    setWalletConnectError('');
+    setConnectingWallet(option.key);
+
+    const candidate = wallets.find(item =>
+      item.adapter.name.toLowerCase().includes(option.name.toLowerCase())
+    );
+
+    if (!candidate) {
+      openWalletFallback(option);
+      setConnectingWallet(null);
+      return;
+    }
+
+    const readyState = candidate.adapter.readyState;
+    const canConnect =
+      readyState === WalletReadyState.Installed ||
+      readyState === WalletReadyState.Loadable;
+
+    if (!canConnect && !isMobileBrowser()) {
+      openWalletFallback(option);
+      setConnectingWallet(null);
+      return;
+    }
+
+    try {
+      select(candidate.adapter.name as WalletName);
+      await Promise.race([
+        candidate.adapter.connected ? Promise.resolve() : candidate.adapter.connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('wallet_timeout')), 15_000)),
+      ]);
+      setWalletMenuOpen(false);
+      setNotice(`${option.name} connected to Mythos Lab. No transaction was signed or submitted.`);
+    } catch (error) {
+      if (isMobileBrowser()) {
+        openWalletFallback(option);
+      } else {
+        setWalletConnectError(
+          error instanceof Error && error.message === 'wallet_timeout'
+            ? `${option.name} opened but did not finish connecting. Unlock the wallet and approve the connection.`
+            : `${option.name} did not respond. Check that the extension is installed and unlocked.`
+        );
+      }
+    } finally {
+      setConnectingWallet(null);
+    }
   }
 
   async function copyMemecoinLaunchBrief(draft: MythosMemecoinDraft) {
@@ -2184,7 +2267,8 @@ export default function MythosLabConsole() {
               <button
                 type="button"
                 onClick={handleWalletAction}
-                className="hidden h-10 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/13 md:inline-flex"
+                disabled={connecting || !!connectingWallet}
+                className="hidden h-10 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/13 disabled:opacity-50 md:inline-flex"
                 title={connected ? 'Disconnect wallet from Mythos Lab' : 'Connect Phantom or Solflare to Mythos Lab'}
               >
                 {connected && wallet?.adapter.icon ? (
@@ -2192,9 +2276,43 @@ export default function MythosLabConsole() {
                 ) : (
                   <Wallet className="h-4 w-4" />
                 )}
-                {connected ? `${wallet?.adapter.name || 'Wallet'} ${walletShortAddress}` : 'Connect Wallet'}
-                {connected ? <LogOut className="h-3.5 w-3.5" /> : null}
+                {connected ? `${wallet?.adapter.name || 'Wallet'} ${walletShortAddress}` : connectingWallet ? 'Connecting...' : 'Connect Wallet'}
+                {connected ? <LogOut className="h-3.5 w-3.5" /> : <ChevronDown className={`h-3.5 w-3.5 transition ${walletMenuOpen ? 'rotate-180' : ''}`} />}
               </button>
+              {walletMenuOpen && !connected ? (
+                <div className="absolute right-[104px] top-14 z-40 w-[330px] overflow-hidden rounded-2xl border border-[#14F195]/18 bg-[#030908]/96 p-2 shadow-[0_20px_70px_rgba(0,0,0,0.58)] backdrop-blur-xl">
+                  <div className="px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8CFFD2]">Connect wallet</p>
+                    <p className="mt-1 text-[11px] leading-4 text-white/42">Phantom or Solflare opens directly. Mythos cannot sign or move funds without your visible approval.</p>
+                  </div>
+                  <div className="space-y-2">
+                    {MYTHOS_WALLET_OPTIONS.map(option => {
+                      const candidate = wallets.find(item => item.adapter.name.toLowerCase().includes(option.name.toLowerCase()));
+                      const installed = candidate?.adapter.readyState === WalletReadyState.Installed || candidate?.adapter.readyState === WalletReadyState.Loadable;
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => connectMythosWallet(option)}
+                          disabled={!!connectingWallet}
+                          className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.035] px-3 py-3 text-left transition hover:border-[#14F195]/22 hover:bg-[#14F195]/8 disabled:opacity-50"
+                        >
+                          <span>
+                            <span className="block text-sm font-black text-white">{option.name}</span>
+                            <span className="mt-1 block text-[11px] leading-4 text-white/45">{option.description}</span>
+                          </span>
+                          <span className="shrink-0 rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[9px] font-black uppercase text-white/42">
+                            {connectingWallet === option.key ? 'opening' : installed ? 'ready' : 'install'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {walletConnectError ? (
+                    <p className="mt-3 rounded-xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/8 p-3 text-[11px] leading-4 text-[#FF9AB1]">{walletConnectError}</p>
+                  ) : null}
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={() => sendMessage('/help')}
