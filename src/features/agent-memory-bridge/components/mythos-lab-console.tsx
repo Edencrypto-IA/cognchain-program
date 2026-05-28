@@ -191,48 +191,56 @@ const MYTHOS_MODEL_OPTIONS = [
     id: 'nvidia',
     label: 'NVIDIA',
     provider: 'NVIDIA NIM ROUTE',
+    access: 'open',
     detail: 'NVIDIA key route for Nemotron plus NVIDIA-hosted open models. This can include non-NVIDIA model families served through NIM.',
   },
   {
     id: 'gpt',
     label: 'GPT PRO',
     provider: 'OPENAI PRO',
+    access: 'pro',
     detail: 'Direct OpenAI paid API route for GPT-class reasoning, artifacts, and structured assistant work.',
   },
   {
     id: 'claude',
     label: 'Claude PRO',
     provider: 'ANTHROPIC PRO',
+    access: 'pro',
     detail: 'Direct Anthropic paid API route for long-form analysis, careful planning, and admin HTML artifacts.',
   },
   {
     id: 'gemini',
     label: 'Gemini',
     provider: 'GOOGLE API',
+    access: 'open',
     detail: 'Google model route for multimodal-friendly reasoning and broad synthesis.',
   },
   {
     id: 'deepseek',
     label: 'DeepSeek PRO',
     provider: 'DEEPSEEK PRO',
+    access: 'pro',
     detail: 'Direct DeepSeek paid API route for code review, debugging, and technical reasoning.',
   },
   {
     id: 'glm',
     label: 'GLM',
     provider: 'FREE/API',
+    access: 'open',
     detail: 'GLM route for multilingual reasoning and structured analysis.',
   },
   {
     id: 'minimax',
     label: 'MiniMax',
     provider: 'FREE/API',
+    access: 'open',
     detail: 'MiniMax route for fast conversational and lightweight drafting work.',
   },
   {
     id: 'qwen',
     label: 'Qwen',
     provider: 'FREE/API',
+    access: 'open',
     detail: 'Qwen route for repository analysis, coding tasks, and long-context work.',
   },
 ];
@@ -1157,19 +1165,121 @@ function MythosMemecoinDraftCard({
   onArmLaunchReview: (draft: MythosMemecoinDraft) => void;
   onCopyLaunchBrief: (draft: MythosMemecoinDraft) => void;
 }) {
-  const statusTone = draft.walletReady ? 'Ready for review' : 'Wallet needed';
-  const readinessLabel = draft.launchMode === 'launch_review_ready' ? 'Launch review ready' : 'Preview only';
+  const [editableDraft, setEditableDraft] = useState(draft);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState('');
+  const [logoFileName, setLogoFileName] = useState('');
+
+  useEffect(() => {
+    setEditableDraft(draft);
+    setLogoPreviewUrl('');
+    setLogoFileName('');
+  }, [draft]);
+
+  function normalizeSymbol(value: string) {
+    const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    return normalized || 'MEME';
+  }
+
+  function recomputeDraft(next: MythosMemecoinDraft): MythosMemecoinDraft {
+    const name = next.name.trim() || 'Untitled Meme';
+    const symbol = normalizeSymbol(next.symbol);
+    const description = next.description.trim() || `${name} is a community meme token draft prepared by Mythos for human review.`;
+    const imagePrompt = next.imagePrompt.trim() || `Premium green-black Solana meme coin logo for ${name}, bold mascot, clean circular icon.`;
+    const initialBuySol = Number.isFinite(next.initialBuySol) ? Math.max(next.initialBuySol, 0) : 0;
+    const walletReady = Boolean(next.walletAddress);
+    const hasName = name !== 'Untitled Meme';
+    const hasFirstBuy = initialBuySol > 0;
+    const readinessScore = Math.min([
+      hasName,
+      symbol.length >= 2,
+      description.length >= 24,
+      imagePrompt.length >= 18,
+      walletReady,
+      hasFirstBuy,
+    ].filter(Boolean).length * 14 + (walletReady && hasFirstBuy ? 16 : 0), 100);
+    const minimumCost = Number((0.02 + initialBuySol).toFixed(4));
+    const maximumCost = Number((0.08 + initialBuySol).toFixed(4));
+
+    return {
+      ...next,
+      name,
+      symbol,
+      description,
+      imagePrompt,
+      initialBuySol,
+      launchMode: walletReady && hasName ? 'launch_review_ready' : 'preview_only',
+      readinessScore,
+      estimatedCostSol: {
+        minimum: minimumCost,
+        maximum: maximumCost,
+        label: `${minimumCost}-${maximumCost} SOL estimated review range`,
+      },
+      phases: [
+        {
+          title: '1. Token identity',
+          status: hasName ? 'ready' : 'review',
+          detail: `Name ${name} and ticker ${symbol} are editable and ready for human review.`,
+        },
+        {
+          title: '2. Visual metadata',
+          status: logoFileName || imagePrompt ? 'review' : 'pending',
+          detail: logoFileName
+            ? `Local logo preview selected: ${logoFileName}. It is not uploaded yet.`
+            : 'Image prompt is prepared, but no file is uploaded to IPFS or Pump.fun yet.',
+        },
+        {
+          title: '3. Wallet readiness',
+          status: walletReady ? 'ready' : 'review',
+          detail: walletReady
+            ? `Wallet ${next.walletAddress?.slice(0, 4)}...${next.walletAddress?.slice(-4)} is connected for future approval.`
+            : 'Connect Phantom or Solflare before any future launch transaction can be prepared.',
+        },
+        {
+          title: '4. First buy intent',
+          status: hasFirstBuy ? 'review' : 'pending',
+          detail: hasFirstBuy
+            ? `User requested a first buy intent of ${initialBuySol} SOL. This is not executed.`
+            : 'No first-buy SOL amount is set yet.',
+        },
+        {
+          title: '5. Pump.fun transaction',
+          status: 'blocked',
+          detail: 'No mint, bonding curve transaction, metadata upload, or buy transaction is created in this phase.',
+        },
+        {
+          title: '6. Wallet signature',
+          status: 'pending',
+          detail: 'A future phase must show the final transaction in Phantom/Solflare and require explicit user approval.',
+        },
+      ],
+    };
+  }
+
+  function updateEditableDraft(patch: Partial<MythosMemecoinDraft>) {
+    setEditableDraft(current => recomputeDraft({ ...current, ...patch }));
+  }
+
+  function handleLogoChange(file?: File) {
+    if (!file) return;
+    if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
+    setLogoPreviewUrl(URL.createObjectURL(file));
+    setLogoFileName(file.name);
+  }
+
+  const statusTone = editableDraft.walletReady ? 'Ready for review' : 'Wallet needed';
+  const readinessLabel = editableDraft.launchMode === 'launch_review_ready' ? 'Launch review ready' : 'Preview only';
+  const compactSymbol = editableDraft.symbol.length > 7 ? `${editableDraft.symbol.slice(0, 7)}...` : editableDraft.symbol;
 
   return (
     <div className="mt-4 overflow-hidden rounded-[28px] border border-[#76FF03]/24 bg-[linear-gradient(135deg,rgba(9,43,4,0.92),rgba(1,8,3,0.98))] p-5 shadow-[0_0_46px_rgba(118,255,3,0.055)]">
-      <div className="flex flex-col gap-5 lg:flex-row">
+      <div className="flex flex-col gap-5 xl:flex-row">
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-[#76FF03]/24 bg-[#76FF03]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">
               Memecoin Studio
             </span>
             <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
-              draft.walletReady
+              editableDraft.walletReady
                 ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
                 : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]'
             }`}>
@@ -1177,26 +1287,65 @@ function MythosMemecoinDraftCard({
             </span>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-[140px_1fr]">
-            <div className="flex aspect-square items-center justify-center rounded-[32px] border border-[#76FF03]/26 bg-[radial-gradient(circle_at_50%_34%,rgba(118,255,3,0.22),transparent_42%),rgba(0,0,0,0.68)]">
+          <div className="mt-5 grid gap-4 md:grid-cols-[170px_minmax(0,1fr)]">
+            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[32px] border border-[#76FF03]/26 bg-[radial-gradient(circle_at_50%_34%,rgba(118,255,3,0.22),transparent_42%),rgba(0,0,0,0.68)]">
+              {logoPreviewUrl ? (
+                <img src={logoPreviewUrl} alt={`${editableDraft.name} local logo preview`} className="h-full w-full object-cover" />
+              ) : (
               <div className="text-center">
                 <Coins className="mx-auto h-9 w-9 text-[#A7FF3D]" />
-                <p className="mt-3 text-2xl font-black uppercase tracking-[0.18em] text-white">${draft.symbol}</p>
+                  <p className="mt-3 max-w-[132px] break-words text-xl font-black uppercase tracking-[0.12em] text-white">${compactSymbol}</p>
               </div>
+              )}
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">Launch draft</p>
-              <h3 className="mt-2 text-3xl font-black text-white">{draft.name}</h3>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/62">{draft.description}</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_150px]">
+                <label className="block">
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Meme name</span>
+                  <input
+                    value={editableDraft.name}
+                    onChange={event => updateEditableDraft({ name: event.target.value })}
+                    className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/34 px-4 text-sm font-bold text-white outline-none transition placeholder:text-white/24 focus:border-[#76FF03]/42"
+                    placeholder="Example: Green Zeus"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Ticker</span>
+                  <input
+                    value={editableDraft.symbol}
+                    onChange={event => updateEditableDraft({ symbol: event.target.value })}
+                    className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/34 px-4 font-mono text-sm font-black uppercase text-[#A7FF3D] outline-none transition placeholder:text-white/24 focus:border-[#76FF03]/42"
+                    placeholder="ZEUS"
+                  />
+                </label>
+              </div>
+              <label className="mt-3 block">
+                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Description</span>
+                <textarea
+                  value={editableDraft.description}
+                  onChange={event => updateEditableDraft({ description: event.target.value })}
+                  className="mt-2 min-h-[82px] w-full resize-none rounded-2xl border border-white/10 bg-black/34 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/24 focus:border-[#76FF03]/42"
+                  placeholder="Explain the meme, community, visual identity, and launch intent."
+                />
+              </label>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Ticker</p>
-                  <p className="mt-2 font-mono text-lg font-black text-[#A7FF3D]">${draft.symbol}</p>
+                  <p className="mt-2 break-all font-mono text-base font-black text-[#A7FF3D]">${editableDraft.symbol}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">First buy</p>
-                  <p className="mt-2 text-lg font-black text-white">{draft.initialBuySol > 0 ? `${draft.initialBuySol} SOL` : 'not set'}</p>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editableDraft.initialBuySol || ''}
+                    onChange={event => updateEditableDraft({ initialBuySol: Number(event.target.value) })}
+                    className="mt-2 h-9 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-sm font-black text-white outline-none focus:border-[#76FF03]/42"
+                    placeholder="0.00 SOL"
+                  />
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Mode</p>
@@ -1206,37 +1355,54 @@ function MythosMemecoinDraftCard({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Image brief</p>
-              <p className="mt-2 text-sm leading-6 text-white/62">{draft.imagePrompt}</p>
+              <textarea
+                value={editableDraft.imagePrompt}
+                onChange={event => updateEditableDraft({ imagePrompt: event.target.value })}
+                className="mt-3 min-h-[102px] w-full resize-none rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/24 focus:border-[#7DE4FF]/40"
+                placeholder="Describe mascot/logo style for the meme image."
+              />
+              <label className="mt-3 inline-flex h-10 cursor-pointer items-center justify-center rounded-2xl border border-[#7DE4FF]/18 bg-[#7DE4FF]/8 px-4 text-xs font-black uppercase tracking-[0.12em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/13">
+                Select local logo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={event => handleLogoChange(event.target.files?.[0])}
+                />
+              </label>
+              {logoFileName ? (
+                <p className="mt-2 break-all text-[11px] leading-4 text-white/42">Local preview only: {logoFileName}. No upload happened.</p>
+              ) : null}
             </div>
             <div className="rounded-2xl border border-[#76FF03]/18 bg-[#76FF03]/[0.045] p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Launch readiness</p>
               <div className="mt-3 flex items-end justify-between gap-3">
-                <p className="text-4xl font-black text-white">{draft.readinessScore}</p>
+                <p className="text-4xl font-black text-white">{editableDraft.readinessScore}</p>
                 <p className="pb-1 text-xs font-black uppercase tracking-[0.12em] text-white/38">/100</p>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
-                <div className="h-full rounded-full bg-[#76FF03]" style={{ width: `${draft.readinessScore}%` }} />
+                <div className="h-full rounded-full bg-[#76FF03]" style={{ width: `${editableDraft.readinessScore}%` }} />
               </div>
-              <p className="mt-3 text-xs leading-5 text-white/52">{draft.estimatedCostSol.label}. This is an estimate for review only, not a quote.</p>
+              <p className="mt-3 text-xs leading-5 text-white/52">{editableDraft.estimatedCostSol.label}. This is an estimate for review only, not a quote.</p>
             </div>
           </div>
         </div>
 
-        <div className="w-full rounded-3xl border border-white/10 bg-black/36 p-4 lg:w-[340px]">
+        <div className="w-full rounded-3xl border border-white/10 bg-black/36 p-4 xl:w-[360px]">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Wallet</p>
-              <p className="mt-1 text-sm font-black text-white">{draft.walletReady ? 'Connected' : 'Not connected'}</p>
+              <p className="mt-1 text-sm font-black text-white">{editableDraft.walletReady ? 'Connected' : 'Not connected'}</p>
             </div>
-            <Wallet className={draft.walletReady ? 'h-5 w-5 text-[#14F195]' : 'h-5 w-5 text-[#FFD166]'} />
+            <Wallet className={editableDraft.walletReady ? 'h-5 w-5 text-[#14F195]' : 'h-5 w-5 text-[#FFD166]'} />
           </div>
           <p className="mt-3 break-all rounded-2xl border border-white/8 bg-white/[0.035] p-3 font-mono text-xs text-white/48">
-            {draft.walletAddress || 'Connect Phantom or Solflare before transaction preparation.'}
+            {editableDraft.walletAddress || 'Connect Phantom or Solflare before transaction preparation.'}
           </p>
-          {!draft.walletReady ? (
+          {!editableDraft.walletReady ? (
             <button
               type="button"
               onClick={onConnectWallet}
@@ -1248,15 +1414,15 @@ function MythosMemecoinDraftCard({
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
             <button
               type="button"
-              onClick={() => onCopyLaunchBrief(draft)}
+              onClick={() => onCopyLaunchBrief(editableDraft)}
               className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] text-xs font-black uppercase tracking-[0.12em] text-white/68 transition hover:bg-white/[0.07]"
             >
               Copy launch brief
             </button>
             <button
               type="button"
-              onClick={() => onArmLaunchReview(draft)}
-              disabled={!draft.walletReady}
+              onClick={() => onArmLaunchReview(editableDraft)}
+              disabled={!editableDraft.walletReady}
               className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#76FF03]/22 bg-[#76FF03]/12 text-xs font-black uppercase tracking-[0.12em] text-[#B8FF5C] transition hover:bg-[#76FF03]/18 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.035] disabled:text-white/30"
             >
               Arm launch review
@@ -1264,7 +1430,7 @@ function MythosMemecoinDraftCard({
           </div>
 
           <div className="mt-5 space-y-2">
-            {draft.phases.map((phase, index) => (
+            {editableDraft.phases.map((phase, index) => (
               <div key={`${phase.title}-${index}`} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-black text-white">{phase.title}</p>
@@ -1290,7 +1456,7 @@ function MythosMemecoinDraftCard({
           <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">Human review checklist</p>
             <ul className="mt-3 space-y-2 text-[11px] leading-4 text-white/48">
-              {draft.reviewChecklist.slice(0, 4).map(item => <li key={item}>- {item}</li>)}
+              {editableDraft.reviewChecklist.slice(0, 4).map(item => <li key={item}>- {item}</li>)}
             </ul>
           </div>
         </div>
@@ -1346,12 +1512,39 @@ export default function MythosLabConsole() {
   const [walletMenuOpen, setWalletMenuOpen] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
   const [walletConnectError, setWalletConnectError] = useState('');
+  const [proAccessOpen, setProAccessOpen] = useState(false);
+  const [pendingProModelId, setPendingProModelId] = useState('');
+  const [proAccessUser, setProAccessUser] = useState('');
+  const [proAccessPassword, setProAccessPassword] = useState('');
+  const [proAccessUnlocked, setProAccessUnlocked] = useState(false);
+  const [proAccessLoading, setProAccessLoading] = useState(false);
+  const [proAccessError, setProAccessError] = useState('');
 
   useEffect(() => {
     const loaded = safeLoadSessions();
     const initial = loaded.length > 0 ? loaded : [makeSession()];
     setSessions(initial);
     setActiveId(initial[0]?.id || '');
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkProAccess() {
+      try {
+        const response = await fetch('/api/mythos/pro-access', { cache: 'no-store' });
+        const data = await response.json();
+        if (!cancelled) setProAccessUnlocked(Boolean(data.unlocked));
+      } catch {
+        if (!cancelled) setProAccessUnlocked(false);
+      }
+    }
+
+    void checkProAccess();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1431,6 +1624,15 @@ export default function MythosLabConsole() {
 
   function selectModel(modelId: string) {
     const model = getModelOption(modelId);
+    if (model.access === 'pro' && !proAccessUnlocked) {
+      setPendingProModelId(model.id);
+      setProAccessOpen(true);
+      setModelMenuOpen(false);
+      setProAccessError('');
+      setNotice(`${model.label} requires Mythos PRO access before it can be selected.`);
+      return;
+    }
+
     updateActive(session => ({
       ...session,
       model: model.id,
@@ -1438,6 +1640,43 @@ export default function MythosLabConsole() {
     }));
     setModelMenuOpen(false);
     setNotice(`Mythos model route set to ${model.label}. Server availability still depends on configured provider keys.`);
+  }
+
+  async function submitProAccess() {
+    setProAccessLoading(true);
+    setProAccessError('');
+
+    try {
+      const response = await fetch('/api/mythos/pro-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: proAccessUser,
+          password: proAccessPassword,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.unlocked) {
+        throw new Error(data.error || 'Mythos PRO access was rejected.');
+      }
+
+      setProAccessUnlocked(true);
+      setProAccessOpen(false);
+      setProAccessPassword('');
+      const nextModel = getModelOption(pendingProModelId || 'gpt');
+      updateActive(session => ({
+        ...session,
+        model: nextModel.id,
+        updatedAt: nowIso(),
+      }));
+      setPendingProModelId('');
+      setNotice(`Mythos PRO route unlocked. Model route set to ${nextModel.label}.`);
+    } catch (error) {
+      setProAccessError(error instanceof Error ? error.message : 'Mythos PRO access failed.');
+    } finally {
+      setProAccessLoading(false);
+    }
   }
 
   async function handleWalletAction() {
@@ -2255,7 +2494,14 @@ export default function MythosLabConsole() {
                         >
                           <span className="flex items-center justify-between gap-3">
                             <span className="text-sm font-black text-white">{option.label}</span>
-                            <span className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[9px] font-bold uppercase text-white/40">{option.provider}</span>
+                            <span className="flex items-center gap-1.5">
+                              {option.access === 'pro' ? (
+                                <span className="rounded-full border border-[#FFD166]/18 bg-[#FFD166]/10 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFE08A]">
+                                  PRO
+                                </span>
+                              ) : null}
+                              <span className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[9px] font-bold uppercase text-white/40">{option.provider}</span>
+                            </span>
                           </span>
                           <span className="mt-1 block text-[11px] leading-4 text-white/45">{option.detail}</span>
                         </button>
@@ -2264,6 +2510,72 @@ export default function MythosLabConsole() {
                   </div>
                 ) : null}
               </div>
+              {proAccessOpen ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/68 px-4 backdrop-blur-sm">
+                  <div className="w-full max-w-[420px] rounded-[28px] border border-[#FFD166]/22 bg-[#050704]/96 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.68)]">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE08A]">Mythos PRO access</p>
+                        <h3 className="mt-2 text-2xl font-black text-white">
+                          Unlock {getModelOption(pendingProModelId || 'gpt').label}
+                        </h3>
+                        <p className="mt-2 text-xs leading-5 text-white/50">
+                          Paid provider routes are admin-gated. The server verifies access and keeps provider keys private.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProAccessOpen(false);
+                          setProAccessPassword('');
+                          setProAccessError('');
+                        }}
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-black text-white/55 transition hover:bg-white/[0.08]"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div className="mt-5 space-y-3">
+                      <label className="block">
+                        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">Login</span>
+                        <input
+                          value={proAccessUser}
+                          onChange={event => setProAccessUser(event.target.value)}
+                          className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/42 px-4 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-[#FFD166]/45"
+                          placeholder="mythos"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">Password</span>
+                        <input
+                          type="password"
+                          value={proAccessPassword}
+                          onChange={event => setProAccessPassword(event.target.value)}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter') void submitProAccess();
+                          }}
+                          className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/42 px-4 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-[#FFD166]/45"
+                          placeholder="Server-side access password"
+                        />
+                      </label>
+                      {proAccessError ? (
+                        <p className="rounded-2xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/10 p-3 text-xs leading-5 text-[#FFB0BF]">{proAccessError}</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void submitProAccess()}
+                      disabled={proAccessLoading}
+                      className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[#FFD166]/24 bg-[#FFD166]/12 text-xs font-black uppercase tracking-[0.14em] text-[#FFE08A] transition hover:bg-[#FFD166]/18 disabled:opacity-55"
+                    >
+                      {proAccessLoading ? 'Checking...' : 'Unlock PRO route'}
+                    </button>
+                    <p className="mt-3 text-[11px] leading-4 text-white/36">
+                      Configure Railway with MYTHOS_PRO_ACCESS_USER and MYTHOS_PRO_ACCESS_PASSWORD. No provider key or password is rendered in the browser.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={handleWalletAction}
