@@ -96,6 +96,25 @@ type DefiLlamaProtocol = {
   url?: string;
 };
 
+type CuratedSolanaProtocol = {
+  displayName: string;
+  category: string;
+  aliases: string[];
+};
+
+const SOLANA_NATIVE_PROTOCOLS: CuratedSolanaProtocol[] = [
+  { displayName: 'Jupiter', category: 'Aggregator / Perps', aliases: ['jupiter', 'jupiter aggregator', 'jupiter perps', 'jupiter lend'] },
+  { displayName: 'Kamino', category: 'Lending / Yield', aliases: ['kamino', 'kamino finance', 'kamino lend'] },
+  { displayName: 'Jito', category: 'Liquid Staking / MEV', aliases: ['jito', 'jito liquid staking', 'jito validator lsts'] },
+  { displayName: 'Marinade Finance', category: 'Liquid Staking', aliases: ['marinade', 'marinade finance'] },
+  { displayName: 'Drift', category: 'Perps / DEX', aliases: ['drift', 'drift protocol', 'drift trade'] },
+  { displayName: 'Raydium', category: 'DEX / AMM', aliases: ['raydium'] },
+  { displayName: 'Sanctum', category: 'Liquid Staking', aliases: ['sanctum', 'sanctum validator lsts'] },
+  { displayName: 'Meteora', category: 'Dynamic Liquidity', aliases: ['meteora'] },
+  { displayName: 'Orca', category: 'DEX / AMM', aliases: ['orca'] },
+  { displayName: 'Save', category: 'Lending', aliases: ['save', 'solend'] },
+];
+
 type CoinGeckoMarketAsset = {
   id?: string;
   symbol?: string;
@@ -168,11 +187,11 @@ function isRealSolanaProtocol(protocol: DefiLlamaProtocol) {
   return true;
 }
 
-function protocolToSummary(protocol: DefiLlamaProtocol): SolanaProtocolSummary {
+function protocolToSummary(protocol: DefiLlamaProtocol, override?: CuratedSolanaProtocol): SolanaProtocolSummary {
   const tvl = typeof protocol.tvl === 'number' ? protocol.tvl : 0;
   return {
-    name: protocol.name || 'Unknown protocol',
-    category: categoryFor(protocol),
+    name: override?.displayName || protocol.name || 'Unknown protocol',
+    category: override?.category || categoryFor(protocol),
     tvlUsd: tvl,
     tvlLabel: fmtUsd(tvl),
     change1d: typeof protocol.change_1d === 'number' ? protocol.change_1d : null,
@@ -180,6 +199,41 @@ function protocolToSummary(protocol: DefiLlamaProtocol): SolanaProtocolSummary {
     url: protocol.url,
     chains: Array.isArray(protocol.chains) ? protocol.chains : [],
   };
+}
+
+function createProtocolPlaceholder(protocol: CuratedSolanaProtocol): SolanaProtocolSummary {
+  return {
+    name: protocol.displayName,
+    category: protocol.category,
+    tvlUsd: 0,
+    tvlLabel: 'live TVL pending',
+    change1d: null,
+    change7d: null,
+    chains: ['Solana'],
+  };
+}
+
+function protocolName(protocol: DefiLlamaProtocol) {
+  return String(protocol.name || '').trim().toLowerCase();
+}
+
+function matchesCuratedProtocol(protocol: DefiLlamaProtocol, curated: CuratedSolanaProtocol) {
+  const name = protocolName(protocol);
+  return curated.aliases.some((alias) => name === alias || name.includes(alias));
+}
+
+function buildCuratedSolanaProtocolList(protocolsRaw: DefiLlamaProtocol[] | null) {
+  if (!Array.isArray(protocolsRaw)) return SOLANA_NATIVE_PROTOCOLS.map(createProtocolPlaceholder);
+
+  const solanaProtocols = protocolsRaw.filter(isRealSolanaProtocol);
+
+  return SOLANA_NATIVE_PROTOCOLS.map((curated) => {
+    const match = solanaProtocols
+      .filter((protocol) => matchesCuratedProtocol(protocol, curated))
+      .sort((a, b) => (Number(b.tvl) || 0) - (Number(a.tvl) || 0))[0];
+
+    return match ? protocolToSummary(match, curated) : createProtocolPlaceholder(curated);
+  });
 }
 
 function assetToSummary(asset: CoinGeckoMarketAsset): SolanaAssetSummary {
@@ -226,7 +280,7 @@ function readoutFor(mode: MythosSolanaReportMode, change24h: number | null, tota
             : 'SOL is near neutral momentum; ecosystem context matters more than price alone.';
 
   const plainEnglish = mode === 'protocols'
-    ? `For a non-crypto user: this report shows real Solana DeFi applications, not exchanges. TVL means how much value is sitting inside those applications. ${leader} is currently the largest sampled protocol, and the top 10 protocols represent ${fmtUsd(totalTvl)} in visible DeFi activity.`
+    ? `For a non-crypto user: this report shows core Solana-native applications such as aggregators, lending markets, liquid staking, DEXs, and perps. TVL means how much value is sitting inside those applications when live data is available. ${leader} is shown first because it is one of the primary entry points for Solana liquidity.`
     : mode === 'volume'
       ? `For a non-crypto user: this report shows which Solana ecosystem assets are moving the most trading volume. Volume means attention and liquidity, but it does not prove safety or quality.`
       : mode === 'memes'
@@ -252,13 +306,7 @@ export async function getMythosSolanaEcosystemReport(mode: MythosSolanaReportMod
   ]);
 
   const market = solana?.market_data;
-  const protocols = Array.isArray(protocolsRaw)
-    ? protocolsRaw
-        .filter(isRealSolanaProtocol)
-        .map(protocolToSummary)
-        .sort((a, b) => b.tvlUsd - a.tvlUsd)
-        .slice(0, 10)
-    : [];
+  const protocols = buildCuratedSolanaProtocolList(protocolsRaw);
   const volumeLeaders = Array.isArray(solanaAssetsRaw) ? solanaAssetsRaw.map(assetToSummary).slice(0, 10) : [];
   const memeLeaders = Array.isArray(memeAssetsRaw) ? memeAssetsRaw.map(assetToSummary).slice(0, 10) : [];
   const totalTvl = protocols.reduce((sum, protocol) => sum + protocol.tvlUsd, 0);
