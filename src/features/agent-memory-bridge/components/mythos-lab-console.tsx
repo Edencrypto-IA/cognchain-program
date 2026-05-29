@@ -47,6 +47,8 @@ type MythosLabMessage = {
   solanaAnalysis?: Record<string, unknown>;
   memecoinDraft?: MythosMemecoinDraft;
   memecoinProposal?: MythosPumpfunLaunchProposal;
+  memecoinMetadataReview?: MythosPumpfunMetadataReview;
+  memecoinUnsignedPreview?: MythosPumpfunUnsignedPreview;
   memoryHash?: string;
   readUrl?: string;
   verifyUrl?: string;
@@ -114,6 +116,88 @@ type MythosPumpfunLaunchProposal = {
   futureExecution: string[];
   blockedActions: string[];
   unsignedTransaction: null;
+};
+
+type MythosPumpfunMetadataReview = {
+  id: string;
+  proposalId: string | null;
+  status: 'blocked' | 'needs_review' | 'ready_for_manual_upload';
+  createdAt: string;
+  platform: string;
+  network: string;
+  metadataHash: string;
+  token: {
+    name: string;
+    symbol: string;
+    description: string;
+    imagePrompt: string;
+  };
+  wallet: {
+    address: string | null;
+    ready: boolean;
+  };
+  upload: {
+    performed: boolean;
+    uri: string | null;
+    storage: string | null;
+    note: string;
+  };
+  readiness: {
+    ready: number;
+    review: number;
+    blocked: number;
+  };
+  checks: Array<{
+    id: string;
+    label: string;
+    status: 'ready' | 'review' | 'blocked';
+    detail: string;
+  }>;
+  nextSteps: string[];
+  blockedActions: string[];
+};
+
+type MythosPumpfunUnsignedPreview = {
+  id: string;
+  proposalId: string | null;
+  metadataReviewId: string | null;
+  status: 'blocked' | 'needs_review' | 'ready_for_wallet_signature_phase';
+  createdAt: string;
+  network: string;
+  platform: string;
+  previewHash: string;
+  signer: {
+    walletAddress: string | null;
+    required: boolean;
+    connected: boolean;
+  };
+  token: {
+    name: string;
+    symbol: string;
+    metadataHash: string | null;
+  };
+  firstBuy: {
+    amountSol: number;
+    configured: boolean;
+  };
+  instructionPlan: string[];
+  transaction: {
+    serializedUnsignedPayload: null;
+    wireReady: boolean;
+    reason: string;
+  };
+  readiness: {
+    ready: number;
+    review: number;
+    blocked: number;
+  };
+  gates: Array<{
+    id: string;
+    label: string;
+    status: 'ready' | 'review' | 'pending' | 'blocked';
+    detail: string;
+  }>;
+  blockedActions: string[];
 };
 
 type MythosCognitiveTrace = {
@@ -957,6 +1041,55 @@ function formatPumpfunProposalResponse(proposal: MythosPumpfunLaunchProposal) {
   ].join('\n\n'));
 }
 
+function formatPumpfunMetadataReviewResponse(review: MythosPumpfunMetadataReview) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Prepare metadata review packet ${review.id}.`),
+    terminalSection('Metadata status', [
+      `Status: ${review.status}`,
+      `Proposal: ${review.proposalId || 'not linked'}`,
+      `Metadata hash: ${review.metadataHash}`,
+      `Upload performed: ${review.upload.performed ? 'yes' : 'no'}`,
+      `Upload URI: ${review.upload.uri || 'not created'}`,
+    ]),
+    terminalSection('Token metadata', [
+      `Name: ${review.token.name}`,
+      `Ticker: ${review.token.symbol}`,
+      `Description: ${review.token.description}`,
+      `Image prompt: ${review.token.imagePrompt}`,
+    ]),
+    terminalSection('Review gates', review.checks.map(check => `- ${check.label}: ${check.status} - ${check.detail}`)),
+    terminalSection('Blocked actions', review.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Next safe step', 'After human review, prepare an unsigned transaction preview. It must still avoid wallet signatures, uploads, buys, or submission.'),
+  ].join('\n\n'));
+}
+
+function formatPumpfunUnsignedPreviewResponse(preview: MythosPumpfunUnsignedPreview) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Prepare unsigned transaction preview ${preview.id}.`),
+    terminalSection('Preview status', [
+      `Status: ${preview.status}`,
+      `Network: ${preview.network}`,
+      `Proposal: ${preview.proposalId || 'not linked'}`,
+      `Metadata review: ${preview.metadataReviewId || 'not linked'}`,
+      `Preview hash: ${preview.previewHash}`,
+    ]),
+    terminalSection('Signer and token', [
+      `Required signer: ${preview.signer.walletAddress || 'not connected'}`,
+      `Token: ${preview.token.name} (${preview.token.symbol})`,
+      `Metadata hash: ${preview.token.metadataHash || 'not ready'}`,
+      `First buy intent: ${preview.firstBuy.configured ? `${preview.firstBuy.amountSol} SOL` : 'not set'}`,
+    ]),
+    terminalSection('Instruction plan', preview.instructionPlan.map(step => `- ${step}`)),
+    terminalSection('Transaction payload', [
+      `Wire ready: ${preview.transaction.wireReady ? 'yes' : 'no'}`,
+      `Serialized unsigned payload: ${preview.transaction.serializedUnsignedPayload || 'not created'}`,
+      `Reason: ${preview.transaction.reason}`,
+    ]),
+    terminalSection('Blocked actions', preview.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Next safe step', 'Next phase must audit Pump.fun payload construction and only then open Phantom/Solflare for explicit signature.'),
+  ].join('\n\n'));
+}
+
 function memecoinLaunchBrief(draft: MythosMemecoinDraft) {
   return cleanTerminalText([
     `MYTHOS MEMECOIN LAUNCH BRIEF`,
@@ -1637,7 +1770,13 @@ function MythosMemecoinDraftCard({
   );
 }
 
-function MythosPumpfunProposalCard({ proposal }: { proposal: MythosPumpfunLaunchProposal }) {
+function MythosPumpfunProposalCard({
+  proposal,
+  onPrepareMetadataReview,
+}: {
+  proposal: MythosPumpfunLaunchProposal;
+  onPrepareMetadataReview: (proposal: MythosPumpfunLaunchProposal) => void;
+}) {
   const statusLabel = proposal.status.replace(/_/g, ' ');
   const statusClass = proposal.status === 'ready_for_future_signature'
     ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
@@ -1710,6 +1849,165 @@ function MythosPumpfunProposalCard({ proposal }: { proposal: MythosPumpfunLaunch
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FF9AB1]">Unsigned transaction</p>
             <p className="mt-2 text-xs leading-5 text-white/54">Not created in this phase. This keeps the flow safe until metadata rules, Pump.fun payload format, slippage, and wallet UX are audited.</p>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#7DE4FF]/14 bg-[#7DE4FF]/[0.045] p-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Next safe phase</p>
+          <p className="mt-1 text-sm leading-6 text-white/58">Prepare metadata review. This creates a hash-addressable packet only; it does not upload to IPFS, Arweave, or Pump.fun.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onPrepareMetadataReview(proposal)}
+          className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#7DE4FF]/20 bg-[#7DE4FF]/10 px-4 text-xs font-black uppercase tracking-[0.12em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/15"
+        >
+          Prepare metadata review
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MythosPumpfunMetadataReviewCard({
+  review,
+  onPrepareUnsignedPreview,
+}: {
+  review: MythosPumpfunMetadataReview;
+  onPrepareUnsignedPreview: (review: MythosPumpfunMetadataReview) => void;
+}) {
+  const statusClass = review.status === 'ready_for_manual_upload'
+    ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
+    : review.status === 'blocked'
+      ? 'border-[#FF5C7A]/24 bg-[#FF5C7A]/10 text-[#FF9AB1]'
+      : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#A7FF3D]/20 bg-[linear-gradient(135deg,rgba(17,41,4,0.9),rgba(1,8,3,0.98))] p-5 shadow-[0_0_42px_rgba(167,255,61,0.045)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Pump.fun Metadata Review</p>
+          <h4 className="mt-2 text-2xl font-black text-white">{review.token.name} <span className="text-[#A7FF3D]">${review.token.symbol}</span></h4>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/58">Metadata packet is hashed for review. No image, JSON, IPFS, Arweave, or Pump.fun upload happened.</p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClass}`}>
+          {review.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        {[
+          ['Metadata ID', review.id],
+          ['Proposal', review.proposalId || 'not linked'],
+          ['Upload URI', review.upload.uri || 'not created'],
+          ['Wallet', review.wallet.address ? `${review.wallet.address.slice(0, 4)}...${review.wallet.address.slice(-4)}` : 'missing'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/34 p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">{label}</p>
+            <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.85fr]">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Metadata gates</p>
+          <div className="mt-3 space-y-2">
+            {review.checks.map(check => (
+              <div key={check.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-white">{check.label}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                    check.status === 'ready'
+                      ? 'bg-[#14F195]/12 text-[#8CFFD2]'
+                      : check.status === 'blocked'
+                        ? 'bg-[#FF5C7A]/12 text-[#FF8FAB]'
+                        : 'bg-[#FFD166]/12 text-[#FFE08A]'
+                  }`}>
+                    {check.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-white/48">{check.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-[#7DE4FF]/16 bg-[#7DE4FF]/7 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Hash and next steps</p>
+          <p className="mt-3 break-all rounded-2xl border border-white/8 bg-black/28 p-3 font-mono text-xs text-white/62">{review.metadataHash}</p>
+          <ol className="mt-3 space-y-2 text-xs leading-5 text-white/58">
+            {review.nextSteps.map((step, index) => (
+              <li key={step} className="flex gap-2">
+                <span className="font-black text-[#9AEAFF]">{index + 1}.</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+          <button
+            type="button"
+            onClick={() => onPrepareUnsignedPreview(review)}
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[#A7FF3D]/22 bg-[#A7FF3D]/10 text-xs font-black uppercase tracking-[0.12em] text-[#B8FF5C] transition hover:bg-[#A7FF3D]/15"
+          >
+            Prepare unsigned preview
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MythosPumpfunUnsignedPreviewCard({ preview }: { preview: MythosPumpfunUnsignedPreview }) {
+  const statusClass = preview.status === 'ready_for_wallet_signature_phase'
+    ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
+    : preview.status === 'blocked'
+      ? 'border-[#FF5C7A]/24 bg-[#FF5C7A]/10 text-[#FF9AB1]'
+      : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#FFD166]/20 bg-[linear-gradient(135deg,rgba(38,27,4,0.88),rgba(1,8,3,0.98))] p-5 shadow-[0_0_42px_rgba(255,209,102,0.045)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE08A]">Unsigned Transaction Preview</p>
+          <h4 className="mt-2 text-2xl font-black text-white">{preview.token.name} <span className="text-[#A7FF3D]">${preview.token.symbol}</span></h4>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/58">This is an instruction plan, not a serialized transaction. Phantom/Solflare was not opened and no transaction was submitted.</p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClass}`}>
+          {preview.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        {[
+          ['Preview ID', preview.id],
+          ['Signer', preview.signer.walletAddress ? `${preview.signer.walletAddress.slice(0, 4)}...${preview.signer.walletAddress.slice(-4)}` : 'missing'],
+          ['Wire ready', preview.transaction.wireReady ? 'yes' : 'no'],
+          ['First buy', preview.firstBuy.configured ? `${preview.firstBuy.amountSol} SOL` : 'not set'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/34 p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">{label}</p>
+            <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE08A]">Instruction plan</p>
+          <ol className="mt-3 space-y-2 text-xs leading-5 text-white/58">
+            {preview.instructionPlan.map((step, index) => (
+              <li key={step} className="flex gap-2 rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <span className="font-black text-[#FFE08A]">{index + 1}.</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/7 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF9AB1]">Still blocked</p>
+          <p className="mt-3 text-xs leading-5 text-white/58">{preview.transaction.reason}</p>
+          <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
+            {preview.blockedActions.map(action => <li key={action}>- {action}</li>)}
+          </ul>
         </div>
       </div>
     </div>
@@ -2120,6 +2418,126 @@ export default function MythosLabConsole() {
       setNotice(`Pump.fun proposal prepared: ${proposal.id}. No token, upload, signature, buy, or submission occurred.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun launch proposal.');
+    }
+  }
+
+  async function preparePumpfunMetadataReview(proposal: MythosPumpfunLaunchProposal) {
+    const started = Date.now();
+    try {
+      const response = await fetch('/api/mythos/pumpfun/metadata-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: proposal.id,
+          name: proposal.token.name,
+          symbol: proposal.token.symbol,
+          description: proposal.token.description,
+          imagePrompt: proposal.token.imagePrompt,
+          walletAddress: proposal.wallet.address,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.metadataReview) {
+        throw new Error(data?.error || 'Could not prepare Pump.fun metadata review.');
+      }
+
+      const metadataReview = data.metadataReview as MythosPumpfunMetadataReview;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: formatPumpfunMetadataReviewResponse(metadataReview),
+        memecoinMetadataReview: metadataReview,
+      };
+
+      updateActive(session => ({
+        ...session,
+        messages: [...session.messages, assistantMessage],
+        lastTrace: {
+          perception: `Metadata review prepared for ${metadataReview.token.name} (${metadataReview.token.symbol}).`,
+          memoryContext: 'The metadata packet is hash-addressable and uses only visible launch proposal fields.',
+          selectedSkill: 'Mythos Memecoin Studio - metadata review',
+          reasoningPath: 'Mythos checked proposal linkage, token identity, description quality, visual prompt, wallet readiness, and upload boundary.',
+          prediction: 'A future upload step can show the exact JSON and storage target before any upload action.',
+          decision: `Return metadata review ${metadataReview.id} with status ${metadataReview.status}; keep upload blocked.`,
+          confidence: metadataReview.status === 'blocked' ? 66 : metadataReview.status === 'needs_review' ? 78 : 88,
+          safetyBoundary: 'No image upload, no JSON upload, no IPFS/Arweave/Pump.fun call, no signature, no buy, no submission.',
+          nextHumanStep: 'Review metadata text and visual identity. Then prepare unsigned transaction preview only as an instruction plan.',
+        },
+        lastObservability: {
+          model: session.model,
+          modelLabel: 'Mythos Pump.fun metadata review engine',
+          latencyMs: Date.now() - started,
+          mode: session.mode,
+          traceSchema: 'mythos-pumpfun-metadata-review/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      setNotice(`Metadata review prepared: ${metadataReview.id}. No metadata upload occurred.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun metadata review.');
+    }
+  }
+
+  async function preparePumpfunUnsignedPreview(metadataReview: MythosPumpfunMetadataReview) {
+    const started = Date.now();
+    try {
+      const relatedProposal = activeSession.messages
+        .map(message => message.memecoinProposal)
+        .find(proposal => proposal?.id === metadataReview.proposalId);
+      const response = await fetch('/api/mythos/pumpfun/unsigned-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: metadataReview.proposalId,
+          metadataReviewId: metadataReview.id,
+          metadataHash: metadataReview.metadataHash,
+          name: metadataReview.token.name,
+          symbol: metadataReview.token.symbol,
+          walletAddress: metadataReview.wallet.address,
+          initialBuySol: relatedProposal?.firstBuy.amountSol || 0,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.unsignedPreview) {
+        throw new Error(data?.error || 'Could not prepare Pump.fun unsigned preview.');
+      }
+
+      const unsignedPreview = data.unsignedPreview as MythosPumpfunUnsignedPreview;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: formatPumpfunUnsignedPreviewResponse(unsignedPreview),
+        memecoinUnsignedPreview: unsignedPreview,
+      };
+
+      updateActive(session => ({
+        ...session,
+        messages: [...session.messages, assistantMessage],
+        lastTrace: {
+          perception: `Unsigned transaction preview prepared for ${unsignedPreview.token.name} (${unsignedPreview.token.symbol}).`,
+          memoryContext: 'The preview links proposal, metadata review, wallet signer, and first-buy intent without creating a wire payload.',
+          selectedSkill: 'Mythos Memecoin Studio - unsigned preview',
+          reasoningPath: 'Mythos checked proposal ID, metadata review hash, signer wallet, first-buy intent, signature boundary, and submission boundary.',
+          prediction: 'The next safe implementation can construct a real unsigned Pump.fun payload only after payload format, fee quote, metadata URI, and wallet UX are audited.',
+          decision: `Return unsigned preview ${unsignedPreview.id}; keep serialized transaction null.`,
+          confidence: unsignedPreview.status === 'blocked' ? 64 : unsignedPreview.status === 'needs_review' ? 78 : 86,
+          safetyBoundary: 'No serialized transaction, no wallet signature modal, no signed payload, no Solana submission, no token buy.',
+          nextHumanStep: 'Audit Pump.fun payload construction before enabling any real unsigned transaction serialization.',
+        },
+        lastObservability: {
+          model: session.model,
+          modelLabel: 'Mythos Pump.fun unsigned preview engine',
+          latencyMs: Date.now() - started,
+          mode: session.mode,
+          traceSchema: 'mythos-pumpfun-unsigned-preview/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      setNotice(`Unsigned preview prepared: ${unsignedPreview.id}. No wallet signature or transaction payload was created.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun unsigned preview.');
     }
   }
 
@@ -3034,8 +3452,26 @@ export default function MythosLabConsole() {
                             onPrepareProposal={preparePumpfunLaunchProposal}
                           />
                         ) : null}
-                        {message.memecoinProposal ? <MythosPumpfunProposalCard proposal={message.memecoinProposal} /> : null}
-                        {!message.cryptoReport && !message.solanaReport && !message.solanaAnalysis && !message.memecoinDraft && !message.memecoinProposal ? (
+                        {message.memecoinProposal ? (
+                          <MythosPumpfunProposalCard
+                            proposal={message.memecoinProposal}
+                            onPrepareMetadataReview={preparePumpfunMetadataReview}
+                          />
+                        ) : null}
+                        {message.memecoinMetadataReview ? (
+                          <MythosPumpfunMetadataReviewCard
+                            review={message.memecoinMetadataReview}
+                            onPrepareUnsignedPreview={preparePumpfunUnsignedPreview}
+                          />
+                        ) : null}
+                        {message.memecoinUnsignedPreview ? <MythosPumpfunUnsignedPreviewCard preview={message.memecoinUnsignedPreview} /> : null}
+                        {!message.cryptoReport
+                          && !message.solanaReport
+                          && !message.solanaAnalysis
+                          && !message.memecoinDraft
+                          && !message.memecoinProposal
+                          && !message.memecoinMetadataReview
+                          && !message.memecoinUnsignedPreview ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
                         {message.htmlArtifact ? (
