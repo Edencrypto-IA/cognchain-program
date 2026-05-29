@@ -46,6 +46,7 @@ type MythosLabMessage = {
   solanaReport?: MythosSolanaEcosystemReport;
   solanaAnalysis?: Record<string, unknown>;
   memecoinDraft?: MythosMemecoinDraft;
+  memecoinProposal?: MythosPumpfunLaunchProposal;
   memoryHash?: string;
   readUrl?: string;
   verifyUrl?: string;
@@ -75,6 +76,44 @@ type MythosMemecoinDraft = {
   reviewChecklist: string[];
   blockedActions: string[];
   safetyNotes: string[];
+};
+
+type MythosPumpfunLaunchProposal = {
+  id: string;
+  status: 'blocked' | 'needs_review' | 'ready_for_future_signature';
+  createdAt: string;
+  network: string;
+  platform: string;
+  token: {
+    name: string;
+    symbol: string;
+    description: string;
+    imagePrompt: string;
+  };
+  wallet: {
+    address: string | null;
+    ready: boolean;
+  };
+  firstBuy: {
+    amountSol: number;
+    configured: boolean;
+    slippageBps: number | null;
+    priorityFeeLamports: number | null;
+  };
+  readiness: {
+    ready: number;
+    review: number;
+    blocked: number;
+  };
+  checks: Array<{
+    id: string;
+    label: string;
+    status: 'ready' | 'review' | 'pending' | 'blocked';
+    detail: string;
+  }>;
+  futureExecution: string[];
+  blockedActions: string[];
+  unsignedTransaction: null;
 };
 
 type MythosCognitiveTrace = {
@@ -891,6 +930,33 @@ function formatMemecoinLaunchReviewResponse(draft: MythosMemecoinDraft) {
   ].join('\n\n'));
 }
 
+function formatPumpfunProposalResponse(proposal: MythosPumpfunLaunchProposal) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Prepare audited Pump.fun proposal ${proposal.id}.`),
+    terminalSection('Proposal status', [
+      `Status: ${proposal.status}`,
+      `Network: ${proposal.network}`,
+      `Platform: ${proposal.platform}`,
+      `Ready: ${proposal.readiness.ready}`,
+      `Review: ${proposal.readiness.review}`,
+      `Blocked: ${proposal.readiness.blocked}`,
+    ]),
+    terminalSection('Token draft', [
+      `Name: ${proposal.token.name}`,
+      `Ticker: ${proposal.token.symbol}`,
+      `Description: ${proposal.token.description}`,
+      `Image prompt: ${proposal.token.imagePrompt}`,
+    ]),
+    terminalSection('Wallet and first buy', [
+      `Wallet: ${proposal.wallet.address || 'not connected'}`,
+      `First buy intent: ${proposal.firstBuy.configured ? `${proposal.firstBuy.amountSol} SOL` : 'not set'}`,
+      `Unsigned transaction: ${proposal.unsignedTransaction === null ? 'not created' : 'created'}`,
+    ]),
+    terminalSection('Execution boundary', proposal.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Next safe step', 'Review this proposal. The next phase may prepare metadata/upload rules, but wallet signature and submission must remain separate visible user actions.'),
+  ].join('\n\n'));
+}
+
 function memecoinLaunchBrief(draft: MythosMemecoinDraft) {
   return cleanTerminalText([
     `MYTHOS MEMECOIN LAUNCH BRIEF`,
@@ -1256,11 +1322,13 @@ function MythosMemecoinDraftCard({
   onConnectWallet,
   onArmLaunchReview,
   onCopyLaunchBrief,
+  onPrepareProposal,
 }: {
   draft: MythosMemecoinDraft;
   onConnectWallet: () => void;
   onArmLaunchReview: (draft: MythosMemecoinDraft) => void;
   onCopyLaunchBrief: (draft: MythosMemecoinDraft) => void;
+  onPrepareProposal: (draft: MythosMemecoinDraft) => void;
 }) {
   const [editableDraft, setEditableDraft] = useState(draft);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState('');
@@ -1524,6 +1592,13 @@ function MythosMemecoinDraftCard({
             >
               Arm launch review
             </button>
+            <button
+              type="button"
+              onClick={() => onPrepareProposal(editableDraft)}
+              className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#7DE4FF]/20 bg-[#7DE4FF]/9 text-xs font-black uppercase tracking-[0.12em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/14"
+            >
+              Prepare proposal
+            </button>
           </div>
 
           <div className="mt-5 space-y-2">
@@ -1555,6 +1630,85 @@ function MythosMemecoinDraftCard({
             <ul className="mt-3 space-y-2 text-[11px] leading-4 text-white/48">
               {editableDraft.reviewChecklist.slice(0, 4).map(item => <li key={item}>- {item}</li>)}
             </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MythosPumpfunProposalCard({ proposal }: { proposal: MythosPumpfunLaunchProposal }) {
+  const statusLabel = proposal.status.replace(/_/g, ' ');
+  const statusClass = proposal.status === 'ready_for_future_signature'
+    ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
+    : proposal.status === 'blocked'
+      ? 'border-[#FF5C7A]/24 bg-[#FF5C7A]/10 text-[#FF9AB1]'
+      : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#7DE4FF]/20 bg-[linear-gradient(135deg,rgba(1,28,34,0.9),rgba(1,8,3,0.98))] p-5 shadow-[0_0_42px_rgba(125,228,255,0.045)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Pump.fun Launch Proposal</p>
+          <h4 className="mt-2 text-2xl font-black text-white">{proposal.token.name} <span className="text-[#A7FF3D]">${proposal.token.symbol}</span></h4>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/58">Audited proposal packet only. Mythos has not uploaded metadata, created a mint, requested a wallet signature, submitted a transaction, or bought tokens.</p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClass}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        {[
+          ['Proposal ID', proposal.id],
+          ['Network', proposal.network],
+          ['Wallet', proposal.wallet.address ? `${proposal.wallet.address.slice(0, 4)}...${proposal.wallet.address.slice(-4)}` : 'missing'],
+          ['First buy', proposal.firstBuy.configured ? `${proposal.firstBuy.amountSol} SOL` : 'not set'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/34 p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">{label}</p>
+            <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Validation gates</p>
+          <div className="mt-3 space-y-2">
+            {proposal.checks.map(check => (
+              <div key={check.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-white">{check.label}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                    check.status === 'ready'
+                      ? 'bg-[#14F195]/12 text-[#8CFFD2]'
+                      : check.status === 'blocked'
+                        ? 'bg-[#FF5C7A]/12 text-[#FF8FAB]'
+                        : 'bg-[#FFD166]/12 text-[#FFE08A]'
+                  }`}>
+                    {check.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-white/48">{check.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#FFD166]/16 bg-[#FFD166]/7 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE08A]">Future execution ladder</p>
+          <ol className="mt-3 space-y-2 text-xs leading-5 text-white/58">
+            {proposal.futureExecution.map((step, index) => (
+              <li key={step} className="flex gap-2">
+                <span className="font-black text-[#FFE08A]">{index + 1}.</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-4 rounded-2xl border border-[#FF5C7A]/16 bg-black/28 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FF9AB1]">Unsigned transaction</p>
+            <p className="mt-2 text-xs leading-5 text-white/54">Not created in this phase. This keeps the flow safe until metadata rules, Pump.fun payload format, slippage, and wallet UX are audited.</p>
           </div>
         </div>
       </div>
@@ -1909,6 +2063,64 @@ export default function MythosLabConsole() {
       updatedAt: nowIso(),
     }));
     setNotice('Launch review armed locally. Mythos still did not create, upload, sign, submit, buy, or move funds.');
+  }
+
+  async function preparePumpfunLaunchProposal(draft: MythosMemecoinDraft) {
+    const started = Date.now();
+    try {
+      const response = await fetch('/api/mythos/pumpfun/launch-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: draft.name,
+          symbol: draft.symbol,
+          description: draft.description,
+          imagePrompt: draft.imagePrompt,
+          initialBuySol: draft.initialBuySol,
+          walletAddress: draft.walletAddress,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.proposal) {
+        throw new Error(data?.error || 'Could not prepare Pump.fun launch proposal.');
+      }
+
+      const proposal = data.proposal as MythosPumpfunLaunchProposal;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: formatPumpfunProposalResponse(proposal),
+        memecoinProposal: proposal,
+      };
+
+      updateActive(session => ({
+        ...session,
+        messages: [...session.messages, assistantMessage],
+        lastTrace: {
+          perception: `Pump.fun proposal prepared for ${proposal.token.name} (${proposal.token.symbol}).`,
+          memoryContext: 'The proposal uses only visible draft fields and the connected public wallet address.',
+          selectedSkill: 'Mythos Memecoin Studio - Pump.fun proposal',
+          reasoningPath: 'Mythos validated token identity, metadata, wallet readiness, first-buy intent, and blocked execution boundaries.',
+          prediction: 'A future phase can prepare metadata upload rules, then an unsigned transaction payload, while preserving explicit wallet signature.',
+          decision: `Return proposal ${proposal.id} with status ${proposal.status} and no unsigned transaction.`,
+          confidence: proposal.status === 'blocked' ? 68 : proposal.status === 'needs_review' ? 78 : 86,
+          safetyBoundary: 'No metadata upload, no mint, no transaction payload, no wallet signature, no buy, no submission.',
+          nextHumanStep: 'Fix any review or blocked gates, then decide whether this proposal should become CongChain memory.',
+        },
+        lastObservability: {
+          model: session.model,
+          modelLabel: 'Mythos Pump.fun proposal engine',
+          latencyMs: Date.now() - started,
+          mode: session.mode,
+          traceSchema: 'mythos-pumpfun-launch-proposal/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      setNotice(`Pump.fun proposal prepared: ${proposal.id}. No token, upload, signature, buy, or submission occurred.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun launch proposal.');
+    }
   }
 
   function markMessageSaved(messageId: string, data: MemoryWriteResponse) {
@@ -2819,9 +3031,11 @@ export default function MythosLabConsole() {
                             onConnectWallet={handleWalletAction}
                             onArmLaunchReview={armMemecoinLaunchReview}
                             onCopyLaunchBrief={copyMemecoinLaunchBrief}
+                            onPrepareProposal={preparePumpfunLaunchProposal}
                           />
                         ) : null}
-                        {!message.cryptoReport && !message.solanaReport && !message.solanaAnalysis && !message.memecoinDraft ? (
+                        {message.memecoinProposal ? <MythosPumpfunProposalCard proposal={message.memecoinProposal} /> : null}
+                        {!message.cryptoReport && !message.solanaReport && !message.solanaAnalysis && !message.memecoinDraft && !message.memecoinProposal ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
                         {message.htmlArtifact ? (
