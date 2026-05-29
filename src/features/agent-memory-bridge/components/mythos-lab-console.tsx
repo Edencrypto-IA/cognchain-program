@@ -49,6 +49,7 @@ type MythosLabMessage = {
   memecoinProposal?: MythosPumpfunLaunchProposal;
   memecoinMetadataReview?: MythosPumpfunMetadataReview;
   memecoinUnsignedPreview?: MythosPumpfunUnsignedPreview;
+  memecoinPayloadAudit?: MythosPumpfunPayloadAudit;
   memoryHash?: string;
   readUrl?: string;
   verifyUrl?: string;
@@ -197,6 +198,57 @@ type MythosPumpfunUnsignedPreview = {
     status: 'ready' | 'review' | 'pending' | 'blocked';
     detail: string;
   }>;
+  blockedActions: string[];
+};
+
+type MythosPumpfunPayloadAudit = {
+  id: string;
+  status: 'blocked' | 'needs_review' | 'ready_for_payload_builder';
+  createdAt: string;
+  platform: string;
+  network: string;
+  payloadHash: string;
+  unsignedPreviewId: string | null;
+  proposalId: string | null;
+  metadataReviewId: string | null;
+  token: {
+    name: string;
+    symbol: string;
+    metadataHash: string | null;
+    metadataUri: string | null;
+  };
+  signer: {
+    walletAddress: string | null;
+    required: boolean;
+  };
+  economics: {
+    firstBuySol: number;
+    slippageBps: number;
+    slippageLabel: string;
+    priorityFeeLamports: number;
+    feeQuoteLamports: number | null;
+    rentEstimateLamports: number | null;
+  };
+  instructionAudit: Array<{
+    label: string;
+    status: 'ready' | 'review' | 'pending' | 'blocked';
+    detail: string;
+  }>;
+  serializedUnsignedPayload: null;
+  walletSignatureRequest: null;
+  submission: null;
+  gates: Array<{
+    id: string;
+    label: string;
+    status: 'ready' | 'review' | 'pending' | 'blocked';
+    detail: string;
+  }>;
+  readiness: {
+    ready: number;
+    review: number;
+    blocked: number;
+  };
+  nextSteps: string[];
   blockedActions: string[];
 };
 
@@ -1090,6 +1142,34 @@ function formatPumpfunUnsignedPreviewResponse(preview: MythosPumpfunUnsignedPrev
   ].join('\n\n'));
 }
 
+function formatPumpfunPayloadAuditResponse(audit: MythosPumpfunPayloadAudit) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Audit Pump.fun payload readiness ${audit.id}.`),
+    terminalSection('Payload status', [
+      `Status: ${audit.status}`,
+      `Payload hash: ${audit.payloadHash}`,
+      `Unsigned preview: ${audit.unsignedPreviewId || 'not linked'}`,
+      `Serialized unsigned payload: ${audit.serializedUnsignedPayload || 'not created'}`,
+      `Wallet signature request: ${audit.walletSignatureRequest || 'not opened'}`,
+    ]),
+    terminalSection('Token and metadata', [
+      `Token: ${audit.token.name} (${audit.token.symbol})`,
+      `Metadata hash: ${audit.token.metadataHash || 'not ready'}`,
+      `Metadata URI: ${audit.token.metadataUri || 'not supplied'}`,
+    ]),
+    terminalSection('Economics', [
+      `First buy intent: ${audit.economics.firstBuySol > 0 ? `${audit.economics.firstBuySol} SOL` : 'not set'}`,
+      `Slippage: ${audit.economics.slippageLabel}`,
+      `Priority fee: ${audit.economics.priorityFeeLamports} lamports`,
+      `Fee quote: ${audit.economics.feeQuoteLamports ?? 'not quoted'}`,
+      `Rent estimate: ${audit.economics.rentEstimateLamports ?? 'not estimated'}`,
+    ]),
+    terminalSection('Instruction audit', audit.instructionAudit.map(item => `- ${item.label}: ${item.status} - ${item.detail}`)),
+    terminalSection('Blocked actions', audit.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Next safe step', 'Audit the official Pump.fun SDK/program payload path before generating real unsigned transaction bytes.'),
+  ].join('\n\n'));
+}
+
 function memecoinLaunchBrief(draft: MythosMemecoinDraft) {
   return cleanTerminalText([
     `MYTHOS MEMECOIN LAUNCH BRIEF`,
@@ -1956,7 +2036,20 @@ function MythosPumpfunMetadataReviewCard({
   );
 }
 
-function MythosPumpfunUnsignedPreviewCard({ preview }: { preview: MythosPumpfunUnsignedPreview }) {
+function MythosPumpfunUnsignedPreviewCard({
+  preview,
+  onAuditPayload,
+}: {
+  preview: MythosPumpfunUnsignedPreview;
+  onAuditPayload: (preview: MythosPumpfunUnsignedPreview, options: {
+    metadataUri: string;
+    slippageBps: number;
+    priorityFeeLamports: number;
+  }) => void;
+}) {
+  const [metadataUri, setMetadataUri] = useState('');
+  const [slippageBps, setSlippageBps] = useState(500);
+  const [priorityFeeLamports, setPriorityFeeLamports] = useState(0);
   const statusClass = preview.status === 'ready_for_wallet_signature_phase'
     ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
     : preview.status === 'blocked'
@@ -2007,6 +2100,121 @@ function MythosPumpfunUnsignedPreviewCard({ preview }: { preview: MythosPumpfunU
           <p className="mt-3 text-xs leading-5 text-white/58">{preview.transaction.reason}</p>
           <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
             {preview.blockedActions.map(action => <li key={action}>- {action}</li>)}
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-[#7DE4FF]/16 bg-[#7DE4FF]/[0.045] p-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Payload audit inputs</p>
+        <p className="mt-2 text-xs leading-5 text-white/50">Paste a reviewed metadata URI and choose execution tolerances. This only audits readiness; it still does not serialize or sign a transaction.</p>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_140px_170px]">
+          <label className="block">
+            <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Metadata URI</span>
+            <input
+              value={metadataUri}
+              onChange={event => setMetadataUri(event.target.value)}
+              className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/34 px-4 font-mono text-xs text-white outline-none transition placeholder:text-white/24 focus:border-[#7DE4FF]/42"
+              placeholder="ipfs://... or https://..."
+            />
+          </label>
+          <label className="block">
+            <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Slippage bps</span>
+            <input
+              type="number"
+              min="50"
+              max="3000"
+              step="50"
+              value={slippageBps}
+              onChange={event => setSlippageBps(Number(event.target.value))}
+              className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/34 px-4 text-sm font-black text-white outline-none transition placeholder:text-white/24 focus:border-[#7DE4FF]/42"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Priority fee</span>
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={priorityFeeLamports}
+              onChange={event => setPriorityFeeLamports(Number(event.target.value))}
+              className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/34 px-4 text-sm font-black text-white outline-none transition placeholder:text-white/24 focus:border-[#7DE4FF]/42"
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={() => onAuditPayload(preview, { metadataUri, slippageBps, priorityFeeLamports })}
+          className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl border border-[#A7FF3D]/22 bg-[#A7FF3D]/10 px-4 text-xs font-black uppercase tracking-[0.12em] text-[#B8FF5C] transition hover:bg-[#A7FF3D]/15"
+        >
+          Audit Pump.fun payload
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MythosPumpfunPayloadAuditCard({ audit }: { audit: MythosPumpfunPayloadAudit }) {
+  const statusClass = audit.status === 'ready_for_payload_builder'
+    ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
+    : audit.status === 'blocked'
+      ? 'border-[#FF5C7A]/24 bg-[#FF5C7A]/10 text-[#FF9AB1]'
+      : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#7DE4FF]/20 bg-[linear-gradient(135deg,rgba(1,24,27,0.92),rgba(1,8,3,0.98))] p-5 shadow-[0_0_42px_rgba(125,228,255,0.045)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Pump.fun Payload Audit</p>
+          <h4 className="mt-2 text-2xl font-black text-white">{audit.token.name} <span className="text-[#A7FF3D]">${audit.token.symbol}</span></h4>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/58">Mythos audited payload readiness without touching Pump.fun, Phantom, Solflare, or Solana submission.</p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClass}`}>
+          {audit.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        {[
+          ['Payload ID', audit.id],
+          ['Metadata URI', audit.token.metadataUri || 'missing'],
+          ['Slippage', audit.economics.slippageLabel],
+          ['Priority fee', `${audit.economics.priorityFeeLamports} lamports`],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/34 p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">{label}</p>
+            <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.85fr]">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Instruction audit</p>
+          <div className="mt-3 space-y-2">
+            {audit.instructionAudit.map(item => (
+              <div key={item.label} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-white">{item.label}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                    item.status === 'ready'
+                      ? 'bg-[#14F195]/12 text-[#8CFFD2]'
+                      : item.status === 'blocked'
+                        ? 'bg-[#FF5C7A]/12 text-[#FF8FAB]'
+                        : 'bg-[#FFD166]/12 text-[#FFE08A]'
+                  }`}>
+                    {item.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-white/48">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/7 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF9AB1]">Execution remains blocked</p>
+          <p className="mt-3 break-all rounded-2xl border border-white/8 bg-black/28 p-3 font-mono text-xs text-white/62">{audit.payloadHash}</p>
+          <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
+            {audit.blockedActions.map(action => <li key={action}>- {action}</li>)}
           </ul>
         </div>
       </div>
@@ -2538,6 +2746,72 @@ export default function MythosLabConsole() {
       setNotice(`Unsigned preview prepared: ${unsignedPreview.id}. No wallet signature or transaction payload was created.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun unsigned preview.');
+    }
+  }
+
+  async function auditPumpfunPayload(
+    preview: MythosPumpfunUnsignedPreview,
+    options: { metadataUri: string; slippageBps: number; priorityFeeLamports: number }
+  ) {
+    const started = Date.now();
+    try {
+      const response = await fetch('/api/mythos/pumpfun/payload-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unsignedPreviewId: preview.id,
+          proposalId: preview.proposalId,
+          metadataReviewId: preview.metadataReviewId,
+          metadataHash: preview.token.metadataHash,
+          metadataUri: options.metadataUri,
+          name: preview.token.name,
+          symbol: preview.token.symbol,
+          walletAddress: preview.signer.walletAddress,
+          firstBuySol: preview.firstBuy.amountSol,
+          slippageBps: options.slippageBps,
+          priorityFeeLamports: options.priorityFeeLamports,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.payloadAudit) {
+        throw new Error(data?.error || 'Could not audit Pump.fun payload readiness.');
+      }
+
+      const payloadAudit = data.payloadAudit as MythosPumpfunPayloadAudit;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: formatPumpfunPayloadAuditResponse(payloadAudit),
+        memecoinPayloadAudit: payloadAudit,
+      };
+
+      updateActive(session => ({
+        ...session,
+        messages: [...session.messages, assistantMessage],
+        lastTrace: {
+          perception: `Pump.fun payload audit prepared for ${payloadAudit.token.name} (${payloadAudit.token.symbol}).`,
+          memoryContext: 'The audit links metadata URI, signer, slippage, priority fee, proposal, and unsigned preview without creating transaction bytes.',
+          selectedSkill: 'Mythos Memecoin Studio - payload audit',
+          reasoningPath: 'Mythos checked metadata URI shape, signer wallet, slippage, priority fee, program payload boundary, wallet signature boundary, and submission boundary.',
+          prediction: 'A future payload builder can serialize transaction bytes only after Pump.fun SDK/program account requirements are audited.',
+          decision: `Return payload audit ${payloadAudit.id}; keep serialized payload null.`,
+          confidence: payloadAudit.status === 'blocked' ? 62 : payloadAudit.status === 'needs_review' ? 78 : 88,
+          safetyBoundary: 'No Pump.fun API/SDK call, no account metas, no instruction bytes, no unsigned transaction payload, no signature, no submission, no fund movement.',
+          nextHumanStep: 'Audit official Pump.fun payload construction and fee quote before enabling transaction serialization.',
+        },
+        lastObservability: {
+          model: session.model,
+          modelLabel: 'Mythos Pump.fun payload audit engine',
+          latencyMs: Date.now() - started,
+          mode: session.mode,
+          traceSchema: 'mythos-pumpfun-payload-audit/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      setNotice(`Pump.fun payload audit prepared: ${payloadAudit.id}. No transaction bytes, signature, or submission were created.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not audit Pump.fun payload readiness.');
     }
   }
 
@@ -3464,14 +3738,21 @@ export default function MythosLabConsole() {
                             onPrepareUnsignedPreview={preparePumpfunUnsignedPreview}
                           />
                         ) : null}
-                        {message.memecoinUnsignedPreview ? <MythosPumpfunUnsignedPreviewCard preview={message.memecoinUnsignedPreview} /> : null}
+                        {message.memecoinUnsignedPreview ? (
+                          <MythosPumpfunUnsignedPreviewCard
+                            preview={message.memecoinUnsignedPreview}
+                            onAuditPayload={auditPumpfunPayload}
+                          />
+                        ) : null}
+                        {message.memecoinPayloadAudit ? <MythosPumpfunPayloadAuditCard audit={message.memecoinPayloadAudit} /> : null}
                         {!message.cryptoReport
                           && !message.solanaReport
                           && !message.solanaAnalysis
                           && !message.memecoinDraft
                           && !message.memecoinProposal
                           && !message.memecoinMetadataReview
-                          && !message.memecoinUnsignedPreview ? (
+                          && !message.memecoinUnsignedPreview
+                          && !message.memecoinPayloadAudit ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
                         {message.htmlArtifact ? (
