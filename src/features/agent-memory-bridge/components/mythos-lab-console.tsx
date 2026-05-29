@@ -96,6 +96,7 @@ type MythosLabSession = {
   updatedAt: string;
   mode: 'demo' | 'connected';
   model: string;
+  nvidiaModelRoute?: string;
   skillId: string;
   messages: MythosLabMessage[];
   lastTrace?: MythosCognitiveTrace;
@@ -245,6 +246,97 @@ const MYTHOS_MODEL_OPTIONS = [
   },
 ];
 
+const NVIDIA_MODEL_ROUTES = [
+  {
+    id: 'nemotron-super-120b',
+    label: 'Nemotron Super 120B',
+    shortLabel: 'Nemotron',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_NEMOTRON_SUPER',
+    detail: 'Default high-capacity route for agent loop, planning, and broad reasoning.',
+  },
+  {
+    id: 'deepseek-v4-pro',
+    label: 'DeepSeek V4 Pro',
+    shortLabel: 'DeepSeek V4',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_DEEPSEEK_V4',
+    detail: 'Best for code review, debugging, protocol reasoning, and technical diagnosis.',
+  },
+  {
+    id: 'seed-oss-36b',
+    label: 'Seed OSS 36B',
+    shortLabel: 'Seed OSS',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_SEED',
+    detail: 'General open-model route for fast drafting, synthesis, and balanced answers.',
+  },
+  {
+    id: 'qwen35-122b',
+    label: 'Qwen 3.5 122B',
+    shortLabel: 'Qwen 122B',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_QWEN35',
+    detail: 'Strong route for repository analysis, long-context coding, and structured outputs.',
+  },
+  {
+    id: 'kimi-k26',
+    label: 'Kimi K2.6',
+    shortLabel: 'Kimi K2.6',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_KIMI',
+    detail: 'Long-context route for large documents, research packets, and multi-file review.',
+  },
+  {
+    id: 'mixtral-8x22b',
+    label: 'Mixtral 8x22B',
+    shortLabel: 'Mixtral',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_MIXTRAL',
+    detail: 'Mixture-of-experts route for flexible reasoning, writing, and planning.',
+  },
+  {
+    id: 'mistral-large',
+    label: 'Mistral Large 3',
+    shortLabel: 'Mistral',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_MISTRAL_LARGE',
+    detail: 'Premium analysis and content route for clear, polished explanations.',
+  },
+  {
+    id: 'gpt-oss-120b',
+    label: 'GPT-OSS 120B',
+    shortLabel: 'GPT-OSS',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_GPT_OSS_120B',
+    detail: 'Heavy open reasoning route for complex plans and verification-style answers.',
+  },
+  {
+    id: 'gemma4-31b',
+    label: 'Gemma 4 31B',
+    shortLabel: 'Gemma 4',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_GEMMA4',
+    detail: 'Creative and multilingual-friendly route for product copy and explanations.',
+  },
+  {
+    id: 'gemma3n-e2b',
+    label: 'Gemma 3N E2B',
+    shortLabel: 'Gemma 3N',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_GEMMA3N_E2B',
+    detail: 'Small, fast route for lightweight checks, summaries, and low-cost responses.',
+  },
+  {
+    id: 'phi4-mini',
+    label: 'Phi-4 Mini',
+    shortLabel: 'Phi-4',
+    provider: 'NVIDIA NIM',
+    envModel: 'NVIDIA_MODEL_PHI4',
+    detail: 'Very fast Microsoft route for quick intent checks and compact assistant replies.',
+  },
+];
+
 const MYTHOS_WALLET_OPTIONS = [
   {
     key: 'phantom',
@@ -272,6 +364,11 @@ function getModelOption(model?: string) {
   return MYTHOS_MODEL_OPTIONS.find(option =>
     option.id.toLowerCase() === normalized || option.label.toLowerCase() === normalized
   ) || MYTHOS_MODEL_OPTIONS[0];
+}
+
+function getNvidiaModelRoute(routeId?: string) {
+  const normalized = (routeId || '').toLowerCase();
+  return NVIDIA_MODEL_ROUTES.find(route => route.id === normalized) || NVIDIA_MODEL_ROUTES[0];
 }
 
 function nowIso() {
@@ -1474,6 +1571,7 @@ function makeSession(): MythosLabSession {
     updatedAt: createdAt,
     mode: 'demo',
     model: 'nvidia',
+    nvidiaModelRoute: getNvidiaModelRoute().id,
     skillId: MYTHOS_FEATURED_SKILLS[0]?.id || 'congchain-memory',
     messages: [
       {
@@ -1560,6 +1658,10 @@ export default function MythosLabConsole() {
   const assistantMessages = activeSession?.messages.filter(message => message.role === 'assistant') || [];
   const lastAssistant = assistantMessages[assistantMessages.length - 1];
   const currentModel = getModelOption(activeSession?.model);
+  const currentNvidiaRoute = getNvidiaModelRoute(activeSession?.nvidiaModelRoute);
+  const currentModelButtonLabel = currentModel.id === 'nvidia'
+    ? `NVIDIA · ${currentNvidiaRoute.shortLabel}`
+    : currentModel.label;
   const connectedAddress = publicKey?.toString() || '';
   const walletShortAddress = connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : '';
 
@@ -1636,10 +1738,23 @@ export default function MythosLabConsole() {
     updateActive(session => ({
       ...session,
       model: model.id,
+      nvidiaModelRoute: model.id === 'nvidia' ? (session.nvidiaModelRoute || getNvidiaModelRoute().id) : session.nvidiaModelRoute,
       updatedAt: nowIso(),
     }));
     setModelMenuOpen(false);
     setNotice(`Mythos model route set to ${model.label}. Server availability still depends on configured provider keys.`);
+  }
+
+  function selectNvidiaRoute(routeId: string) {
+    const route = getNvidiaModelRoute(routeId);
+    updateActive(session => ({
+      ...session,
+      model: 'nvidia',
+      nvidiaModelRoute: route.id,
+      updatedAt: nowIso(),
+    }));
+    setModelMenuOpen(false);
+    setNotice(`NVIDIA route set to ${route.label}. Mythos will use this allowlisted backend model when the NVIDIA route is selected.`);
   }
 
   async function submitProAccess() {
@@ -2306,6 +2421,7 @@ export default function MythosLabConsole() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: activeSession.model,
+          nvidiaModelRoute: activeSession.model === 'nvidia' ? (activeSession.nvidiaModelRoute || getNvidiaModelRoute().id) : undefined,
           mode: activeSession.mode,
           selectedSkill: routedSkill?.name,
           skillPath: routedSkill?.path,
@@ -2471,7 +2587,7 @@ export default function MythosLabConsole() {
                   aria-expanded={modelMenuOpen}
                   aria-label="Choose Mythos model route"
                 >
-                  {currentModel.label}
+                  {currentModelButtonLabel}
                   <ChevronDown className={`h-3.5 w-3.5 transition ${modelMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {modelMenuOpen ? (
@@ -2482,29 +2598,58 @@ export default function MythosLabConsole() {
                     </div>
                     <div className="max-h-[360px] overflow-y-auto pr-1">
                       {MYTHOS_MODEL_OPTIONS.map(option => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => selectModel(option.id)}
-                          className={`w-full rounded-xl px-3 py-2.5 text-left transition ${
-                            option.id === currentModel.id
-                              ? 'border border-[#76FF03]/24 bg-[#76FF03]/10'
-                              : 'border border-transparent hover:bg-white/[0.055]'
-                          }`}
-                        >
-                          <span className="flex items-center justify-between gap-3">
-                            <span className="text-sm font-black text-white">{option.label}</span>
-                            <span className="flex items-center gap-1.5">
-                              {option.access === 'pro' ? (
-                                <span className="rounded-full border border-[#FFD166]/18 bg-[#FFD166]/10 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFE08A]">
-                                  PRO
-                                </span>
-                              ) : null}
-                              <span className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[9px] font-bold uppercase text-white/40">{option.provider}</span>
+                        <div key={option.id}>
+                          <button
+                            type="button"
+                            onClick={() => selectModel(option.id)}
+                            className={`w-full rounded-xl px-3 py-2.5 text-left transition ${
+                              option.id === currentModel.id
+                                ? 'border border-[#76FF03]/24 bg-[#76FF03]/10'
+                                : 'border border-transparent hover:bg-white/[0.055]'
+                            }`}
+                          >
+                            <span className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-black text-white">{option.label}</span>
+                              <span className="flex items-center gap-1.5">
+                                {option.access === 'pro' ? (
+                                  <span className="rounded-full border border-[#FFD166]/18 bg-[#FFD166]/10 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFE08A]">
+                                    PRO
+                                  </span>
+                                ) : null}
+                                <span className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-0.5 text-[9px] font-bold uppercase text-white/40">{option.provider}</span>
+                              </span>
                             </span>
-                          </span>
-                          <span className="mt-1 block text-[11px] leading-4 text-white/45">{option.detail}</span>
-                        </button>
+                            <span className="mt-1 block text-[11px] leading-4 text-white/45">{option.detail}</span>
+                          </button>
+                          {option.id === 'nvidia' ? (
+                            <div className="mb-2 ml-3 mt-2 grid gap-1.5 border-l border-[#76FF03]/14 pl-2">
+                              <p className="px-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]/70">
+                                NVIDIA model router
+                              </p>
+                              {NVIDIA_MODEL_ROUTES.map(route => (
+                                <button
+                                  key={route.id}
+                                  type="button"
+                                  onClick={() => selectNvidiaRoute(route.id)}
+                                  className={`rounded-xl border px-2.5 py-2 text-left transition ${
+                                    currentModel.id === 'nvidia' && currentNvidiaRoute.id === route.id
+                                      ? 'border-[#76FF03]/28 bg-[#76FF03]/12'
+                                      : 'border-white/8 bg-white/[0.025] hover:border-[#76FF03]/18 hover:bg-[#76FF03]/7'
+                                  }`}
+                                >
+                                  <span className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-black text-white">{route.label}</span>
+                                    <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 text-[8px] font-bold uppercase text-white/36">
+                                      {route.provider}
+                                    </span>
+                                  </span>
+                                  <span className="mt-1 block text-[10px] leading-4 text-white/42">{route.detail}</span>
+                                  <span className="mt-1 block text-[9px] font-mono text-[#A7FF3D]/52">{route.envModel}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
 import { callModel } from '@/services/ai';
 import { checkRateLimit, Limits, safeErrorMessage, validateModel } from '@/lib/security';
 
@@ -24,6 +25,7 @@ type MythosTestMessage = {
 type MythosTestBody = {
   model?: string;
   mode?: string;
+  nvidiaModelRoute?: string;
   selectedSkill?: string;
   skillPath?: string;
   messages?: unknown;
@@ -40,6 +42,76 @@ type MythosCognitiveTrace = {
   safetyBoundary: string;
   nextHumanStep: string;
 };
+
+const NVIDIA_LAB_MODEL_ROUTES = [
+  {
+    id: 'nemotron-super-120b',
+    label: 'Nemotron Super 120B',
+    model: 'nvidia/nemotron-3-super-120b-a12b',
+    envModel: 'NVIDIA_MODEL_NEMOTRON_SUPER',
+  },
+  {
+    id: 'deepseek-v4-pro',
+    label: 'DeepSeek V4 Pro',
+    model: 'deepseek-ai/deepseek-v4-pro',
+    envModel: 'NVIDIA_MODEL_DEEPSEEK_V4',
+    apiKeyEnv: 'NVIDIA_KEY_DEEPSEEK_V4',
+  },
+  {
+    id: 'seed-oss-36b',
+    label: 'Seed OSS 36B',
+    model: 'bytedance/seed-oss-36b-instruct',
+    envModel: 'NVIDIA_MODEL_SEED',
+  },
+  {
+    id: 'qwen35-122b',
+    label: 'Qwen 3.5 122B',
+    model: 'qwen/qwen3.5-122b-a10b',
+    envModel: 'NVIDIA_MODEL_QWEN35',
+  },
+  {
+    id: 'kimi-k26',
+    label: 'Kimi K2.6',
+    model: 'moonshotai/kimi-k2.6',
+    envModel: 'NVIDIA_MODEL_KIMI',
+  },
+  {
+    id: 'mixtral-8x22b',
+    label: 'Mixtral 8x22B',
+    model: 'mistralai/mixtral-8x22b-instruct',
+    envModel: 'NVIDIA_MODEL_MIXTRAL',
+  },
+  {
+    id: 'mistral-large',
+    label: 'Mistral Large 3',
+    model: 'mistralai/mistral-large-3-675b-instruct-2512',
+    envModel: 'NVIDIA_MODEL_MISTRAL_LARGE',
+  },
+  {
+    id: 'gpt-oss-120b',
+    label: 'GPT-OSS 120B',
+    model: 'openai/gpt-oss-120b',
+    envModel: 'NVIDIA_MODEL_GPT_OSS_120B',
+  },
+  {
+    id: 'gemma4-31b',
+    label: 'Gemma 4 31B',
+    model: 'google/gemma-4-31b-it',
+    envModel: 'NVIDIA_MODEL_GEMMA4',
+  },
+  {
+    id: 'gemma3n-e2b',
+    label: 'Gemma 3N E2B',
+    model: 'google/gemma-3n-e2b-it',
+    envModel: 'NVIDIA_MODEL_GEMMA3N_E2B',
+  },
+  {
+    id: 'phi4-mini',
+    label: 'Phi-4 Mini',
+    model: 'microsoft/phi-4-mini-instruct',
+    envModel: 'NVIDIA_MODEL_PHI4',
+  },
+] as const;
 
 function inferSkill(content: string) {
   const lower = content.toLowerCase();
@@ -61,13 +133,55 @@ function inferSkill(content: string) {
   return 'Mythos General Reasoning';
 }
 
-function buildCognitiveTrace(messages: MythosTestMessage[], model: string, selectedSkillInput?: string): MythosCognitiveTrace {
+function getNvidiaLabRoute(routeId?: string) {
+  const normalized = (routeId || '').trim().toLowerCase();
+  return NVIDIA_LAB_MODEL_ROUTES.find(route => route.id === normalized) || NVIDIA_LAB_MODEL_ROUTES[0];
+}
+
+async function callNvidiaLabRoute(routeId: string | undefined, messages: MythosTestMessage[], systemPrompt: string) {
+  const route = getNvidiaLabRoute(routeId);
+  const apiKey = (route.apiKeyEnv ? process.env[route.apiKeyEnv] : undefined) || process.env.NVIDIA_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('NVIDIA_API_KEY nao esta configurada para o Mythos Lab.');
+  }
+
+  const client = new OpenAI({
+    apiKey,
+    baseURL: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+  });
+  const model = process.env[route.envModel] || route.model;
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(message => ({
+        role: message.role,
+        content: message.content,
+      })),
+    ],
+    max_tokens: 900,
+    temperature: 0.45,
+    top_p: 0.9,
+  });
+
+  return {
+    content: response.choices[0]?.message?.content || 'Sem resposta da rota NVIDIA.',
+    model: 'nvidia',
+    modelLabel: `NVIDIA · ${route.label}`,
+    providerModel: model,
+    routeId: route.id,
+  };
+}
+
+function buildCognitiveTrace(messages: MythosTestMessage[], model: string, selectedSkillInput?: string, modelLabel?: string): MythosCognitiveTrace {
   const latest = messages[messages.length - 1]?.content || '';
   const selectedSkill = selectedSkillInput?.trim() || inferSkill(latest);
+  const routeLabel = modelLabel || model;
 
   return {
     perception:
-      `User asked: "${latest.slice(0, 180)}${latest.length > 180 ? '...' : ''}". Runtime model route: ${model}.`,
+      `User asked: "${latest.slice(0, 180)}${latest.length > 180 ? '...' : ''}". Runtime model route: ${routeLabel}.`,
     memoryContext:
       'This Lab request does not read private vault memory automatically. It only uses the current conversation, selected skill, and visible request context.',
     selectedSkill,
@@ -119,30 +233,38 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as MythosTestBody;
     const model = validateModel(body.model || 'nvidia');
     const messages = sanitizeMessages(body.messages);
-    const cognitiveTrace = buildCognitiveTrace(messages, model, body.selectedSkill);
+    const nvidiaRoute = model === 'nvidia' ? getNvidiaLabRoute(body.nvidiaModelRoute) : undefined;
+    const modelLabel = nvidiaRoute ? `NVIDIA · ${nvidiaRoute.label}` : model;
+    const cognitiveTrace = buildCognitiveTrace(messages, model, body.selectedSkill, modelLabel);
     const skillContext = body.selectedSkill
       ? `Selected Mythos skill: ${body.selectedSkill}${body.skillPath ? ` (${body.skillPath})` : ''}. Lab mode: ${body.mode || 'demo'}.`
       : `No explicit Mythos skill selected. Lab mode: ${body.mode || 'demo'}.`;
 
-    const result = await callModel({
-      model,
-      messages: [
+    const modelMessages = [
         {
           role: 'user',
           content: skillContext,
         },
         ...messages,
-      ],
-      systemPrompt: MYTHOS_TEST_SYSTEM,
-      useContext: false,
-      agentName: 'Mythos',
-    });
+      ];
+
+    const result = model === 'nvidia'
+      ? await callNvidiaLabRoute(body.nvidiaModelRoute, modelMessages, `Voce sao o agente "Mythos". ${MYTHOS_TEST_SYSTEM}`)
+      : await callModel({
+          model,
+          messages: modelMessages,
+          systemPrompt: MYTHOS_TEST_SYSTEM,
+          useContext: false,
+          agentName: 'Mythos',
+        });
 
     return NextResponse.json({
       ok: true,
       response: result.content,
       model: result.model,
       modelLabel: result.modelLabel,
+      nvidiaModelRoute: 'routeId' in result ? result.routeId : undefined,
+      providerModel: 'providerModel' in result ? result.providerModel : undefined,
       mode: 'mythos_test_terminal',
       cognitiveTrace,
       cognitiveTraceSchema: 'mythos_decision_trace_v1',
