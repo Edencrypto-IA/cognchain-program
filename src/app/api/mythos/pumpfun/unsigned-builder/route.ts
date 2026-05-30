@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
 import { getPumpfunBuilderConfig } from '@/lib/solana/pumpfun-builder-config';
+import { buildPumpfunCreateUnsignedTransaction } from '@/lib/solana/pumpfun-unsigned-serializer';
 
 type UnsignedBuilderInput = {
   payloadAuditId?: unknown;
@@ -10,6 +11,7 @@ type UnsignedBuilderInput = {
   name?: unknown;
   symbol?: unknown;
   walletAddress?: unknown;
+  mintPublicKey?: unknown;
   firstBuySol?: unknown;
   slippageBps?: unknown;
   priorityFeeLamports?: unknown;
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
     const name = clean(body.name, 42);
     const symbol = clean(body.symbol, 10).replace(/[^a-z0-9]/gi, '').toUpperCase();
     const walletAddress = clean(body.walletAddress, 64);
+    const mintPublicKey = clean(body.mintPublicKey, 64);
     const firstBuySol = amount(body.firstBuySol);
     const slippageBps = integer(body.slippageBps, 500, 50, 3000);
     const priorityFeeLamports = integer(body.priorityFeeLamports, 0, 0, 10_000_000);
@@ -97,8 +100,7 @@ export async function POST(request: NextRequest) {
       ['fee_recipient', 'Fee recipient', feeRecipient],
       ['global_account', 'Global account', globalAccount],
       ['event_authority', 'Event authority', eventAuthority],
-      ['bonding_curve', 'Bonding curve', bondingCurve],
-      ['associated_bonding_curve', 'Associated bonding curve', associatedBondingCurve],
+      ['mint_public_key', 'Mint public key', mintPublicKey],
     ] as const;
 
     const accountGates = accountInputs.map(([id, label, value]) => gate(
@@ -138,10 +140,10 @@ export async function POST(request: NextRequest) {
       gate(
         'first_buy',
         'First buy intent',
-        firstBuySol > 0 ? 'review' : 'ready',
+        firstBuySol > 0 ? 'blocked' : 'ready',
         firstBuySol > 0
-          ? `${firstBuySol} SOL buy intent requires visible wallet confirmation and a separate submission step.`
-          : 'No first buy is configured, which keeps launch review simpler.'
+          ? `${firstBuySol} SOL buy intent is intentionally blocked in the create serializer. Buy must be quoted and built in a separate future transaction.`
+          : 'No first buy is configured, so the serializer can prepare create-only bytes when every other gate is ready.'
       ),
       gate(
         'slippage',
@@ -192,6 +194,7 @@ export async function POST(request: NextRequest) {
       name,
       symbol,
       walletAddress,
+      mintPublicKey,
       firstBuySol,
       slippageBps,
       priorityFeeLamports,
@@ -204,6 +207,34 @@ export async function POST(request: NextRequest) {
       phase: 'pumpfun_unsigned_builder_gate_v1',
     });
     const builderHash = crypto.createHash('sha256').update(canonical).digest('hex');
+    const unsignedCreate = builderConfig.transaction.unsignedBytesEnabled && blocked === 0
+      ? await buildPumpfunCreateUnsignedTransaction({
+        name,
+        symbol,
+        metadataUri,
+        walletAddress,
+        mintPublicKey,
+        priorityFeeLamports,
+      }, builderConfig)
+      : null;
+    const blockedActions = unsignedCreate
+      ? [
+        'Unsigned Pump.fun create transaction bytes were prepared for review only.',
+        'No server-side private key was generated or stored.',
+        'No wallet signature modal was opened.',
+        'No signed transaction was stored.',
+        'No transaction was submitted.',
+        'No token launch or first buy occurred.',
+      ]
+      : [
+        'No third-party Pump.fun transaction builder was called.',
+        'No Program ID or account meta was guessed.',
+        'No unsigned transaction bytes were created.',
+        'No wallet signature modal was opened.',
+        'No signed transaction was stored.',
+        'No transaction was submitted.',
+        'No token launch or first buy occurred.',
+      ];
 
     return NextResponse.json({
       ok: true,
@@ -236,30 +267,38 @@ export async function POST(request: NextRequest) {
           firstBuySol,
           slippageBps,
           priorityFeeLamports,
-          feeQuoteLamports: null,
-          rentEstimateLamports: null,
-          totalEstimatedLamports: null,
+          feeQuoteLamports: unsignedCreate?.quote.networkFeeLamports ?? null,
+          rentEstimateLamports: unsignedCreate
+            ? (unsignedCreate.quote.mintRentLamports ?? 0) + (unsignedCreate.quote.tokenAccountRentLamports ?? 0)
+            : null,
+          totalEstimatedLamports: unsignedCreate?.quote.totalKnownLamports ?? null,
         },
         programAudit: {
-          programId: programId || null,
+          programId: unsignedCreate?.accounts.program || programId || null,
           feeRecipient: feeRecipient || null,
-          globalAccount: globalAccount || null,
-          eventAuthority: eventAuthority || null,
-          bondingCurve: bondingCurve || null,
-          associatedBondingCurve: associatedBondingCurve || null,
+          globalAccount: unsignedCreate?.accounts.global || globalAccount || null,
+          eventAuthority: unsignedCreate?.accounts.eventAuthority || eventAuthority || null,
+          bondingCurve: unsignedCreate?.accounts.bondingCurve || bondingCurve || null,
+          associatedBondingCurve: unsignedCreate?.accounts.associatedBondingCurve || associatedBondingCurve || null,
           accountSchemaVerified: builderConfig.program.accountSchemaVerified,
           instructionDiscriminatorVerified: builderConfig.program.instructionDiscriminatorVerified,
         },
         transaction: {
-          serializedUnsignedPayload: null,
-          messageVersion: null,
-          recentBlockhash: null,
+          serializedUnsignedPayload: unsignedCreate?.serializedUnsignedPayload ?? null,
+          messageBase64: unsignedCreate?.messageBase64 ?? null,
+          messageVersion: unsignedCreate ? 'v0' : null,
+          recentBlockhash: unsignedCreate?.recentBlockhash ?? null,
           feePayer: walletAddress || null,
-          wireReady: false,
-          reason: builderConfig.transaction.unsignedBytesEnabled
-            ? 'Configuration is ready, but local serialization is still intentionally disabled in this safety phase.'
+          requiredSigners: unsignedCreate?.requiredSigners ?? [],
+          transactionHash: unsignedCreate?.transactionHash ?? null,
+          wireReady: Boolean(unsignedCreate),
+          reason: unsignedCreate
+            ? 'Unsigned create transaction bytes were serialized for human review. Wallet signature and submission remain separate explicit user actions.'
+            : builderConfig.transaction.unsignedBytesEnabled
+              ? 'Configuration is ready, but create-only serialization still needs all request gates including mint public key and zero first buy.'
             : 'Unsigned transaction bytes are blocked until official program IDs, account metas, instruction layout, fee/rent quote, and metadata URI are audited.',
         },
+        createAudit: unsignedCreate?.audit ?? null,
         configuredReadiness: {
           providerMode: builderConfig.provider.mode,
           accountSchemaVersion: builderConfig.program.accountSchemaVersion,
@@ -280,15 +319,7 @@ export async function POST(request: NextRequest) {
           'Serialize an unsigned VersionedTransaction only after every gate is ready or explicitly reviewed.',
           'Open Phantom/Solflare from a separate user click and show all values before signature.',
         ],
-        blockedActions: [
-          'No third-party Pump.fun transaction builder was called.',
-          'No Program ID or account meta was guessed.',
-          'No unsigned transaction bytes were created.',
-          'No wallet signature modal was opened.',
-          'No signed transaction was stored.',
-          'No transaction was submitted.',
-          'No token launch or first buy occurred.',
-        ],
+        blockedActions,
       },
     });
   } catch (error) {

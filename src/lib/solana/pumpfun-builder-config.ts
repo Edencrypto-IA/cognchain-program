@@ -86,6 +86,7 @@ export function getPumpfunBuilderConfig(): PumpfunBuilderConfig {
   const rentQuoteConfigured = boolEnv('PUMPFUN_RENT_QUOTE_PROVIDER_ENABLED');
   const uploadProviderConfigured = boolEnv('PUMPFUN_METADATA_UPLOAD_PROVIDER_ENABLED');
   const unsignedBytesRequested = boolEnv('PUMPFUN_ENABLE_UNSIGNED_BYTES');
+  const localSerializerImplemented = boolEnv('PUMPFUN_LOCAL_SERIALIZER_REVIEWED');
 
   const programReady = Boolean(programId && isLikelySolanaAddress(programId));
   const fixedAccountsReady = [feeRecipient, globalAccount, eventAuthority]
@@ -93,7 +94,6 @@ export function getPumpfunBuilderConfig(): PumpfunBuilderConfig {
   const accountSchemaVerified = Boolean(accountSchemaVersion && auditHash && officialDocsVerified);
   const instructionDiscriminatorVerified = Boolean(instructionLayoutHash && auditHash && officialDocsVerified);
   const providerConfigured = mode !== 'disabled' && Boolean(source && officialDocsVerified && auditHash);
-  const localSerializerImplemented = false;
   const unsignedBytesEnabled = Boolean(
     unsignedBytesRequested
     && mode === 'server_unsigned'
@@ -175,7 +175,9 @@ export function getPumpfunBuilderConfig(): PumpfunBuilderConfig {
       'local_serializer',
       'Local serializer',
       localSerializerImplemented ? 'ready' : 'blocked',
-      'The local VersionedTransaction serializer is intentionally not implemented until every previous gate is audited.'
+      localSerializerImplemented
+        ? 'The local VersionedTransaction serializer review flag is enabled server-side.'
+        : 'The local VersionedTransaction serializer is intentionally blocked until PUMPFUN_LOCAL_SERIALIZER_REVIEWED=true is set after review.'
     ),
   ];
 

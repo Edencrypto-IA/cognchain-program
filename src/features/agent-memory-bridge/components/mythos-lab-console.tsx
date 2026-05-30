@@ -297,13 +297,23 @@ type MythosPumpfunUnsignedBuilder = {
     instructionDiscriminatorVerified: boolean;
   };
   transaction: {
-    serializedUnsignedPayload: null;
+    serializedUnsignedPayload: string | null;
+    messageBase64?: string | null;
     messageVersion: string | null;
     recentBlockhash: string | null;
     feePayer: string | null;
+    requiredSigners?: string[];
+    transactionHash?: string | null;
     wireReady: boolean;
     reason: string;
   };
+  createAudit?: {
+    discriminator: number[];
+    accountOrder: string[];
+    serverGeneratedSecrets: false;
+    submitsTransaction: false;
+    signsTransaction: false;
+  } | null;
   gates: Array<{
     id: string;
     label: string;
@@ -2587,6 +2597,7 @@ export default function MythosLabConsole() {
   const [pumpfunReadiness, setPumpfunReadiness] = useState<MythosPumpfunBuilderReadiness | null>(null);
   const [pumpfunReadinessLoading, setPumpfunReadinessLoading] = useState(false);
   const [pumpfunReadinessError, setPumpfunReadinessError] = useState('');
+  const [pumpfunMintSecrets, setPumpfunMintSecrets] = useState<Record<string, number[]>>({});
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -3150,6 +3161,9 @@ export default function MythosLabConsole() {
   async function preparePumpfunUnsignedBuilder(audit: MythosPumpfunPayloadAudit) {
     const started = Date.now();
     try {
+      const { Keypair } = await import('@solana/web3.js');
+      const mintKeypair = Keypair.generate();
+      const mintPublicKey = mintKeypair.publicKey.toBase58();
       const response = await fetch('/api/mythos/pumpfun/unsigned-builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3160,6 +3174,7 @@ export default function MythosLabConsole() {
           name: audit.token.name,
           symbol: audit.token.symbol,
           walletAddress: audit.signer.walletAddress,
+          mintPublicKey,
           firstBuySol: audit.economics.firstBuySol,
           slippageBps: audit.economics.slippageBps,
           priorityFeeLamports: audit.economics.priorityFeeLamports,
@@ -3171,6 +3186,12 @@ export default function MythosLabConsole() {
       }
 
       const unsignedBuilder = data.unsignedBuilder as MythosPumpfunUnsignedBuilder;
+      if (unsignedBuilder.transaction.wireReady) {
+        setPumpfunMintSecrets(current => ({
+          ...current,
+          [unsignedBuilder.id]: Array.from(mintKeypair.secretKey),
+        }));
+      }
       const assistantMessage: MythosLabMessage = {
         id: createId('msg'),
         role: 'assistant',
@@ -3184,14 +3205,14 @@ export default function MythosLabConsole() {
         messages: [...session.messages, assistantMessage],
         lastTrace: {
           perception: `Unsigned builder gate prepared for ${unsignedBuilder.token.name} (${unsignedBuilder.token.symbol}).`,
-          memoryContext: 'The gate records payload hash, metadata URI, signer, fee/slippage intent, and missing Pump.fun program/account requirements.',
+          memoryContext: 'The gate records payload hash, metadata URI, signer, locally generated mint public key, fee/slippage intent, and Pump.fun account requirements.',
           selectedSkill: 'Mythos Memecoin Studio - unsigned builder gate',
           reasoningPath: 'Mythos refused third-party builders, refused guessed Program IDs, and required official account schema plus fee/rent quote before bytes.',
-          prediction: 'Once an official audited builder provider is configured, this same contract can become the handoff point for real unsigned transaction serialization.',
-          decision: `Return builder gate ${unsignedBuilder.id}; keep wire payload null.`,
+          prediction: 'Once wallet signing UX is reviewed, this unsigned create payload can become the handoff point for explicit mint + wallet signatures.',
+          decision: `Return builder gate ${unsignedBuilder.id}; wireReady=${unsignedBuilder.transaction.wireReady}.`,
           confidence: unsignedBuilder.status === 'blocked' ? 74 : unsignedBuilder.status === 'needs_review' ? 84 : 92,
-          safetyBoundary: 'No Pump.fun builder call, no guessed accounts, no unsigned bytes, no wallet signature, no signed payload, no submission, no fund movement.',
-          nextHumanStep: 'Pin official Pump.fun program/account contract and fee quote path before enabling real transaction bytes.',
+          safetyBoundary: 'No Pump.fun third-party builder call, no server-side mint secret, no wallet signature, no signed payload, no submission, no fund movement.',
+          nextHumanStep: 'Review the unsigned payload, then build a separate explicit wallet-signing handoff.',
         },
         lastObservability: {
           model: session.model,
@@ -3202,7 +3223,9 @@ export default function MythosLabConsole() {
         },
         updatedAt: nowIso(),
       }));
-      setNotice(`Unsigned builder gate prepared: ${unsignedBuilder.id}. Real transaction bytes remain blocked until official audit gates are ready.`);
+      setNotice(unsignedBuilder.transaction.wireReady
+        ? `Unsigned Pump.fun create payload prepared: ${unsignedBuilder.id}. Mint secret is held only in browser memory; no signature or submission occurred.`
+        : `Unsigned builder gate prepared: ${unsignedBuilder.id}. Real transaction bytes remain blocked until official audit gates are ready.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun unsigned builder gate.');
     }
