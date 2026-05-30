@@ -362,6 +362,15 @@ type MythosPumpfunBuilderReadiness = {
   };
 };
 
+type MythosPumpfunSignedPayload = {
+  signedAt: string;
+  signedTransactionBase64: string;
+  signedTransactionHash: string;
+  signerCount: number;
+  storedInBrowserMemory: true;
+  submittedToSolana: false;
+};
+
 type MythosCognitiveTrace = {
   perception?: string;
   memoryContext?: string;
@@ -2379,7 +2388,15 @@ function MythosPumpfunPayloadAuditCard({
   );
 }
 
-function MythosPumpfunUnsignedBuilderCard({ builder }: { builder: MythosPumpfunUnsignedBuilder }) {
+function MythosPumpfunUnsignedBuilderCard({
+  builder,
+  signedPayload,
+  onSignCreate,
+}: {
+  builder: MythosPumpfunUnsignedBuilder;
+  signedPayload?: MythosPumpfunSignedPayload;
+  onSignCreate: (builder: MythosPumpfunUnsignedBuilder) => void;
+}) {
   const statusClass = builder.status === 'ready_for_audited_provider'
     ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
     : builder.status === 'blocked'
@@ -2454,6 +2471,29 @@ function MythosPumpfunUnsignedBuilderCard({ builder }: { builder: MythosPumpfunU
             <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
               {builder.blockedActions.map(action => <li key={action}>- {action}</li>)}
             </ul>
+            {builder.transaction.wireReady ? (
+              <div className="mt-4 rounded-2xl border border-[#FFD166]/18 bg-[#FFD166]/10 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFE08A]">Wallet signature gate</p>
+                <p className="mt-2 text-[11px] leading-4 text-white/52">
+                  Signing stays in browser memory. Mythos will not submit this transaction from this step.
+                </p>
+                {signedPayload ? (
+                  <div className="mt-3 rounded-xl border border-[#14F195]/16 bg-[#14F195]/8 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8CFFD2]">Signed locally</p>
+                    <p className="mt-1 break-all font-mono text-[11px] text-white/58">{signedPayload.signedTransactionHash}</p>
+                    <p className="mt-1 text-[11px] text-white/42">Submitted to Solana: false</p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onSignCreate(builder)}
+                    className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#FFD166]/24 bg-[#FFD166]/12 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#FFE08A] transition hover:bg-[#FFD166]/18"
+                  >
+                    Sign create payload
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -2572,9 +2612,31 @@ function safeLoadSessions(): MythosLabSession[] {
   }
 }
 
+function base64ToBytes(value: string) {
+  const binary = window.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = '';
+  bytes.forEach(byte => {
+    binary += String.fromCharCode(byte);
+  });
+  return window.btoa(binary);
+}
+
+async function sha256Hex(bytes: Uint8Array) {
+  const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export default function MythosLabConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
-  const { publicKey, connected, disconnect, wallet, wallets, select, connecting } = useWallet();
+  const { publicKey, connected, disconnect, wallet, wallets, select, connecting, signTransaction } = useWallet();
   const [sessions, setSessions] = useState<MythosLabSession[]>([]);
   const [activeId, setActiveId] = useState('');
   const [input, setInput] = useState('');
@@ -2598,6 +2660,7 @@ export default function MythosLabConsole() {
   const [pumpfunReadinessLoading, setPumpfunReadinessLoading] = useState(false);
   const [pumpfunReadinessError, setPumpfunReadinessError] = useState('');
   const [pumpfunMintSecrets, setPumpfunMintSecrets] = useState<Record<string, number[]>>({});
+  const [pumpfunSignedPayloads, setPumpfunSignedPayloads] = useState<Record<string, MythosPumpfunSignedPayload>>({});
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -3228,6 +3291,44 @@ export default function MythosLabConsole() {
         : `Unsigned builder gate prepared: ${unsignedBuilder.id}. Real transaction bytes remain blocked until official audit gates are ready.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun unsigned builder gate.');
+    }
+  }
+
+  async function signPumpfunCreatePayload(builder: MythosPumpfunUnsignedBuilder) {
+    try {
+      if (!builder.transaction.wireReady || !builder.transaction.serializedUnsignedPayload) {
+        throw new Error('Unsigned Pump.fun create payload is not wire-ready.');
+      }
+      if (!connected || !publicKey || !signTransaction) {
+        throw new Error('Connect Phantom or Solflare before signing the reviewed create payload.');
+      }
+      const mintSecret = pumpfunMintSecrets[builder.id];
+      if (!mintSecret) {
+        throw new Error('Mint keypair is not available in browser memory. Prepare the unsigned builder gate again.');
+      }
+
+      const { Keypair, VersionedTransaction } = await import('@solana/web3.js');
+      const transaction = VersionedTransaction.deserialize(base64ToBytes(builder.transaction.serializedUnsignedPayload));
+      const mintKeypair = Keypair.fromSecretKey(Uint8Array.from(mintSecret));
+      transaction.sign([mintKeypair]);
+      const walletSigned = await signTransaction(transaction);
+      const signedBytes = walletSigned.serialize();
+      const signedTransactionHash = await sha256Hex(signedBytes);
+
+      setPumpfunSignedPayloads(current => ({
+        ...current,
+        [builder.id]: {
+          signedAt: nowIso(),
+          signedTransactionBase64: bytesToBase64(signedBytes),
+          signedTransactionHash,
+          signerCount: walletSigned.signatures.length,
+          storedInBrowserMemory: true,
+          submittedToSolana: false,
+        },
+      }));
+      setNotice(`Pump.fun create payload signed in browser memory: ${signedTransactionHash.slice(0, 12)}... No transaction was submitted.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not sign Pump.fun create payload.');
     }
   }
 
@@ -4172,7 +4273,13 @@ export default function MythosLabConsole() {
                             onPrepareUnsignedBuilder={preparePumpfunUnsignedBuilder}
                           />
                         ) : null}
-                        {message.memecoinUnsignedBuilder ? <MythosPumpfunUnsignedBuilderCard builder={message.memecoinUnsignedBuilder} /> : null}
+                        {message.memecoinUnsignedBuilder ? (
+                          <MythosPumpfunUnsignedBuilderCard
+                            builder={message.memecoinUnsignedBuilder}
+                            signedPayload={pumpfunSignedPayloads[message.memecoinUnsignedBuilder.id]}
+                            onSignCreate={signPumpfunCreatePayload}
+                          />
+                        ) : null}
                         {!message.cryptoReport
                           && !message.solanaReport
                           && !message.solanaAnalysis
