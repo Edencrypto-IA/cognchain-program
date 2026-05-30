@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
 import {
   Activity,
@@ -369,6 +370,13 @@ type MythosPumpfunSignedPayload = {
   signerCount: number;
   storedInBrowserMemory: true;
   submittedToSolana: false;
+};
+
+type MythosPumpfunSubmittedPayload = {
+  submittedAt: string;
+  signature: string;
+  confirmed: boolean;
+  submittedFromBrowser: true;
 };
 
 type MythosCognitiveTrace = {
@@ -2391,11 +2399,21 @@ function MythosPumpfunPayloadAuditCard({
 function MythosPumpfunUnsignedBuilderCard({
   builder,
   signedPayload,
+  submittedPayload,
+  submitConfirmation,
+  submitting,
   onSignCreate,
+  onSubmitConfirmationChange,
+  onSubmitSignedCreate,
 }: {
   builder: MythosPumpfunUnsignedBuilder;
   signedPayload?: MythosPumpfunSignedPayload;
+  submittedPayload?: MythosPumpfunSubmittedPayload;
+  submitConfirmation: string;
+  submitting: boolean;
   onSignCreate: (builder: MythosPumpfunUnsignedBuilder) => void;
+  onSubmitConfirmationChange: (builderId: string, value: string) => void;
+  onSubmitSignedCreate: (builder: MythosPumpfunUnsignedBuilder) => void;
 }) {
   const statusClass = builder.status === 'ready_for_audited_provider'
     ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
@@ -2481,7 +2499,35 @@ function MythosPumpfunUnsignedBuilderCard({
                   <div className="mt-3 rounded-xl border border-[#14F195]/16 bg-[#14F195]/8 p-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8CFFD2]">Signed locally</p>
                     <p className="mt-1 break-all font-mono text-[11px] text-white/58">{signedPayload.signedTransactionHash}</p>
-                    <p className="mt-1 text-[11px] text-white/42">Submitted to Solana: false</p>
+                    <p className="mt-1 text-[11px] text-white/42">Submitted to Solana: {submittedPayload ? 'true' : 'false'}</p>
+                    {submittedPayload ? (
+                      <div className="mt-3 rounded-xl border border-[#7DE4FF]/18 bg-[#7DE4FF]/10 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9AEAFF]">Submitted</p>
+                        <p className="mt-1 break-all font-mono text-[11px] text-white/62">{submittedPayload.signature}</p>
+                        <p className="mt-1 text-[11px] text-white/42">Confirmed: {submittedPayload.confirmed ? 'yes' : 'pending'}</p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/10 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FF9AB1]">Separate submit gate</p>
+                        <p className="mt-1 text-[11px] leading-4 text-white/50">
+                          Type SUBMIT to send the signed transaction from this browser. This can create the token on Solana.
+                        </p>
+                        <input
+                          value={submitConfirmation}
+                          onChange={event => onSubmitConfirmationChange(builder.id, event.target.value)}
+                          className="mt-3 h-10 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-xs font-black uppercase tracking-[0.12em] text-white outline-none placeholder:text-white/20 focus:border-[#FF5C7A]/35"
+                          placeholder="SUBMIT"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => onSubmitSignedCreate(builder)}
+                          disabled={submitConfirmation.trim().toUpperCase() !== 'SUBMIT' || submitting}
+                          className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#FF5C7A]/26 bg-[#FF5C7A]/13 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#FFB0BF] transition hover:bg-[#FF5C7A]/18 disabled:opacity-45"
+                        >
+                          {submitting ? 'Submitting...' : 'Submit signed create'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <button
@@ -2636,6 +2682,7 @@ async function sha256Hex(bytes: Uint8Array) {
 
 export default function MythosLabConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
+  const { connection } = useConnection();
   const { publicKey, connected, disconnect, wallet, wallets, select, connecting, signTransaction } = useWallet();
   const [sessions, setSessions] = useState<MythosLabSession[]>([]);
   const [activeId, setActiveId] = useState('');
@@ -2661,6 +2708,9 @@ export default function MythosLabConsole() {
   const [pumpfunReadinessError, setPumpfunReadinessError] = useState('');
   const [pumpfunMintSecrets, setPumpfunMintSecrets] = useState<Record<string, number[]>>({});
   const [pumpfunSignedPayloads, setPumpfunSignedPayloads] = useState<Record<string, MythosPumpfunSignedPayload>>({});
+  const [pumpfunSubmitConfirmations, setPumpfunSubmitConfirmations] = useState<Record<string, string>>({});
+  const [pumpfunSubmittedPayloads, setPumpfunSubmittedPayloads] = useState<Record<string, MythosPumpfunSubmittedPayload>>({});
+  const [pumpfunSubmittingIds, setPumpfunSubmittingIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -3329,6 +3379,53 @@ export default function MythosLabConsole() {
       setNotice(`Pump.fun create payload signed in browser memory: ${signedTransactionHash.slice(0, 12)}... No transaction was submitted.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not sign Pump.fun create payload.');
+    }
+  }
+
+  async function submitPumpfunSignedCreate(builder: MythosPumpfunUnsignedBuilder) {
+    const confirmation = pumpfunSubmitConfirmations[builder.id]?.trim().toUpperCase();
+    try {
+      if (confirmation !== 'SUBMIT') {
+        throw new Error('Type SUBMIT before sending the signed Pump.fun create transaction.');
+      }
+      const signedPayload = pumpfunSignedPayloads[builder.id];
+      if (!signedPayload?.signedTransactionBase64) {
+        throw new Error('Signed transaction is not available in browser memory.');
+      }
+      setPumpfunSubmittingIds(current => ({ ...current, [builder.id]: true }));
+      const raw = base64ToBytes(signedPayload.signedTransactionBase64);
+      const signature = await connection.sendRawTransaction(raw, {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+
+      let confirmed = false;
+      try {
+        const latest = await connection.getLatestBlockhash('confirmed');
+        const result = await connection.confirmTransaction({
+          signature,
+          blockhash: latest.blockhash,
+          lastValidBlockHeight: latest.lastValidBlockHeight,
+        }, 'confirmed');
+        confirmed = !result.value.err;
+      } catch {
+        confirmed = false;
+      }
+
+      setPumpfunSubmittedPayloads(current => ({
+        ...current,
+        [builder.id]: {
+          submittedAt: nowIso(),
+          signature,
+          confirmed,
+          submittedFromBrowser: true,
+        },
+      }));
+      setNotice(`Pump.fun create transaction submitted from browser: ${signature}. Confirmation: ${confirmed ? 'confirmed' : 'pending'}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not submit Pump.fun create transaction.');
+    } finally {
+      setPumpfunSubmittingIds(current => ({ ...current, [builder.id]: false }));
     }
   }
 
@@ -4277,7 +4374,12 @@ export default function MythosLabConsole() {
                           <MythosPumpfunUnsignedBuilderCard
                             builder={message.memecoinUnsignedBuilder}
                             signedPayload={pumpfunSignedPayloads[message.memecoinUnsignedBuilder.id]}
+                            submittedPayload={pumpfunSubmittedPayloads[message.memecoinUnsignedBuilder.id]}
+                            submitConfirmation={pumpfunSubmitConfirmations[message.memecoinUnsignedBuilder.id] || ''}
+                            submitting={Boolean(pumpfunSubmittingIds[message.memecoinUnsignedBuilder.id])}
                             onSignCreate={signPumpfunCreatePayload}
+                            onSubmitConfirmationChange={(builderId, value) => setPumpfunSubmitConfirmations(current => ({ ...current, [builderId]: value }))}
+                            onSubmitSignedCreate={submitPumpfunSignedCreate}
                           />
                         ) : null}
                         {!message.cryptoReport
