@@ -1,0 +1,268 @@
+import crypto from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, safeErrorMessage } from '@/lib/security';
+
+type UnsignedBuilderInput = {
+  payloadAuditId?: unknown;
+  payloadHash?: unknown;
+  metadataUri?: unknown;
+  name?: unknown;
+  symbol?: unknown;
+  walletAddress?: unknown;
+  firstBuySol?: unknown;
+  slippageBps?: unknown;
+  priorityFeeLamports?: unknown;
+  programId?: unknown;
+  feeRecipient?: unknown;
+  globalAccount?: unknown;
+  eventAuthority?: unknown;
+  bondingCurve?: unknown;
+  associatedBondingCurve?: unknown;
+};
+
+function clean(value: unknown, maxLength: number) {
+  return typeof value === 'string'
+    ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength)
+    : '';
+}
+
+function amount(value: unknown, fallback = 0) {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value.replace(',', '.'))
+      : fallback;
+  return Number.isFinite(parsed) ? Math.max(0, Number(parsed.toFixed(4))) : fallback;
+}
+
+function integer(value: unknown, fallback: number, min: number, max: number) {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value)
+      : fallback;
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
+function isLikelySolanaAddress(value: string) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function isLikelyMetadataUri(value: string) {
+  return /^(ipfs:\/\/|ar:\/\/|https:\/\/)/i.test(value) && value.length <= 240;
+}
+
+function gate(
+  id: string,
+  label: string,
+  status: 'ready' | 'review' | 'blocked',
+  detail: string
+) {
+  return { id, label, status, detail };
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const rate = checkRateLimit(ip, '/api/mythos/pumpfun/unsigned-builder');
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: 'Muitas preparacoes de unsigned builder foram solicitadas. Aguarde um pouco e tente novamente.' },
+        { status: 429 }
+      );
+    }
+
+    const body = await request.json() as UnsignedBuilderInput;
+    const payloadAuditId = clean(body.payloadAuditId, 80);
+    const payloadHash = clean(body.payloadHash, 80);
+    const metadataUri = clean(body.metadataUri, 240);
+    const name = clean(body.name, 42);
+    const symbol = clean(body.symbol, 10).replace(/[^a-z0-9]/gi, '').toUpperCase();
+    const walletAddress = clean(body.walletAddress, 64);
+    const firstBuySol = amount(body.firstBuySol);
+    const slippageBps = integer(body.slippageBps, 500, 50, 3000);
+    const priorityFeeLamports = integer(body.priorityFeeLamports, 0, 0, 10_000_000);
+    const programId = clean(body.programId, 64);
+    const feeRecipient = clean(body.feeRecipient, 64);
+    const globalAccount = clean(body.globalAccount, 64);
+    const eventAuthority = clean(body.eventAuthority, 64);
+    const bondingCurve = clean(body.bondingCurve, 64);
+    const associatedBondingCurve = clean(body.associatedBondingCurve, 64);
+
+    const accountInputs = [
+      ['program_id', 'Pump.fun program ID', programId],
+      ['fee_recipient', 'Fee recipient', feeRecipient],
+      ['global_account', 'Global account', globalAccount],
+      ['event_authority', 'Event authority', eventAuthority],
+      ['bonding_curve', 'Bonding curve', bondingCurve],
+      ['associated_bonding_curve', 'Associated bonding curve', associatedBondingCurve],
+    ] as const;
+
+    const accountGates = accountInputs.map(([id, label, value]) => gate(
+      id,
+      label,
+      value && isLikelySolanaAddress(value) ? 'review' : 'blocked',
+      value && isLikelySolanaAddress(value)
+        ? `${label} was supplied, but must be verified against an official Pump.fun source before serialization.`
+        : `${label} is not configured. Mythos will not infer or scrape this account.`
+    ));
+
+    const gates = [
+      gate(
+        'payload_audit',
+        'Payload audit',
+        payloadAuditId.startsWith('payload_') && payloadHash.length >= 32 ? 'ready' : 'blocked',
+        payloadAuditId.startsWith('payload_') && payloadHash.length >= 32
+          ? `Payload audit ${payloadAuditId} is linked.`
+          : 'A completed Mythos payload audit is required before unsigned builder review.'
+      ),
+      gate(
+        'metadata_uri',
+        'Final metadata URI',
+        isLikelyMetadataUri(metadataUri) ? 'ready' : 'blocked',
+        isLikelyMetadataUri(metadataUri)
+          ? 'Metadata URI is present for future transaction metadata.'
+          : 'Final metadata URI must be ipfs://, ar://, or https:// and human-reviewed.'
+      ),
+      gate(
+        'wallet_signer',
+        'Wallet signer',
+        isLikelySolanaAddress(walletAddress) ? 'ready' : 'blocked',
+        isLikelySolanaAddress(walletAddress)
+          ? `Future fee payer/signature origin must be ${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}.`
+          : 'A connected Phantom/Solflare public key is required.'
+      ),
+      gate(
+        'first_buy',
+        'First buy intent',
+        firstBuySol > 0 ? 'review' : 'ready',
+        firstBuySol > 0
+          ? `${firstBuySol} SOL buy intent requires visible wallet confirmation and a separate submission step.`
+          : 'No first buy is configured, which keeps launch review simpler.'
+      ),
+      gate(
+        'slippage',
+        'Slippage and priority fee',
+        slippageBps <= 1000 && priorityFeeLamports <= 2_000_000 ? 'ready' : 'review',
+        `${slippageBps / 100}% slippage and ${priorityFeeLamports} lamports priority fee must be visible before wallet signing.`
+      ),
+      ...accountGates,
+      gate(
+        'official_builder_provider',
+        'Official builder provider',
+        'blocked',
+        'No official audited Pump.fun builder provider is configured server-side. Third-party transaction builders are intentionally rejected here.'
+      ),
+      gate(
+        'fee_rent_quote',
+        'Fee and rent quote',
+        'blocked',
+        'Create account rent, mint costs, platform fees, and priority fee quote must be fetched from an audited path before bytes exist.'
+      ),
+    ];
+
+    const ready = gates.filter(item => item.status === 'ready').length;
+    const review = gates.filter(item => item.status === 'review').length;
+    const blocked = gates.filter(item => item.status === 'blocked').length;
+    const canonical = JSON.stringify({
+      payloadAuditId,
+      payloadHash,
+      metadataUri,
+      name,
+      symbol,
+      walletAddress,
+      firstBuySol,
+      slippageBps,
+      priorityFeeLamports,
+      programId,
+      feeRecipient,
+      globalAccount,
+      eventAuthority,
+      bondingCurve,
+      associatedBondingCurve,
+      phase: 'pumpfun_unsigned_builder_gate_v1',
+    });
+    const builderHash = crypto.createHash('sha256').update(canonical).digest('hex');
+
+    return NextResponse.json({
+      ok: true,
+      unsignedBuilder: {
+        id: `builder_${builderHash.slice(0, 24)}`,
+        status: blocked > 0 ? 'blocked' : review > 0 ? 'needs_review' : 'ready_for_audited_provider',
+        createdAt: new Date().toISOString(),
+        platform: 'pump.fun',
+        network: 'solana-mainnet-preview',
+        builderMode: 'audit_gate',
+        builderHash,
+        payloadAuditId: payloadAuditId || null,
+        payloadHash: payloadHash || null,
+        provider: {
+          configured: false,
+          source: null,
+          officialDocsVerified: false,
+          reason: 'Official Pump.fun program/account contract is not configured in this app yet.',
+        },
+        token: {
+          name,
+          symbol,
+          metadataUri: metadataUri || null,
+        },
+        signer: {
+          walletAddress: walletAddress || null,
+          required: true,
+        },
+        economics: {
+          firstBuySol,
+          slippageBps,
+          priorityFeeLamports,
+          feeQuoteLamports: null,
+          rentEstimateLamports: null,
+          totalEstimatedLamports: null,
+        },
+        programAudit: {
+          programId: programId || null,
+          feeRecipient: feeRecipient || null,
+          globalAccount: globalAccount || null,
+          eventAuthority: eventAuthority || null,
+          bondingCurve: bondingCurve || null,
+          associatedBondingCurve: associatedBondingCurve || null,
+          accountSchemaVerified: false,
+          instructionDiscriminatorVerified: false,
+        },
+        transaction: {
+          serializedUnsignedPayload: null,
+          messageVersion: null,
+          recentBlockhash: null,
+          feePayer: walletAddress || null,
+          wireReady: false,
+          reason: 'Unsigned transaction bytes are blocked until official program IDs, account metas, instruction layout, fee/rent quote, and metadata URI are audited.',
+        },
+        gates,
+        readiness: {
+          ready,
+          review,
+          blocked,
+        },
+        nextSteps: [
+          'Pin official Pump.fun program IDs and account schema in server-side configuration.',
+          'Add a metadata upload provider that returns a final immutable URI.',
+          'Fetch rent, platform fee, priority fee, and slippage quote before transaction bytes are generated.',
+          'Serialize an unsigned VersionedTransaction only after every gate is ready or explicitly reviewed.',
+          'Open Phantom/Solflare from a separate user click and show all values before signature.',
+        ],
+        blockedActions: [
+          'No third-party Pump.fun transaction builder was called.',
+          'No Program ID or account meta was guessed.',
+          'No unsigned transaction bytes were created.',
+          'No wallet signature modal was opened.',
+          'No signed transaction was stored.',
+          'No transaction was submitted.',
+          'No token launch or first buy occurred.',
+        ],
+      },
+    });
+  } catch (error) {
+    return NextResponse.json({ error: safeErrorMessage(error) }, { status: 500 });
+  }
+}

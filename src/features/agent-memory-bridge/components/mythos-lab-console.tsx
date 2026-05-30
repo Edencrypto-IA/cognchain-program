@@ -50,6 +50,7 @@ type MythosLabMessage = {
   memecoinMetadataReview?: MythosPumpfunMetadataReview;
   memecoinUnsignedPreview?: MythosPumpfunUnsignedPreview;
   memecoinPayloadAudit?: MythosPumpfunPayloadAudit;
+  memecoinUnsignedBuilder?: MythosPumpfunUnsignedBuilder;
   memoryHash?: string;
   readUrl?: string;
   verifyUrl?: string;
@@ -241,6 +242,72 @@ type MythosPumpfunPayloadAudit = {
     id: string;
     label: string;
     status: 'ready' | 'review' | 'pending' | 'blocked';
+    detail: string;
+  }>;
+  readiness: {
+    ready: number;
+    review: number;
+    blocked: number;
+  };
+  nextSteps: string[];
+  blockedActions: string[];
+};
+
+type MythosPumpfunUnsignedBuilder = {
+  id: string;
+  status: 'blocked' | 'needs_review' | 'ready_for_audited_provider';
+  createdAt: string;
+  platform: string;
+  network: string;
+  builderMode: 'audit_gate';
+  builderHash: string;
+  payloadAuditId: string | null;
+  payloadHash: string | null;
+  provider: {
+    configured: boolean;
+    source: string | null;
+    officialDocsVerified: boolean;
+    reason: string;
+  };
+  token: {
+    name: string;
+    symbol: string;
+    metadataUri: string | null;
+  };
+  signer: {
+    walletAddress: string | null;
+    required: boolean;
+  };
+  economics: {
+    firstBuySol: number;
+    slippageBps: number;
+    priorityFeeLamports: number;
+    feeQuoteLamports: number | null;
+    rentEstimateLamports: number | null;
+    totalEstimatedLamports: number | null;
+  };
+  programAudit: {
+    programId: string | null;
+    feeRecipient: string | null;
+    globalAccount: string | null;
+    eventAuthority: string | null;
+    bondingCurve: string | null;
+    associatedBondingCurve: string | null;
+    accountSchemaVerified: boolean;
+    instructionDiscriminatorVerified: boolean;
+  };
+  transaction: {
+    serializedUnsignedPayload: null;
+    messageVersion: string | null;
+    recentBlockhash: string | null;
+    feePayer: string | null;
+    wireReady: boolean;
+    reason: string;
+  };
+  gates: Array<{
+    id: string;
+    label: string;
+    status: 'ready' | 'review' | 'blocked';
     detail: string;
   }>;
   readiness: {
@@ -1167,6 +1234,40 @@ function formatPumpfunPayloadAuditResponse(audit: MythosPumpfunPayloadAudit) {
     terminalSection('Instruction audit', audit.instructionAudit.map(item => `- ${item.label}: ${item.status} - ${item.detail}`)),
     terminalSection('Blocked actions', audit.blockedActions.map(action => `- ${action}`)),
     terminalSection('Next safe step', 'Audit the official Pump.fun SDK/program payload path before generating real unsigned transaction bytes.'),
+  ].join('\n\n'));
+}
+
+function formatPumpfunUnsignedBuilderResponse(builder: MythosPumpfunUnsignedBuilder) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Prepare Pump.fun unsigned builder gate ${builder.id}.`),
+    terminalSection('Builder status', [
+      `Status: ${builder.status}`,
+      `Mode: ${builder.builderMode}`,
+      `Builder hash: ${builder.builderHash}`,
+      `Payload audit: ${builder.payloadAuditId || 'not linked'}`,
+      `Provider configured: ${builder.provider.configured ? 'yes' : 'no'}`,
+      `Official docs verified: ${builder.provider.officialDocsVerified ? 'yes' : 'no'}`,
+    ]),
+    terminalSection('Token and signer', [
+      `Token: ${builder.token.name} (${builder.token.symbol})`,
+      `Metadata URI: ${builder.token.metadataUri || 'not supplied'}`,
+      `Wallet signer: ${builder.signer.walletAddress || 'not connected'}`,
+      `First buy intent: ${builder.economics.firstBuySol > 0 ? `${builder.economics.firstBuySol} SOL` : 'not set'}`,
+    ]),
+    terminalSection('Program audit', [
+      `Program ID: ${builder.programAudit.programId || 'not configured'}`,
+      `Account schema verified: ${builder.programAudit.accountSchemaVerified ? 'yes' : 'no'}`,
+      `Instruction discriminator verified: ${builder.programAudit.instructionDiscriminatorVerified ? 'yes' : 'no'}`,
+      `Fee quote: ${builder.economics.feeQuoteLamports ?? 'not quoted'}`,
+      `Rent estimate: ${builder.economics.rentEstimateLamports ?? 'not estimated'}`,
+    ]),
+    terminalSection('Transaction payload', [
+      `Wire ready: ${builder.transaction.wireReady ? 'yes' : 'no'}`,
+      `Serialized unsigned payload: ${builder.transaction.serializedUnsignedPayload || 'not created'}`,
+      `Reason: ${builder.transaction.reason}`,
+    ]),
+    terminalSection('Blocked actions', builder.blockedActions.map(action => `- ${action}`)),
+    terminalSection('Next safe step', 'Configure an official audited Pump.fun builder provider, then quote fees/rent before any unsigned transaction bytes are created.'),
   ].join('\n\n'));
 }
 
@@ -2153,7 +2254,13 @@ function MythosPumpfunUnsignedPreviewCard({
   );
 }
 
-function MythosPumpfunPayloadAuditCard({ audit }: { audit: MythosPumpfunPayloadAudit }) {
+function MythosPumpfunPayloadAuditCard({
+  audit,
+  onPrepareUnsignedBuilder,
+}: {
+  audit: MythosPumpfunPayloadAudit;
+  onPrepareUnsignedBuilder: (audit: MythosPumpfunPayloadAudit) => void;
+}) {
   const statusClass = audit.status === 'ready_for_payload_builder'
     ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
     : audit.status === 'blocked'
@@ -2216,6 +2323,95 @@ function MythosPumpfunPayloadAuditCard({ audit }: { audit: MythosPumpfunPayloadA
           <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
             {audit.blockedActions.map(action => <li key={action}>- {action}</li>)}
           </ul>
+          <button
+            type="button"
+            onClick={() => onPrepareUnsignedBuilder(audit)}
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[#A7FF3D]/22 bg-[#A7FF3D]/10 px-4 text-xs font-black uppercase tracking-[0.12em] text-[#B8FF5C] transition hover:bg-[#A7FF3D]/15"
+          >
+            Prepare unsigned builder gate
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MythosPumpfunUnsignedBuilderCard({ builder }: { builder: MythosPumpfunUnsignedBuilder }) {
+  const statusClass = builder.status === 'ready_for_audited_provider'
+    ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
+    : builder.status === 'blocked'
+      ? 'border-[#FF5C7A]/24 bg-[#FF5C7A]/10 text-[#FF9AB1]'
+      : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#A7FF3D]/20 bg-[radial-gradient(circle_at_20%_0%,rgba(118,255,3,0.12),transparent_30%),linear-gradient(135deg,rgba(4,22,0,0.94),rgba(0,0,0,0.98))] p-5 shadow-[0_0_46px_rgba(118,255,3,0.055)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Unsigned Builder Gate</p>
+          <h4 className="mt-2 text-2xl font-black text-white">{builder.token.name} <span className="text-[#A7FF3D]">${builder.token.symbol}</span></h4>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/58">
+            Mythos prepared the real builder contract, but transaction bytes stay blocked until official Pump.fun program IDs, account metas, fee/rent quote, and metadata URI are audited.
+          </p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClass}`}>
+          {builder.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        {[
+          ['Builder ID', builder.id],
+          ['Provider', builder.provider.configured ? builder.provider.source || 'configured' : 'not configured'],
+          ['Wire ready', builder.transaction.wireReady ? 'yes' : 'no'],
+          ['Fee quote', builder.economics.feeQuoteLamports === null ? 'not quoted' : `${builder.economics.feeQuoteLamports} lamports`],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/34 p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">{label}</p>
+            <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.85fr]">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Serialization gates</p>
+          <div className="mt-3 space-y-2">
+            {builder.gates.map(item => (
+              <div key={item.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-white">{item.label}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                    item.status === 'ready'
+                      ? 'bg-[#14F195]/12 text-[#8CFFD2]'
+                      : item.status === 'blocked'
+                        ? 'bg-[#FF5C7A]/12 text-[#FF8FAB]'
+                        : 'bg-[#FFD166]/12 text-[#FFE08A]'
+                  }`}>
+                    {item.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-white/48">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-[#7DE4FF]/16 bg-[#7DE4FF]/[0.045] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Program audit</p>
+            <div className="mt-3 space-y-2 font-mono text-[11px] leading-5 text-white/58">
+              <p>program: {builder.programAudit.programId || 'not configured'}</p>
+              <p>schema: {builder.programAudit.accountSchemaVerified ? 'verified' : 'not verified'}</p>
+              <p>discriminator: {builder.programAudit.instructionDiscriminatorVerified ? 'verified' : 'not verified'}</p>
+              <p>metadata: {builder.token.metadataUri || 'missing'}</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/7 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF9AB1]">Still no execution</p>
+            <p className="mt-3 text-xs leading-5 text-white/58">{builder.transaction.reason}</p>
+            <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
+              {builder.blockedActions.map(action => <li key={action}>- {action}</li>)}
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -2812,6 +3008,67 @@ export default function MythosLabConsole() {
       setNotice(`Pump.fun payload audit prepared: ${payloadAudit.id}. No transaction bytes, signature, or submission were created.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not audit Pump.fun payload readiness.');
+    }
+  }
+
+  async function preparePumpfunUnsignedBuilder(audit: MythosPumpfunPayloadAudit) {
+    const started = Date.now();
+    try {
+      const response = await fetch('/api/mythos/pumpfun/unsigned-builder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payloadAuditId: audit.id,
+          payloadHash: audit.payloadHash,
+          metadataUri: audit.token.metadataUri,
+          name: audit.token.name,
+          symbol: audit.token.symbol,
+          walletAddress: audit.signer.walletAddress,
+          firstBuySol: audit.economics.firstBuySol,
+          slippageBps: audit.economics.slippageBps,
+          priorityFeeLamports: audit.economics.priorityFeeLamports,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.unsignedBuilder) {
+        throw new Error(data?.error || 'Could not prepare Pump.fun unsigned builder gate.');
+      }
+
+      const unsignedBuilder = data.unsignedBuilder as MythosPumpfunUnsignedBuilder;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: formatPumpfunUnsignedBuilderResponse(unsignedBuilder),
+        memecoinUnsignedBuilder: unsignedBuilder,
+      };
+
+      updateActive(session => ({
+        ...session,
+        messages: [...session.messages, assistantMessage],
+        lastTrace: {
+          perception: `Unsigned builder gate prepared for ${unsignedBuilder.token.name} (${unsignedBuilder.token.symbol}).`,
+          memoryContext: 'The gate records payload hash, metadata URI, signer, fee/slippage intent, and missing Pump.fun program/account requirements.',
+          selectedSkill: 'Mythos Memecoin Studio - unsigned builder gate',
+          reasoningPath: 'Mythos refused third-party builders, refused guessed Program IDs, and required official account schema plus fee/rent quote before bytes.',
+          prediction: 'Once an official audited builder provider is configured, this same contract can become the handoff point for real unsigned transaction serialization.',
+          decision: `Return builder gate ${unsignedBuilder.id}; keep wire payload null.`,
+          confidence: unsignedBuilder.status === 'blocked' ? 74 : unsignedBuilder.status === 'needs_review' ? 84 : 92,
+          safetyBoundary: 'No Pump.fun builder call, no guessed accounts, no unsigned bytes, no wallet signature, no signed payload, no submission, no fund movement.',
+          nextHumanStep: 'Pin official Pump.fun program/account contract and fee quote path before enabling real transaction bytes.',
+        },
+        lastObservability: {
+          model: session.model,
+          modelLabel: 'Mythos Pump.fun unsigned builder gate',
+          latencyMs: Date.now() - started,
+          mode: session.mode,
+          traceSchema: 'mythos-pumpfun-unsigned-builder-gate/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      setNotice(`Unsigned builder gate prepared: ${unsignedBuilder.id}. Real transaction bytes remain blocked until official audit gates are ready.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun unsigned builder gate.');
     }
   }
 
@@ -3744,7 +4001,13 @@ export default function MythosLabConsole() {
                             onAuditPayload={auditPumpfunPayload}
                           />
                         ) : null}
-                        {message.memecoinPayloadAudit ? <MythosPumpfunPayloadAuditCard audit={message.memecoinPayloadAudit} /> : null}
+                        {message.memecoinPayloadAudit ? (
+                          <MythosPumpfunPayloadAuditCard
+                            audit={message.memecoinPayloadAudit}
+                            onPrepareUnsignedBuilder={preparePumpfunUnsignedBuilder}
+                          />
+                        ) : null}
+                        {message.memecoinUnsignedBuilder ? <MythosPumpfunUnsignedBuilderCard builder={message.memecoinUnsignedBuilder} /> : null}
                         {!message.cryptoReport
                           && !message.solanaReport
                           && !message.solanaAnalysis
@@ -3752,7 +4015,8 @@ export default function MythosLabConsole() {
                           && !message.memecoinProposal
                           && !message.memecoinMetadataReview
                           && !message.memecoinUnsignedPreview
-                          && !message.memecoinPayloadAudit ? (
+                          && !message.memecoinPayloadAudit
+                          && !message.memecoinUnsignedBuilder ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
                         {message.htmlArtifact ? (
