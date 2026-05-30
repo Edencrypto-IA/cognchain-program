@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
+import { getPumpfunBuilderConfig } from '@/lib/solana/pumpfun-builder-config';
 
 type UnsignedBuilderInput = {
   payloadAuditId?: unknown;
@@ -83,10 +84,11 @@ export async function POST(request: NextRequest) {
     const firstBuySol = amount(body.firstBuySol);
     const slippageBps = integer(body.slippageBps, 500, 50, 3000);
     const priorityFeeLamports = integer(body.priorityFeeLamports, 0, 0, 10_000_000);
-    const programId = clean(body.programId, 64);
-    const feeRecipient = clean(body.feeRecipient, 64);
-    const globalAccount = clean(body.globalAccount, 64);
-    const eventAuthority = clean(body.eventAuthority, 64);
+    const builderConfig = getPumpfunBuilderConfig();
+    const programId = builderConfig.program.programId || clean(body.programId, 64);
+    const feeRecipient = builderConfig.program.feeRecipient || clean(body.feeRecipient, 64);
+    const globalAccount = builderConfig.program.globalAccount || clean(body.globalAccount, 64);
+    const eventAuthority = builderConfig.program.eventAuthority || clean(body.eventAuthority, 64);
     const bondingCurve = clean(body.bondingCurve, 64);
     const associatedBondingCurve = clean(body.associatedBondingCurve, 64);
 
@@ -151,14 +153,32 @@ export async function POST(request: NextRequest) {
       gate(
         'official_builder_provider',
         'Official builder provider',
-        'blocked',
-        'No official audited Pump.fun builder provider is configured server-side. Third-party transaction builders are intentionally rejected here.'
+        builderConfig.provider.configured ? 'ready' : 'blocked',
+        builderConfig.provider.configured
+          ? builderConfig.provider.reason
+          : 'No official audited Pump.fun builder provider is configured server-side. Third-party transaction builders are intentionally rejected here.'
       ),
       gate(
         'fee_rent_quote',
         'Fee and rent quote',
-        'blocked',
-        'Create account rent, mint costs, platform fees, and priority fee quote must be fetched from an audited path before bytes exist.'
+        builderConfig.fees.quoteProviderConfigured && builderConfig.fees.rentQuoteConfigured ? 'ready' : 'blocked',
+        builderConfig.fees.quoteProviderConfigured && builderConfig.fees.rentQuoteConfigured
+          ? 'Fee and rent quote providers are configured, but bytes still require serializer readiness.'
+          : 'Create account rent, mint costs, platform fees, and priority fee quote must be fetched from an audited path before bytes exist.'
+      ),
+      gate(
+        'metadata_upload_provider',
+        'Metadata upload provider',
+        builderConfig.metadata.uploadProviderConfigured ? 'ready' : 'blocked',
+        builderConfig.metadata.uploadProviderConfigured
+          ? 'Server-side metadata upload provider is configured.'
+          : 'A server-side upload provider must return the final metadata URI before launch bytes.'
+      ),
+      gate(
+        'local_serializer',
+        'Local serializer',
+        builderConfig.transaction.localSerializerImplemented ? 'ready' : 'blocked',
+        'Local VersionedTransaction serializer remains disabled until the official Pump.fun account contract is implemented and reviewed.'
       ),
     ];
 
@@ -198,10 +218,10 @@ export async function POST(request: NextRequest) {
         payloadAuditId: payloadAuditId || null,
         payloadHash: payloadHash || null,
         provider: {
-          configured: false,
-          source: null,
-          officialDocsVerified: false,
-          reason: 'Official Pump.fun program/account contract is not configured in this app yet.',
+          configured: builderConfig.provider.configured,
+          source: builderConfig.provider.source,
+          officialDocsVerified: builderConfig.provider.officialDocsVerified,
+          reason: builderConfig.provider.reason,
         },
         token: {
           name,
@@ -227,8 +247,8 @@ export async function POST(request: NextRequest) {
           eventAuthority: eventAuthority || null,
           bondingCurve: bondingCurve || null,
           associatedBondingCurve: associatedBondingCurve || null,
-          accountSchemaVerified: false,
-          instructionDiscriminatorVerified: false,
+          accountSchemaVerified: builderConfig.program.accountSchemaVerified,
+          instructionDiscriminatorVerified: builderConfig.program.instructionDiscriminatorVerified,
         },
         transaction: {
           serializedUnsignedPayload: null,
@@ -236,7 +256,16 @@ export async function POST(request: NextRequest) {
           recentBlockhash: null,
           feePayer: walletAddress || null,
           wireReady: false,
-          reason: 'Unsigned transaction bytes are blocked until official program IDs, account metas, instruction layout, fee/rent quote, and metadata URI are audited.',
+          reason: builderConfig.transaction.unsignedBytesEnabled
+            ? 'Configuration is ready, but local serialization is still intentionally disabled in this safety phase.'
+            : 'Unsigned transaction bytes are blocked until official program IDs, account metas, instruction layout, fee/rent quote, and metadata URI are audited.',
+        },
+        configuredReadiness: {
+          providerMode: builderConfig.provider.mode,
+          accountSchemaVersion: builderConfig.program.accountSchemaVersion,
+          instructionLayoutHashConfigured: Boolean(builderConfig.program.instructionLayoutHash),
+          metadataUploadProviderConfigured: builderConfig.metadata.uploadProviderConfigured,
+          unsignedBytesEnabled: builderConfig.transaction.unsignedBytesEnabled,
         },
         gates,
         readiness: {
