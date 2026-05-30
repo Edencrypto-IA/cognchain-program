@@ -52,6 +52,7 @@ type MythosLabMessage = {
   memecoinUnsignedPreview?: MythosPumpfunUnsignedPreview;
   memecoinPayloadAudit?: MythosPumpfunPayloadAudit;
   memecoinUnsignedBuilder?: MythosPumpfunUnsignedBuilder;
+  memecoinBuyBuilder?: MythosPumpfunBuyBuilder;
   memoryHash?: string;
   readUrl?: string;
   verifyUrl?: string;
@@ -327,6 +328,71 @@ type MythosPumpfunUnsignedBuilder = {
     blocked: number;
   };
   nextSteps: string[];
+  blockedActions: string[];
+};
+
+type MythosPumpfunBuyBuilder = {
+  id: string;
+  status: 'blocked' | 'needs_review' | 'ready_for_wallet_signature';
+  createdAt: string;
+  platform: string;
+  network: string;
+  createBuilderId: string | null;
+  createSignature: string | null;
+  mint: string | null;
+  signer: {
+    walletAddress: string | null;
+    required: boolean;
+  };
+  quote: {
+    spendLamports: string | null;
+    expectedTokensOut: string | null;
+    minTokensOut: string | null;
+    slippageBps: number;
+    priorityFeeLamports: number;
+    networkFeeLamports: number | null;
+    totalKnownLamports: number | null;
+    caveat: string;
+  };
+  bondingCurve: {
+    virtualTokenReserves: string;
+    virtualQuoteReserves: string;
+    realTokenReserves: string;
+    realQuoteReserves: string;
+    tokenTotalSupply: string;
+    complete: boolean;
+    creator: string;
+  } | null;
+  transaction: {
+    serializedUnsignedPayload: string | null;
+    messageBase64: string | null;
+    messageVersion: string | null;
+    recentBlockhash: string | null;
+    feePayer: string | null;
+    requiredSigners: string[];
+    transactionHash: string | null;
+    wireReady: boolean;
+    reason: string;
+  };
+  accounts: Record<string, string> | null;
+  buyAudit: {
+    discriminator: number[];
+    accountOrder: string[];
+    serverGeneratedSecrets: false;
+    submitsTransaction: false;
+    signsTransaction: false;
+  } | null;
+  gates: Array<{
+    id: string;
+    label: string;
+    status: 'ready' | 'review' | 'blocked';
+    detail: string;
+  }>;
+  readiness: {
+    ready: number;
+    review: number;
+    blocked: number;
+  };
   blockedActions: string[];
 };
 
@@ -2400,18 +2466,24 @@ function MythosPumpfunUnsignedBuilderCard({
   builder,
   signedPayload,
   submittedPayload,
+  buySpendSol,
   submitConfirmation,
   submitting,
   onSignCreate,
+  onBuySpendChange,
+  onPrepareBuy,
   onSubmitConfirmationChange,
   onSubmitSignedCreate,
 }: {
   builder: MythosPumpfunUnsignedBuilder;
   signedPayload?: MythosPumpfunSignedPayload;
   submittedPayload?: MythosPumpfunSubmittedPayload;
+  buySpendSol: string;
   submitConfirmation: string;
   submitting: boolean;
   onSignCreate: (builder: MythosPumpfunUnsignedBuilder) => void;
+  onBuySpendChange: (builderId: string, value: string) => void;
+  onPrepareBuy: (builder: MythosPumpfunUnsignedBuilder, submitted: MythosPumpfunSubmittedPayload) => void;
   onSubmitConfirmationChange: (builderId: string, value: string) => void;
   onSubmitSignedCreate: (builder: MythosPumpfunUnsignedBuilder) => void;
 }) {
@@ -2505,6 +2577,22 @@ function MythosPumpfunUnsignedBuilderCard({
                         <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9AEAFF]">Submitted</p>
                         <p className="mt-1 break-all font-mono text-[11px] text-white/62">{submittedPayload.signature}</p>
                         <p className="mt-1 text-[11px] text-white/42">Confirmed: {submittedPayload.confirmed ? 'yes' : 'pending'}</p>
+                        <div className="mt-3 rounded-xl border border-white/10 bg-black/28 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FFE08A]">Initial buy</p>
+                          <input
+                            value={buySpendSol}
+                            onChange={event => onBuySpendChange(builder.id, event.target.value)}
+                            className="mt-3 h-10 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-xs font-black text-white outline-none placeholder:text-white/20 focus:border-[#FFD166]/35"
+                            placeholder="0.01"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => onPrepareBuy(builder, submittedPayload)}
+                            className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#7DE4FF]/24 bg-[#7DE4FF]/12 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/18"
+                          >
+                            Prepare buy quote
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="mt-3 rounded-xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/10 p-3">
@@ -2536,6 +2624,143 @@ function MythosPumpfunUnsignedBuilderCard({
                     className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#FFD166]/24 bg-[#FFD166]/12 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#FFE08A] transition hover:bg-[#FFD166]/18"
                   >
                     Sign create payload
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MythosPumpfunBuyBuilderCard({
+  buy,
+  signedPayload,
+  submittedPayload,
+  submitConfirmation,
+  submitting,
+  onSignBuy,
+  onSubmitConfirmationChange,
+  onSubmitSignedBuy,
+}: {
+  buy: MythosPumpfunBuyBuilder;
+  signedPayload?: MythosPumpfunSignedPayload;
+  submittedPayload?: MythosPumpfunSubmittedPayload;
+  submitConfirmation: string;
+  submitting: boolean;
+  onSignBuy: (buy: MythosPumpfunBuyBuilder) => void;
+  onSubmitConfirmationChange: (builderId: string, value: string) => void;
+  onSubmitSignedBuy: (buy: MythosPumpfunBuyBuilder) => void;
+}) {
+  const statusClass = buy.status === 'ready_for_wallet_signature'
+    ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
+    : buy.status === 'blocked'
+      ? 'border-[#FF5C7A]/24 bg-[#FF5C7A]/10 text-[#FF9AB1]'
+      : 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#7DE4FF]/20 bg-[radial-gradient(circle_at_20%_0%,rgba(125,228,255,0.12),transparent_30%),linear-gradient(135deg,rgba(0,16,28,0.94),rgba(0,0,0,0.98))] p-5 shadow-[0_0_46px_rgba(125,228,255,0.055)]">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Pump.fun Buy Gate</p>
+          <h4 className="mt-2 text-2xl font-black text-white">Initial buy review</h4>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/58">
+            Buy is separate from create. Mythos quotes the current bonding curve, prepares unsigned bytes, and still requires wallet signature plus a separate submit confirmation.
+          </p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClass}`}>
+          {buy.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        {[
+          ['Spend', buy.quote.spendLamports ? `${Number(buy.quote.spendLamports) / 1_000_000_000} SOL` : 'not quoted'],
+          ['Min tokens', buy.quote.minTokensOut || 'not quoted'],
+          ['Slippage', `${buy.quote.slippageBps / 100}%`],
+          ['Wire ready', buy.transaction.wireReady ? 'yes' : 'no'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-black/34 p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">{label}</p>
+            <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.85fr]">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Buy gates</p>
+          <div className="mt-3 space-y-2">
+            {buy.gates.map(item => (
+              <div key={item.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-white">{item.label}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                    item.status === 'ready'
+                      ? 'bg-[#14F195]/12 text-[#8CFFD2]'
+                      : item.status === 'blocked'
+                        ? 'bg-[#FF5C7A]/12 text-[#FF8FAB]'
+                        : 'bg-[#FFD166]/12 text-[#FFE08A]'
+                  }`}>
+                    {item.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-white/48">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-[#FFD166]/16 bg-[#FFD166]/8 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE08A]">Quote caveat</p>
+            <p className="mt-3 text-xs leading-5 text-white/58">{buy.quote.caveat}</p>
+          </div>
+          <div className="rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/7 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF9AB1]">Buy execution</p>
+            <p className="mt-3 text-xs leading-5 text-white/58">{buy.transaction.reason}</p>
+            {buy.transaction.wireReady ? (
+              <div className="mt-4 rounded-2xl border border-[#FFD166]/18 bg-[#FFD166]/10 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFE08A]">Wallet signature gate</p>
+                {signedPayload ? (
+                  <div className="mt-3 rounded-xl border border-[#14F195]/16 bg-[#14F195]/8 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8CFFD2]">Buy signed locally</p>
+                    <p className="mt-1 break-all font-mono text-[11px] text-white/58">{signedPayload.signedTransactionHash}</p>
+                    <p className="mt-1 text-[11px] text-white/42">Submitted to Solana: {submittedPayload ? 'true' : 'false'}</p>
+                    {submittedPayload ? (
+                      <div className="mt-3 rounded-xl border border-[#7DE4FF]/18 bg-[#7DE4FF]/10 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9AEAFF]">Buy submitted</p>
+                        <p className="mt-1 break-all font-mono text-[11px] text-white/62">{submittedPayload.signature}</p>
+                        <p className="mt-1 text-[11px] text-white/42">Confirmed: {submittedPayload.confirmed ? 'yes' : 'pending'}</p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/10 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FF9AB1]">Separate submit gate</p>
+                        <input
+                          value={submitConfirmation}
+                          onChange={event => onSubmitConfirmationChange(buy.id, event.target.value)}
+                          className="mt-3 h-10 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-xs font-black uppercase tracking-[0.12em] text-white outline-none placeholder:text-white/20 focus:border-[#FF5C7A]/35"
+                          placeholder="SUBMIT"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => onSubmitSignedBuy(buy)}
+                          disabled={submitConfirmation.trim().toUpperCase() !== 'SUBMIT' || submitting}
+                          className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#FF5C7A]/26 bg-[#FF5C7A]/13 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#FFB0BF] transition hover:bg-[#FF5C7A]/18 disabled:opacity-45"
+                        >
+                          {submitting ? 'Submitting...' : 'Submit signed buy'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onSignBuy(buy)}
+                    className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#FFD166]/24 bg-[#FFD166]/12 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#FFE08A] transition hover:bg-[#FFD166]/18"
+                  >
+                    Sign buy payload
                   </button>
                 )}
               </div>
@@ -2711,6 +2936,7 @@ export default function MythosLabConsole() {
   const [pumpfunSubmitConfirmations, setPumpfunSubmitConfirmations] = useState<Record<string, string>>({});
   const [pumpfunSubmittedPayloads, setPumpfunSubmittedPayloads] = useState<Record<string, MythosPumpfunSubmittedPayload>>({});
   const [pumpfunSubmittingIds, setPumpfunSubmittingIds] = useState<Record<string, boolean>>({});
+  const [pumpfunBuySpendSol, setPumpfunBuySpendSol] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -3426,6 +3652,139 @@ export default function MythosLabConsole() {
       setNotice(error instanceof Error ? error.message : 'Could not submit Pump.fun create transaction.');
     } finally {
       setPumpfunSubmittingIds(current => ({ ...current, [builder.id]: false }));
+    }
+  }
+
+  async function preparePumpfunBuyBuilder(builder: MythosPumpfunUnsignedBuilder, submitted: MythosPumpfunSubmittedPayload) {
+    const started = Date.now();
+    try {
+      const spendSol = Number((pumpfunBuySpendSol[builder.id] || '0.01').replace(',', '.'));
+      const mint = builder.programAudit.bondingCurve ? builder.transaction.requiredSigners?.[1] : null;
+      const response = await fetch('/api/mythos/pumpfun/buy-builder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          createBuilderId: builder.id,
+          createSignature: submitted.signature,
+          mint: mint || builder.transaction.requiredSigners?.[1],
+          walletAddress: builder.signer.walletAddress,
+          spendSol,
+          slippageBps: builder.economics.slippageBps,
+          priorityFeeLamports: builder.economics.priorityFeeLamports,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.buyBuilder) {
+        throw new Error(data?.error || 'Could not prepare Pump.fun buy builder.');
+      }
+      const buyBuilder = data.buyBuilder as MythosPumpfunBuyBuilder;
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: `Pump.fun buy builder ${buyBuilder.id} prepared.\nStatus: ${buyBuilder.status}\nWire ready: ${buyBuilder.transaction.wireReady ? 'yes' : 'no'}\nSpend lamports: ${buyBuilder.quote.spendLamports || 'not quoted'}\nMin tokens out: ${buyBuilder.quote.minTokensOut || 'not quoted'}\nSubmitted to Solana: false`,
+        memecoinBuyBuilder: buyBuilder,
+      };
+      updateActive(session => ({
+        ...session,
+        messages: [...session.messages, assistantMessage],
+        lastTrace: {
+          perception: `Pump.fun buy builder prepared for mint ${buyBuilder.mint || 'unknown'}.`,
+          memoryContext: 'Buy is separate from create and uses the submitted create signature plus current bonding curve quote.',
+          selectedSkill: 'Mythos Memecoin Studio - buy builder',
+          reasoningPath: 'Mythos required create submission, mint, wallet signer, spend cap, bonding curve quote, unsigned bytes, wallet signature, and separate submit.',
+          prediction: 'The user can sign and submit the buy only after reviewing spend, min tokens out, slippage, and quote caveat.',
+          decision: `Return buy builder ${buyBuilder.id}; wireReady=${buyBuilder.transaction.wireReady}.`,
+          confidence: buyBuilder.status === 'blocked' ? 66 : buyBuilder.status === 'needs_review' ? 82 : 91,
+          safetyBoundary: 'No server-side wallet signature, no signed buy stored server-side, no buy submitted automatically.',
+          nextHumanStep: 'Review quote, sign buy payload, then use the separate submit gate if intentional.',
+        },
+        lastObservability: {
+          model: session.model,
+          modelLabel: 'Mythos Pump.fun buy builder',
+          latencyMs: Date.now() - started,
+          mode: session.mode,
+          traceSchema: 'mythos-pumpfun-buy-builder/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      setNotice(`Pump.fun buy builder prepared: ${buyBuilder.id}. No buy signature or submit occurred.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun buy builder.');
+    }
+  }
+
+  async function signPumpfunBuyPayload(buy: MythosPumpfunBuyBuilder) {
+    try {
+      if (!buy.transaction.wireReady || !buy.transaction.serializedUnsignedPayload) {
+        throw new Error('Unsigned Pump.fun buy payload is not wire-ready.');
+      }
+      if (!connected || !publicKey || !signTransaction) {
+        throw new Error('Connect Phantom or Solflare before signing the reviewed buy payload.');
+      }
+      const { VersionedTransaction } = await import('@solana/web3.js');
+      const transaction = VersionedTransaction.deserialize(base64ToBytes(buy.transaction.serializedUnsignedPayload));
+      const walletSigned = await signTransaction(transaction);
+      const signedBytes = walletSigned.serialize();
+      const signedTransactionHash = await sha256Hex(signedBytes);
+      setPumpfunSignedPayloads(current => ({
+        ...current,
+        [buy.id]: {
+          signedAt: nowIso(),
+          signedTransactionBase64: bytesToBase64(signedBytes),
+          signedTransactionHash,
+          signerCount: walletSigned.signatures.length,
+          storedInBrowserMemory: true,
+          submittedToSolana: false,
+        },
+      }));
+      setNotice(`Pump.fun buy payload signed in browser memory: ${signedTransactionHash.slice(0, 12)}... No buy was submitted.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not sign Pump.fun buy payload.');
+    }
+  }
+
+  async function submitPumpfunSignedBuy(buy: MythosPumpfunBuyBuilder) {
+    const confirmation = pumpfunSubmitConfirmations[buy.id]?.trim().toUpperCase();
+    try {
+      if (confirmation !== 'SUBMIT') {
+        throw new Error('Type SUBMIT before sending the signed Pump.fun buy transaction.');
+      }
+      const signedPayload = pumpfunSignedPayloads[buy.id];
+      if (!signedPayload?.signedTransactionBase64) {
+        throw new Error('Signed buy transaction is not available in browser memory.');
+      }
+      setPumpfunSubmittingIds(current => ({ ...current, [buy.id]: true }));
+      const signature = await connection.sendRawTransaction(base64ToBytes(signedPayload.signedTransactionBase64), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+      let confirmed = false;
+      try {
+        const latest = await connection.getLatestBlockhash('confirmed');
+        const result = await connection.confirmTransaction({
+          signature,
+          blockhash: latest.blockhash,
+          lastValidBlockHeight: latest.lastValidBlockHeight,
+        }, 'confirmed');
+        confirmed = !result.value.err;
+      } catch {
+        confirmed = false;
+      }
+      setPumpfunSubmittedPayloads(current => ({
+        ...current,
+        [buy.id]: {
+          submittedAt: nowIso(),
+          signature,
+          confirmed,
+          submittedFromBrowser: true,
+        },
+      }));
+      setNotice(`Pump.fun buy transaction submitted from browser: ${signature}. Confirmation: ${confirmed ? 'confirmed' : 'pending'}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not submit Pump.fun buy transaction.');
+    } finally {
+      setPumpfunSubmittingIds(current => ({ ...current, [buy.id]: false }));
     }
   }
 
@@ -4375,11 +4734,26 @@ export default function MythosLabConsole() {
                             builder={message.memecoinUnsignedBuilder}
                             signedPayload={pumpfunSignedPayloads[message.memecoinUnsignedBuilder.id]}
                             submittedPayload={pumpfunSubmittedPayloads[message.memecoinUnsignedBuilder.id]}
+                            buySpendSol={pumpfunBuySpendSol[message.memecoinUnsignedBuilder.id] || '0.01'}
                             submitConfirmation={pumpfunSubmitConfirmations[message.memecoinUnsignedBuilder.id] || ''}
                             submitting={Boolean(pumpfunSubmittingIds[message.memecoinUnsignedBuilder.id])}
                             onSignCreate={signPumpfunCreatePayload}
+                            onBuySpendChange={(builderId, value) => setPumpfunBuySpendSol(current => ({ ...current, [builderId]: value }))}
+                            onPrepareBuy={preparePumpfunBuyBuilder}
                             onSubmitConfirmationChange={(builderId, value) => setPumpfunSubmitConfirmations(current => ({ ...current, [builderId]: value }))}
                             onSubmitSignedCreate={submitPumpfunSignedCreate}
+                          />
+                        ) : null}
+                        {message.memecoinBuyBuilder ? (
+                          <MythosPumpfunBuyBuilderCard
+                            buy={message.memecoinBuyBuilder}
+                            signedPayload={pumpfunSignedPayloads[message.memecoinBuyBuilder.id]}
+                            submittedPayload={pumpfunSubmittedPayloads[message.memecoinBuyBuilder.id]}
+                            submitConfirmation={pumpfunSubmitConfirmations[message.memecoinBuyBuilder.id] || ''}
+                            submitting={Boolean(pumpfunSubmittingIds[message.memecoinBuyBuilder.id])}
+                            onSignBuy={signPumpfunBuyPayload}
+                            onSubmitConfirmationChange={(builderId, value) => setPumpfunSubmitConfirmations(current => ({ ...current, [builderId]: value }))}
+                            onSubmitSignedBuy={submitPumpfunSignedBuy}
                           />
                         ) : null}
                         {!message.cryptoReport
@@ -4390,7 +4764,8 @@ export default function MythosLabConsole() {
                           && !message.memecoinMetadataReview
                           && !message.memecoinUnsignedPreview
                           && !message.memecoinPayloadAudit
-                          && !message.memecoinUnsignedBuilder ? (
+                          && !message.memecoinUnsignedBuilder
+                          && !message.memecoinBuyBuilder ? (
                           <p className="whitespace-pre-wrap">{message.content}</p>
                         ) : null}
                         {message.htmlArtifact ? (
