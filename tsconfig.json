@@ -38,7 +38,9 @@
   ],
   "exclude": [
     "node_modules",
+    ".tmp",
     "examples",
-    "skills"
+    "skills",
+    "zk-artifacts"
   ]
 }

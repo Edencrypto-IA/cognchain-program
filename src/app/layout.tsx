@@ -1,20 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "@/styles/dashboards.css";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import { Toaster } from "@/components/ui/toaster";
 import AppProviders from "@/components/providers/app-providers";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "CONGCHAIN — Verifiable AI Memory Layer",
@@ -34,8 +23,13 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ backgroundColor: '#06060e', color: '#f0f0f5' }}
+        className="antialiased"
+        style={{
+          backgroundColor: '#06060e',
+          color: '#f0f0f5',
+          '--font-geist-sans': 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          '--font-geist-mono': '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
+        } as React.CSSProperties}
       >
         <AppProviders>
           {children}

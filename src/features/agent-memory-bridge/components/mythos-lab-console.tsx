@@ -319,6 +319,39 @@ type MythosPumpfunUnsignedBuilder = {
   blockedActions: string[];
 };
 
+type MythosPumpfunBuilderReadiness = {
+  status: 'ready_for_unsigned_bytes' | 'needs_review' | 'blocked';
+  provider: {
+    configured: boolean;
+    mode: 'disabled' | 'official_audit' | 'server_unsigned';
+    reason: string;
+  };
+  transaction: {
+    unsignedBytesEnabled: boolean;
+    localSerializerImplemented: boolean;
+    walletSignatureRequired: true;
+    submissionRequiresSeparateAction: true;
+  };
+  gates: Array<{
+    id: string;
+    label: string;
+    status: 'ready' | 'review' | 'blocked';
+    detail: string;
+  }>;
+  counts: {
+    ready: number;
+    review: number;
+    blocked: number;
+  };
+  safety: {
+    canCreateUnsignedBytes: boolean;
+    canOpenWalletSignature: boolean;
+    canSubmitTransaction: boolean;
+    canMoveFunds: boolean;
+    note: string;
+  };
+};
+
 type MythosCognitiveTrace = {
   perception?: string;
   memoryContext?: string;
@@ -2418,6 +2451,84 @@ function MythosPumpfunUnsignedBuilderCard({ builder }: { builder: MythosPumpfunU
   );
 }
 
+function MythosPumpfunReadinessCard({
+  readiness,
+  loading,
+  error,
+  onRefresh,
+}: {
+  readiness: MythosPumpfunBuilderReadiness | null;
+  loading: boolean;
+  error: string;
+  onRefresh: () => void;
+}) {
+  const blocked = readiness?.counts.blocked ?? 0;
+  const status = readiness?.status || (loading ? 'checking' : 'unavailable');
+  const canCreateBytes = Boolean(readiness?.safety.canCreateUnsignedBytes);
+  const topBlockedGates = readiness?.gates.filter(gate => gate.status === 'blocked').slice(0, 4) || [];
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-[24px] border border-[#FF5C7A]/20 bg-[linear-gradient(135deg,rgba(255,92,122,0.10),rgba(0,0,0,0.52)),radial-gradient(circle_at_90%_0%,rgba(118,255,3,0.10),transparent_30%)] p-4 shadow-[0_0_36px_rgba(255,92,122,0.055)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF9AB1]">Pump.fun safety gate</p>
+          <h3 className="mt-2 text-xl font-black text-white">Server readiness is {status.replace(/_/g, ' ')}</h3>
+          <p className="mt-2 max-w-2xl text-xs leading-5 text-white/54">
+            Mythos can draft and audit the launch flow, but token creation, wallet signature, buying, submission, and fund movement remain disabled.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-white/58 transition hover:border-[#A7FF3D]/24 hover:text-[#A7FF3D] disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+          Refresh
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-4">
+        {[
+          ['Unsigned bytes', canCreateBytes ? 'enabled' : 'blocked'],
+          ['Wallet signature', readiness?.safety.canOpenWalletSignature ? 'enabled' : 'blocked'],
+          ['Submit tx', readiness?.safety.canSubmitTransaction ? 'enabled' : 'blocked'],
+          ['Move funds', readiness?.safety.canMoveFunds ? 'enabled' : 'blocked'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/8 bg-black/30 p-3">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">{label}</p>
+            <p className={`mt-1 text-sm font-black ${value === 'blocked' ? 'text-[#FF9AB1]' : 'text-[#8CFFD2]'}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {error ? (
+        <p className="mt-3 rounded-2xl border border-[#FFD166]/18 bg-[#FFD166]/10 p-3 text-xs leading-5 text-[#FFE08A]">{error}</p>
+      ) : null}
+
+      {readiness ? (
+        <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1fr]">
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/38">Gate counts</p>
+            <p className="mt-2 text-sm font-black text-white">
+              {readiness.counts.ready} ready / {readiness.counts.review} review / {blocked} blocked
+            </p>
+            <p className="mt-2 text-[11px] leading-4 text-white/45">{readiness.provider.reason}</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {topBlockedGates.map(gate => (
+              <div key={gate.id} className="rounded-2xl border border-[#FF5C7A]/14 bg-[#FF5C7A]/7 p-3">
+                <p className="text-xs font-black text-white">{gate.label}</p>
+                <p className="mt-1 text-[11px] leading-4 text-white/48">{gate.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function makeSession(): MythosLabSession {
   const createdAt = nowIso();
   return {
@@ -2473,6 +2584,9 @@ export default function MythosLabConsole() {
   const [proAccessUnlocked, setProAccessUnlocked] = useState(false);
   const [proAccessLoading, setProAccessLoading] = useState(false);
   const [proAccessError, setProAccessError] = useState('');
+  const [pumpfunReadiness, setPumpfunReadiness] = useState<MythosPumpfunBuilderReadiness | null>(null);
+  const [pumpfunReadinessLoading, setPumpfunReadinessLoading] = useState(false);
+  const [pumpfunReadinessError, setPumpfunReadinessError] = useState('');
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -2506,6 +2620,28 @@ export default function MythosLabConsole() {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.slice(0, 8)));
     }
   }, [sessions]);
+
+  async function refreshPumpfunReadiness() {
+    setPumpfunReadinessLoading(true);
+    setPumpfunReadinessError('');
+
+    try {
+      const response = await fetch('/api/mythos/pumpfun/builder-readiness', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !data?.readiness) {
+        throw new Error(data?.error || 'Could not load Pump.fun readiness.');
+      }
+      setPumpfunReadiness(data.readiness as MythosPumpfunBuilderReadiness);
+    } catch (error) {
+      setPumpfunReadinessError(error instanceof Error ? error.message : 'Could not load Pump.fun readiness.');
+    } finally {
+      setPumpfunReadinessLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshPumpfunReadiness();
+  }, []);
 
   const activeSession = sessions.find(session => session.id === activeId) || sessions[0];
   const selectedSkill =
@@ -3945,6 +4081,12 @@ export default function MythosLabConsole() {
 
           <div className="relative flex flex-1 flex-col overflow-y-auto px-4 pb-4 sm:px-6">
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+              <MythosPumpfunReadinessCard
+                readiness={pumpfunReadiness}
+                loading={pumpfunReadinessLoading}
+                error={pumpfunReadinessError}
+                onRefresh={() => void refreshPumpfunReadiness()}
+              />
               <div className={`flex flex-1 flex-col ${hasConversation ? 'justify-start pt-6' : 'justify-center'}`}>
                 {!hasConversation ? (
                   <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">

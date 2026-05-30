@@ -44,7 +44,22 @@ const eslintConfig = [...compat.extends("next/core-web-vitals", "next/typescript
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  files: ["server.js"],
+  rules: {
+    "@typescript-eslint/no-require-imports": "off",
+  },
+}, {
+  ignores: [
+    "node_modules/**",
+    ".next/**",
+    ".tmp/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "examples/**",
+    "skills",
+    "zk-artifacts/**"
+  ]
 }];
 
 export default eslintConfig;
