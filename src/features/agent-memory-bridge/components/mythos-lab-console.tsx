@@ -14,6 +14,7 @@ import {
   LogOut,
   Loader2,
   Network,
+  Paperclip,
   Plus,
   Radar,
   Save,
@@ -23,6 +24,7 @@ import {
   TerminalSquare,
   Trash2,
   Wallet,
+  X,
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
@@ -38,6 +40,7 @@ type MythosLabMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: string;
+  attachments?: MythosLabAttachment[];
   htmlArtifact?: {
     title: string;
     html: string;
@@ -59,6 +62,17 @@ type MythosLabMessage = {
   readUrl?: string;
   verifyUrl?: string;
   proofUrl?: string;
+};
+
+type MythosLabAttachment = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  kind: 'image' | 'text' | 'pdf' | 'other';
+  text?: string;
+  dataUrl?: string;
+  note?: string;
 };
 
 type MythosMemecoinDraft = {
@@ -3026,6 +3040,97 @@ function bytesToBase64(bytes: Uint8Array) {
   return window.btoa(binary);
 }
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function isTextLikeFile(file: File) {
+  const name = file.name.toLowerCase();
+  return file.type.startsWith('text/') ||
+    /\.(txt|md|csv|json|log|xml|html|css|js|jsx|ts|tsx|py|rs|go|sol|toml|yaml|yml|env)$/i.test(name);
+}
+
+async function extractPdfText(file: File) {
+  const buffer = await file.arrayBuffer();
+  const raw = new TextDecoder('latin1').decode(buffer);
+  const fragments = [...raw.matchAll(/\(([^()]{8,400})\)/g)]
+    .map(match => match[1])
+    .join(' ')
+    .replace(/\\[nrtd]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return fragments.slice(0, 16_000);
+}
+
+async function readMythosAttachment(file: File): Promise<MythosLabAttachment> {
+  const base = {
+    id: createId('att'),
+    name: file.name,
+    type: file.type || 'application/octet-stream',
+    size: file.size,
+  };
+
+  if (file.type.startsWith('image/')) {
+    return {
+      ...base,
+      kind: 'image',
+      dataUrl: await fileToDataUrl(file),
+      note: 'Image attached for visual analysis when the selected model route supports vision.',
+    };
+  }
+
+  if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+    const text = await extractPdfText(file);
+    return {
+      ...base,
+      kind: 'pdf',
+      text,
+      note: text
+        ? 'PDF text was extracted with a basic browser parser. Verify against the original file for critical use.'
+        : 'PDF attached, but no readable text was extracted by the browser parser.',
+    };
+  }
+
+  if (isTextLikeFile(file)) {
+    const text = (await file.text()).slice(0, 20_000);
+    return {
+      ...base,
+      kind: 'text',
+      text,
+      note: text.length >= 20_000 ? 'Text was truncated to 20,000 characters for safe analysis.' : 'Text extracted in browser.',
+    };
+  }
+
+  return {
+    ...base,
+    kind: 'other',
+    note: 'File metadata attached. This type is not readable yet; convert to text, image, or PDF for deeper analysis.',
+  };
+}
+
+function formatAttachmentContext(attachments: MythosLabAttachment[]) {
+  if (!attachments.length) return '';
+
+  return [
+    'Attached file context:',
+    ...attachments.map((attachment, index) => [
+      `File ${index + 1}: ${attachment.name}`,
+      `Type: ${attachment.type}`,
+      `Kind: ${attachment.kind}`,
+      `Size: ${attachment.size} bytes`,
+      attachment.note ? `Note: ${attachment.note}` : '',
+      attachment.text ? `Extracted text:\n${attachment.text}` : '',
+      attachment.kind === 'image' ? 'Image data was attached for multimodal routes; if this model cannot see images, say that clearly.' : '',
+    ].filter(Boolean).join('\n')),
+  ].join('\n\n');
+}
+
 async function sha256Hex(bytes: Uint8Array) {
   const digest = await window.crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -3038,6 +3143,7 @@ export default function MythosLabConsole() {
   const [sessions, setSessions] = useState<MythosLabSession[]>([]);
   const [activeId, setActiveId] = useState('');
   const [input, setInput] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<MythosLabAttachment[]>([]);
   const [apiKey, setApiKey] = useState('');
   const [pendingSaveMessageId, setPendingSaveMessageId] = useState('');
   const [savingMemoryId, setSavingMemoryId] = useState('');
@@ -3203,6 +3309,7 @@ export default function MythosLabConsole() {
     setSessions(current => [session, ...current].slice(0, 8));
     setActiveId(session.id);
     setInput('');
+    setPendingAttachments([]);
     setNotice('');
     setPendingSaveMessageId('');
   }
@@ -3223,6 +3330,7 @@ export default function MythosLabConsole() {
     setSessions([session]);
     setActiveId(session.id);
     setInput('');
+    setPendingAttachments([]);
     setNotice('');
     setPendingSaveMessageId('');
   }
@@ -4027,6 +4135,30 @@ export default function MythosLabConsole() {
     return data as MythosSkillRouteResult;
   }
 
+  async function attachFiles(files: FileList | null) {
+    if (!files?.length) return;
+
+    const incoming = Array.from(files).slice(0, Math.max(0, 4 - pendingAttachments.length));
+    if (!incoming.length) {
+      setNotice('Mythos aceita ate 4 anexos por mensagem.');
+      return;
+    }
+
+    try {
+      const oversized = incoming.find(file => file.size > 8 * 1024 * 1024);
+      if (oversized) {
+        setNotice(`${oversized.name} passa de 8 MB. Use um arquivo menor para analise.`);
+        return;
+      }
+
+      const parsed = await Promise.all(incoming.map(readMythosAttachment));
+      setPendingAttachments(current => [...current, ...parsed].slice(0, 4));
+      setNotice(`${parsed.length} arquivo(s) anexado(s). Envie a mensagem para o Mythos analisar.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Nao foi possivel ler o arquivo anexado.');
+    }
+  }
+
   async function runTerminalCommand(content: string, nextMessages: MythosLabMessage[], started: number) {
     const command = content.trim();
     const lower = command.toLowerCase();
@@ -4485,8 +4617,11 @@ export default function MythosLabConsole() {
 
   async function sendMessage(prompt?: string) {
     if (!activeSession || loading) return;
-    const content = (prompt || input).trim();
+    const attachments = prompt ? [] : pendingAttachments;
+    const content = (prompt || input).trim() || (attachments.length ? 'Analise os arquivos anexados.' : '');
     if (!content) return;
+    const attachmentContext = formatAttachmentContext(attachments);
+    const contentForModel = attachmentContext ? `${content}\n\n${attachmentContext}` : content;
 
     const createdAt = nowIso();
     const userMessage: MythosLabMessage = {
@@ -4494,6 +4629,7 @@ export default function MythosLabConsole() {
       role: 'user',
       content,
       createdAt,
+      attachments,
     };
     const nextMessages = [...activeSession.messages, userMessage];
     updateActive(session => ({
@@ -4505,6 +4641,7 @@ export default function MythosLabConsole() {
       updatedAt: createdAt,
     }));
     setInput('');
+    setPendingAttachments([]);
     setLoading(true);
     setNotice('');
 
@@ -4515,7 +4652,7 @@ export default function MythosLabConsole() {
         return;
       }
 
-      const route = await routeSkillForPrompt(content);
+      const route = await routeSkillForPrompt(contentForModel);
       const routedSkill =
         MYTHOS_FEATURED_SKILLS.find(skill => skill.id === route.selectedSkill.id) ||
         selectedSkill;
@@ -4537,7 +4674,13 @@ export default function MythosLabConsole() {
           skillPath: routedSkill?.path,
           messages: nextMessages
             .filter(message => message.role !== 'system')
-            .map(message => ({ role: message.role, content: message.content })),
+            .map(message => ({
+              role: message.role,
+              content: message.attachments?.length
+                ? `${message.content}\n\n${formatAttachmentContext(message.attachments)}`
+                : message.content,
+              attachments: message.attachments,
+            })),
         }),
       });
       const data = await response.json();
@@ -4920,6 +5063,20 @@ export default function MythosLabConsole() {
                         <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-white/32">
                           {message.role === 'user' ? 'You' : 'Mythos'}
                         </p>
+                        {message.attachments?.length ? (
+                          <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                            {message.attachments.map(attachment => (
+                              <div key={attachment.id} className="overflow-hidden rounded-2xl border border-white/10 bg-black/28 p-3">
+                                {attachment.kind === 'image' && attachment.dataUrl ? (
+                                  <img src={attachment.dataUrl} alt={attachment.name} className="mb-3 h-32 w-full rounded-xl object-cover" />
+                                ) : null}
+                                <p className="truncate text-xs font-black text-white">{attachment.name}</p>
+                                <p className="mt-1 text-[11px] text-white/42">{attachment.kind} - {(attachment.size / 1024).toFixed(1)} KB</p>
+                                {attachment.note ? <p className="mt-2 text-[11px] leading-4 text-white/45">{attachment.note}</p> : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
                         {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
                         {message.solanaReport ? <MythosSolanaReportCard report={message.solanaReport} /> : null}
                         {message.solanaAnalysis ? <MythosSolanaAnalysisCard data={message.solanaAnalysis} /> : null}
@@ -5084,6 +5241,33 @@ export default function MythosLabConsole() {
               <footer className="sticky bottom-0 pb-4 pt-3">
                 <div className="mx-auto w-full max-w-3xl">
                   <div className="rounded-[28px] border border-[#76FF03]/28 bg-black/62 p-4 shadow-[0_0_34px_rgba(118,255,3,0.045)] backdrop-blur-xl">
+                    {pendingAttachments.length ? (
+                      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                        {pendingAttachments.map(attachment => (
+                          <div key={attachment.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-2">
+                            {attachment.kind === 'image' && attachment.dataUrl ? (
+                              <img src={attachment.dataUrl} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                            ) : (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#76FF03]/18 bg-[#76FF03]/8">
+                                <Paperclip className="h-4 w-4 text-[#A7FF3D]" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-black text-white">{attachment.name}</p>
+                              <p className="text-[11px] text-white/42">{attachment.kind} - {(attachment.size / 1024).toFixed(1)} KB</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setPendingAttachments(current => current.filter(item => item.id !== attachment.id))}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
+                              aria-label={`Remove ${attachment.name}`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                     <textarea
                       value={input}
                       onChange={event => setInput(event.target.value)}
@@ -5098,17 +5282,23 @@ export default function MythosLabConsole() {
                       className="w-full resize-none bg-transparent px-2 text-base leading-7 text-white outline-none placeholder:text-white/34"
                     />
                     <div className="flex items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
-                        aria-label="Attach context"
-                      >
-                        <KeyRound className="h-4 w-4" />
-                      </button>
+                      <label className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white" aria-label="Attach file for analysis">
+                        <Paperclip className="h-4 w-4" />
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,.pdf,.txt,.md,.csv,.json,.log,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.rs,.go,.sol,.toml,.yaml,.yml"
+                          className="hidden"
+                          onChange={event => {
+                            void attachFiles(event.target.files);
+                            event.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={() => sendMessage()}
-                        disabled={!input.trim() || loading}
+                        disabled={(!input.trim() && pendingAttachments.length === 0) || loading}
                         className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/85 text-black transition hover:bg-[#A7FF3D] disabled:cursor-not-allowed disabled:opacity-45"
                         aria-label="Send message to Mythos"
                       >

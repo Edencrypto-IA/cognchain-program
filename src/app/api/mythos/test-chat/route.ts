@@ -20,6 +20,12 @@ const MYTHOS_TEST_SYSTEM = [
 type MythosTestMessage = {
   role: 'user' | 'assistant';
   content: string;
+  attachments?: Array<{
+    kind?: string;
+    name?: string;
+    type?: string;
+    dataUrl?: string;
+  }>;
 };
 
 type MythosTestBody = {
@@ -174,6 +180,57 @@ async function callNvidiaLabRoute(routeId: string | undefined, messages: MythosT
   };
 }
 
+async function callOpenAIVisionRoute(messages: MythosTestMessage[], systemPrompt: string) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY nao esta configurada para analise visual no Mythos Lab.');
+  }
+
+  const client = new OpenAI({ apiKey });
+  const model = process.env.OPENAI_VISION_MODEL || 'gpt-4o-mini';
+  const response = await client.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(message => {
+        const images = (message.attachments || [])
+          .filter(attachment => attachment.kind === 'image' && typeof attachment.dataUrl === 'string' && attachment.dataUrl.startsWith('data:image/'))
+          .slice(0, 4);
+
+        if (message.role === 'user' && images.length) {
+          return {
+            role: 'user' as const,
+            content: [
+              { type: 'text' as const, text: message.content },
+              ...images.map(image => ({
+                type: 'image_url' as const,
+                image_url: {
+                  url: image.dataUrl!,
+                  detail: 'auto' as const,
+                },
+              })),
+            ],
+          };
+        }
+
+        return {
+          role: message.role,
+          content: message.content,
+        };
+      }),
+    ],
+    max_tokens: 1000,
+    temperature: 0.35,
+  });
+
+  return {
+    content: response.choices[0]?.message?.content || 'Sem resposta da rota visual OpenAI.',
+    model: 'gpt',
+    modelLabel: `OpenAI Vision · ${model}`,
+    providerModel: model,
+  };
+}
+
 function buildCognitiveTrace(messages: MythosTestMessage[], model: string, selectedSkillInput?: string, modelLabel?: string): MythosCognitiveTrace {
   const latest = messages[messages.length - 1]?.content || '';
   const selectedSkill = selectedSkillInput?.trim() || inferSkill(latest);
@@ -210,12 +267,23 @@ function sanitizeMessages(messages: unknown): MythosTestMessage[] {
     const content = typeof item.content === 'string'
       ? item.content.slice(0, Limits.MAX_PROMPT_LENGTH)
       : '';
+    const attachments = Array.isArray(item.attachments)
+      ? item.attachments.slice(0, 4).map(attachment => {
+        const raw = attachment as Partial<NonNullable<MythosTestMessage['attachments']>[number]>;
+        return {
+          kind: typeof raw.kind === 'string' ? raw.kind : '',
+          name: typeof raw.name === 'string' ? raw.name.slice(0, 160) : '',
+          type: typeof raw.type === 'string' ? raw.type.slice(0, 120) : '',
+          dataUrl: typeof raw.dataUrl === 'string' && raw.dataUrl.length <= 8_500_000 ? raw.dataUrl : undefined,
+        };
+      })
+      : undefined;
 
     if (!content.trim()) {
       throw new Error('Mensagem vazia nao pode ser enviada ao terminal Mythos.');
     }
 
-    return { role, content };
+    return { role, content, attachments };
   });
 }
 
@@ -248,9 +316,15 @@ export async function POST(request: NextRequest) {
         ...messages,
       ];
 
-    const result = model === 'nvidia'
-      ? await callNvidiaLabRoute(body.nvidiaModelRoute, modelMessages, `Voce sao o agente "Mythos". ${MYTHOS_TEST_SYSTEM}`)
-      : await callModel({
+    const hasImageAttachment = messages.some(message =>
+      message.attachments?.some(attachment => attachment.kind === 'image' && attachment.dataUrl?.startsWith('data:image/'))
+    );
+
+    const result = hasImageAttachment
+      ? await callOpenAIVisionRoute(modelMessages, `Voce e o agente "Mythos". ${MYTHOS_TEST_SYSTEM} Analise imagens anexadas apenas pelo que for visualmente observavel; se algo nao estiver claro, diga que nao consegue confirmar.`)
+      : model === 'nvidia'
+        ? await callNvidiaLabRoute(body.nvidiaModelRoute, modelMessages, `Voce sao o agente "Mythos". ${MYTHOS_TEST_SYSTEM}`)
+        : await callModel({
           model,
           messages: modelMessages,
           systemPrompt: MYTHOS_TEST_SYSTEM,
