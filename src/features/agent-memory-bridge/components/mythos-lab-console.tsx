@@ -1856,15 +1856,13 @@ function MythosSolanaReportCard({ report }: { report: MythosSolanaEcosystemRepor
 function MythosMemecoinDraftCard({
   draft,
   onConnectWallet,
-  onArmLaunchReview,
   onCopyLaunchBrief,
-  onPrepareProposal,
+  onSimpleLaunch,
 }: {
   draft: MythosMemecoinDraft;
   onConnectWallet: () => void;
-  onArmLaunchReview: (draft: MythosMemecoinDraft) => void;
   onCopyLaunchBrief: (draft: MythosMemecoinDraft) => void;
-  onPrepareProposal: (draft: MythosMemecoinDraft) => void;
+  onSimpleLaunch: (draft: MythosMemecoinDraft) => void;
 }) {
   const [editableDraft, setEditableDraft] = useState(draft);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState('');
@@ -1965,6 +1963,28 @@ function MythosMemecoinDraftCard({
     if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
     setLogoPreviewUrl(URL.createObjectURL(file));
     setLogoFileName(file.name);
+  }
+
+  function completeWithMythos() {
+    const seeds = [
+      ['Neon Penguin', 'NPENG', 'A sharp green-black Solana meme built around a neon penguin mascot, fast community jokes, and transparent launch review.'],
+      ['Zeus Cat', 'ZCAT', 'A lightning-charged Solana meme with a mythic cat mascot, playful culture, and creator-owned visual identity.'],
+      ['Mito Frog', 'MITO', 'A CongChain-native meme concept with a bright green frog mascot, Mythos lore, and a clean community-first launch story.'],
+      ['Orbit Dog', 'ODOG', 'A space-dog Solana meme with premium black-green branding, simple lore, and a safe human-reviewed launch path.'],
+    ];
+    const [name, symbol, description] = seeds[Math.floor(Math.random() * seeds.length)];
+    const nextName = editableDraft.name === 'Untitled Meme' ? name : editableDraft.name;
+    const nextSymbol = editableDraft.symbol === 'UNTITL' || editableDraft.symbol === 'MEME' ? symbol : editableDraft.symbol;
+
+    updateEditableDraft({
+      name: nextName,
+      symbol: nextSymbol,
+      description: editableDraft.description.length < 24 ? description : editableDraft.description,
+      imagePrompt: editableDraft.imagePrompt.length < 24
+        ? `Premium green-black Solana meme logo for ${nextName}, bold mascot, clean circular icon, high contrast, launch-ready branding.`
+        : editableDraft.imagePrompt,
+      initialBuySol: editableDraft.initialBuySol > 0 ? editableDraft.initialBuySol : 0.01,
+    });
   }
 
   const statusTone = editableDraft.walletReady ? 'Ready for review' : 'Wallet needed';
@@ -2122,18 +2142,17 @@ function MythosMemecoinDraftCard({
             </button>
             <button
               type="button"
-              onClick={() => onArmLaunchReview(editableDraft)}
-              disabled={!editableDraft.walletReady}
+              onClick={completeWithMythos}
               className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#76FF03]/22 bg-[#76FF03]/12 px-3 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#B8FF5C] transition hover:bg-[#76FF03]/18 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.035] disabled:text-white/30"
             >
-              Arm launch review
+              Mythos complete
             </button>
             <button
               type="button"
-              onClick={() => onPrepareProposal(editableDraft)}
+              onClick={() => onSimpleLaunch(editableDraft)}
               className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#7DE4FF]/20 bg-[#7DE4FF]/9 px-3 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/14"
             >
-              Prepare proposal
+              Generate and launch
             </button>
           </div>
 
@@ -3870,6 +3889,198 @@ export default function MythosLabConsole() {
     }
   }
 
+  async function simplePumpfunLaunch(draft: MythosMemecoinDraft) {
+    const started = Date.now();
+    try {
+      if (!draft.walletReady || !draft.walletAddress) {
+        throw new Error('Connect Phantom or Solflare before Mythos prepares the Pump.fun launch.');
+      }
+      if (!draft.initialBuySol || draft.initialBuySol <= 0) {
+        throw new Error('Choose the initial buy amount before launching. Mythos will not choose that value for you.');
+      }
+
+      setNotice('Mythos is generating the memecoin launch package...');
+
+      const proposalResponse = await fetch('/api/mythos/pumpfun/launch-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: draft.name,
+          symbol: draft.symbol,
+          description: draft.description,
+          imagePrompt: draft.imagePrompt,
+          initialBuySol: draft.initialBuySol,
+          walletAddress: draft.walletAddress,
+        }),
+      });
+      const proposalData = await proposalResponse.json();
+      if (!proposalResponse.ok || !proposalData?.proposal) {
+        throw new Error(proposalData?.error || 'Could not prepare Pump.fun proposal.');
+      }
+      const proposal = proposalData.proposal as MythosPumpfunLaunchProposal;
+
+      const metadataResponse = await fetch('/api/mythos/pumpfun/metadata-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: proposal.id,
+          name: proposal.token.name,
+          symbol: proposal.token.symbol,
+          description: proposal.token.description,
+          imagePrompt: proposal.token.imagePrompt,
+          walletAddress: proposal.wallet.address,
+        }),
+      });
+      const metadataData = await metadataResponse.json();
+      if (!metadataResponse.ok || !metadataData?.metadataReview) {
+        throw new Error(metadataData?.error || 'Could not prepare metadata review.');
+      }
+      const metadataReview = metadataData.metadataReview as MythosPumpfunMetadataReview;
+
+      const previewResponse = await fetch('/api/mythos/pumpfun/unsigned-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: metadataReview.proposalId,
+          metadataReviewId: metadataReview.id,
+          metadataHash: metadataReview.metadataHash,
+          name: metadataReview.token.name,
+          symbol: metadataReview.token.symbol,
+          walletAddress: metadataReview.wallet.address,
+          initialBuySol: proposal.firstBuy.amountSol,
+        }),
+      });
+      const previewData = await previewResponse.json();
+      if (!previewResponse.ok || !previewData?.unsignedPreview) {
+        throw new Error(previewData?.error || 'Could not prepare unsigned preview.');
+      }
+      const preview = previewData.unsignedPreview as MythosPumpfunUnsignedPreview;
+      const metadataUri = makePumpfunMetadataPreviewUrl({
+        name: proposal.token.name,
+        symbol: proposal.token.symbol,
+        description: proposal.token.description,
+        imagePrompt: proposal.token.imagePrompt,
+        hash: metadataReview.metadataHash,
+      });
+
+      const auditResponse = await fetch('/api/mythos/pumpfun/payload-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unsignedPreviewId: preview.id,
+          proposalId: preview.proposalId,
+          metadataReviewId: preview.metadataReviewId,
+          metadataHash: preview.token.metadataHash,
+          metadataUri,
+          name: preview.token.name,
+          symbol: preview.token.symbol,
+          walletAddress: preview.signer.walletAddress,
+          firstBuySol: preview.firstBuy.amountSol,
+          slippageBps: 500,
+          priorityFeeLamports: 0,
+        }),
+      });
+      const auditData = await auditResponse.json();
+      if (!auditResponse.ok || !auditData?.payloadAudit) {
+        throw new Error(auditData?.error || 'Could not audit Pump.fun payload.');
+      }
+      const payloadAudit = auditData.payloadAudit as MythosPumpfunPayloadAudit;
+
+      const { Keypair } = await import('@solana/web3.js');
+      const mintKeypair = Keypair.generate();
+      const mintPublicKey = mintKeypair.publicKey.toBase58();
+      const builderResponse = await fetch('/api/mythos/pumpfun/unsigned-builder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payloadAuditId: payloadAudit.id,
+          payloadHash: payloadAudit.payloadHash,
+          metadataUri: payloadAudit.token.metadataUri,
+          name: payloadAudit.token.name,
+          symbol: payloadAudit.token.symbol,
+          walletAddress: payloadAudit.signer.walletAddress,
+          mintPublicKey,
+          firstBuySol: 0,
+          slippageBps: payloadAudit.economics.slippageBps,
+          priorityFeeLamports: payloadAudit.economics.priorityFeeLamports,
+        }),
+      });
+      const builderData = await builderResponse.json();
+      if (!builderResponse.ok || !builderData?.unsignedBuilder) {
+        throw new Error(builderData?.error || 'Could not prepare Pump.fun builder.');
+      }
+      const unsignedBuilder = builderData.unsignedBuilder as MythosPumpfunUnsignedBuilder;
+
+      if (unsignedBuilder.transaction.wireReady) {
+        setPumpfunMintSecrets(current => ({
+          ...current,
+          [unsignedBuilder.id]: Array.from(mintKeypair.secretKey),
+        }));
+      }
+      setPumpfunBuySpendSol(current => ({
+        ...current,
+        [unsignedBuilder.id]: String(draft.initialBuySol),
+      }));
+
+      const assistantMessage: MythosLabMessage = {
+        id: createId('msg'),
+        role: 'assistant',
+        createdAt: nowIso(),
+        content: cleanTerminalText([
+          terminalSection('Intent', `Simple Pump.fun launch package for ${unsignedBuilder.token.name} (${unsignedBuilder.token.symbol}).`),
+          terminalSection('Decision', unsignedBuilder.transaction.wireReady
+            ? 'Create-only transaction is ready for Phantom/Solflare signature. Initial buy is queued for the next separate buy quote after create submit.'
+            : 'Launch package was generated, but one or more builder gates still block transaction bytes.'),
+          terminalSection('User-controlled fields', [
+            `Name: ${draft.name}`,
+            `Ticker: ${draft.symbol}`,
+            `Initial buy: ${draft.initialBuySol} SOL`,
+            `Wallet: ${draft.walletAddress}`,
+          ]),
+          terminalSection('Safety boundary', [
+            'Mythos generated and prepared the launch package.',
+            'Mythos did not sign.',
+            'Mythos did not submit.',
+            'Mythos did not buy.',
+            'Only Phantom/Solflare approval can continue.',
+          ]),
+        ].join('\n\n')),
+        memecoinUnsignedBuilder: unsignedBuilder,
+      };
+
+      updateActive(session => ({
+        ...session,
+        messages: [...session.messages, assistantMessage],
+        lastTrace: {
+          perception: `User requested simple Pump.fun launch for ${draft.name} (${draft.symbol}).`,
+          memoryContext: 'Mythos used the visible user-edited draft, connected wallet address, and user-selected initial buy amount.',
+          selectedSkill: 'Mythos Memecoin Studio - simple launch copilot',
+          reasoningPath: 'Mythos prepared proposal, metadata review, unsigned preview, payload audit, and create-only builder behind one user action.',
+          prediction: 'The next user-visible step is wallet signature if the builder is wire-ready; otherwise the blocking gates explain what remains.',
+          decision: `Return final create builder ${unsignedBuilder.id}; wireReady=${unsignedBuilder.transaction.wireReady}.`,
+          confidence: unsignedBuilder.transaction.wireReady ? 91 : 76,
+          safetyBoundary: 'No automatic signature, no submit, no buy, no hidden fund movement.',
+          nextHumanStep: unsignedBuilder.transaction.wireReady
+            ? 'Review the final card and sign in Phantom/Solflare only if intentional.'
+            : 'Review the visible blocking gates before retrying.',
+        },
+        lastObservability: {
+          model: session.model,
+          modelLabel: 'Mythos Pump.fun simple launch',
+          latencyMs: Date.now() - started,
+          mode: session.mode,
+          traceSchema: 'mythos-pumpfun-simple-launch/v1',
+        },
+        updatedAt: nowIso(),
+      }));
+      setNotice(unsignedBuilder.transaction.wireReady
+        ? 'Launch package ready. Review the final card and sign create in Phantom/Solflare if you want to continue.'
+        : 'Launch package generated, but the final card shows the blocking gates.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not generate Pump.fun launch package.');
+    }
+  }
+
   async function signPumpfunCreatePayload(builder: MythosPumpfunUnsignedBuilder) {
     try {
       if (!builder.transaction.wireReady || !builder.transaction.serializedUnsignedPayload) {
@@ -5118,9 +5329,8 @@ export default function MythosLabConsole() {
                           <MythosMemecoinDraftCard
                             draft={message.memecoinDraft}
                             onConnectWallet={handleWalletAction}
-                            onArmLaunchReview={armMemecoinLaunchReview}
                             onCopyLaunchBrief={copyMemecoinLaunchBrief}
-                            onPrepareProposal={preparePumpfunLaunchProposal}
+                            onSimpleLaunch={simplePumpfunLaunch}
                           />
                         ) : null}
                         {message.memecoinProposal ? (
