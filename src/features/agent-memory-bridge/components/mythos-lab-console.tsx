@@ -1942,13 +1942,15 @@ function MythosMemecoinDraftCard({
         },
         {
           title: '5. Pump.fun transaction',
-          status: 'blocked',
-          detail: 'No mint, bonding curve transaction, metadata upload, or buy transaction is created in this phase.',
+          status: hasName && walletReady && hasFirstBuy ? 'ready' : 'pending',
+          detail: hasName && walletReady && hasFirstBuy
+            ? 'Ready for Mythos to prepare the launch package behind one action.'
+            : 'Complete name, wallet, and first buy amount before Mythos prepares the launch package.',
         },
         {
           title: '6. Wallet signature',
           status: 'pending',
-          detail: 'A future phase must show the final transaction in Phantom/Solflare and require explicit user approval.',
+          detail: 'Phantom/Solflare approval appears only after the final transaction preview is ready.',
         },
       ],
     };
@@ -2176,9 +2178,9 @@ function MythosMemecoinDraftCard({
             ))}
           </div>
 
-          <div className="mt-5 rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/6 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF8FAB]">Blocked until future signature phase</p>
-            <p className="mt-2 text-xs leading-5 text-white/54">No mint, Pump.fun upload, first buy, or Solana submission is executed from this preview.</p>
+          <div className="mt-5 rounded-2xl border border-[#14F195]/14 bg-[#14F195]/[0.055] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8CFFD2]">Simple launch path</p>
+            <p className="mt-2 text-xs leading-5 text-white/54">Mythos prepares the technical package after Generate and launch. You still approve the final transaction visibly in Phantom/Solflare.</p>
           </div>
           <div className="mt-3 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">Human review checklist</p>
