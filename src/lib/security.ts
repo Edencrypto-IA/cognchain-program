@@ -35,6 +35,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/mythos/solana/explain-rpc': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/market/report': { windowMs: 60_000, maxRequests: 8 },
   '/api/mythos/market/solana': { windowMs: 60_000, maxRequests: 12 },
+  '/api/mythos/wallet/intelligence': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/html-artifact': { windowMs: 60_000, maxRequests: 6 },
   '/api/mythos/pumpfun/builder-readiness': { windowMs: 60_000, maxRequests: 20 },
   '/api/mythos/pumpfun/launch-proposal': { windowMs: 60_000, maxRequests: 12 },

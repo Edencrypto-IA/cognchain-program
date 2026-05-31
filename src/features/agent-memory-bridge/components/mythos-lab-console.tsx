@@ -84,6 +84,47 @@ type MythosMemecoinDraft = {
   safetyNotes: string[];
 };
 
+type MythosWalletIntelligenceToken = {
+  mint: string | null;
+  symbol: string;
+  name: string;
+  amount: number | null;
+  valueUsd: number | null;
+  change24hPct: number | null;
+  source: string;
+};
+
+type MythosWalletIntelligence = {
+  address: string;
+  fetchedAt: string;
+  sources: string[];
+  confidence: number;
+  portfolio: {
+    valueUsd: number | null;
+    valueLabel: string;
+    change24hPct: number | null;
+    change24hLabel: string;
+    changeMethod: 'weighted_current_holdings' | 'unavailable';
+    estimateNote: string;
+  };
+  sol: {
+    balance: number | null;
+    priceUsd: number | null;
+    valueUsd: number | null;
+    change24hPct: number | null;
+  };
+  tokens: MythosWalletIntelligenceToken[];
+  highlights: string[];
+  recommendations: string[];
+  unavailable: string[];
+  safety: {
+    readOnly: true;
+    noSigning: true;
+    noFundsMovement: true;
+    disclaimer: string;
+  };
+};
+
 type MythosPumpfunLaunchProposal = {
   id: string;
   status: 'blocked' | 'needs_review' | 'ready_for_future_signature';
@@ -2075,6 +2116,115 @@ function MythosMemecoinDraftCard({
   );
 }
 
+function pctTone(value: number | null) {
+  if (value === null) return 'text-white/46';
+  return value >= 0 ? 'text-[#8CFFD2]' : 'text-[#FF8FAB]';
+}
+
+function MythosWalletIntelligenceCard({
+  intelligence,
+  loading,
+  error,
+  onRefresh,
+}: {
+  intelligence: MythosWalletIntelligence | null;
+  loading: boolean;
+  error: string;
+  onRefresh: () => void;
+}) {
+  if (!intelligence && !loading && !error) return null;
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-[24px] border border-[#14F195]/18 bg-[linear-gradient(135deg,rgba(4,28,20,0.82),rgba(1,8,3,0.96))] p-4 shadow-[0_0_38px_rgba(20,241,149,0.05)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8CFFD2]">Wallet Financial Intelligence</p>
+          <h3 className="mt-2 text-xl font-black text-white">
+            {loading && !intelligence ? 'Reading real wallet data...' : intelligence?.portfolio.valueLabel || 'Wallet data unavailable'}
+          </h3>
+          <p className="mt-1 break-all text-xs leading-5 text-white/48">
+            {intelligence?.address || 'Mythos only reports values returned by live data providers.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="inline-flex h-9 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/13 disabled:opacity-50"
+        >
+          <Radar className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
+
+      {error ? (
+        <p className="mt-4 rounded-2xl border border-[#FF5C7A]/18 bg-[#FF5C7A]/8 p-3 text-xs leading-5 text-[#FFB0BF]">{error}</p>
+      ) : null}
+
+      {intelligence ? (
+        <>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/8 bg-black/28 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">24h estimate</p>
+              <p className={`mt-2 text-2xl font-black ${pctTone(intelligence.portfolio.change24hPct)}`}>{intelligence.portfolio.change24hLabel}</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/42">Current holdings, not cost-basis PnL.</p>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-black/28 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">SOL</p>
+              <p className="mt-2 text-lg font-black text-white">{intelligence.sol.balance === null ? 'unavailable' : `${intelligence.sol.balance.toFixed(4)} SOL`}</p>
+              <p className={`mt-1 text-xs font-bold ${pctTone(intelligence.sol.change24hPct)}`}>SOL 24h {intelligence.sol.change24hPct === null ? 'unavailable' : `${intelligence.sol.change24hPct >= 0 ? '+' : ''}${intelligence.sol.change24hPct.toFixed(2)}%`}</p>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-black/28 p-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Data confidence</p>
+              <p className="mt-2 text-2xl font-black text-white">{intelligence.confidence}/100</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/42">{new Date(intelligence.fetchedAt).toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_0.9fr]">
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/38">Tracked positions</p>
+              <div className="mt-3 space-y-2">
+                {intelligence.tokens.slice(0, 5).map(token => (
+                  <div key={`${token.mint}-${token.symbol}`} className="flex items-center justify-between gap-3 rounded-xl border border-white/6 bg-black/20 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-white">{token.symbol}</p>
+                      <p className="truncate text-[11px] text-white/38">{token.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-black text-white">{token.valueUsd === null ? 'n/a' : `$${token.valueUsd.toFixed(token.valueUsd >= 100 ? 0 : 2)}`}</p>
+                      <p className={`text-[11px] font-bold ${pctTone(token.change24hPct)}`}>{token.change24hPct === null ? '24h n/a' : `${token.change24hPct >= 0 ? '+' : ''}${token.change24hPct.toFixed(2)}%`}</p>
+                    </div>
+                  </div>
+                ))}
+                {!intelligence.tokens.length ? (
+                  <p className="rounded-xl border border-white/6 bg-black/20 p-3 text-xs leading-5 text-white/46">No priced SPL token positions returned by the provider.</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/38">Mythos notes</p>
+              <ul className="mt-3 space-y-2 text-xs leading-5 text-white/54">
+                {intelligence.highlights.slice(0, 4).map(item => <li key={item}>- {item}</li>)}
+                {intelligence.recommendations.slice(0, 2).map(item => <li key={item}>- {item}</li>)}
+              </ul>
+              {intelligence.unavailable.length ? (
+                <p className="mt-3 rounded-xl border border-[#FFD166]/16 bg-[#FFD166]/8 p-3 text-[11px] leading-4 text-[#FFE08A]">
+                  {intelligence.unavailable[0]}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-4 text-white/36">
+            Sources: {intelligence.sources.join(' | ')}. {intelligence.portfolio.estimateNote}
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function MythosPumpfunProposalCard({
   proposal,
   onPrepareMetadataReview,
@@ -2855,6 +3005,9 @@ export default function MythosLabConsole() {
   const [pumpfunSubmittedPayloads, setPumpfunSubmittedPayloads] = useState<Record<string, MythosPumpfunSubmittedPayload>>({});
   const [pumpfunSubmittingIds, setPumpfunSubmittingIds] = useState<Record<string, boolean>>({});
   const [pumpfunBuySpendSol, setPumpfunBuySpendSol] = useState<Record<string, string>>({});
+  const [walletIntelligence, setWalletIntelligence] = useState<MythosWalletIntelligence | null>(null);
+  const [walletIntelligenceLoading, setWalletIntelligenceLoading] = useState(false);
+  const [walletIntelligenceError, setWalletIntelligenceError] = useState('');
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -2960,6 +3113,41 @@ export default function MythosLabConsole() {
         }
         : message),
     })));
+  }, [connectedAddress]);
+
+  async function refreshWalletIntelligence(address = connectedAddress) {
+    if (!address) return;
+    setWalletIntelligenceLoading(true);
+    setWalletIntelligenceError('');
+
+    try {
+      const response = await fetch(`/api/mythos/wallet/intelligence?address=${encodeURIComponent(address)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.intelligence) {
+        throw new Error(data?.error || 'Could not load wallet intelligence.');
+      }
+      setWalletIntelligence(data.intelligence as MythosWalletIntelligence);
+    } catch (error) {
+      setWalletIntelligence(null);
+      setWalletIntelligenceError(error instanceof Error ? error.message : 'Could not load wallet intelligence.');
+    } finally {
+      setWalletIntelligenceLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!connectedAddress) {
+      setWalletIntelligence(null);
+      setWalletIntelligenceError('');
+      setWalletIntelligenceLoading(false);
+      return;
+    }
+
+    void refreshWalletIntelligence(connectedAddress);
   }, [connectedAddress]);
 
   const memoryPayload = useMemo(() => ({
@@ -4617,6 +4805,16 @@ export default function MythosLabConsole() {
               <div className={`flex flex-1 flex-col ${hasConversation ? 'justify-start pt-6' : 'justify-center'}`}>
                 {!hasConversation ? (
                   <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
+                    {connectedAddress ? (
+                      <div className="w-full text-left">
+                        <MythosWalletIntelligenceCard
+                          intelligence={walletIntelligence}
+                          loading={walletIntelligenceLoading}
+                          error={walletIntelligenceError}
+                          onRefresh={() => void refreshWalletIntelligence()}
+                        />
+                      </div>
+                    ) : null}
                     <img
                       src="/agents/mythos-terminal.png"
                       alt="Mythos, the first autonomous external agent"
@@ -4628,6 +4826,14 @@ export default function MythosLabConsole() {
                   </div>
                 ) : (
                   <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 pb-6">
+                    {connectedAddress ? (
+                      <MythosWalletIntelligenceCard
+                        intelligence={walletIntelligence}
+                        loading={walletIntelligenceLoading}
+                        error={walletIntelligenceError}
+                        onRefresh={() => void refreshWalletIntelligence()}
+                      />
+                    ) : null}
                     {visibleMessages.map(message => (
                       <div
                         key={message.id}
