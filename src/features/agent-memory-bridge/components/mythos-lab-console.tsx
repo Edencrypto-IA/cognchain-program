@@ -1171,6 +1171,37 @@ function parseMemecoinDraft(content: string, walletAddress?: string): MythosMeme
   };
 }
 
+function updateMemecoinDraftWallet(draft: MythosMemecoinDraft, walletAddress: string): MythosMemecoinDraft {
+  const walletReady = Boolean(walletAddress);
+  const hasName = draft.name !== 'Untitled Meme';
+  const hasFirstBuy = draft.initialBuySol > 0;
+  const readinessScore = Math.min([
+    hasName,
+    draft.symbol.length >= 2,
+    draft.description.length >= 24,
+    draft.imagePrompt.length >= 18,
+    walletReady,
+    hasFirstBuy,
+  ].filter(Boolean).length * 14 + (walletReady && hasFirstBuy ? 16 : 0), 100);
+
+  return {
+    ...draft,
+    walletAddress: walletAddress || undefined,
+    walletReady,
+    launchMode: walletReady && hasName ? 'launch_review_ready' : 'preview_only',
+    readinessScore,
+    phases: draft.phases.map(phase => phase.title === '3. Wallet readiness'
+      ? {
+        ...phase,
+        status: walletReady ? 'ready' : 'review',
+        detail: walletReady
+          ? `Wallet ${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} is connected for future approval.`
+          : 'Connect Phantom or Solflare before any future launch transaction can be prepared.',
+      }
+      : phase),
+  };
+}
+
 function isMemecoinLaunchRequest(content: string) {
   return Boolean(parseMemecoinDraft(content));
 }
@@ -2797,7 +2828,7 @@ async function sha256Hex(bytes: Uint8Array) {
 export default function MythosLabConsole() {
   const profile = MYTHOS_AGENT_PROFILE;
   const { connection } = useConnection();
-  const { publicKey, connected, disconnect, wallet, wallets, select, connecting, signTransaction } = useWallet();
+  const { publicKey, connected, disconnect, wallet, wallets, select, connect, connecting, signTransaction } = useWallet();
   const [sessions, setSessions] = useState<MythosLabSession[]>([]);
   const [activeId, setActiveId] = useState('');
   const [input, setInput] = useState('');
@@ -2809,6 +2840,7 @@ export default function MythosLabConsole() {
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [walletMenuOpen, setWalletMenuOpen] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
+  const [pendingWalletName, setPendingWalletName] = useState<WalletName | null>(null);
   const [walletConnectError, setWalletConnectError] = useState('');
   const [proAccessOpen, setProAccessOpen] = useState(false);
   const [pendingProModelId, setPendingProModelId] = useState('');
@@ -2870,6 +2902,65 @@ export default function MythosLabConsole() {
     : currentModel.label;
   const connectedAddress = publicKey?.toString() || '';
   const walletShortAddress = connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : '';
+
+  useEffect(() => {
+    if (!pendingWalletName || !wallet || wallet.adapter.name !== pendingWalletName || connected) return;
+    let cancelled = false;
+
+    async function finishWalletConnection() {
+      try {
+        await Promise.race([
+          connect(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('wallet_timeout')), 15_000)),
+        ]);
+        if (!cancelled) {
+          setWalletMenuOpen(false);
+          setWalletConnectError('');
+          setNotice(`${pendingWalletName} connected to Mythos Lab. No transaction was signed or submitted.`);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWalletConnectError(
+            error instanceof Error && error.message === 'wallet_timeout'
+              ? `${pendingWalletName} opened but did not finish connecting. Unlock the wallet and approve the connection.`
+              : `${pendingWalletName} did not respond. Check that the extension is installed and unlocked.`
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setConnectingWallet(null);
+          setPendingWalletName(null);
+        }
+      }
+    }
+
+    void finishWalletConnection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connect, connected, pendingWalletName, wallet]);
+
+  useEffect(() => {
+    if (!connected || !pendingWalletName) return;
+    setWalletMenuOpen(false);
+    setWalletConnectError('');
+    setConnectingWallet(null);
+    setPendingWalletName(null);
+  }, [connected, pendingWalletName]);
+
+  useEffect(() => {
+    if (!connectedAddress) return;
+    setSessions(current => current.map(session => ({
+      ...session,
+      messages: session.messages.map(message => message.memecoinDraft
+        ? {
+          ...message,
+          memecoinDraft: updateMemecoinDraftWallet(message.memecoinDraft, connectedAddress),
+        }
+        : message),
+    })));
+  }, [connectedAddress]);
 
   const memoryPayload = useMemo(() => ({
     content: lastAssistant?.content || '',
@@ -3005,6 +3096,8 @@ export default function MythosLabConsole() {
       await disconnect();
       setNotice('Wallet disconnected from Mythos Lab. No transaction was signed or submitted.');
       setWalletMenuOpen(false);
+      setPendingWalletName(null);
+      setConnectingWallet(null);
       return;
     }
     setWalletConnectError('');
@@ -3046,13 +3139,9 @@ export default function MythosLabConsole() {
     }
 
     try {
-      select(candidate.adapter.name as WalletName);
-      await Promise.race([
-        candidate.adapter.connected ? Promise.resolve() : candidate.adapter.connect(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('wallet_timeout')), 15_000)),
-      ]);
-      setWalletMenuOpen(false);
-      setNotice(`${option.name} connected to Mythos Lab. No transaction was signed or submitted.`);
+      const walletName = candidate.adapter.name as WalletName;
+      setPendingWalletName(walletName);
+      select(walletName);
     } catch (error) {
       if (isMobileBrowser()) {
         openWalletFallback(option);
@@ -3064,7 +3153,7 @@ export default function MythosLabConsole() {
         );
       }
     } finally {
-      setConnectingWallet(null);
+      if (!pendingWalletName) setConnectingWallet(null);
     }
   }
 
