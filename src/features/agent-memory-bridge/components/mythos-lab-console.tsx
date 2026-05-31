@@ -1582,7 +1582,7 @@ function formatMarketReportText(report: MythosCryptoMarketReport) {
 
 function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
   const list = report.mode === 'memes'
-    ? (report.assets?.memeLeaders ?? []).map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
+    ? (report.assets?.memeLeaders ?? []).map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.priceLabel} live price, ${asset.marketCapLabel} market cap, ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
     : report.mode === 'volume'
       ? (report.assets?.volumeLeaders ?? []).map((asset, index) => `${index + 1}. ${asset.symbol} - ${asset.volume24hLabel} 24h volume (${asset.change24hLabel})`)
       : report.mode === 'protocols'
@@ -1631,7 +1631,18 @@ function CoinRow({ coin, index, mode }: { coin: MythosCryptoCoin | SolanaAssetSu
   const changeLabel = 'change7d' in coin && mode !== 'volume' && mode !== 'meme'
     ? `${coin.change7d !== null && coin.change7d !== undefined ? coin.change7d.toFixed(2) : '0.00'}%`
     : coin.change24hLabel;
-  const valueLabel = 'volume24hLabel' in coin ? coin.volume24hLabel : coin.price ? `$${coin.price.toLocaleString('en-US', { maximumSignificantDigits: 4 })}` : 'trending';
+  const valueLabel = 'volume24hLabel' in coin
+    ? mode === 'meme'
+      ? coin.priceLabel
+      : coin.volume24hLabel
+    : coin.price
+      ? `$${coin.price.toLocaleString('en-US', { maximumSignificantDigits: 4 })}`
+      : 'trending';
+  const detailLabel = 'volume24hLabel' in coin
+    ? mode === 'meme'
+      ? `MCap ${coin.marketCapLabel} | Vol ${coin.volume24hLabel}`
+      : '24h volume'
+    : coin.name;
 
   return (
     <div className="grid grid-cols-[34px_1fr_auto] items-center gap-3 border-b border-white/8 py-3 last:border-b-0">
@@ -1645,7 +1656,7 @@ function CoinRow({ coin, index, mode }: { coin: MythosCryptoCoin | SolanaAssetSu
             #{coin.rank || index + 1}
           </span>
         </div>
-        <p className="truncate text-[11px] text-white/42">{coin.name}</p>
+        <p className="truncate text-[11px] text-white/42">{detailLabel}</p>
       </div>
       <div className="text-right">
         <p className="text-xs font-black text-white">{valueLabel}</p>
