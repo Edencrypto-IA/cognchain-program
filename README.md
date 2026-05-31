@@ -139,6 +139,10 @@ New Mythos Lab endpoint:
 
 Mythos Solana is positioned as AI-native observability for Solana builders: wallets can sign, but they cannot explain risk, failure causes, program behavior, or memory context by themselves. Mythos adds that intelligence layer without replacing Phantom, Solflare, or human approval.
 
+Architecture addendum:
+
+- [`docs/mythos-openai-architecture.md`](docs/mythos-openai-architecture.md) curates the OpenAI/Mythos expansion plan into safe incremental phases, allowlisted tools, transaction boundaries, and production checks.
+
 What the Solana console makes visible:
 
 | Layer | What it shows | Safety boundary |
