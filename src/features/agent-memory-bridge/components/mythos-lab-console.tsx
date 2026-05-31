@@ -1843,9 +1843,9 @@ function MythosMemecoinDraftCard({
   const compactSymbol = editableDraft.symbol.length > 7 ? `${editableDraft.symbol.slice(0, 7)}...` : editableDraft.symbol;
 
   return (
-    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#76FF03]/24 bg-[linear-gradient(135deg,rgba(9,43,4,0.92),rgba(1,8,3,0.98))] p-5 shadow-[0_0_46px_rgba(118,255,3,0.055)]">
-      <div className="flex flex-col gap-5 xl:flex-row">
-        <div className="flex-1">
+    <div className="mt-4 overflow-hidden rounded-[28px] border border-[#76FF03]/24 bg-[linear-gradient(135deg,rgba(9,43,4,0.92),rgba(1,8,3,0.98))] p-4 shadow-[0_0_46px_rgba(118,255,3,0.055)] sm:p-5">
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_348px] 2xl:items-start">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-[#76FF03]/24 bg-[#76FF03]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">
               Memecoin Studio
@@ -1859,21 +1859,21 @@ function MythosMemecoinDraftCard({
             </span>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-[170px_minmax(0,1fr)]">
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[32px] border border-[#76FF03]/26 bg-[radial-gradient(circle_at_50%_34%,rgba(118,255,3,0.22),transparent_42%),rgba(0,0,0,0.68)]">
+          <div className="mt-5 grid gap-4 sm:grid-cols-[150px_minmax(0,1fr)] 2xl:grid-cols-[170px_minmax(0,1fr)]">
+            <div className="flex h-[150px] items-center justify-center overflow-hidden rounded-[26px] border border-[#76FF03]/26 bg-[radial-gradient(circle_at_50%_34%,rgba(118,255,3,0.22),transparent_42%),rgba(0,0,0,0.68)] 2xl:aspect-square 2xl:h-auto 2xl:rounded-[32px]">
               {logoPreviewUrl ? (
                 <img src={logoPreviewUrl} alt={`${editableDraft.name} local logo preview`} className="h-full w-full object-cover" />
               ) : (
               <div className="text-center">
                 <Coins className="mx-auto h-9 w-9 text-[#A7FF3D]" />
-                  <p className="mt-3 max-w-[132px] break-words text-xl font-black uppercase tracking-[0.12em] text-white">${compactSymbol}</p>
+                  <p className="mx-auto mt-3 max-w-[132px] break-words text-lg font-black uppercase tracking-[0.08em] text-white sm:text-xl">${compactSymbol}</p>
               </div>
               )}
             </div>
 
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/36">Launch draft</p>
-              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_150px]">
+              <div className="mt-3 grid gap-3 2xl:grid-cols-[1fr_150px]">
                 <label className="block">
                   <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Meme name</span>
                   <input
@@ -1905,7 +1905,7 @@ function MythosMemecoinDraftCard({
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Ticker</p>
-                  <p className="mt-2 break-all font-mono text-base font-black text-[#A7FF3D]">${editableDraft.symbol}</p>
+                  <p className="mt-2 break-all font-mono text-sm font-black leading-5 text-[#A7FF3D] sm:text-base">${editableDraft.symbol}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">First buy</p>
@@ -1921,13 +1921,13 @@ function MythosMemecoinDraftCard({
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/34 p-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/34">Mode</p>
-                  <p className="mt-2 text-lg font-black text-white">{readinessLabel}</p>
+                  <p className="mt-2 text-sm font-black leading-5 text-white sm:text-base">{readinessLabel}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="mt-4 grid gap-3 2xl:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7DE4FF]">Image brief</p>
               <textarea
@@ -1963,7 +1963,7 @@ function MythosMemecoinDraftCard({
           </div>
         </div>
 
-        <div className="w-full rounded-3xl border border-white/10 bg-black/36 p-4 xl:w-[360px]">
+        <div className="min-w-0 rounded-3xl border border-white/10 bg-black/36 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Wallet</p>
@@ -1978,16 +1978,16 @@ function MythosMemecoinDraftCard({
             <button
               type="button"
               onClick={onConnectWallet}
-              className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#14F195]/22 bg-[#14F195]/10 text-xs font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/16"
+              className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-2xl border border-[#14F195]/22 bg-[#14F195]/10 px-3 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#8CFFD2] transition hover:bg-[#14F195]/16"
             >
               Connect Phantom / Solflare
             </button>
           ) : null}
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="mt-3 grid gap-2 sm:grid-cols-3 2xl:grid-cols-1">
             <button
               type="button"
               onClick={() => onCopyLaunchBrief(editableDraft)}
-              className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] text-xs font-black uppercase tracking-[0.12em] text-white/68 transition hover:bg-white/[0.07]"
+              className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] px-3 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-white/68 transition hover:bg-white/[0.07]"
             >
               Copy launch brief
             </button>
@@ -1995,24 +1995,24 @@ function MythosMemecoinDraftCard({
               type="button"
               onClick={() => onArmLaunchReview(editableDraft)}
               disabled={!editableDraft.walletReady}
-              className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#76FF03]/22 bg-[#76FF03]/12 text-xs font-black uppercase tracking-[0.12em] text-[#B8FF5C] transition hover:bg-[#76FF03]/18 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.035] disabled:text-white/30"
+              className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#76FF03]/22 bg-[#76FF03]/12 px-3 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#B8FF5C] transition hover:bg-[#76FF03]/18 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.035] disabled:text-white/30"
             >
               Arm launch review
             </button>
             <button
               type="button"
               onClick={() => onPrepareProposal(editableDraft)}
-              className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#7DE4FF]/20 bg-[#7DE4FF]/9 text-xs font-black uppercase tracking-[0.12em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/14"
+              className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#7DE4FF]/20 bg-[#7DE4FF]/9 px-3 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/14"
             >
               Prepare proposal
             </button>
           </div>
 
-          <div className="mt-5 space-y-2">
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 2xl:grid-cols-1">
             {editableDraft.phases.map((phase, index) => (
               <div key={`${phase.title}-${index}`} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-black text-white">{phase.title}</p>
+                  <p className="min-w-0 text-xs font-black leading-4 text-white">{phase.title}</p>
                   <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
                     phase.status === 'ready'
                       ? 'bg-[#14F195]/12 text-[#8CFFD2]'
