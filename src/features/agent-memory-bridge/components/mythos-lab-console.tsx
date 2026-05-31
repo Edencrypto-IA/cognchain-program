@@ -2444,8 +2444,8 @@ function MythosPumpfunMetadataReviewCard({
         ))}
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.85fr]">
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-black/30 p-4">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Metadata gates</p>
           <div className="mt-3 space-y-2">
             {review.checks.map(check => (
@@ -2781,14 +2781,14 @@ function MythosPumpfunUnsignedBuilderCard({
             ))}
           </div>
         </div>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="rounded-2xl border border-[#7DE4FF]/16 bg-[#7DE4FF]/[0.045] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Program audit</p>
             <div className="mt-3 space-y-2 font-mono text-[11px] leading-5 text-white/58">
-              <p>program: {builder.programAudit.programId || 'not configured'}</p>
-              <p>schema: {builder.programAudit.accountSchemaVerified ? 'verified' : 'not verified'}</p>
-              <p>discriminator: {builder.programAudit.instructionDiscriminatorVerified ? 'verified' : 'not verified'}</p>
-              <p>metadata: {builder.token.metadataUri || 'missing'}</p>
+              <p className="break-all">program: {builder.programAudit.programId || 'not configured'}</p>
+              <p className="break-all">schema: {builder.programAudit.accountSchemaVerified ? 'verified' : 'not verified'}</p>
+              <p className="break-all">discriminator: {builder.programAudit.instructionDiscriminatorVerified ? 'verified' : 'not verified'}</p>
+              <p className="break-all">metadata: {builder.token.metadataUri || 'missing'}</p>
             </div>
           </div>
           <div className="rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/7 p-4">
@@ -2832,7 +2832,7 @@ function MythosPumpfunUnsignedBuilderCard({
                           <button
                             type="button"
                             onClick={() => onPrepareBuy(builder, submittedPayload)}
-                            className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#7DE4FF]/24 bg-[#7DE4FF]/12 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/18"
+                            className="mt-3 inline-flex min-h-10 w-full min-w-0 items-center justify-center whitespace-normal rounded-2xl border border-[#7DE4FF]/24 bg-[#7DE4FF]/12 px-4 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/18"
                           >
                             Prepare buy quote
                           </button>
@@ -2854,7 +2854,7 @@ function MythosPumpfunUnsignedBuilderCard({
                           type="button"
                           onClick={() => onSubmitSignedCreate(builder)}
                           disabled={submitConfirmation.trim().toUpperCase() !== 'SUBMIT' || submitting}
-                          className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#FF5C7A]/26 bg-[#FF5C7A]/13 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#FFB0BF] transition hover:bg-[#FF5C7A]/18 disabled:opacity-45"
+                          className="mt-3 inline-flex min-h-10 w-full min-w-0 items-center justify-center whitespace-normal rounded-2xl border border-[#FF5C7A]/26 bg-[#FF5C7A]/13 px-4 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#FFB0BF] transition hover:bg-[#FF5C7A]/18 disabled:opacity-45"
                         >
                           {submitting ? 'Submitting...' : 'Submit signed create'}
                         </button>
@@ -2865,7 +2865,7 @@ function MythosPumpfunUnsignedBuilderCard({
                   <button
                     type="button"
                     onClick={() => onSignCreate(builder)}
-                    className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl border border-[#FFD166]/24 bg-[#FFD166]/12 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-[#FFE08A] transition hover:bg-[#FFD166]/18"
+                    className="mt-3 inline-flex min-h-10 w-full min-w-0 items-center justify-center whitespace-normal rounded-2xl border border-[#FFD166]/24 bg-[#FFD166]/12 px-4 py-2 text-center text-[11px] font-black uppercase leading-4 tracking-[0.08em] text-[#FFE08A] transition hover:bg-[#FFD166]/18"
                   >
                     Sign create payload
                   </button>
