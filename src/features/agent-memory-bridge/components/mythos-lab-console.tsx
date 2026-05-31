@@ -46,6 +46,8 @@ type MythosLabMessage = {
   cryptoReport?: MythosCryptoMarketReport;
   solanaReport?: MythosSolanaEcosystemReport;
   solanaAnalysis?: Record<string, unknown>;
+  walletIntelligence?: MythosWalletIntelligence;
+  walletIntelligenceError?: string;
   memecoinDraft?: MythosMemecoinDraft;
   memecoinProposal?: MythosPumpfunLaunchProposal;
   memecoinMetadataReview?: MythosPumpfunMetadataReview;
@@ -524,6 +526,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/quote swap <amount> <token> to <token>',
     detail: 'Fetch a read-only Jupiter route quote. No swap transaction is created.',
+  },
+  {
+    command: '/wallet intelligence',
+    detail: 'Open a real read-only financial snapshot for the connected wallet. No signing or fund movement.',
   },
   {
     command: '/market report',
@@ -1616,6 +1622,32 @@ function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
   ].join('\n\n'));
 }
 
+function formatWalletIntelligenceText(intelligence: MythosWalletIntelligence) {
+  return cleanTerminalText([
+    terminalSection('Intent', `Read-only wallet financial intelligence for ${intelligence.address}`),
+    terminalSection('Portfolio snapshot', [
+      `Estimated value: ${intelligence.portfolio.valueLabel}`,
+      `24h estimate: ${intelligence.portfolio.change24hLabel}`,
+      `SOL: ${intelligence.sol.balance === null ? 'unavailable' : `${intelligence.sol.balance.toFixed(4)} SOL`}`,
+      `Data confidence: ${intelligence.confidence}/100`,
+    ]),
+    terminalSection('Method', intelligence.portfolio.estimateNote),
+    terminalSection('Mythos notes', intelligence.recommendations.map(item => `- ${item}`)),
+    terminalSection('Sources', intelligence.sources.map(item => `- ${item}`)),
+    terminalSection('Safety boundary', [
+      intelligence.safety.disclaimer,
+      'No wallet signature was requested.',
+      'No transaction was created or submitted.',
+    ]),
+  ].join('\n\n'));
+}
+
+function isWalletIntelligenceCommand(content: string) {
+  const normalized = content.trim().toLowerCase();
+  return /^\/wallet\s+(intelligence|intel|finance|financial|snapshot|portfolio)$/.test(normalized) ||
+    /^\/carteira\s+(inteligencia|inteligência|financeira|snapshot|portfolio|portfólio)$/.test(normalized);
+}
+
 function trendClass(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return 'text-white/52';
   return value >= 0 ? 'text-[#76FF03]' : 'text-[#FF5C7A]';
@@ -2141,7 +2173,7 @@ function MythosWalletIntelligenceCard({
   intelligence: MythosWalletIntelligence | null;
   loading: boolean;
   error: string;
-  onRefresh: () => void;
+  onRefresh?: () => void;
 }) {
   if (!intelligence && !loading && !error) return null;
 
@@ -2157,15 +2189,17 @@ function MythosWalletIntelligenceCard({
             {intelligence?.address || 'Mythos only reports values returned by live data providers.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={loading}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/13 disabled:opacity-50"
-        >
-          <Radar className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        {onRefresh ? (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/13 disabled:opacity-50"
+          >
+            <Radar className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        ) : null}
       </div>
 
       {error ? (
@@ -3016,9 +3050,6 @@ export default function MythosLabConsole() {
   const [pumpfunSubmittedPayloads, setPumpfunSubmittedPayloads] = useState<Record<string, MythosPumpfunSubmittedPayload>>({});
   const [pumpfunSubmittingIds, setPumpfunSubmittingIds] = useState<Record<string, boolean>>({});
   const [pumpfunBuySpendSol, setPumpfunBuySpendSol] = useState<Record<string, string>>({});
-  const [walletIntelligence, setWalletIntelligence] = useState<MythosWalletIntelligence | null>(null);
-  const [walletIntelligenceLoading, setWalletIntelligenceLoading] = useState(false);
-  const [walletIntelligenceError, setWalletIntelligenceError] = useState('');
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -3124,41 +3155,6 @@ export default function MythosLabConsole() {
         }
         : message),
     })));
-  }, [connectedAddress]);
-
-  async function refreshWalletIntelligence(address = connectedAddress) {
-    if (!address) return;
-    setWalletIntelligenceLoading(true);
-    setWalletIntelligenceError('');
-
-    try {
-      const response = await fetch(`/api/mythos/wallet/intelligence?address=${encodeURIComponent(address)}`, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-        cache: 'no-store',
-      });
-      const data = await response.json();
-      if (!response.ok || !data?.intelligence) {
-        throw new Error(data?.error || 'Could not load wallet intelligence.');
-      }
-      setWalletIntelligence(data.intelligence as MythosWalletIntelligence);
-    } catch (error) {
-      setWalletIntelligence(null);
-      setWalletIntelligenceError(error instanceof Error ? error.message : 'Could not load wallet intelligence.');
-    } finally {
-      setWalletIntelligenceLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!connectedAddress) {
-      setWalletIntelligence(null);
-      setWalletIntelligenceError('');
-      setWalletIntelligenceLoading(false);
-      return;
-    }
-
-    void refreshWalletIntelligence(connectedAddress);
   }, [connectedAddress]);
 
   const memoryPayload = useMemo(() => ({
@@ -4023,6 +4019,8 @@ export default function MythosLabConsole() {
       observability?: MythosObservability;
       htmlArtifact?: MythosLabMessage['htmlArtifact'];
       solanaAnalysis?: Record<string, unknown>;
+      walletIntelligence?: MythosWalletIntelligence;
+      walletIntelligenceError?: string;
       memecoinDraft?: MythosMemecoinDraft;
     }) {
       const assistantMessage: MythosLabMessage = {
@@ -4032,6 +4030,8 @@ export default function MythosLabConsole() {
         content: cleanTerminalText(responseContent),
         htmlArtifact: extra?.htmlArtifact,
         solanaAnalysis: extra?.solanaAnalysis,
+        walletIntelligence: extra?.walletIntelligence,
+        walletIntelligenceError: extra?.walletIntelligenceError,
         memecoinDraft: extra?.memecoinDraft,
       };
       updateActive(session => ({
@@ -4063,6 +4063,70 @@ export default function MythosLabConsole() {
           mode: activeSession.mode,
           traceSchema: 'mythos-command-terminal/v1',
           latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    if (isWalletIntelligenceCommand(command)) {
+      if (!connectedAddress) {
+        appendTerminalResponse([
+          terminalSection('Intent', 'Open wallet financial intelligence'),
+          terminalSection('Decision', 'Blocked because no Phantom or Solflare wallet is connected.'),
+          terminalSection('Next safe step', 'Connect a wallet, then run /wallet intelligence again.'),
+          terminalSection('Safety boundary', 'This command is read-only and never signs, submits, buys, sells, or moves funds.'),
+        ].join('\n\n'), {
+          trace: {
+            perception: 'User requested wallet intelligence without a connected wallet.',
+            selectedSkill: 'Mythos Wallet Financial Intelligence',
+            decision: 'Block until a public wallet address is available.',
+            prediction: 'After connection, Mythos can fetch a read-only portfolio snapshot.',
+            safetyBoundary: 'No wallet signature or fund movement.',
+            nextHumanStep: 'Connect Phantom or Solflare and rerun the command.',
+          },
+        });
+        return;
+      }
+
+      const response = await fetch(`/api/mythos/wallet/intelligence?address=${encodeURIComponent(connectedAddress)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.intelligence) {
+        const error = data?.error || 'Could not load wallet intelligence.';
+        appendTerminalResponse([
+          terminalSection('Intent', 'Open wallet financial intelligence'),
+          terminalSection('Decision', `Provider returned no usable portfolio snapshot: ${error}`),
+          terminalSection('Next safe step', 'Check SOLSCAN_API_KEY on Railway or try again later.'),
+          terminalSection('Safety boundary', 'No wallet signature or fund movement occurred.'),
+        ].join('\n\n'), {
+          walletIntelligenceError: error,
+        });
+        return;
+      }
+
+      const intelligence = data.intelligence as MythosWalletIntelligence;
+      appendTerminalResponse(formatWalletIntelligenceText(intelligence), {
+        walletIntelligence: intelligence,
+        trace: {
+          perception: `User requested wallet financial intelligence for ${connectedAddress}.`,
+          memoryContext: 'Only the connected public wallet address was used. No private key, signature, or hidden wallet data was accessed.',
+          selectedSkill: 'Mythos Wallet Financial Intelligence',
+          reasoningPath: 'Mythos fetched server-side Solscan/CoinGecko data and rendered only source-backed values or unavailable fields.',
+          prediction: 'User can inspect portfolio movement and decide whether to run deeper token or liquidity analysis.',
+          decision: 'Return a read-only wallet intelligence card.',
+          confidence: intelligence.confidence,
+          safetyBoundary: 'Read-only. No signing, transaction creation, submission, buying, selling, or fund movement.',
+          nextHumanStep: 'Review the sources and use token-specific analysis before any wallet action.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: 'Solscan + CoinGecko wallet intelligence',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-wallet-intelligence/v1',
         },
       });
       return;
@@ -4816,16 +4880,6 @@ export default function MythosLabConsole() {
               <div className={`flex flex-1 flex-col ${hasConversation ? 'justify-start pt-6' : 'justify-center'}`}>
                 {!hasConversation ? (
                   <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
-                    {connectedAddress ? (
-                      <div className="w-full text-left">
-                        <MythosWalletIntelligenceCard
-                          intelligence={walletIntelligence}
-                          loading={walletIntelligenceLoading}
-                          error={walletIntelligenceError}
-                          onRefresh={() => void refreshWalletIntelligence()}
-                        />
-                      </div>
-                    ) : null}
                     <img
                       src="/agents/mythos-terminal.png"
                       alt="Mythos, the first autonomous external agent"
@@ -4837,14 +4891,6 @@ export default function MythosLabConsole() {
                   </div>
                 ) : (
                   <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 pb-6">
-                    {connectedAddress ? (
-                      <MythosWalletIntelligenceCard
-                        intelligence={walletIntelligence}
-                        loading={walletIntelligenceLoading}
-                        error={walletIntelligenceError}
-                        onRefresh={() => void refreshWalletIntelligence()}
-                      />
-                    ) : null}
                     {visibleMessages.map(message => (
                       <div
                         key={message.id}
@@ -4860,6 +4906,13 @@ export default function MythosLabConsole() {
                         {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
                         {message.solanaReport ? <MythosSolanaReportCard report={message.solanaReport} /> : null}
                         {message.solanaAnalysis ? <MythosSolanaAnalysisCard data={message.solanaAnalysis} /> : null}
+                        {message.walletIntelligence || message.walletIntelligenceError ? (
+                          <MythosWalletIntelligenceCard
+                            intelligence={message.walletIntelligence || null}
+                            loading={false}
+                            error={message.walletIntelligenceError || ''}
+                          />
+                        ) : null}
                         {message.memecoinDraft ? (
                           <MythosMemecoinDraftCard
                             draft={message.memecoinDraft}
