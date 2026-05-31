@@ -2475,15 +2475,20 @@ function MythosPumpfunUnsignedPreviewCard({
   onAuditPayload,
 }: {
   preview: MythosPumpfunUnsignedPreview;
+  defaultMetadataUri: string;
   onAuditPayload: (preview: MythosPumpfunUnsignedPreview, options: {
     metadataUri: string;
     slippageBps: number;
     priorityFeeLamports: number;
   }) => void;
 }) {
-  const [metadataUri, setMetadataUri] = useState('');
+  const [metadataUri, setMetadataUri] = useState(defaultMetadataUri);
   const [slippageBps, setSlippageBps] = useState(500);
   const [priorityFeeLamports, setPriorityFeeLamports] = useState(0);
+
+  useEffect(() => {
+    setMetadataUri(defaultMetadataUri);
+  }, [defaultMetadataUri]);
   const statusClass = preview.status === 'ready_for_wallet_signature_phase'
     ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
     : preview.status === 'blocked'
@@ -2539,8 +2544,8 @@ function MythosPumpfunUnsignedPreviewCard({
       </div>
 
       <div className="mt-5 rounded-2xl border border-[#7DE4FF]/16 bg-[#7DE4FF]/[0.045] p-4">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Payload audit inputs</p>
-        <p className="mt-2 text-xs leading-5 text-white/50">Paste a reviewed metadata URI and choose execution tolerances. This only audits readiness; it still does not serialize or sign a transaction.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Payload audit inputs</p>
+        <p className="mt-2 text-xs leading-5 text-white/50">Mythos prefilled a server-side HTTPS metadata preview so you can test the flow. Replace it with IPFS/Arweave before any real public launch.</p>
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_140px_170px]">
           <label className="block">
             <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/34">Metadata URI</span>
@@ -3038,6 +3043,28 @@ function bytesToBase64(bytes: Uint8Array) {
     binary += String.fromCharCode(byte);
   });
   return window.btoa(binary);
+}
+
+function makePumpfunMetadataPreviewUrl(input: {
+  name: string;
+  symbol: string;
+  description?: string;
+  imagePrompt?: string;
+  hash?: string | null;
+}) {
+  const params = new URLSearchParams({
+    name: input.name,
+    symbol: input.symbol,
+    description: input.description || '',
+    imagePrompt: input.imagePrompt || '',
+    hash: input.hash || '',
+  });
+
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/mythos/pumpfun/metadata-preview?${params.toString()}`;
+  }
+
+  return `/api/mythos/pumpfun/metadata-preview?${params.toString()}`;
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -5111,6 +5138,11 @@ export default function MythosLabConsole() {
                         {message.memecoinUnsignedPreview ? (
                           <MythosPumpfunUnsignedPreviewCard
                             preview={message.memecoinUnsignedPreview}
+                            defaultMetadataUri={makePumpfunMetadataPreviewUrl({
+                              name: message.memecoinUnsignedPreview.token.name,
+                              symbol: message.memecoinUnsignedPreview.token.symbol,
+                              hash: message.memecoinUnsignedPreview.token.metadataHash,
+                            })}
                             onAuditPayload={auditPumpfunPayload}
                           />
                         ) : null}

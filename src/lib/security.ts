@@ -40,6 +40,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/mythos/pumpfun/builder-readiness': { windowMs: 60_000, maxRequests: 20 },
   '/api/mythos/pumpfun/launch-proposal': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/pumpfun/metadata-review': { windowMs: 60_000, maxRequests: 12 },
+  '/api/mythos/pumpfun/metadata-preview': { windowMs: 60_000, maxRequests: 30 },
   '/api/mythos/pumpfun/unsigned-preview': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/pumpfun/payload-audit': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/pumpfun/unsigned-builder': { windowMs: 60_000, maxRequests: 12 },
