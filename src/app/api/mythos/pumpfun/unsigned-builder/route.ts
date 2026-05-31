@@ -180,7 +180,9 @@ export async function POST(request: NextRequest) {
         'local_serializer',
         'Local serializer',
         builderConfig.transaction.localSerializerImplemented ? 'ready' : 'blocked',
-        'Local VersionedTransaction serializer remains disabled until the official Pump.fun account contract is implemented and reviewed.'
+        builderConfig.transaction.localSerializerImplemented
+          ? 'Local VersionedTransaction serializer is reviewed and available for create-only unsigned bytes.'
+          : 'Local VersionedTransaction serializer remains disabled until the official Pump.fun account contract is implemented and reviewed.'
       ),
     ];
 

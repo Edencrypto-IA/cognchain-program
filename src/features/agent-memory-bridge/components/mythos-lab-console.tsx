@@ -2680,6 +2680,7 @@ function MythosPumpfunUnsignedBuilderCard({
   onSubmitConfirmationChange: (builderId: string, value: string) => void;
   onSubmitSignedCreate: (builder: MythosPumpfunUnsignedBuilder) => void;
 }) {
+  const blockedGates = builder.gates.filter(item => item.status === 'blocked');
   const statusClass = builder.status === 'ready_for_audited_provider'
     ? 'border-[#14F195]/24 bg-[#14F195]/10 text-[#8CFFD2]'
     : builder.status === 'blocked'
@@ -2693,7 +2694,9 @@ function MythosPumpfunUnsignedBuilderCard({
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Unsigned Builder Gate</p>
           <h4 className="mt-2 text-2xl font-black text-white">{builder.token.name} <span className="text-[#A7FF3D]">${builder.token.symbol}</span></h4>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/58">
-            Mythos prepared the real builder contract, but transaction bytes stay blocked until official Pump.fun program IDs, account metas, fee/rent quote, and metadata URI are audited.
+            {builder.transaction.wireReady
+              ? 'Create-only transaction bytes are ready for explicit wallet review. Initial buy remains a separate quote, signature, and submit phase after create confirmation.'
+              : 'Mythos prepared the builder review, but create bytes are still blocked until the remaining serialization gates are ready.'}
           </p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClass}`}>
@@ -2751,8 +2754,16 @@ function MythosPumpfunUnsignedBuilderCard({
           <div className="rounded-2xl border border-[#FF5C7A]/16 bg-[#FF5C7A]/7 p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF9AB1]">Still no execution</p>
             <p className="mt-3 text-xs leading-5 text-white/58">{builder.transaction.reason}</p>
+            {blockedGates.length ? (
+              <div className="mt-3 rounded-2xl border border-white/8 bg-black/28 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FFE08A]">Blocking gates</p>
+                <ul className="mt-2 space-y-2 text-[11px] leading-4 text-white/56">
+                  {blockedGates.slice(0, 4).map(gate => <li key={gate.id}>- {gate.label}: {gate.detail}</li>)}
+                </ul>
+              </div>
+            ) : null}
             <ul className="mt-3 space-y-2 text-xs leading-5 text-white/56">
-              {builder.blockedActions.map(action => <li key={action}>- {action}</li>)}
+              {builder.blockedActions.slice(0, 4).map(action => <li key={action}>- {action}</li>)}
             </ul>
             {builder.transaction.wireReady ? (
               <div className="mt-4 rounded-2xl border border-[#FFD166]/18 bg-[#FFD166]/10 p-3">
@@ -3662,7 +3673,7 @@ export default function MythosLabConsole() {
           symbol: audit.token.symbol,
           walletAddress: audit.signer.walletAddress,
           mintPublicKey,
-          firstBuySol: audit.economics.firstBuySol,
+          firstBuySol: 0,
           slippageBps: audit.economics.slippageBps,
           priorityFeeLamports: audit.economics.priorityFeeLamports,
         }),
@@ -3679,6 +3690,12 @@ export default function MythosLabConsole() {
           [unsignedBuilder.id]: Array.from(mintKeypair.secretKey),
         }));
       }
+      if (audit.economics.firstBuySol > 0) {
+        setPumpfunBuySpendSol(current => ({
+          ...current,
+          [unsignedBuilder.id]: String(audit.economics.firstBuySol),
+        }));
+      }
       const assistantMessage: MythosLabMessage = {
         id: createId('msg'),
         role: 'assistant',
@@ -3692,7 +3709,7 @@ export default function MythosLabConsole() {
         messages: [...session.messages, assistantMessage],
         lastTrace: {
           perception: `Unsigned builder gate prepared for ${unsignedBuilder.token.name} (${unsignedBuilder.token.symbol}).`,
-          memoryContext: 'The gate records payload hash, metadata URI, signer, locally generated mint public key, fee/slippage intent, and Pump.fun account requirements.',
+          memoryContext: 'The gate records payload hash, metadata URI, signer, locally generated mint public key, fee/slippage intent, and Pump.fun account requirements. Create bytes are create-only; first buy is separated.',
           selectedSkill: 'Mythos Memecoin Studio - unsigned builder gate',
           reasoningPath: 'Mythos refused third-party builders, refused guessed Program IDs, and required official account schema plus fee/rent quote before bytes.',
           prediction: 'Once wallet signing UX is reviewed, this unsigned create payload can become the handoff point for explicit mint + wallet signatures.',
@@ -3711,7 +3728,7 @@ export default function MythosLabConsole() {
         updatedAt: nowIso(),
       }));
       setNotice(unsignedBuilder.transaction.wireReady
-        ? `Unsigned Pump.fun create payload prepared: ${unsignedBuilder.id}. Mint secret is held only in browser memory; no signature or submission occurred.`
+        ? `Unsigned Pump.fun create-only payload prepared: ${unsignedBuilder.id}. Initial buy is queued for the separate buy phase; no signature or submission occurred.`
         : `Unsigned builder gate prepared: ${unsignedBuilder.id}. Real transaction bytes remain blocked until official audit gates are ready.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not prepare Pump.fun unsigned builder gate.');
