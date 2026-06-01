@@ -24,7 +24,8 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
       if (r.ok) {
-        router.push('/');
+        const nextPath = new URLSearchParams(window.location.search).get('next');
+        router.push(nextPath?.startsWith('/') ? nextPath : '/');
         router.refresh();
       } else {
         const d = await r.json();

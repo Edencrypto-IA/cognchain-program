@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdminToken } from '@/app/api/auth/verify/route';
 
 const COOKIE_NAME = 'mythos_pro_access';
 const TOKEN_SUBJECT = 'mythos-pro-route';
@@ -30,12 +31,15 @@ function isValidToken(value?: string) {
 
 export async function GET(request: NextRequest) {
   const configured = Boolean(process.env.MYTHOS_PRO_ACCESS_PASSWORD);
-  const unlocked = configured && isValidToken(request.cookies.get(COOKIE_NAME)?.value);
+  const adminToken = request.cookies.get('cog_admin')?.value || '';
+  const adminUnlocked = adminToken ? verifyAdminToken(adminToken) : false;
+  const unlocked = adminUnlocked || (configured && isValidToken(request.cookies.get(COOKIE_NAME)?.value));
 
   return NextResponse.json({
     ok: true,
     configured,
     unlocked,
+    adminUnlocked,
   });
 }
 

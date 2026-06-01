@@ -3225,6 +3225,7 @@ export default function MythosLabConsole() {
   const [proAccessUser, setProAccessUser] = useState('');
   const [proAccessPassword, setProAccessPassword] = useState('');
   const [proAccessUnlocked, setProAccessUnlocked] = useState(false);
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [proAccessLoading, setProAccessLoading] = useState(false);
   const [proAccessError, setProAccessError] = useState('');
   const [pumpfunMintSecrets, setPumpfunMintSecrets] = useState<Record<string, number[]>>({});
@@ -3246,11 +3247,22 @@ export default function MythosLabConsole() {
 
     async function checkProAccess() {
       try {
-        const response = await fetch('/api/mythos/pro-access', { cache: 'no-store' });
-        const data = await response.json();
-        if (!cancelled) setProAccessUnlocked(Boolean(data.unlocked));
+        const [proResponse, adminResponse] = await Promise.all([
+          fetch('/api/mythos/pro-access', { cache: 'no-store' }),
+          fetch('/api/auth/verify', { cache: 'no-store' }),
+        ]);
+        const proData = await proResponse.json();
+        const adminData = await adminResponse.json();
+        const isAdmin = Boolean(adminData.admin || proData.adminUnlocked);
+        if (!cancelled) {
+          setAdminUnlocked(isAdmin);
+          setProAccessUnlocked(isAdmin || Boolean(proData.unlocked));
+        }
       } catch {
-        if (!cancelled) setProAccessUnlocked(false);
+        if (!cancelled) {
+          setAdminUnlocked(false);
+          setProAccessUnlocked(false);
+        }
       }
     }
 
@@ -3403,7 +3415,7 @@ export default function MythosLabConsole() {
 
   function selectModel(modelId: string) {
     const model = getModelOption(modelId);
-    if (model.access === 'pro' && !proAccessUnlocked) {
+    if (model.access === 'pro' && !proAccessUnlocked && !adminUnlocked) {
       setPendingProModelId(model.id);
       setProAccessOpen(true);
       setModelMenuOpen(false);
@@ -5101,6 +5113,18 @@ export default function MythosLabConsole() {
           <header className="relative flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
             <a href="/mythos" className="text-xs text-white/45 transition hover:text-white/80">Back to Mythos</a>
             <div className="flex items-center gap-2">
+              <a
+                href="/login?next=/mythos/lab"
+                className={`hidden h-10 items-center gap-2 rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.12em] transition sm:inline-flex ${
+                  adminUnlocked
+                    ? 'border-[#14F195]/22 bg-[#14F195]/10 text-[#8CFFD2]'
+                    : 'border-[#FFD166]/22 bg-[#FFD166]/10 text-[#FFE08A] hover:bg-[#FFD166]/16'
+                }`}
+                title={adminUnlocked ? 'Admin session is active for Mythos Lab' : 'Login as admin to unlock HTML previews and PRO model routes'}
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {adminUnlocked ? 'Admin online' : 'Admin login'}
+              </a>
               <div className="relative">
                 <button
                   type="button"
@@ -5187,7 +5211,7 @@ export default function MythosLabConsole() {
                           Unlock {getModelOption(pendingProModelId || 'gpt').label}
                         </h3>
                         <p className="mt-2 text-xs leading-5 text-white/50">
-                          Paid provider routes are admin-gated. The server verifies access and keeps provider keys private.
+                          Paid provider routes are admin-gated. Admin login unlocks them automatically; a separate Mythos PRO password can also be configured.
                         </p>
                       </div>
                       <button
@@ -5238,7 +5262,7 @@ export default function MythosLabConsole() {
                       {proAccessLoading ? 'Checking...' : 'Unlock PRO route'}
                     </button>
                     <p className="mt-3 text-[11px] leading-4 text-white/36">
-                      Configure Railway with MYTHOS_PRO_ACCESS_USER and MYTHOS_PRO_ACCESS_PASSWORD. No provider key or password is rendered in the browser.
+                      Admin sessions use /login. Optional separate PRO access uses MYTHOS_PRO_ACCESS_USER and MYTHOS_PRO_ACCESS_PASSWORD. No provider key is rendered in the browser.
                     </p>
                   </div>
                 </div>
