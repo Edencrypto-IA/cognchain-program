@@ -578,8 +578,8 @@ const TERMINAL_COMMANDS = [
     detail: 'Save the last approved Mythos answer to CongChain when a full cog_live key is pasted.',
   },
   {
-    command: '/artifact <visual request>',
-    detail: 'Admin-only: ask Anthropic to generate a read-only HTML artifact preview. The Claude key stays on the server.',
+    command: '/criar html <pedido> ou /artifact <visual request>',
+    detail: 'Admin-only: ask Anthropic to generate a read-only HTML preview. The Claude key stays on the server.',
   },
 ];
 
@@ -1131,6 +1131,24 @@ function inferMemecoinImagePrompt(content: string, name: string) {
   const explicit = content.match(/(?:image|imagem|logo|foto)\s*[:=-]?\s*["']?([^"'\n]{8,180})/i);
   if (explicit?.[1]) return explicit[1].trim();
   return `Premium green-black Solana meme coin logo for ${name}, bold mascot, high contrast, clean circular icon, no text.`;
+}
+
+function parseHtmlArtifactPrompt(command: string) {
+  const trimmed = command.trim();
+  const patterns = [
+    /^\/artifact\s+(.+)$/i,
+    /^\/criar\s+(?:html|site|pagina|p[aá]gina|landing(?:\s+page)?)\s+(.+)$/i,
+    /^\/create\s+(?:html|site|website|page|landing(?:\s+page)?)\s+(.+)$/i,
+    /^\/gerar\s+(?:html|site|pagina|p[aá]gina|landing(?:\s+page)?)\s+(.+)$/i,
+    /^\/generate\s+(?:html|site|website|page|landing(?:\s+page)?)\s+(.+)$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match?.[1]?.trim()) return match[1].trim();
+  }
+
+  return '';
 }
 
 function parseMemecoinDraft(content: string, walletAddress?: string): MythosMemecoinDraft | null {
@@ -4521,13 +4539,14 @@ export default function MythosLabConsole() {
       return;
     }
 
-    if (lower.startsWith('/artifact ')) {
-      const prompt = command.slice('/artifact '.length).trim();
+    const htmlArtifactPrompt = parseHtmlArtifactPrompt(command);
+    if (htmlArtifactPrompt) {
+      const prompt = htmlArtifactPrompt;
       if (!prompt) {
         appendTerminalResponse([
           terminalSection('Intent', 'Generate a Mythos HTML artifact'),
           terminalSection('Decision', 'Blocked because no artifact request was provided.'),
-          terminalSection('Next safe step', 'Try: /artifact create a compact SOL price dashboard'),
+          terminalSection('Next safe step', 'Try: /criar html landing page do meu token'),
         ].join('\n\n'));
         return;
       }
