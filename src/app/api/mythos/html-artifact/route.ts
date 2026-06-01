@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/app/api/auth/verify/route';
+import {
+  MYTHOS_HTML_SYSTEM_PROMPT,
+  buildMythosHtmlGenerationPrompt,
+} from '@/lib/mythos/html-artifact-prompts';
+import {
+  checkMythosHtmlSafety,
+  extractMythosArtifactHtml,
+  sanitizeMythosHtml,
+} from '@/lib/mythos/html-artifact-safety';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
-
-const SYSTEM_PROMPT = `You are Mythos, the CongChain external agent interface.
-
-Generate a clean self-contained HTML artifact only when the user asks for a visual interface, dashboard, report, card, chart, or interactive preview.
-
-Rules:
-- Return a short explanation first.
-- Then wrap the HTML in: <artifact type="html" title="Short title">...</artifact>
-- Use CongChain styling: black background, neon green accents, cyan highlights, compact terminal-grade UI, professional spacing.
-- Keep the artifact self-contained with inline CSS and optional inline JavaScript.
-- Do not ask for, render, or store API keys, seed phrases, private keys, wallet secrets, signed payloads, or hidden prompts.
-- Do not create wallet-signing, buy, sell, pay, schedule, or fund-movement flows.
-- The artifact is an admin-only preview layer and must stay read-only.`;
 
 type AnthropicTextBlock = {
   type?: string;
@@ -35,41 +31,6 @@ function getClientIp(req: NextRequest) {
 function isAdminRequest(req: NextRequest) {
   const token = req.cookies.get('cog_admin')?.value || req.headers.get('x-admin-token') || '';
   return token ? verifyAdminToken(token) : false;
-}
-
-function extractArtifact(text: string) {
-  const match = text.match(/<artifact\s+type=["']html["'](?:\s+title=["']([^"']*)["'])?\s*>([\s\S]*?)<\/artifact>/i);
-  if (!match) {
-    const fenced = text.match(/```html\s*([\s\S]*?)```/i);
-    if (fenced?.[1]?.trim()) {
-      return {
-        title: 'Mythos HTML Preview',
-        html: fenced[1].trim(),
-        text: text.replace(fenced[0], '').trim(),
-      };
-    }
-
-    const rawHtml = text.match(/(<!doctype\s+html[\s\S]*|<html[\s\S]*<\/html>|<(?:main|section|div)\b[\s\S]*<\/(?:main|section|div)>)/i);
-    if (rawHtml?.[1]?.trim()) {
-      return {
-        title: 'Mythos HTML Preview',
-        html: rawHtml[1].trim(),
-        text: text.replace(rawHtml[1], '').trim(),
-      };
-    }
-
-    return {
-      title: 'Mythos Artifact',
-      html: '',
-      text: text.trim(),
-    };
-  }
-
-  return {
-    title: match[1]?.trim() || 'Mythos Artifact',
-    html: match[2]?.trim() || '',
-    text: text.replace(match[0], '').trim(),
-  };
 }
 
 function hasSecretLikeContent(value: string) {
@@ -96,7 +57,7 @@ async function callNvidiaArtifact(prompt: string): Promise<ArtifactProviderResul
     body: JSON.stringify({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: MYTHOS_HTML_SYSTEM_PROMPT },
         { role: 'user', content: prompt },
       ],
       max_tokens: 6000,
@@ -134,7 +95,7 @@ async function callAnthropicArtifact(prompt: string): Promise<ArtifactProviderRe
     body: JSON.stringify({
       model,
       max_tokens: 6000,
-      system: SYSTEM_PROMPT,
+      system: MYTHOS_HTML_SYSTEM_PROMPT,
       messages: [
         {
           role: 'user',
@@ -210,12 +171,30 @@ export async function POST(req: NextRequest) {
     }
 
     const provider = typeof body.provider === 'string' ? body.provider : process.env.MYTHOS_HTML_ARTIFACT_PROVIDER || 'nvidia';
-    const generated = await generateArtifact(prompt, provider);
-    const artifact = extractArtifact(generated.text);
+    const generationPrompt = buildMythosHtmlGenerationPrompt({ userRequest: prompt });
+    const generated = await generateArtifact(generationPrompt, provider);
+    const artifact = extractMythosArtifactHtml(generated.text);
 
     if (artifact.html && hasSecretLikeContent(artifact.html)) {
       return NextResponse.json({
         error: 'Generated artifact was blocked because it appeared to contain sensitive content.',
+      }, { status: 422 });
+    }
+    const sanitized = artifact.html ? sanitizeMythosHtml(artifact.html) : { html: '', removals: [] };
+    const safetyCheck = sanitized.html ? checkMythosHtmlSafety(sanitized.html) : null;
+
+    if (safetyCheck?.blockers.length) {
+      return NextResponse.json({
+        error: 'Generated artifact was blocked by the Mythos sandbox safety gate.',
+        safety: {
+          adminOnly: true,
+          keyExposedToBrowser: false,
+          canMoveFunds: false,
+          canSignTransactions: false,
+          blockers: safetyCheck.blockers.map(item => item.rule),
+          warnings: safetyCheck.warnings.map(item => item.rule),
+          removals: sanitized.removals,
+        },
       }, { status: 422 });
     }
 
@@ -227,13 +206,15 @@ export async function POST(req: NextRequest) {
       artifact: artifact.html ? {
         type: 'html',
         title: artifact.title,
-        html: artifact.html,
+        html: sanitized.html,
       } : null,
       safety: {
         adminOnly: true,
         keyExposedToBrowser: false,
         canMoveFunds: false,
         canSignTransactions: false,
+        warnings: safetyCheck?.warnings.map(item => item.rule) || [],
+        removals: sanitized.removals,
       },
     });
   } catch (error) {

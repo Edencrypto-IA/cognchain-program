@@ -4602,13 +4602,19 @@ export default function MythosLabConsole() {
         throw new Error(message);
       }
       const artifact = getRecord(data, 'artifact');
+      const safety = getRecord(data, 'safety');
+      const safetyRemovals = getArray(safety, 'removals').map(String);
+      const safetyWarnings = getArray(safety, 'warnings').map(String);
       appendTerminalResponse([
         terminalSection('Intent', 'Generate a read-only Mythos HTML artifact'),
         terminalSection('Decision', asString(data.text, 'Artifact generated for admin review.')),
+        terminalSection('Design pipeline', 'Mythos used the premium HTML design prompt, selected a visual preset, and ran the sandbox safety gate before rendering.'),
         terminalSection('Safety boundary', [
           'Admin-only route.',
           'Provider API keys stay on the server.',
           'Artifact iframe is sandboxed and cannot sign, buy, sell, pay, schedule, or move funds.',
+          safetyRemovals.length ? `Safety removals: ${safetyRemovals.join(', ')}` : 'Safety removals: none.',
+          safetyWarnings.length ? `Safety warnings: ${safetyWarnings.join(', ')}` : 'Safety warnings: none.',
         ]),
       ].join('\n\n'), {
         htmlArtifact: asString(artifact.html, '') ? {
