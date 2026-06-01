@@ -31,7 +31,7 @@ function isValidToken(value?: string) {
 
 export async function GET(request: NextRequest) {
   const configured = Boolean(process.env.MYTHOS_PRO_ACCESS_PASSWORD);
-  const adminToken = request.cookies.get('cog_admin')?.value || '';
+  const adminToken = request.cookies.get('cog_admin')?.value || request.headers.get('x-admin-token') || '';
   const adminUnlocked = adminToken ? verifyAdminToken(adminToken) : false;
   const unlocked = adminUnlocked || (configured && isValidToken(request.cookies.get(COOKIE_NAME)?.value));
 
