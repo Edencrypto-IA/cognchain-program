@@ -20,6 +20,12 @@ type AnthropicTextBlock = {
   text?: string;
 };
 
+type ArtifactProviderResult = {
+  text: string;
+  model: string;
+  provider: 'nvidia' | 'anthropic';
+};
+
 function getClientIp(req: NextRequest) {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || req.headers.get('x-real-ip')
@@ -34,6 +40,24 @@ function isAdminRequest(req: NextRequest) {
 function extractArtifact(text: string) {
   const match = text.match(/<artifact\s+type=["']html["'](?:\s+title=["']([^"']*)["'])?\s*>([\s\S]*?)<\/artifact>/i);
   if (!match) {
+    const fenced = text.match(/```html\s*([\s\S]*?)```/i);
+    if (fenced?.[1]?.trim()) {
+      return {
+        title: 'Mythos HTML Preview',
+        html: fenced[1].trim(),
+        text: text.replace(fenced[0], '').trim(),
+      };
+    }
+
+    const rawHtml = text.match(/(<!doctype\s+html[\s\S]*|<html[\s\S]*<\/html>|<(?:main|section|div)\b[\s\S]*<\/(?:main|section|div)>)/i);
+    if (rawHtml?.[1]?.trim()) {
+      return {
+        title: 'Mythos HTML Preview',
+        html: rawHtml[1].trim(),
+        text: text.replace(rawHtml[1], '').trim(),
+      };
+    }
+
     return {
       title: 'Mythos Artifact',
       html: '',
@@ -53,6 +77,108 @@ function hasSecretLikeContent(value: string) {
     || /\b(cog_live_[a-z0-9]{16,}|sk-ant-[a-z0-9_-]+|xox[baprs]-[a-z0-9-]+)\b/i.test(value);
 }
 
+async function callNvidiaArtifact(prompt: string): Promise<ArtifactProviderResult> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey) {
+    throw new Error('NVIDIA_API_KEY is not configured.');
+  }
+
+  const model = process.env.MYTHOS_HTML_NVIDIA_MODEL
+    || process.env.NVIDIA_MODEL_GPT_OSS_120B
+    || process.env.NVIDIA_MODEL_NEMOTRON_SUPER
+    || 'openai/gpt-oss-120b';
+  const response = await fetch(`${process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1'}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 6000,
+      temperature: 0.35,
+      top_p: 0.9,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`NVIDIA artifact request failed with status ${response.status}.`);
+  }
+
+  return {
+    text: data?.choices?.[0]?.message?.content?.trim() || '',
+    model,
+    provider: 'nvidia',
+  };
+}
+
+async function callAnthropicArtifact(prompt: string): Promise<ArtifactProviderResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is not configured.');
+  }
+
+  const model = process.env.MYTHOS_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 6000,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Anthropic artifact request failed with status ${response.status}.`);
+  }
+
+  const text = Array.isArray(data.content)
+    ? data.content
+      .map((block: AnthropicTextBlock) => block?.type === 'text' ? block.text || '' : '')
+      .join('\n')
+      .trim()
+    : '';
+
+  return {
+    text,
+    model,
+    provider: 'anthropic',
+  };
+}
+
+async function generateArtifact(prompt: string, preferredProvider: string): Promise<ArtifactProviderResult> {
+  const provider = preferredProvider.trim().toLowerCase();
+  if (provider === 'anthropic' || provider === 'claude') {
+    return callAnthropicArtifact(prompt);
+  }
+
+  try {
+    return await callNvidiaArtifact(prompt);
+  } catch (nvidiaError) {
+    if (process.env.ANTHROPIC_API_KEY) {
+      return callAnthropicArtifact(prompt);
+    }
+    throw nvidiaError;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
   const rate = checkRateLimit(ip, '/api/mythos/html-artifact');
@@ -70,14 +196,6 @@ export async function POST(req: NextRequest) {
     }, { status: 401 });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({
-      error: 'ANTHROPIC_API_KEY is not configured on the server.',
-      configured: false,
-    }, { status: 503 });
-  }
-
   try {
     const body = await req.json();
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
@@ -91,42 +209,9 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const model = process.env.MYTHOS_ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 6000,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      return NextResponse.json({
-        error: 'Anthropic artifact request failed.',
-        status: response.status,
-      }, { status: response.status });
-    }
-
-    const text = Array.isArray(data.content)
-      ? data.content
-        .map((block: AnthropicTextBlock) => block?.type === 'text' ? block.text || '' : '')
-        .join('\n')
-        .trim()
-      : '';
-    const artifact = extractArtifact(text);
+    const provider = typeof body.provider === 'string' ? body.provider : process.env.MYTHOS_HTML_ARTIFACT_PROVIDER || 'nvidia';
+    const generated = await generateArtifact(prompt, provider);
+    const artifact = extractArtifact(generated.text);
 
     if (artifact.html && hasSecretLikeContent(artifact.html)) {
       return NextResponse.json({
@@ -136,7 +221,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      model,
+      model: generated.model,
+      provider: generated.provider,
       text: artifact.text || 'Mythos generated a read-only HTML artifact.',
       artifact: artifact.html ? {
         type: 'html',

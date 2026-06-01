@@ -579,7 +579,7 @@ const TERMINAL_COMMANDS = [
   },
   {
     command: '/criar html <pedido> ou /artifact <visual request>',
-    detail: 'Admin-only: ask Anthropic to generate a read-only HTML preview. The Claude key stays on the server.',
+    detail: 'Admin-only: generate a read-only HTML preview. The model key stays on the server and NVIDIA free-tier is preferred.',
   },
 ];
 
@@ -4566,7 +4566,7 @@ export default function MythosLabConsole() {
         terminalSection('Decision', asString(data.text, 'Artifact generated for admin review.')),
         terminalSection('Safety boundary', [
           'Admin-only route.',
-          'ANTHROPIC_API_KEY stays on the server.',
+          'Provider API keys stay on the server.',
           'Artifact iframe is sandboxed and cannot sign, buy, sell, pay, schedule, or move funds.',
         ]),
       ].join('\n\n'), {
@@ -4580,12 +4580,12 @@ export default function MythosLabConsole() {
           selectedSkill: 'Mythos HTML Artifact Renderer',
           decision: 'Generate and sandbox a read-only preview.',
           prediction: 'The artifact can become a polished Mythos interface pattern after human review.',
-          safetyBoundary: 'Admin-only, server-side Anthropic key, sandboxed preview, no execution authority.',
+          safetyBoundary: 'Admin-only, server-side model key, sandboxed preview, no execution authority.',
           nextHumanStep: 'Review the preview and copy HTML only if it is safe for productization.',
         },
         observability: {
-          model: asString(data.model, 'anthropic'),
-          modelLabel: 'Anthropic HTML artifact renderer',
+          model: asString(data.model, 'artifact-provider'),
+          modelLabel: `${asString(data.provider, 'provider')} HTML artifact renderer`,
           mode: activeSession.mode,
           traceSchema: 'mythos-html-artifact/v1',
           latencyMs: Date.now() - started,
