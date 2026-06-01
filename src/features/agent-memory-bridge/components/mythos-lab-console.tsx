@@ -4558,7 +4558,12 @@ export default function MythosLabConsole() {
       });
       const data = await response.json();
       if (!response.ok || !isRecord(data)) {
-        throw new Error(isRecord(data) ? asString(data.error, 'Mythos artifact request failed.') : 'Mythos artifact request failed.');
+        const message = response.status === 401
+          ? 'HTML preview is admin-only right now. Log in as admin, then run /criar html again.'
+          : isRecord(data)
+            ? asString(data.error, 'Mythos artifact request failed.')
+            : 'Mythos artifact request failed.';
+        throw new Error(message);
       }
       const artifact = getRecord(data, 'artifact');
       appendTerminalResponse([
@@ -4974,9 +4979,14 @@ export default function MythosLabConsole() {
           ...session.messages,
           {
             id: createId('msg'),
-            role: 'system',
+            role: 'assistant',
             createdAt: nowIso(),
-            content: error instanceof Error ? error.message : 'Could not reach Mythos Lab right now.',
+            content: cleanTerminalText([
+              terminalSection('Intent', 'Mythos command response'),
+              terminalSection('Decision', error instanceof Error ? error.message : 'Could not reach Mythos Lab right now.'),
+              terminalSection('Next safe step', 'Check the required login, provider key, or command input, then try again.'),
+              terminalSection('Safety boundary', 'No wallet signature, transaction submit, buy, sell, or fund movement occurred.'),
+            ].join('\n\n')),
           },
         ],
         updatedAt: nowIso(),
