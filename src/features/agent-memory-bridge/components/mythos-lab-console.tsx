@@ -516,6 +516,15 @@ type MemoryWriteResponse = {
 
 const STORAGE_KEY = 'congchain:mythos-lab:sessions:v1';
 
+const MYTHOS_LOADING_STEPS = [
+  'Mythos is reading the request...',
+  'Choosing the safest route...',
+  'Building the preview...',
+  'Refining the interface...',
+  'Checking safety boundaries...',
+  'Almost there...',
+];
+
 const TERMINAL_COMMANDS = [
   {
     command: '/analyze tx <signature>',
@@ -3214,6 +3223,7 @@ export default function MythosLabConsole() {
   const [pendingSaveMessageId, setPendingSaveMessageId] = useState('');
   const [savingMemoryId, setSavingMemoryId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [notice, setNotice] = useState('');
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [walletMenuOpen, setWalletMenuOpen] = useState(false);
@@ -3278,6 +3288,20 @@ export default function MythosLabConsole() {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions.slice(0, 8)));
     }
   }, [sessions]);
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStep(0);
+      return;
+    }
+
+    setLoadingStep(0);
+    const interval = window.setInterval(() => {
+      setLoadingStep(current => Math.min(current + 1, MYTHOS_LOADING_STEPS.length - 1));
+    }, 2200);
+
+    return () => window.clearInterval(interval);
+  }, [loading]);
 
   const activeSession = sessions.find(session => session.id === activeId) || sessions[0];
   const selectedSkill =
@@ -5526,9 +5550,22 @@ export default function MythosLabConsole() {
                       </div>
                     ))}
                     {loading && (
-                      <div className="mr-auto inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-4 py-3 text-sm text-white/55">
-                        <Loader2 className="h-4 w-4 animate-spin text-[#76FF03]" />
-                        Mythos is processing the command...
+                      <div className="mr-auto w-full max-w-[520px] rounded-2xl border border-[#76FF03]/18 bg-[linear-gradient(135deg,rgba(118,255,3,0.09),rgba(255,255,255,0.035))] p-4 text-sm text-white/72 shadow-[0_0_34px_rgba(118,255,3,0.035)]">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#76FF03]/20 bg-black/42">
+                            <Loader2 className="h-4 w-4 animate-spin text-[#76FF03]" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#A7FF3D]">Mythos is working</p>
+                            <p className="mt-1 text-sm font-semibold text-white/74">{MYTHOS_LOADING_STEPS[loadingStep]}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/8">
+                          <div
+                            className="h-full rounded-full bg-[#76FF03] transition-all duration-500"
+                            style={{ width: `${Math.max(14, ((loadingStep + 1) / MYTHOS_LOADING_STEPS.length) * 100)}%` }}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
