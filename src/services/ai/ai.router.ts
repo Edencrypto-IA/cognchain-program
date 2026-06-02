@@ -238,6 +238,44 @@ class QwenHandler implements AIHandler {
 }
 
 // ── Handlers singleton ───────────────────────────────────────
+class NvidiaConfiguredRouteHandler implements AIHandler {
+  name: string;
+  model: string;
+  private envModel: string;
+  private fallbackModel: string;
+
+  constructor(model: string, name: string, envModel: string, fallbackModel: string) {
+    this.model = model;
+    this.name = name;
+    this.envModel = envModel;
+    this.fallbackModel = fallbackModel;
+  }
+
+  async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
+    const client = new OpenAI({
+      apiKey: process.env.NVIDIA_API_KEY,
+      baseURL: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+    });
+    const systemPrompt = systemPromptOverride ||
+      'Voce e um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain. Responda em portugues de forma precisa e eficiente.';
+
+    const response = await client.chat.completions.create({
+      model: process.env[this.envModel] || this.fallbackModel,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ],
+      max_tokens: 1024,
+      temperature: 0.7,
+      top_p: 1,
+    });
+
+    const content = response.choices[0]?.message?.content || `Sem resposta do ${this.name}.`;
+    trackUsage('nvidia', response.usage?.prompt_tokens ?? estimateTokens(systemPrompt), response.usage?.completion_tokens ?? estimateTokens(content));
+    return content;
+  }
+}
+
 const handlers: Record<string, AIHandler> = {
   gpt:      new GPTHandler(),
   claude:   new ClaudeHandler(),
@@ -247,6 +285,17 @@ const handlers: Record<string, AIHandler> = {
   glm:      new GLMHandler(),
   minimax:  new MiniMaxHandler(),
   qwen:     new QwenHandler(),
+  'nemotron-super-120b': new NvidiaConfiguredRouteHandler('nemotron-super-120b', 'Nemotron Super 120B', 'NVIDIA_MODEL_NEMOTRON_SUPER', 'nvidia/nemotron-3-super-120b-a12b'),
+  'deepseek-v4-pro': new NvidiaConfiguredRouteHandler('deepseek-v4-pro', 'DeepSeek V4 Pro', 'NVIDIA_MODEL_DEEPSEEK_V4', 'deepseek-ai/deepseek-v3.1'),
+  'seed-oss-36b': new NvidiaConfiguredRouteHandler('seed-oss-36b', 'Seed OSS 36B', 'NVIDIA_MODEL_SEED', 'bytedance/seed-oss-36b-instruct'),
+  'qwen35-122b': new NvidiaConfiguredRouteHandler('qwen35-122b', 'Qwen 3.5 122B', 'NVIDIA_MODEL_QWEN35', 'qwen/qwen3-235b-a22b-instruct-2507'),
+  'kimi-k26': new NvidiaConfiguredRouteHandler('kimi-k26', 'Kimi K2.6', 'NVIDIA_MODEL_KIMI', 'moonshotai/kimi-k2-instruct'),
+  'mixtral-8x22b': new NvidiaConfiguredRouteHandler('mixtral-8x22b', 'Mixtral 8x22B', 'NVIDIA_MODEL_MIXTRAL', 'mistralai/mixtral-8x22b-instruct-v0.1'),
+  'mistral-large': new NvidiaConfiguredRouteHandler('mistral-large', 'Mistral Large 3', 'NVIDIA_MODEL_MISTRAL_LARGE', 'mistralai/mistral-large'),
+  'gpt-oss-120b': new NvidiaConfiguredRouteHandler('gpt-oss-120b', 'GPT-OSS 120B', 'NVIDIA_MODEL_GPT_OSS_120B', 'openai/gpt-oss-120b'),
+  'gemma4-31b': new NvidiaConfiguredRouteHandler('gemma4-31b', 'Gemma 4 31B', 'NVIDIA_MODEL_GEMMA4', 'google/gemma-3-27b-it'),
+  'gemma3n-e2b': new NvidiaConfiguredRouteHandler('gemma3n-e2b', 'Gemma 3N E2B', 'NVIDIA_MODEL_GEMMA3N_E2B', 'google/gemma-3n-e2b-it'),
+  'phi4-mini': new NvidiaConfiguredRouteHandler('phi4-mini', 'Phi-4 Mini', 'NVIDIA_MODEL_PHI4', 'microsoft/phi-4-mini-instruct'),
 };
 
 export function getHandler(model: string): AIHandler {

@@ -193,6 +193,17 @@ export async function POST(req: NextRequest) {
             glm:     { url: 'https://integrate.api.nvidia.com/v1', name: 'z-ai/glm4.7', key: process.env.NVIDIA_GLM_KEY ?? '' },
             minimax: { url: 'https://integrate.api.nvidia.com/v1', name: 'minimaxai/minimax-m2.7', key: process.env.NVIDIA_MINIMAX_KEY ?? '' },
             qwen:    { url: 'https://integrate.api.nvidia.com/v1', name: 'qwen/qwen3-next-80b-a3b-instruct', key: process.env.NVIDIA_QWEN_KEY ?? '' },
+            'nemotron-super-120b': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_NEMOTRON_SUPER || 'nvidia/nemotron-3-super-120b-a12b', key: process.env.NVIDIA_API_KEY ?? '' },
+            'deepseek-v4-pro': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_DEEPSEEK_V4 || 'deepseek-ai/deepseek-v3.1', key: process.env.NVIDIA_API_KEY ?? '' },
+            'seed-oss-36b': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_SEED || 'bytedance/seed-oss-36b-instruct', key: process.env.NVIDIA_API_KEY ?? '' },
+            'qwen35-122b': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_QWEN35 || 'qwen/qwen3-235b-a22b-instruct-2507', key: process.env.NVIDIA_API_KEY ?? '' },
+            'kimi-k26': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_KIMI || 'moonshotai/kimi-k2-instruct', key: process.env.NVIDIA_API_KEY ?? '' },
+            'mixtral-8x22b': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_MIXTRAL || 'mistralai/mixtral-8x22b-instruct-v0.1', key: process.env.NVIDIA_API_KEY ?? '' },
+            'mistral-large': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_MISTRAL_LARGE || 'mistralai/mistral-large', key: process.env.NVIDIA_API_KEY ?? '' },
+            'gpt-oss-120b': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_GPT_OSS_120B || 'openai/gpt-oss-120b', key: process.env.NVIDIA_API_KEY ?? '' },
+            'gemma4-31b': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_GEMMA4 || 'google/gemma-3-27b-it', key: process.env.NVIDIA_API_KEY ?? '' },
+            'gemma3n-e2b': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_GEMMA3N_E2B || 'google/gemma-3n-e2b-it', key: process.env.NVIDIA_API_KEY ?? '' },
+            'phi4-mini': { url: 'https://integrate.api.nvidia.com/v1', name: process.env.NVIDIA_MODEL_PHI4 || 'microsoft/phi-4-mini-instruct', key: process.env.NVIDIA_API_KEY ?? '' },
           };
           const cfg = modelMap[selectedModel] ?? modelMap.nvidia;
           full = await streamOpenAICompat(validMsgs, cfg.name, cfg.url, cfg.key, SYSTEM, controller);

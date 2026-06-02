@@ -115,9 +115,23 @@ const MAX_MESSAGES_ARRAY = 50;
 const MAX_COMPARE_MODELS = 5;
 const MAX_TRANSLATE_MESSAGES = 100;
 
-const ALLOWED_MODELS = new Set(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'glm', 'minimax', 'qwen']);
+const NVIDIA_ROUTE_MODELS = [
+  'nemotron-super-120b',
+  'deepseek-v4-pro',
+  'seed-oss-36b',
+  'qwen35-122b',
+  'kimi-k26',
+  'mixtral-8x22b',
+  'mistral-large',
+  'gpt-oss-120b',
+  'gemma4-31b',
+  'gemma3n-e2b',
+  'phi4-mini',
+];
 
-export const FREE_MODELS  = new Set(['nvidia', 'glm', 'minimax', 'qwen']);
+const ALLOWED_MODELS = new Set(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'glm', 'minimax', 'qwen', ...NVIDIA_ROUTE_MODELS]);
+
+export const FREE_MODELS  = new Set(['nvidia', 'glm', 'minimax', 'qwen', ...NVIDIA_ROUTE_MODELS]);
 export const PRO_MODELS   = new Set(['gpt', 'claude', 'deepseek', 'gemini']);
 export const MODEL_TIER   = (m: string): 'free' | 'pro' => PRO_MODELS.has(m) ? 'pro' : 'free';
 const HEX_REGEX = /^[a-fA-F0-9]{64}$/;
