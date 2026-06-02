@@ -4,6 +4,8 @@ import {
   resolveMythosHtmlSkills,
   type MythosHtmlPresetName,
 } from './html-design-skills';
+import { MYTHOS_PREMIUM_CSS_GUIDE } from './design-system';
+import { buildSkillPipelinePrompt } from './skill-engine';
 
 export type MythosHtmlGenerationBrief = {
   userRequest: string;
@@ -29,6 +31,7 @@ Technical requirements:
 - Do not include JavaScript. Use HTML and CSS only.
 - No external scripts, stylesheets, fonts, iframes, images, or CDNs.
 - Use system fonts only.
+- Do not use Tailwind, Bootstrap, utility classes, or CDN frameworks.
 - Use CSS custom properties for colors, spacing, radius, and shadows.
 - Responsive at 375px, 768px, and 1280px.
 - Use stable layout constraints: max-width, minmax(0, 1fr), overflow-wrap, and responsive grids.
@@ -91,6 +94,12 @@ export function buildMythosHtmlGenerationPrompt(brief: MythosHtmlGenerationBrief
     brief.ticker ? `Ticker: ${brief.ticker}` : '',
     '',
     `Internal skill pipeline: ${skills.join(' -> ')}`,
+    '',
+    'Premium UI skill engine:',
+    buildSkillPipelinePrompt(brief.userRequest),
+    '',
+    'Mythos design system CSS guidance:',
+    MYTHOS_PREMIUM_CSS_GUIDE,
     '',
     'Generate a polished, production-grade, read-only HTML preview. Keep it safe, self-contained, responsive, and visually premium.',
   ].filter(Boolean).join('\n');

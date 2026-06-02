@@ -9,6 +9,7 @@ export type MythosHtmlSafetyViolation = {
 
 export type MythosHtmlSafetyResult = {
   safe: boolean;
+  riskScore: number;
   violations: MythosHtmlSafetyViolation[];
   blockers: MythosHtmlSafetyViolation[];
   warnings: MythosHtmlSafetyViolation[];
@@ -21,6 +22,9 @@ type SafetyRule = {
   patterns: RegExp[];
 };
 
+// These rules are lightweight risk heuristics, not a complete HTML parser.
+// Final rendering still relies on a strict sandbox, no scripts, no dependencies,
+// and server-side validation before the artifact reaches the iframe preview.
 const MYTHOS_HTML_SAFETY_RULES: SafetyRule[] = [
   {
     id: 'external-script',
@@ -67,6 +71,17 @@ const MYTHOS_HTML_SAFETY_RULES: SafetyRule[] = [
       /WalletMultiButton/gi,
       /connectWallet\s*\(/gi,
       /requestAccounts/gi,
+      />\s*(connect\s+wallet|connect\s+phantom|connect\s+solflare|claim\s+airdrop)\s*</gi,
+    ],
+  },
+  {
+    id: 'wallet-phishing-copy',
+    severity: 'block',
+    description: 'Wallet phishing or fake connect-wallet language detected.',
+    patterns: [
+      /\b(connect\s+(your\s+)?wallet\s+to\s+(claim|unlock|verify|receive))/gi,
+      /\b(phantom|solflare)\s+(login|password|seed|phrase|private\s+key)/gi,
+      /\b(claim|unlock|verify)\s+(airdrop|reward|allocation)\b/gi,
     ],
   },
   {
@@ -77,6 +92,7 @@ const MYTHOS_HTML_SAFETY_RULES: SafetyRule[] = [
       /name\s*=\s*["'][^"']*(seed|mnemonic|private|secret|api[_-]?key|signed)[^"']*["']/gi,
       /placeholder\s*=\s*["'][^"']*(seed phrase|private key|secret key|mnemonic|api key)[^"']*["']/gi,
       /type\s*=\s*["']password["']/gi,
+      /\b(seed phrase|private key|secret key|mnemonic phrase|recovery phrase)\b/gi,
     ],
   },
   {
@@ -186,8 +202,14 @@ export function checkMythosHtmlSafety(html: string): MythosHtmlSafetyResult {
 
   const blockers = violations.filter(item => item.severity === 'block');
   const warnings = violations.filter(item => item.severity === 'warn');
+  const riskScore = Math.min(100, violations.reduce((sum, item) => {
+    if (item.severity === 'block') return sum + 35;
+    if (item.severity === 'warn') return sum + 12;
+    return sum + 3;
+  }, 0));
   return {
     safe: blockers.length === 0,
+    riskScore,
     violations,
     blockers,
     warnings,
@@ -336,7 +358,7 @@ export function detectUnsafeHtml(html: string) {
 }
 
 export function validateHtmlArtifact(html: string) {
-  return checkMythosHtmlSafety(html).safe;
+  return checkMythosHtmlSafety(html);
 }
 
 export function sanitizeHtmlArtifact(html: string) {
@@ -347,6 +369,7 @@ export function generateSafetyReport(html: string) {
   const result = checkMythosHtmlSafety(html);
   return {
     safe: result.safe,
+    riskScore: result.riskScore,
     blockers: result.blockers.map(item => item.rule),
     warnings: result.warnings.map(item => item.rule),
     violations: result.violations,
