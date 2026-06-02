@@ -375,3 +375,17 @@ export function generateSafetyReport(html: string) {
     violations: result.violations,
   };
 }
+
+export function createSafetySkillTransform(): (html: string) => string {
+  return (html: string) => {
+    const sanitized = sanitizeMythosHtml(html);
+    if (!sanitized.removals.length) return sanitized.html;
+
+    const note = `\n<!-- Mythos safety skill removed: ${sanitized.removals.join(', ')} -->`;
+    if (sanitized.html.includes('</body>')) {
+      return sanitized.html.replace('</body>', `${note}\n</body>`);
+    }
+
+    return `${sanitized.html}${note}`;
+  };
+}

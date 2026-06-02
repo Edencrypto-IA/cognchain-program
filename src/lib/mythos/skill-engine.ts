@@ -7,6 +7,7 @@ import { AI_ARTIFACT_REFINER_SKILL } from './skills/ai-artifact-refiner';
 import { MYTHOS_TERMINAL_SKILL } from './skills/mythos-terminal-skill';
 import { WEBSITE_DNA_EXTRACTOR_SKILL } from './skills/website-dna-extractor-skill';
 import { UI_EVOLUTION_SKILL } from './skills/ui-evolution-skill';
+import { SAFETY_SKILL } from './skills/safety-skill';
 
 export type MythosSkillStage = 'generation' | 'review' | 'polish' | 'mobile' | 'safety';
 
@@ -50,6 +51,7 @@ export const MYTHOS_PREMIUM_UI_SKILLS: MythosSkill[] = [
   MOBILE_NATIVE_SKILL,
   AI_ARTIFACT_REFINER_SKILL,
   MYTHOS_TERMINAL_SKILL,
+  SAFETY_SKILL,
 ];
 
 export function selectSkills(context: SkillExecutionContext, skills = MYTHOS_PREMIUM_UI_SKILLS): MythosSkill[] {
