@@ -62,6 +62,11 @@ type MythosLabMessage = {
   readUrl?: string;
   verifyUrl?: string;
   proofUrl?: string;
+  memoryVault?: string;
+  memoryVerified?: boolean;
+  memoryOnChain?: boolean;
+  memoryZkEnabled?: boolean;
+  memoryZkPersisted?: boolean;
 };
 
 type MythosLabAttachment = {
@@ -598,6 +603,13 @@ type MemoryWriteResponse = {
   readUrl?: string;
   verifyUrl?: string;
   proofUrl?: string;
+  vault?: string;
+  verified?: boolean;
+  on_chain?: boolean;
+  zkEnabled?: boolean;
+  zkPersisted?: boolean;
+  zkReason?: string;
+  zkPersistReason?: string;
   error?: string;
 };
 
@@ -1832,6 +1844,56 @@ function missionStatusClass(status: MythosMissionAgent['status']) {
   if (status === 'warning') return 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
   if (status === 'fired') return 'border-[#FF5C7A]/20 bg-[#FF5C7A]/10 text-[#FF9AB1]';
   return 'border-white/10 bg-white/[0.035] text-white/46';
+}
+
+function CongChainMemoryRecord({ message }: { message: MythosLabMessage }) {
+  if (!message.memoryHash) return null;
+
+  const proofStatus = message.memoryZkPersisted
+    ? 'ZK ready'
+    : message.memoryZkEnabled
+      ? 'ZK requested'
+      : 'Proof route';
+  const chainStatus = message.memoryOnChain ? 'on-chain' : 'anchor manual';
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-[#7DE4FF]/18 bg-[linear-gradient(135deg,rgba(125,228,255,0.08),rgba(20,241,149,0.04))]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">CONGCHAIN MEMORY RECORD</p>
+          <p className="mt-1 text-[11px] leading-4 text-white/46">Mythos response saved through the CongChain Agent Memory Bridge.</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-2 py-1 text-[9px] font-black uppercase text-[#8CFFD2]">Hash</span>
+          <span className="rounded-full border border-[#7DE4FF]/18 bg-[#7DE4FF]/8 px-2 py-1 text-[9px] font-black uppercase text-[#9AEAFF]">{proofStatus}</span>
+          <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase ${
+            message.memoryOnChain
+              ? 'border-[#76FF03]/20 bg-[#76FF03]/10 text-[#A7FF3D]'
+              : 'border-[#FFD166]/20 bg-[#FFD166]/10 text-[#FFE08A]'
+          }`}>{chainStatus}</span>
+        </div>
+      </div>
+      <div className="grid gap-3 px-4 py-3 sm:grid-cols-[1.1fr_0.9fr]">
+        <div className="min-w-0 rounded-xl border border-white/8 bg-black/24 p-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">SHA-256 memory hash</p>
+          <p className="mt-2 break-all font-mono text-[11px] leading-4 text-[#A7FF3D]/82">{message.memoryHash}</p>
+        </div>
+        <div className="rounded-xl border border-white/8 bg-black/24 p-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Protocol state</p>
+          <p className="mt-2 text-[11px] leading-4 text-white/52">
+            Vault: {message.memoryVault || 'Mythos isolated vault'}<br />
+            Verified: {message.memoryVerified ? 'yes' : 'pending'}<br />
+            Anchor: {message.memoryOnChain ? 'Solana record linked' : 'manual anchor available'}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-white/8 px-4 py-3">
+        {message.readUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.readUrl}>Read memory</a> : null}
+        {message.verifyUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.verifyUrl}>Verify record</a> : null}
+        {message.proofUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.proofUrl}>ZK proof</a> : null}
+      </div>
+    </div>
+  );
 }
 
 function MythosMissionControlPanel({
@@ -4764,6 +4826,11 @@ export default function MythosLabConsole() {
           readUrl: data.readUrl,
           verifyUrl: data.verifyUrl,
           proofUrl: data.proofUrl,
+          memoryVault: data.vault,
+          memoryVerified: data.verified,
+          memoryOnChain: data.on_chain,
+          memoryZkEnabled: data.zkEnabled,
+          memoryZkPersisted: data.zkPersisted,
         }
         : message),
       lastObservability: {
@@ -4795,10 +4862,13 @@ export default function MythosLabConsole() {
         body: JSON.stringify({
           ...memoryPayload,
           content: message.content,
+          generateZkProof: true,
           metadata: {
             ...memoryPayload.metadata,
             messageId: message.id,
             messageCreatedAt: message.createdAt,
+            proofMode: 'zk_requested',
+            anchorMode: 'manual',
           },
         }),
       });
@@ -4806,7 +4876,7 @@ export default function MythosLabConsole() {
       if (!response.ok) throw new Error(data.error || 'Could not save Mythos memory.');
       markMessageSaved(message.id, data);
       setPendingSaveMessageId('');
-      setNotice(`Memory saved to Mythos vault: ${shortHash(data.hash, 18)}`);
+      setNotice(`CongChain memory saved: ${shortHash(data.hash, 18)}. ZK ${data.zkPersisted ? 'ready' : data.zkEnabled ? 'requested' : 'available by proof route'}. Anchor remains manual.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not save Mythos memory.');
     } finally {
@@ -5180,7 +5250,15 @@ export default function MythosLabConsole() {
           Authorization: `Bearer ${apiKey.trim()}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(memoryPayload),
+        body: JSON.stringify({
+          ...memoryPayload,
+          generateZkProof: true,
+          metadata: {
+            ...memoryPayload.metadata,
+            proofMode: 'zk_requested',
+            anchorMode: 'manual',
+          },
+        }),
       });
       const data = await response.json() as MemoryWriteResponse;
       if (!response.ok) throw new Error(data.error || 'Could not save Mythos memory.');
@@ -5498,6 +5576,26 @@ export default function MythosLabConsole() {
                 {missionControlOpen ? 'open' : 'tasks'}
               </span>
             </button>
+          </div>
+
+          <div className="relative mt-4 rounded-2xl border border-[#7DE4FF]/14 bg-[#7DE4FF]/[0.045] p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Powered by CongChain Protocol</p>
+            <p className="mt-2 text-[11px] leading-4 text-white/46">
+              Mythos usa o Agent Memory Bridge para transformar respostas importantes em memorias verificaveis.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[
+                ['Bridge', 'write/read'],
+                ['Hash', 'SHA-256'],
+                ['Proof', 'ZK route'],
+                ['Anchor', 'Solana'],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-white/8 bg-black/24 p-2">
+                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-white/30">{label}</p>
+                  <p className="mt-1 text-[10px] font-black text-white/62">{value}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="relative mt-10">
@@ -5951,17 +6049,8 @@ export default function MythosLabConsole() {
                                 {savingMemoryId === message.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                                 {message.memoryHash ? 'Saved' : 'Save'}
                               </button>
-                              {message.memoryHash ? (
-                                <>
-                                  <span className="rounded-full border border-white/8 bg-white/[0.035] px-3 py-1 text-[11px] font-mono text-white/48">
-                                    {shortHash(message.memoryHash, 18)}
-                                  </span>
-                                  {message.readUrl ? <a className="text-[11px] font-bold text-[#7DE4FF]" href={message.readUrl}>Read</a> : null}
-                                  {message.verifyUrl ? <a className="text-[11px] font-bold text-[#7DE4FF]" href={message.verifyUrl}>Verify</a> : null}
-                                  {message.proofUrl ? <a className="text-[11px] font-bold text-[#7DE4FF]" href={message.proofUrl}>Proof</a> : null}
-                                </>
-                              ) : null}
                             </div>
+                            <CongChainMemoryRecord message={message} />
                             {pendingSaveMessageId === message.id && !message.memoryHash ? (
                               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                                 <input
