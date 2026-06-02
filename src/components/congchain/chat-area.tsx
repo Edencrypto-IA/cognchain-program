@@ -1836,12 +1836,8 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
   }, []);
 
   const selected = CONGCHAIN_MODEL_OPTIONS.find(modelOption => modelOption.key === selectedModel) ?? CONGCHAIN_MODEL_OPTIONS[0];
-  const FREE = CONGCHAIN_MODEL_OPTIONS
-    .filter(modelOption => modelOption.tier === 'open')
-    .map(modelOption => ({ key: modelOption.key, name: modelOption.name, color: modelOption.color }));
-  const PRO = CONGCHAIN_MODEL_OPTIONS
-    .filter(modelOption => modelOption.tier === 'pro')
-    .map(modelOption => ({ key: modelOption.key, name: modelOption.name, color: modelOption.color }));
+  const openRoutes = CONGCHAIN_MODEL_OPTIONS.filter(modelOption => modelOption.tier === 'open');
+  const proRoutes = CONGCHAIN_MODEL_OPTIONS.filter(modelOption => modelOption.tier === 'pro');
 
   const handleClick = (key: AIModel, isPro: boolean) => {
     if (isPro && !isAdmin) { setShowUpgrade(key); return; }
@@ -1849,10 +1845,46 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
     onModelChange(key);
   };
 
+  const renderRouteButton = (modelOption: typeof CONGCHAIN_MODEL_OPTIONS[number]) => {
+    const active = selectedModel === modelOption.key;
+    const locked = modelOption.tier === 'pro' && !isAdmin;
+
+    return (
+      <button
+        key={modelOption.key}
+        type="button"
+        onClick={() => handleClick(modelOption.key, modelOption.tier === 'pro')}
+        className={`group flex w-full min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 ${
+          active
+            ? 'border-[#14F195]/30 bg-[#14F195]/[0.075] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+            : locked
+              ? 'border-white/[0.055] bg-white/[0.018] text-white/42 hover:border-[#9945FF]/24 hover:bg-[#9945FF]/[0.055] hover:text-white/68'
+              : 'border-white/[0.065] bg-white/[0.025] text-white/58 hover:border-[#14F195]/22 hover:bg-[#14F195]/[0.045] hover:text-white/82'
+        }`}
+      >
+        <span
+          className="h-2.5 w-2.5 flex-shrink-0 rounded-full shadow-[0_0_12px_currentColor]"
+          style={{ backgroundColor: modelOption.color, color: modelOption.color, opacity: locked ? 0.55 : 1 }}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[11px] font-black uppercase tracking-[0.08em]">{modelOption.name}</span>
+          <span className="mt-0.5 block truncate text-[10px] font-medium text-white/34">
+            {modelOption.tier === 'pro' ? (isAdmin ? 'rota pro liberada' : 'rota pro/admin') : 'rota aberta'}
+          </span>
+        </span>
+        {active ? (
+          <span className="rounded-full bg-[#14F195]/12 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#14F195]/86">ativo</span>
+        ) : locked ? (
+          <span className="rounded-full bg-[#9945FF]/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#C4B5FD]/74">pro</span>
+        ) : null}
+      </button>
+    );
+  };
+
   return (
     <>
       {showUpgrade && <UpgradeModal model={showUpgrade} onClose={() => setShowUpgrade(null)} />}
-      <div className="relative">
+      <div className="relative z-[80]">
         <button
           type="button"
           onClick={() => setOpen(current => !current)}
@@ -1864,32 +1896,23 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
           <span>{selected.name}</span>
           <ChevronDown className={`h-3.5 w-3.5 text-white/42 transition ${open ? 'rotate-180' : ''}`} />
         </button>
-      <div className={`${open ? 'flex' : 'hidden'} absolute right-0 top-full z-50 mt-2 w-[min(92vw,720px)] items-center gap-1 flex-wrap rounded-2xl border border-[#14F195]/16 bg-[#070A08]/96 p-2 shadow-2xl shadow-black/45 backdrop-blur-2xl`}>
-        {FREE.map(m => (
-          <button key={m.key} onClick={() => handleClick(m.key, false)}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200
-              ${selectedModel === m.key ? 'bg-white/[0.105] border border-white/[0.14] text-white/92 shadow-sm' : 'border border-transparent text-white/48 hover:text-white/72 hover:bg-white/[0.045]'}`}>
-            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 shadow-[0_0_10px_currentColor]" style={{ backgroundColor: m.color, color: m.color }} />
-            {m.name}
-          </button>
-        ))}
-        <span className="w-px h-4 bg-white/[0.08] mx-0.5" />
-        {PRO.map(m => (
-          <button key={m.key} onClick={() => handleClick(m.key, true)}
-            className={`relative px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200 group
-              ${selectedModel === m.key
-                ? 'bg-white/[0.105] border border-white/[0.14] text-white/92 shadow-sm'
-                : isAdmin
-                  ? 'border border-transparent text-white/56 hover:text-white/84 hover:bg-white/[0.04]'
-                  : 'border border-transparent text-white/38 hover:text-white/58 hover:bg-white/[0.035]'
-              }`}>
-            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 shadow-[0_0_10px_currentColor]" style={{ backgroundColor: m.color, color: m.color, opacity: isAdmin ? 1 : 0.55 }} />
-            {m.name}
-            {!isAdmin && <span className="ml-1 text-[9px] font-bold text-[#A78BFA]/80 group-hover:text-[#C4B5FD]">PRO</span>}
-            {isAdmin && selectedModel === m.key && <span className="ml-1 text-[9px] text-[#00d4aa]/60">✓</span>}
-          </button>
-        ))}
-      </div>
+        <div className={`${open ? 'block' : 'hidden'} absolute right-0 top-[calc(100%+8px)] z-[90] w-[min(92vw,380px)] max-h-[72vh] overflow-y-auto rounded-2xl border border-[#14F195]/18 bg-[#050806]/96 p-3 shadow-2xl shadow-black/55 backdrop-blur-2xl`}>
+          <div className="mb-3 flex items-start justify-between gap-3 border-b border-white/[0.07] pb-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14F195]/70">Selecionar IA</p>
+              <p className="mt-1 truncate text-xs text-white/46">Rotas disponíveis na CONGCHAIN</p>
+            </div>
+            {isAdmin ? (
+              <span className="rounded-full border border-[#14F195]/18 bg-[#14F195]/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-[#14F195]/78">admin</span>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <p className="px-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/30">Abertas</p>
+            <div className="space-y-1.5">{openRoutes.map(renderRouteButton)}</div>
+            <p className="px-1 pt-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/30">Pro / admin</p>
+            <div className="space-y-1.5">{proRoutes.map(renderRouteButton)}</div>
+          </div>
+        </div>
       </div>
     </>
   );
@@ -3259,7 +3282,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               </div>
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-sm font-semibold tracking-[-0.01em] text-white/90">CognChain</h1>
+              <h1 className="text-sm font-semibold tracking-[-0.01em] text-white/90">CONGCHAIN</h1>
               <p className="max-w-[190px] text-[11px] leading-snug text-white/34">Verifiable Memory Protocol for AI Agents.</p>
             </div>
           </div>
@@ -3342,7 +3365,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                     <Orb mode={orbMode} size="xl" interactive />
                   </div>
                 </div>
-                <p className="relative mb-2 text-[9px] font-bold uppercase tracking-[0.34em] text-[#5AD7FF]/70 xl:mb-3 xl:text-[10px]">CognChain</p>
+                <p className="relative mb-2 text-[9px] font-bold uppercase tracking-[0.34em] text-[#5AD7FF]/70 xl:mb-3 xl:text-[10px]">CONGCHAIN</p>
                 <h2 className="relative max-w-2xl text-center text-[1.55rem] font-semibold leading-[1.06] text-[#F4F2FF] md:text-[2.45rem] xl:text-[3.35rem]">
                   Verifiable Memory Protocol
                   <span className="block text-white/82">for AI Agents.</span>
@@ -3357,17 +3380,6 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                     </span>
                   ))}
                 </div>
-              </div>
-              {/* Model selector on empty state */}
-              <div className="flex items-center gap-1.5 mb-5 flex-wrap justify-center">
-                {CONGCHAIN_MODEL_OPTIONS.map(({ key, name, color, tier }) => (
-                  <button key={key} onClick={() => setSelectedModel(key)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${selectedModel === key ? 'bg-white/[0.08] border border-white/[0.14] text-white/90 shadow-sm' : 'bg-white/[0.025] border border-white/[0.06] text-white/42 hover:text-white/65 hover:bg-white/[0.055]'}`}>
-                    <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: color }} />
-                    {name}
-                    {tier === 'pro' ? <span className="ml-1 text-[9px] font-black text-[#C4B5FD]/70">PRO</span> : null}
-                  </button>
-                ))}
               </div>
               {/* Memory hash loader */}
               <div className="w-full max-w-md mb-5">
@@ -3388,7 +3400,7 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
                         const mem = data.memory;
                         if (!mem) throw new Error('Memória inválida');
                         const createdAt = new Date(mem.timestamp * 1000).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-                        const ctx = `⚡ Memória Verificada · CognChain on Solana\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nHash: ${mem.hash}\nModelo: ${mem.model} · Score: ${mem.score ?? '—'}/10\nCriada em: ${createdAt}\nStatus: ${mem.verified ? '✓ Verificado on-chain' : '⏳ Pendente'}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${mem.content}`;
+                        const ctx = `⚡ Memória Verificada · CONGCHAIN on Solana\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nHash: ${mem.hash}\nModelo: ${mem.model} · Score: ${mem.score ?? '—'}/10\nCriada em: ${createdAt}\nStatus: ${mem.verified ? '✓ Verificado on-chain' : '⏳ Pendente'}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${mem.content}`;
                         setMessages([{ id: Date.now().toString(), role: 'assistant', content: ctx, timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }]);
                         setHashInput('');
                         setInputValue(`Continue e aprofunde esta memoria verificada.\n\nFormato obrigatorio da resposta:\n### Com base no hash ${mem.hash}\nMemoria salva em ${createdAt}, criada por ${MODEL_LABELS[mem.model as AIModel] || mem.model}.\n\n### Aprofundando a Memoria Verificada\nEscreva abaixo o aprofundamento com clareza, contexto, decisoes praticas, fontes quando disponiveis e proximos passos.\n\nNao repita o texto original inteiro; continue a partir dele.`);
