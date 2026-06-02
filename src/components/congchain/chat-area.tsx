@@ -814,10 +814,31 @@ function ContextChip({ active }: { active: boolean }) {
 const MODEL_META: Record<string, { label: string; color: string; bg: string; border: string }> = {
   gpt:      { label: 'GPT-4o',       color: '#10b981', bg: 'bg-green-500/10',  border: 'border-green-500/20'  },
   claude:   { label: 'Claude',       color: '#f97316', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-  nvidia:   { label: 'NVIDIA Llama', color: '#a855f7', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
+  nvidia:   { label: 'NVIDIA Llama', color: '#76B900', bg: 'bg-lime-500/10',   border: 'border-lime-500/20'   },
   gemini:   { label: 'Gemini Pro',   color: '#3b82f6', bg: 'bg-blue-500/10',   border: 'border-blue-500/20'  },
   deepseek: { label: 'DeepSeek V3',  color: '#06b6d4', bg: 'bg-cyan-500/10',   border: 'border-cyan-500/20'  },
+  glm:      { label: 'GLM-4.7',      color: '#00D1FF', bg: 'bg-sky-500/10',    border: 'border-sky-500/20'   },
+  minimax:  { label: 'MiniMax M2.7', color: '#FF6B35', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+  qwen:     { label: 'Qwen3 80B',    color: '#A855F7', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
 };
+
+const CONGCHAIN_MODEL_OPTIONS: Array<{
+  key: AIModel;
+  name: string;
+  provider: string;
+  tier: 'open' | 'pro';
+  color: string;
+  detail: string;
+}> = [
+  { key: 'nvidia', name: 'NVIDIA', provider: 'NVIDIA NIM', tier: 'open', color: '#76B900', detail: 'Default open route for fast reasoning and memory continuity.' },
+  { key: 'glm', name: 'GLM-4.7', provider: 'NVIDIA NIM', tier: 'open', color: '#00D1FF', detail: 'Multilingual route for structured analysis and synthesis.' },
+  { key: 'minimax', name: 'MiniMax', provider: 'NVIDIA NIM', tier: 'open', color: '#FF6B35', detail: 'Fast drafting route for lightweight conversational work.' },
+  { key: 'qwen', name: 'Qwen3', provider: 'NVIDIA NIM', tier: 'open', color: '#A855F7', detail: 'Coding, repository reasoning, and long-context review route.' },
+  { key: 'gpt', name: 'GPT-4o', provider: 'OpenAI', tier: 'pro', color: '#10b981', detail: 'Premium route for product reasoning, artifacts, and broad execution.' },
+  { key: 'claude', name: 'Claude', provider: 'Anthropic', tier: 'pro', color: '#f97316', detail: 'Premium route for careful planning, long analysis, and review.' },
+  { key: 'deepseek', name: 'DeepSeek', provider: 'DeepSeek', tier: 'pro', color: '#06b6d4', detail: 'Premium route for code, debugging, and protocol reasoning.' },
+  { key: 'gemini', name: 'Gemini', provider: 'Google', tier: 'pro', color: '#3B82F6', detail: 'Premium route for broad synthesis and multimodal-ready reasoning.' },
+];
 
 function HashBlocks({ hash }: { hash: string }) {
   const blocks: string[] = [];
@@ -1785,34 +1806,43 @@ function UpgradeModal({ model, onClose }: { model: string; onClose: () => void }
 // ── Model Selector ────────────────────────────────────────────
 function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIModel; onModelChange: (model: AIModel) => void }) {
   const [showUpgrade, setShowUpgrade] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/verify').then(r => r.json()).then(d => setIsAdmin(!!d.admin)).catch(() => {});
   }, []);
 
-  const FREE = [
-    { key: 'nvidia'  as AIModel, name: 'NVIDIA',   color: '#76B900' },
-    { key: 'glm'     as AIModel, name: 'GLM-4.7',  color: '#00D1FF' },
-    { key: 'minimax' as AIModel, name: 'MiniMax',  color: '#FF6B35' },
-    { key: 'qwen'    as AIModel, name: 'Qwen3',    color: '#A855F7' },
-  ];
-  const PRO = [
-    { key: 'gpt'      as AIModel, name: 'GPT-4o',   color: '#10b981' },
-    { key: 'claude'   as AIModel, name: 'Claude',   color: '#f97316' },
-    { key: 'deepseek' as AIModel, name: 'DeepSeek', color: '#06b6d4' },
-    { key: 'gemini'   as AIModel, name: 'Gemini',   color: '#3B82F6' },
-  ];
+  const selected = CONGCHAIN_MODEL_OPTIONS.find(modelOption => modelOption.key === selectedModel) ?? CONGCHAIN_MODEL_OPTIONS[0];
+  const FREE = CONGCHAIN_MODEL_OPTIONS
+    .filter(modelOption => modelOption.tier === 'open')
+    .map(modelOption => ({ key: modelOption.key, name: modelOption.name, color: modelOption.color }));
+  const PRO = CONGCHAIN_MODEL_OPTIONS
+    .filter(modelOption => modelOption.tier === 'pro')
+    .map(modelOption => ({ key: modelOption.key, name: modelOption.name, color: modelOption.color }));
 
   const handleClick = (key: AIModel, isPro: boolean) => {
     if (isPro && !isAdmin) { setShowUpgrade(key); return; }
+    setOpen(false);
     onModelChange(key);
   };
 
   return (
     <>
       {showUpgrade && <UpgradeModal model={showUpgrade} onClose={() => setShowUpgrade(null)} />}
-      <div className="flex items-center gap-1 flex-wrap rounded-full border border-white/[0.055] bg-white/[0.025] px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen(current => !current)}
+          className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[linear-gradient(135deg,rgba(20,241,149,0.10),rgba(153,69,255,0.07))] px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:border-[#14F195]/32 hover:text-white"
+          title="Selecionar IA da CongChain"
+        >
+          <span className="h-2 w-2 rounded-full shadow-[0_0_12px_currentColor]" style={{ backgroundColor: selected.color, color: selected.color }} />
+          <span className="hidden sm:inline">IA</span>
+          <span>{selected.name}</span>
+          <ChevronDown className={`h-3.5 w-3.5 text-white/42 transition ${open ? 'rotate-180' : ''}`} />
+        </button>
+      <div className={`${open ? 'flex' : 'hidden'} absolute right-0 top-full z-50 mt-2 w-[min(92vw,720px)] items-center gap-1 flex-wrap rounded-2xl border border-[#14F195]/16 bg-[#070A08]/96 p-2 shadow-2xl shadow-black/45 backdrop-blur-2xl`}>
         {FREE.map(m => (
           <button key={m.key} onClick={() => handleClick(m.key, false)}
             className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-200
@@ -1837,6 +1867,7 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
             {isAdmin && selectedModel === m.key && <span className="ml-1 text-[9px] text-[#00d4aa]/60">✓</span>}
           </button>
         ))}
+      </div>
       </div>
     </>
   );
@@ -3307,11 +3338,12 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
               </div>
               {/* Model selector on empty state */}
               <div className="flex items-center gap-1.5 mb-5 flex-wrap justify-center">
-                {([['gpt', 'GPT-4o', '#10b981'], ['claude', 'Claude', '#f97316'], ['deepseek', 'DeepSeek', '#06b6d4'], ['nvidia', 'Llama', '#9945FF'], ['gemini', 'Gemini', '#3B82F6']] as [AIModel, string, string][]).map(([key, name, color]) => (
-                  <button key={key} onClick={() => setSelectedModel(key as AIModel)}
+                {CONGCHAIN_MODEL_OPTIONS.map(({ key, name, color, tier }) => (
+                  <button key={key} onClick={() => setSelectedModel(key)}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${selectedModel === key ? 'bg-white/[0.08] border border-white/[0.14] text-white/90 shadow-sm' : 'bg-white/[0.025] border border-white/[0.06] text-white/42 hover:text-white/65 hover:bg-white/[0.055]'}`}>
                     <span className="inline-block w-2 h-2 rounded-full mr-2" style={{ backgroundColor: color }} />
                     {name}
+                    {tier === 'pro' ? <span className="ml-1 text-[9px] font-black text-[#C4B5FD]/70">PRO</span> : null}
                   </button>
                 ))}
               </div>
