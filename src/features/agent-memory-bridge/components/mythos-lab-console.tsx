@@ -17,7 +17,6 @@ import {
   Paperclip,
   Plus,
   Radar,
-  Save,
   Send,
   ShieldCheck,
   Sparkles,
@@ -1889,10 +1888,52 @@ function CongChainMemoryRecord({ message }: { message: MythosLabMessage }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-white/8 px-4 py-3">
-        {message.readUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.readUrl}>Read memory</a> : null}
-        {message.verifyUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.verifyUrl}>Verify record</a> : null}
-        {message.proofUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.proofUrl}>ZK proof</a> : null}
+        {message.readUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.readUrl}>Abrir memoria</a> : null}
+        {message.verifyUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.verifyUrl}>Verificar hash</a> : null}
+        {message.proofUrl ? <a className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-black text-white/58 transition hover:text-[#9AEAFF]" href={message.proofUrl}>Prova ZK</a> : null}
       </div>
+    </div>
+  );
+}
+
+function CongChainMemoryActions({
+  message,
+  saving,
+  onSave,
+}: {
+  message: MythosLabMessage;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const saved = Boolean(message.memoryHash);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={saving || saved}
+        className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] transition disabled:cursor-default ${
+          saved
+            ? 'border-[#14F195]/20 bg-[#14F195]/10 text-[#8CFFD2]'
+            : 'border-[#7DE4FF]/20 bg-[#7DE4FF]/8 text-[#9AEAFF] hover:border-[#14F195]/26 hover:bg-[#14F195]/10 hover:text-[#8CFFD2]'
+        } ${saving ? 'opacity-70' : ''}`}
+        title={saved ? 'Esta resposta ja virou memoria verificavel no CongChain.' : 'Gera hash, vault, rota de leitura, verificacao e prova ZK para esta resposta.'}
+      >
+        {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <ShieldCheck className="h-3.5 w-3.5" /> : <Network className="h-3.5 w-3.5" />}
+        {saved ? `CongChain ${shortHash(message.memoryHash, 10)}` : 'Gerar hash CongChain'}
+      </button>
+      {saved ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {message.readUrl ? <a className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/[0.035] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-white/52 transition hover:text-[#9AEAFF]" href={message.readUrl}>Ler</a> : null}
+          {message.verifyUrl ? <a className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/[0.035] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-white/52 transition hover:text-[#9AEAFF]" href={message.verifyUrl}>Verificar</a> : null}
+          {message.proofUrl ? <a className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/[0.035] px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-white/52 transition hover:text-[#9AEAFF]" href={message.proofUrl}>ZK</a> : null}
+        </div>
+      ) : (
+        <span className="text-[10px] leading-4 text-white/36">
+          Salva esta resposta como memoria verificavel. Nao assina, nao envia transacao e nao move fundos.
+        </span>
+      )}
     </div>
   );
 }
@@ -5580,26 +5621,6 @@ export default function MythosLabConsole() {
             </button>
           </div>
 
-          <div className="relative mt-4 rounded-2xl border border-[#7DE4FF]/14 bg-[#7DE4FF]/[0.045] p-4">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Powered by CongChain Protocol</p>
-            <p className="mt-2 text-[11px] leading-4 text-white/46">
-              Mythos usa o Agent Memory Bridge para transformar respostas importantes em memorias verificaveis.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {[
-                ['Bridge', 'write/read'],
-                ['Hash', 'SHA-256'],
-                ['Proof', 'ZK route'],
-                ['Anchor', 'Solana'],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-white/8 bg-black/24 p-2">
-                  <p className="text-[8px] font-black uppercase tracking-[0.12em] text-white/30">{label}</p>
-                  <p className="mt-1 text-[10px] font-black text-white/62">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="relative mt-10">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-white/45">Today</p>
@@ -6041,17 +6062,11 @@ export default function MythosLabConsole() {
                         ) : null}
                         {message.role === 'assistant' ? (
                           <div className="mt-4 border-t border-white/8 pt-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => saveMessageAsMemory(message)}
-                                disabled={savingMemoryId === message.id}
-                                className="inline-flex h-8 items-center gap-2 rounded-full border border-[#76FF03]/18 bg-[#76FF03]/8 px-3 text-[11px] font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/14 disabled:opacity-50"
-                              >
-                                {savingMemoryId === message.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                                {message.memoryHash ? 'Saved' : 'Save'}
-                              </button>
-                            </div>
+                            <CongChainMemoryActions
+                              message={message}
+                              saving={savingMemoryId === message.id}
+                              onSave={() => saveMessageAsMemory(message)}
+                            />
                             <CongChainMemoryRecord message={message} />
                             {pendingSaveMessageId === message.id && !message.memoryHash ? (
                               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -6068,7 +6083,7 @@ export default function MythosLabConsole() {
                                   disabled={savingMemoryId === message.id}
                                   className="rounded-xl border border-[#76FF03]/18 bg-[#76FF03]/10 px-4 py-2 text-xs font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/15 disabled:opacity-50"
                                 >
-                                  Confirm save
+                                  Gerar hash
                                 </button>
                               </div>
                             ) : null}
