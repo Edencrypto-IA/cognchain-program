@@ -1841,6 +1841,7 @@ function MythosMissionControlPanel({
   connectedAddress,
   onRefresh,
   onRunTask,
+  onClose,
 }: {
   data: MythosMissionControl | null;
   loading: boolean;
@@ -1848,13 +1849,16 @@ function MythosMissionControlPanel({
   connectedAddress: string;
   onRefresh: () => void;
   onRunTask: (task: 'market' | 'wallet') => void;
+  onClose: () => void;
 }) {
+  const [expandedTaskSeq, setExpandedTaskSeq] = useState<number | null>(null);
   const intelligence = data?.mythos.intelligence;
   const activeAgents = data?.office.activeAgents ?? [];
   const recentTasks = data?.office.recentTasks ?? [];
   const memories = data?.memories ?? [];
   const score = intelligence?.total ?? 0;
   const statusLabel = loading && !data ? 'loading' : data?.ok ? 'online' : 'waiting';
+  const expandedTask = recentTasks.find(task => task.seq === expandedTaskSeq) ?? recentTasks[0] ?? null;
 
   return (
     <div className="mb-5 overflow-hidden rounded-[28px] border border-[#14F195]/18 bg-[radial-gradient(circle_at_top_left,rgba(20,241,149,0.13),transparent_32%),linear-gradient(180deg,rgba(2,20,12,0.88),rgba(0,0,0,0.78))] shadow-[0_22px_70px_rgba(0,0,0,0.36)]">
@@ -1868,12 +1872,20 @@ function MythosMissionControlPanel({
               {statusLabel}
             </span>
           </div>
-          <h3 className="mt-3 text-2xl font-black text-white">{data?.mythos.name ?? 'Mythos'} operational brain</h3>
+          <h3 className="mt-3 text-2xl font-black text-white">Painel de tarefas do {data?.mythos.name ?? 'Mythos'}</h3>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-white/50">
-            Live read-only view of agents, memory inheritance, intelligence score, and safe task runners. No signature, submit, swap, buy, or fund movement is automatic.
+            Aqui voce ve o que os agentes fizeram, qual memoria foi salva, quais fontes/evidencias foram usadas e roda tarefas seguras de leitura. Nao assina, nao envia transacao e nao move fundos.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-white/58 transition hover:border-[#FF5C7A]/22 hover:text-[#FF9AB1]"
+          >
+            <X className="h-3.5 w-3.5" />
+            Fechar
+          </button>
           <button
             type="button"
             onClick={onRefresh}
@@ -1881,7 +1893,7 @@ function MythosMissionControlPanel({
             className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-white/58 transition hover:border-[#14F195]/22 hover:text-[#8CFFD2] disabled:opacity-45"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radar className="h-3.5 w-3.5" />}
-            Refresh
+            Atualizar
           </button>
           <button
             type="button"
@@ -1905,7 +1917,7 @@ function MythosMissionControlPanel({
         </div>
       </div>
 
-      <div className="grid gap-4 p-5 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-4 p-5 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-[#76FF03]/16 bg-black/28 p-4">
             <div className="flex items-center justify-between gap-3">
@@ -1954,9 +1966,9 @@ function MythosMissionControlPanel({
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-[0.82fr_1.18fr]">
           <div className="rounded-2xl border border-white/10 bg-black/28 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Active agents</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Agentes ativos</p>
             <div className="mt-3 space-y-2">
               {activeAgents.slice(0, 5).map(agent => (
                 <div key={agent.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.025] p-3">
@@ -1969,24 +1981,80 @@ function MythosMissionControlPanel({
                   </span>
                 </div>
               ))}
-              {activeAgents.length === 0 ? <p className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-xs text-white/42">No live office agents yet. Run Market Intel to create a real event.</p> : null}
+              {activeAgents.length === 0 ? <p className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-xs text-white/42">Nenhum agente ativo nesta sessao do servidor. Rode Market Intel para criar uma tarefa real.</p> : null}
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-black/28 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Recent real tasks</p>
-            <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Historico de tarefas</p>
+              <span className="text-[9px] font-black uppercase tracking-[0.12em] text-white/24">{recentTasks.length} items</span>
+            </div>
+            <div className="mt-3 grid gap-3 xl:grid-cols-[0.8fr_1.2fr]">
+              <div className="space-y-2">
               {recentTasks.slice(0, 4).map(task => (
-                <div key={task.seq} className="rounded-xl border border-white/8 bg-white/[0.025] p-3">
+                <button
+                  type="button"
+                  key={task.seq}
+                  onClick={() => setExpandedTaskSeq(task.seq)}
+                  className={`w-full rounded-xl border p-3 text-left transition ${
+                    (expandedTask?.seq === task.seq)
+                      ? 'border-[#14F195]/24 bg-[#14F195]/8'
+                      : 'border-white/8 bg-white/[0.025] hover:border-[#14F195]/18 hover:bg-[#14F195]/5'
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-xs font-black text-white">{task.agentName}</p>
                     <span className="rounded-full border border-[#14F195]/16 bg-[#14F195]/8 px-2 py-0.5 text-[9px] font-black text-[#8CFFD2]">{task.dataQuality ?? 0}/10</span>
                   </div>
                   <p className="mt-1 truncate text-[10px] uppercase tracking-[0.12em] text-white/34">{task.task}</p>
                   <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-white/48">{task.result}</p>
-                </div>
+                  <span className="mt-2 inline-flex text-[9px] font-black uppercase tracking-[0.12em] text-[#8CFFD2]/70">Ver detalhes</span>
+                </button>
               ))}
-              {recentTasks.length === 0 ? <p className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-xs text-white/42">No real task has been pushed in this server session yet.</p> : null}
+              {recentTasks.length === 0 ? <p className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-xs text-white/42">Nenhuma tarefa real foi rodada nesta sessao ainda.</p> : null}
+              </div>
+              <div className="min-h-[220px] rounded-xl border border-[#7DE4FF]/14 bg-[#7DE4FF]/[0.045] p-4">
+                {expandedTask ? (
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">O que ele fez</p>
+                        <h4 className="mt-2 break-words text-base font-black text-white">{expandedTask.task}</h4>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-white/34">
+                          {expandedTask.agentName} | {expandedTask.modelLabel || expandedTask.model}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-2.5 py-1 text-[9px] font-black text-[#8CFFD2]">
+                        Qualidade {expandedTask.dataQuality ?? 0}/10
+                      </span>
+                    </div>
+                    <p className="mt-4 whitespace-pre-wrap text-xs leading-5 text-white/62">{expandedTask.result}</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-white/8 bg-black/24 p-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Memoria salva</p>
+                        <p className="mt-2 break-all font-mono text-[11px] text-[#A7FF3D]/78">{expandedTask.hash || 'not saved'}</p>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/24 p-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Fontes</p>
+                        <p className="mt-2 text-[11px] leading-4 text-white/52">{expandedTask.sources?.length ? expandedTask.sources.join(', ') : 'O provedor nao retornou fontes explicitas.'}</p>
+                      </div>
+                    </div>
+                    {expandedTask.evidence?.length ? (
+                      <div className="mt-3 rounded-xl border border-white/8 bg-black/24 p-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Evidencias</p>
+                        <ul className="mt-2 space-y-1 text-[11px] leading-4 text-white/52">
+                          {expandedTask.evidence.slice(0, 4).map(item => <li key={item}>- {item}</li>)}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="flex h-full min-h-[220px] items-center justify-center text-center">
+                    <p className="max-w-xs text-xs leading-5 text-white/42">Rode Market Intel ou Wallet Risk, depois selecione uma tarefa para ver resultado, memoria salva, fontes e evidencias.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1995,10 +2063,10 @@ function MythosMissionControlPanel({
       <div className="border-t border-white/8 px-5 py-3">
         <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/38">
           <ShieldCheck className="h-3.5 w-3.5 text-[#8CFFD2]" />
-          <span>Read-only mission layer.</span>
-          <span>No wallet signature.</span>
-          <span>No transaction submit.</span>
-          <span>No buy, sell, swap, payment, or fund movement.</span>
+          <span>Painel apenas leitura.</span>
+          <span>Sem assinatura da carteira.</span>
+          <span>Sem envio de transacao.</span>
+          <span>Sem compra, venda, swap, pagamento ou movimento de fundos.</span>
         </div>
       </div>
     </div>
@@ -3513,6 +3581,7 @@ export default function MythosLabConsole() {
   const [missionControl, setMissionControl] = useState<MythosMissionControl | null>(null);
   const [missionLoading, setMissionLoading] = useState(false);
   const [missionRunningTask, setMissionRunningTask] = useState<'market' | 'wallet' | null>(null);
+  const [missionControlOpen, setMissionControlOpen] = useState(false);
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -3742,6 +3811,7 @@ export default function MythosLabConsole() {
     setPendingAttachments([]);
     setNotice('');
     setPendingSaveMessageId('');
+    setMissionControlOpen(false);
   }
 
   function deleteSession(sessionId: string) {
@@ -3763,6 +3833,7 @@ export default function MythosLabConsole() {
     setPendingAttachments([]);
     setNotice('');
     setPendingSaveMessageId('');
+    setMissionControlOpen(false);
   }
 
   function selectModel(modelId: string) {
@@ -5407,6 +5478,26 @@ export default function MythosLabConsole() {
               <TerminalSquare className="h-5 w-5 text-white/80" />
               New Conversation
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMissionControlOpen(current => !current);
+                void refreshMissionControl(true);
+              }}
+              className={`mt-3 inline-flex h-12 w-full items-center justify-between gap-3 rounded-2xl border px-4 text-sm font-semibold transition ${
+                missionControlOpen
+                  ? 'border-[#14F195]/26 bg-[#14F195]/12 text-[#8CFFD2]'
+                  : 'border-white/8 bg-white/[0.035] text-white/70 hover:border-[#14F195]/22 hover:bg-[#14F195]/8 hover:text-[#8CFFD2]'
+              }`}
+            >
+              <span className="inline-flex min-w-0 items-center gap-3">
+                <Activity className="h-4 w-4" />
+                Mission Control
+              </span>
+              <span className="rounded-full border border-white/10 bg-black/24 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-white/38">
+                {missionControlOpen ? 'open' : 'tasks'}
+              </span>
+            </button>
           </div>
 
           <div className="relative mt-10">
@@ -5689,14 +5780,17 @@ export default function MythosLabConsole() {
           <div className="relative flex flex-1 flex-col overflow-y-auto px-4 pb-4 sm:px-6">
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
               <div className="flex flex-1 flex-col justify-start pt-6">
-                <MythosMissionControlPanel
-                  data={missionControl}
-                  loading={missionLoading}
-                  runningTask={missionRunningTask}
-                  connectedAddress={connectedAddress}
-                  onRefresh={() => void refreshMissionControl()}
-                  onRunTask={task => void runMissionTask(task)}
-                />
+                {missionControlOpen ? (
+                  <MythosMissionControlPanel
+                    data={missionControl}
+                    loading={missionLoading}
+                    runningTask={missionRunningTask}
+                    connectedAddress={connectedAddress}
+                    onRefresh={() => void refreshMissionControl()}
+                    onRunTask={task => void runMissionTask(task)}
+                    onClose={() => setMissionControlOpen(false)}
+                  />
+                ) : null}
                 {!hasConversation ? (
                   <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
                     <img
