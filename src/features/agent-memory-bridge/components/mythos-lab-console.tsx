@@ -1899,11 +1899,15 @@ function CongChainMemoryRecord({ message }: { message: MythosLabMessage }) {
 function CongChainMemoryActions({
   message,
   saving,
+  setupOpen,
   onSave,
+  onOpenSetup,
 }: {
   message: MythosLabMessage;
   saving: boolean;
+  setupOpen: boolean;
   onSave: () => void;
+  onOpenSetup: () => void;
 }) {
   const saved = Boolean(message.memoryHash);
 
@@ -1911,7 +1915,7 @@ function CongChainMemoryActions({
     <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        onClick={onSave}
+        onClick={saved ? undefined : setupOpen ? onSave : onOpenSetup}
         disabled={saving || saved}
         className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] transition disabled:cursor-default ${
           saved
@@ -1921,7 +1925,7 @@ function CongChainMemoryActions({
         title={saved ? 'Esta resposta ja virou memoria verificavel no CongChain.' : 'Gera hash, vault, rota de leitura, verificacao e prova ZK para esta resposta.'}
       >
         {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <ShieldCheck className="h-3.5 w-3.5" /> : <Network className="h-3.5 w-3.5" />}
-        {saved ? `CongChain ${shortHash(message.memoryHash, 10)}` : 'Gerar hash CongChain'}
+        {saved ? `CongChain ${shortHash(message.memoryHash, 10)}` : setupOpen ? 'Gerar hash CongChain' : 'Conectar CongChain'}
       </button>
       {saved ? (
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -4887,17 +4891,21 @@ export default function MythosLabConsole() {
 
   async function saveMessageAsMemory(message: MythosLabMessage) {
     if (!message.content) return;
+    if (!apiKey.trim().startsWith('cog_live_')) {
+      setPendingSaveMessageId(message.id);
+      setNotice('Crie ou cole sua CongChain API key para salvar esta resposta no seu vault pessoal.');
+      return;
+    }
 
     setSavingMemoryId(message.id);
     setNotice('');
     try {
-      const useManualKey = apiKey.trim().startsWith('cog_live_');
-      const response = await fetch(useManualKey ? profile.endpoints.writeMemory : '/api/mythos/memory/write', {
+      const response = await fetch(profile.endpoints.writeMemory, {
         method: 'POST',
-        headers: useManualKey ? {
+        headers: {
           Authorization: `Bearer ${apiKey.trim()}`,
           'Content-Type': 'application/json',
-        } : { 'Content-Type': 'application/json' },
+        },
         body: JSON.stringify({
           ...memoryPayload,
           content: message.content,
@@ -4915,7 +4923,7 @@ export default function MythosLabConsole() {
       if (!response.ok) throw new Error(data.error || 'Could not save Mythos memory.');
       markMessageSaved(message.id, data);
       setPendingSaveMessageId('');
-      setNotice(`CongChain hash generated: ${shortHash(data.hash, 18)}. ZK ${data.zkPersisted ? 'ready' : data.zkEnabled ? 'requested' : 'available by proof route'}. Anchor remains manual.`);
+      setNotice(`Seu hash CongChain foi gerado: ${shortHash(data.hash, 18)}. ZK ${data.zkPersisted ? 'ready' : data.zkEnabled ? 'requested' : 'available by proof route'}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not save Mythos memory.');
     } finally {
@@ -6061,26 +6069,67 @@ export default function MythosLabConsole() {
                             <CongChainMemoryActions
                               message={message}
                               saving={savingMemoryId === message.id}
+                              setupOpen={pendingSaveMessageId === message.id}
                               onSave={() => saveMessageAsMemory(message)}
+                              onOpenSetup={() => setPendingSaveMessageId(message.id)}
                             />
                             <CongChainMemoryRecord message={message} />
                             {pendingSaveMessageId === message.id && !message.memoryHash ? (
-                              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                                <input
-                                  type="password"
-                                  value={apiKey}
-                                  onChange={event => setApiKey(event.target.value)}
-                                  placeholder="cog_live_..."
-                                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/45 px-3 py-2 text-xs text-white outline-none placeholder:text-white/25 focus:border-[#76FF03]/35"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => saveMessageAsMemory(message)}
-                                  disabled={savingMemoryId === message.id}
-                                  className="rounded-xl border border-[#76FF03]/18 bg-[#76FF03]/10 px-4 py-2 text-xs font-bold text-[#A7FF3D] transition hover:bg-[#76FF03]/15 disabled:opacity-50"
-                                >
-                                  Gerar hash
-                                </button>
+                              <div className="mt-3 rounded-2xl border border-[#7DE4FF]/18 bg-[linear-gradient(135deg,rgba(125,228,255,0.075),rgba(20,241,149,0.035))] p-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Sua memoria CongChain</p>
+                                    <p className="mt-1 max-w-xl text-[11px] leading-4 text-white/52">
+                                      Use sua propria API key para este hash ficar ligado ao seu vault. A key e enviada uma vez para a API e nunca aparece no historico do Mythos.
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPendingSaveMessageId('')}
+                                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-white/42 transition hover:text-white/70"
+                                  >
+                                    Fechar
+                                  </button>
+                                </div>
+                                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                                  {[
+                                    ['1', 'Abra API Keys', 'Clique no link e entre na tela de chaves da CongChain.'],
+                                    ['2', 'Crie sua chave', 'Coloque seu email, nomeie a key e copie o cog_live gerado.'],
+                                    ['3', 'Cole e gere', 'Cole abaixo para salvar esta resposta e receber hash, leitura, verificacao e ZK.'],
+                                  ].map(([step, title, detail]) => (
+                                    <div key={step} className="rounded-xl border border-white/8 bg-black/24 p-3">
+                                      <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#A7FF3D]">Passo {step}</p>
+                                      <p className="mt-2 text-xs font-black text-white/78">{title}</p>
+                                      <p className="mt-1 text-[11px] leading-4 text-white/42">{detail}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                                  <a
+                                    href="/dashboard/keys"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#7DE4FF]/18 bg-[#7DE4FF]/8 px-4 text-xs font-black uppercase tracking-[0.12em] text-[#9AEAFF] transition hover:bg-[#7DE4FF]/12"
+                                  >
+                                    Abrir API Keys
+                                  </a>
+                                  <input
+                                    type="password"
+                                    value={apiKey}
+                                    onChange={event => setApiKey(event.target.value)}
+                                    placeholder="Cole sua key cog_live_..."
+                                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/45 px-3 text-xs text-white outline-none placeholder:text-white/25 focus:border-[#76FF03]/35"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => saveMessageAsMemory(message)}
+                                    disabled={savingMemoryId === message.id || !apiKey.trim().startsWith('cog_live_')}
+                                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#76FF03]/18 bg-[#76FF03]/10 px-4 text-xs font-black uppercase tracking-[0.12em] text-[#A7FF3D] transition hover:bg-[#76FF03]/15 disabled:opacity-50"
+                                  >
+                                    {savingMemoryId === message.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Network className="h-3.5 w-3.5" />}
+                                    Gerar hash
+                                  </button>
+                                </div>
                               </div>
                             ) : null}
                           </div>
