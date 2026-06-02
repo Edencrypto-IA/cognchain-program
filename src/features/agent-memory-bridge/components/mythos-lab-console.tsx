@@ -5503,7 +5503,7 @@ export default function MythosLabConsole() {
                             </div>
                             <iframe
                               title={message.htmlArtifact.title}
-                              sandbox="allow-scripts"
+                              sandbox=""
                               srcDoc={message.htmlArtifact.html}
                               className="h-[520px] w-full border-0 bg-black"
                             />

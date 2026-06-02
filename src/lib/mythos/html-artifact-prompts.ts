@@ -26,7 +26,7 @@ Return only:
 Technical requirements:
 - One self-contained HTML document.
 - CSS must be inside one <style> block.
-- JavaScript is optional and must be inline only.
+- Do not include JavaScript. Use HTML and CSS only.
 - No external scripts, stylesheets, fonts, iframes, images, or CDNs.
 - Use system fonts only.
 - Use CSS custom properties for colors, spacing, radius, and shadows.
@@ -45,7 +45,7 @@ Visual quality bar:
 
 Safety rules:
 - Do not create wallet connect, signing, submit, buy, sell, swap, airdrop claim, payment, or fund movement flows.
-- Do not access window.solana, window.ethereum, localStorage, sessionStorage, clipboard, or external network APIs.
+- Do not access window.solana, window.ethereum, localStorage, sessionStorage, clipboard, external network APIs, eval(), Function(), or redirects.
 - Do not ask for seed phrase, private key, API key, password, or signed payload.
 - Do not include hidden inputs or auto-submit forms.
 - Do not invent real market data, holder counts, prices, market caps, liquidity, or guaranteed returns.
@@ -114,3 +114,29 @@ export const MYTHOS_HTML_PIPELINE_STAGE_LABELS = {
   safety: 'Running the sandbox safety gate...',
   preview: 'Rendering preview...',
 } as const;
+
+export const SYSTEM_PROMPT_HTML_GENERATOR = MYTHOS_HTML_SYSTEM_PROMPT;
+export const SYSTEM_PROMPT_HTML_REVIEWER = MYTHOS_HTML_REVISION_PROMPT;
+
+export const PROMPT_VISUAL_BRIEF = 'Create a concise visual brief with preset, sections, visual rhythm, CTA, palette, and safety flags.';
+export const PROMPT_UI_REFINER = 'Refine spacing, hierarchy, depth, cards, buttons, contrast, and premium visual polish without adding dependencies.';
+export const PROMPT_RESPONSIVE_PASS = 'Audit 375px, 768px, and desktop layouts for overflow, readable type, stacked grids, and touch-friendly controls.';
+export const PROMPT_ACCESSIBILITY_PASS = 'Improve semantic structure, contrast, focus states, labels, readable motion, and mobile legibility.';
+export const PROMPT_SAFETY_REVIEW = 'Remove or block external scripts, wallet APIs, secret fields, hidden inputs, auto-submit, clipboard writes, redirects, and suspicious storage.';
+
+export function buildGenerationPrompt(brief: MythosHtmlGenerationBrief) {
+  return buildMythosHtmlGenerationPrompt(brief);
+}
+
+export function buildReviewPrompt(html: string) {
+  return buildMythosHtmlRevisionPrompt(html);
+}
+
+export function buildSkillPrompt(skillPrompt: string) {
+  return [
+    MYTHOS_HTML_SYSTEM_PROMPT,
+    '',
+    'Internal skill instruction:',
+    skillPrompt,
+  ].join('\n');
+}

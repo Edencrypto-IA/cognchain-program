@@ -29,6 +29,18 @@ const MYTHOS_HTML_SAFETY_RULES: SafetyRule[] = [
     patterns: [/<script[^>]+src\s*=\s*["'][^"']*["']/gi],
   },
   {
+    id: 'inline-script',
+    severity: 'block',
+    description: 'Inline script block detected.',
+    patterns: [/<script(?![^>]*src)[^>]*>[\s\S]*?<\/script>/gi],
+  },
+  {
+    id: 'dynamic-code-execution',
+    severity: 'block',
+    description: 'eval() or Function() dynamic code execution detected.',
+    patterns: [/\beval\s*\(/gi, /\bnew\s+Function\s*\(/gi, /\bFunction\s*\(/gi],
+  },
+  {
     id: 'external-stylesheet',
     severity: 'block',
     description: 'External stylesheet or font import detected.',
@@ -84,6 +96,17 @@ const MYTHOS_HTML_SAFETY_RULES: SafetyRule[] = [
     ],
   },
   {
+    id: 'auto-redirect',
+    severity: 'block',
+    description: 'Auto redirect pattern detected.',
+    patterns: [
+      /window\.location\s*=/gi,
+      /location\.href\s*=/gi,
+      /location\.replace\s*\(/gi,
+      /<meta[^>]+http-equiv\s*=\s*["']refresh["'][^>]*>/gi,
+    ],
+  },
+  {
     id: 'clipboard-write',
     severity: 'block',
     description: 'Clipboard write detected.',
@@ -118,6 +141,16 @@ const MYTHOS_HTML_SAFETY_RULES: SafetyRule[] = [
     ],
   },
   {
+    id: 'hidden-overlay',
+    severity: 'block',
+    description: 'Hidden full-screen overlay or click hijacking pattern detected.',
+    patterns: [
+      /position\s*:\s*fixed[\s\S]{0,160}opacity\s*:\s*0/gi,
+      /opacity\s*:\s*0[\s\S]{0,160}position\s*:\s*fixed/gi,
+      /pointer-events\s*:\s*auto[\s\S]{0,160}z-index\s*:\s*999/gi,
+    ],
+  },
+  {
     id: 'financial-claim',
     severity: 'warn',
     description: 'Potential financial guarantee language detected.',
@@ -130,12 +163,6 @@ const MYTHOS_HTML_SAFETY_RULES: SafetyRule[] = [
     severity: 'info',
     description: 'External image URL detected.',
     patterns: [/<img[^>]+src\s*=\s*["']https?:\/\/[^"']+["']/gi],
-  },
-  {
-    id: 'inline-script',
-    severity: 'info',
-    description: 'Inline script block present.',
-    patterns: [/<script(?![^>]*src)[^>]*>/gi],
   },
 ];
 
@@ -175,6 +202,11 @@ export function sanitizeMythosHtml(html: string): { html: string; removals: stri
       id: 'external-script',
       pattern: /<script[^>]+src\s*=\s*["'][^"']*["'][^>]*>[\s\S]*?<\/script>/gi,
       replacement: '<!-- MYTHOS SAFETY: external script removed -->',
+    },
+    {
+      id: 'inline-script',
+      pattern: /<script(?![^>]*src)[^>]*>[\s\S]*?<\/script>/gi,
+      replacement: '<!-- MYTHOS SAFETY: inline script removed -->',
     },
     {
       id: 'external-stylesheet',
@@ -220,6 +252,11 @@ export function sanitizeMythosHtml(html: string): { html: string; removals: stri
       id: 'auto-submit',
       pattern: /\.submit\s*\(\s*\)\s*;?/gi,
       replacement: '/* MYTHOS SAFETY: auto-submit removed */',
+    },
+    {
+      id: 'auto-redirect',
+      pattern: /(window\.location\s*=|location\.href\s*=|location\.replace\s*\()[^;]+;?/gi,
+      replacement: '/* MYTHOS SAFETY: redirect removed */',
     },
     {
       id: 'javascript-protocol',
@@ -282,3 +319,36 @@ export const MYTHOS_HTML_SAFETY_CHECKLIST = MYTHOS_HTML_SAFETY_RULES.map(rule =>
   severity: rule.severity,
   check: rule.description,
 }));
+
+export type SafetyViolation = MythosHtmlSafetyViolation;
+export type SafetyCheckResult = MythosHtmlSafetyResult;
+
+export const BLOCKED_PATTERNS = MYTHOS_HTML_SAFETY_RULES
+  .filter(rule => rule.severity === 'block')
+  .flatMap(rule => rule.patterns);
+
+export const SUSPICIOUS_PATTERNS = MYTHOS_HTML_SAFETY_RULES
+  .filter(rule => rule.severity !== 'block')
+  .flatMap(rule => rule.patterns);
+
+export function detectUnsafeHtml(html: string) {
+  return checkMythosHtmlSafety(html);
+}
+
+export function validateHtmlArtifact(html: string) {
+  return checkMythosHtmlSafety(html).safe;
+}
+
+export function sanitizeHtmlArtifact(html: string) {
+  return sanitizeMythosHtml(html);
+}
+
+export function generateSafetyReport(html: string) {
+  const result = checkMythosHtmlSafety(html);
+  return {
+    safe: result.safe,
+    blockers: result.blockers.map(item => item.rule),
+    warnings: result.warnings.map(item => item.rule),
+    violations: result.violations,
+  };
+}

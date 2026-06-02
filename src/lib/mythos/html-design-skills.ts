@@ -7,7 +7,9 @@ export type MythosHtmlSkillName =
   | 'visual-hierarchy-reviewer'
   | 'cta-conversion-designer'
   | 'dark-terminal-design-system'
+  | 'solana-dashboard-designer'
   | 'sandbox-safety-reviewer'
+  | 'accessibility-pass'
   | 'mobile-polish-pass';
 
 export type MythosHtmlPresetName =
@@ -23,11 +25,36 @@ export type MythosHtmlPresetName =
 export type MythosHtmlSkill = {
   name: MythosHtmlSkillName;
   label: string;
+  stage?: 'brief' | 'architecture' | 'generation' | 'review' | 'safety' | 'polish';
   objective: string;
   whenToUse: string;
   securityRules: string[];
   internalPrompt: string;
+  enabled?: boolean;
 };
+
+export interface SkillExecutionContext {
+  userPrompt: string;
+  presetName?: MythosHtmlPresetName;
+  provider?: string;
+  mobileFirst?: boolean;
+  applyBrandSystem?: boolean;
+}
+
+export interface SkillResult {
+  skill: MythosHtmlSkillName;
+  ok: boolean;
+  output: string;
+  warnings: string[];
+}
+
+export interface MythosSkill extends MythosHtmlSkill {
+  id: MythosHtmlSkillName;
+  description: string;
+  systemPrompt: string;
+  enabled: boolean;
+  runWhen: (context: SkillExecutionContext) => boolean;
+}
 
 export type MythosDesignPreset = {
   name: MythosHtmlPresetName;
@@ -128,6 +155,19 @@ export const MYTHOS_HTML_SKILLS: Record<MythosHtmlSkillName, MythosHtmlSkill> = 
     securityRules: ['Use system fonts only.', 'No external assets or script sources.'],
     internalPrompt: 'Use black surfaces, neon green/cyan accents, terminal details, scanline-like CSS, tight cards, and professional density.',
   },
+  'solana-dashboard-designer': {
+    name: 'solana-dashboard-designer',
+    label: 'Solana Dashboard Designer',
+    stage: 'generation',
+    objective: 'Design data-rich Solana dashboards that feel credible, source-labeled, and safe.',
+    whenToUse: 'Use for wallet, portfolio, token analytics, market, DeFi, and protocol dashboards.',
+    securityRules: [
+      'All numbers must be labeled demo, placeholder, estimated, or source-backed.',
+      'No send, receive, swap, claim, sign, or connect wallet actions.',
+      'No live RPC calls inside the artifact HTML.',
+    ],
+    internalPrompt: 'Create dense but readable Solana dashboards with metric cards, tables, risk chips, source labels, and demo-only data boundaries.',
+  },
   'sandbox-safety-reviewer': {
     name: 'sandbox-safety-reviewer',
     label: 'Sandbox Safety Reviewer',
@@ -139,6 +179,19 @@ export const MYTHOS_HTML_SKILLS: Record<MythosHtmlSkillName, MythosHtmlSkill> = 
       'Remove hidden inputs, secret fields, auto-submit, clipboard writes, and javascript: links.',
     ],
     internalPrompt: 'Sanitize all unsafe patterns and preserve a read-only visual preview.',
+  },
+  'accessibility-pass': {
+    name: 'accessibility-pass',
+    label: 'Accessibility Pass',
+    stage: 'polish',
+    objective: 'Improve readability, contrast, focus states, labels, and motion restraint.',
+    whenToUse: 'Use for every artifact after visual refinement and before final preview.',
+    securityRules: [
+      'Do not add external dependencies.',
+      'Do not add forms for sensitive data.',
+      'Do not weaken safety removals.',
+    ],
+    internalPrompt: 'Improve semantic structure, color contrast, visible focus states, aria labels where needed, reduced-motion support, and readable mobile typography.',
   },
   'mobile-polish-pass': {
     name: 'mobile-polish-pass',
@@ -267,8 +320,63 @@ export function resolveMythosHtmlSkills(
     'cta-conversion-designer',
   ];
 
+  if (/\b(wallet|carteira|portfolio|dashboard|solana|defi|token table)\b/i.test(userPrompt)) {
+    pipeline.push('solana-dashboard-designer');
+  }
   if (options.applyBrandSystem !== false) pipeline.push('dark-terminal-design-system');
+  pipeline.push('accessibility-pass');
   if (options.mobileFirst !== false) pipeline.push('mobile-polish-pass');
   pipeline.push('sandbox-safety-reviewer');
   return pipeline;
+}
+
+export const DESIGN_PRESETS = MYTHOS_DESIGN_PRESETS;
+
+export const MYTHOS_SKILLS: Record<MythosHtmlSkillName, MythosSkill> = Object.fromEntries(
+  Object.entries(MYTHOS_HTML_SKILLS).map(([id, skill]) => [
+    id,
+    {
+      ...skill,
+      id: id as MythosHtmlSkillName,
+      description: skill.objective,
+      systemPrompt: skill.internalPrompt,
+      enabled: skill.enabled ?? true,
+      runWhen: () => true,
+    },
+  ]),
+) as Record<MythosHtmlSkillName, MythosSkill>;
+
+export function selectSkills(context: SkillExecutionContext): MythosSkill[] {
+  return resolveMythosHtmlSkills(context.userPrompt, {
+    applyBrandSystem: context.applyBrandSystem,
+    mobileFirst: context.mobileFirst,
+  })
+    .map(name => MYTHOS_SKILLS[name])
+    .filter(skill => skill.enabled && skill.runWhen(context));
+}
+
+export function applyPreset(userPrompt: string, presetName?: MythosHtmlPresetName): MythosDesignPreset {
+  return MYTHOS_DESIGN_PRESETS[presetName || inferMythosHtmlPreset(userPrompt)];
+}
+
+export function buildVisualBrief(context: SkillExecutionContext) {
+  const preset = applyPreset(context.userPrompt, context.presetName);
+  const skills = selectSkills(context).map(skill => skill.name);
+  return {
+    preset: preset.name,
+    presetLabel: preset.label,
+    sections: preset.sections,
+    visualStyle: preset.visualStyle,
+    palette: preset.palette,
+    components: preset.components,
+    primaryCta: preset.primaryCta,
+    avoidErrors: preset.avoidErrors,
+    skills,
+    safety: {
+      canMoveFunds: false,
+      canSignTransactions: false,
+      allowsWalletConnect: false,
+      externalDependencies: false,
+    },
+  };
 }
