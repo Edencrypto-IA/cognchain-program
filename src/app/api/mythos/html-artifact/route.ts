@@ -14,6 +14,11 @@ import {
   fetchWebsiteDnaBrief,
   formatWebsiteDnaForPrompt,
 } from '@/lib/mythos/website-dna-extractor';
+import {
+  analyzeScreenshotDna,
+  formatScreenshotDnaForPrompt,
+  type MythosScreenshotInput,
+} from '@/lib/mythos/screenshot-dna-analyzer';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
 
 type AnthropicTextBlock = {
@@ -178,9 +183,14 @@ export async function POST(req: NextRequest) {
     const provider = typeof body.provider === 'string' ? body.provider : process.env.MYTHOS_HTML_ARTIFACT_PROVIDER || 'nvidia';
     const referenceUrl = extractFirstUrl(prompt);
     const websiteDnaBrief = referenceUrl ? await fetchWebsiteDnaBrief(referenceUrl) : null;
+    const screenshotInputs = Array.isArray(body.screenshots)
+      ? body.screenshots.filter((item: unknown): item is MythosScreenshotInput => Boolean(item) && typeof item === 'object')
+      : [];
+    const screenshotDna = await analyzeScreenshotDna(screenshotInputs);
     const generationPrompt = buildMythosHtmlGenerationPrompt({
       userRequest: prompt,
       websiteDna: websiteDnaBrief ? formatWebsiteDnaForPrompt(websiteDnaBrief) : undefined,
+      screenshotDna: screenshotDna.length ? formatScreenshotDnaForPrompt(screenshotDna) : undefined,
     });
     const generated = await generateArtifact(generationPrompt, provider);
     const artifact = extractMythosArtifactHtml(generated.text);
@@ -225,6 +235,8 @@ export async function POST(req: NextRequest) {
         canSignTransactions: false,
         websiteReferenceFetched: Boolean(websiteDnaBrief),
         websiteReferenceUrl: websiteDnaBrief?.url || null,
+        screenshotReferenceAnalyzed: screenshotDna.length > 0,
+        screenshotReferenceCount: screenshotDna.length,
         warnings: safetyCheck?.warnings.map(item => item.rule) || [],
         removals: sanitized.removals,
       },

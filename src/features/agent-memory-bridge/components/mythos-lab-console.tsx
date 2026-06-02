@@ -4969,7 +4969,7 @@ export default function MythosLabConsole() {
     }
   }
 
-  async function runTerminalCommand(content: string, nextMessages: MythosLabMessage[], started: number) {
+  async function runTerminalCommand(content: string, nextMessages: MythosLabMessage[], started: number, attachments: MythosLabAttachment[] = []) {
     const command = content.trim();
     const lower = command.toLowerCase();
 
@@ -5106,7 +5106,17 @@ export default function MythosLabConsole() {
       const response = await fetch('/api/mythos/html-artifact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          prompt,
+          screenshots: attachments
+            .filter(attachment => attachment.kind === 'image' && attachment.dataUrl)
+            .slice(0, 2)
+            .map((attachment, index) => ({
+              label: attachment.name || `screenshot-${index + 1}`,
+              dataUrl: attachment.dataUrl,
+              mimeType: attachment.type,
+            })),
+        }),
       });
       const data = await response.json();
       if (!response.ok || !isRecord(data)) {
@@ -5121,10 +5131,15 @@ export default function MythosLabConsole() {
       const safety = getRecord(data, 'safety');
       const safetyRemovals = getArray(safety, 'removals').map(String);
       const safetyWarnings = getArray(safety, 'warnings').map(String);
+      const screenshotAnalyzed = Boolean(safety.screenshotReferenceAnalyzed);
+      const screenshotCount = asNumber(safety.screenshotReferenceCount, 0);
       appendTerminalResponse([
         terminalSection('Intent', 'Generate a read-only Mythos HTML artifact'),
         terminalSection('Decision', asString(data.text, 'Artifact generated for admin review.')),
-        terminalSection('Design pipeline', 'Mythos used the premium HTML design prompt, selected a visual preset, and ran the sandbox safety gate before rendering.'),
+        terminalSection('Design pipeline', [
+          'Mythos used the premium HTML design prompt, selected a visual preset, and ran the sandbox safety gate before rendering.',
+          screenshotAnalyzed ? `Screenshot DNA analyzer used ${screenshotCount} visual reference(s).` : 'Screenshot DNA analyzer: no screenshot reference attached.',
+        ]),
         terminalSection('Safety boundary', [
           'Admin-only route.',
           'Provider API keys stay on the server.',
@@ -5478,7 +5493,7 @@ export default function MythosLabConsole() {
     const started = Date.now();
     try {
       if (content.startsWith('/') || isMarketReportRequest(content) || isSolanaEcosystemRequest(content) || isMemecoinLaunchRequest(content)) {
-        await runTerminalCommand(content, nextMessages, started);
+        await runTerminalCommand(content, nextMessages, started, attachments);
         return;
       }
 

@@ -13,6 +13,7 @@ export type MythosHtmlGenerationBrief = {
   projectName?: string;
   ticker?: string;
   websiteDna?: string;
+  screenshotDna?: string;
 };
 
 export const MYTHOS_HTML_SYSTEM_PROMPT = `
@@ -104,6 +105,12 @@ export function buildMythosHtmlGenerationPrompt(brief: MythosHtmlGenerationBrief
       brief.websiteDna,
       '',
       'Important: use this as abstract design DNA only. Do not copy source code, protected assets, logos, full text, or brand identity.',
+    ].join('\n') : '',
+    brief.screenshotDna ? [
+      'Screenshot visual analysis context:',
+      brief.screenshotDna,
+      '',
+      'Important: use screenshots as visual rhythm only. Do not copy protected imagery, exact text, logos, or brand identity.',
     ].join('\n') : '',
     '',
     `Internal skill pipeline: ${skills.join(' -> ')}`,
