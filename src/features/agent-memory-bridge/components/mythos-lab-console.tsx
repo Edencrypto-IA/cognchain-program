@@ -6180,7 +6180,8 @@ export default function MythosLabConsole() {
                                   <button
                                     key={label}
                                     type="button"
-                                    onClick={() => setInput(command)}
+                                    disabled={loading}
+                                    onClick={() => sendMessage(command)}
                                     className="rounded-full border border-[#7DE4FF]/12 bg-[#7DE4FF]/[0.045] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.09em] text-[#9AEAFF]/70 transition hover:border-[#7DE4FF]/28 hover:text-[#9AEAFF]"
                                   >
                                     {label}
