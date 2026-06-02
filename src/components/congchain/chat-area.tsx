@@ -1830,10 +1830,45 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
   const [showUpgrade, setShowUpgrade] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 56, right: 16, width: 380 });
 
   useEffect(() => {
     fetch('/api/auth/verify').then(r => r.json()).then(d => setIsAdmin(!!d.admin)).catch(() => {});
   }, []);
+
+  const updateMenuPosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect || typeof window === 'undefined') return;
+    setMenuPosition({
+      top: rect.bottom + 8,
+      right: Math.max(12, window.innerWidth - rect.right),
+      width: Math.min(380, window.innerWidth - 24),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && (triggerRef.current?.contains(target) || menuRef.current?.contains(target))) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
+  }, [open]);
 
   const selected = CONGCHAIN_MODEL_OPTIONS.find(modelOption => modelOption.key === selectedModel) ?? CONGCHAIN_MODEL_OPTIONS[0];
   const openRoutes = CONGCHAIN_MODEL_OPTIONS.filter(modelOption => modelOption.tier === 'open');
@@ -1853,6 +1888,7 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
       <button
         key={modelOption.key}
         type="button"
+        onPointerDown={event => event.stopPropagation()}
         onClick={() => handleClick(modelOption.key, modelOption.tier === 'pro')}
         className={`group flex w-full min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 ${
           active
@@ -1886,8 +1922,13 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
       {showUpgrade && <UpgradeModal model={showUpgrade} onClose={() => setShowUpgrade(null)} />}
       <div className="relative z-[80]">
         <button
+          ref={triggerRef}
           type="button"
-          onClick={() => setOpen(current => !current)}
+          onClick={() => setOpen(current => {
+            const next = !current;
+            if (next) requestAnimationFrame(updateMenuPosition);
+            return next;
+          })}
           className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#14F195]/18 bg-[linear-gradient(135deg,rgba(20,241,149,0.10),rgba(153,69,255,0.07))] px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:border-[#14F195]/32 hover:text-white"
           title="Selecionar IA da CongChain"
         >
@@ -1896,7 +1937,18 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
           <span>{selected.name}</span>
           <ChevronDown className={`h-3.5 w-3.5 text-white/42 transition ${open ? 'rotate-180' : ''}`} />
         </button>
-        <div className={`${open ? 'block' : 'hidden'} absolute right-0 top-[calc(100%+8px)] z-[90] w-[min(92vw,380px)] max-h-[72vh] overflow-y-auto rounded-2xl border border-[#14F195]/18 bg-[#050806]/96 p-3 shadow-2xl shadow-black/55 backdrop-blur-2xl`}>
+        {open ? createPortal(
+        <div
+          ref={menuRef}
+          onPointerDown={event => event.stopPropagation()}
+          className="fixed z-[9999] block overflow-y-auto rounded-2xl border border-[#14F195]/18 bg-[#050806]/96 p-3 shadow-2xl shadow-black/55 backdrop-blur-2xl pointer-events-auto"
+          style={{
+            top: menuPosition.top,
+            right: menuPosition.right,
+            width: menuPosition.width,
+            maxHeight: `calc(100vh - ${menuPosition.top + 16}px)`,
+          }}
+        >
           <div className="mb-3 flex items-start justify-between gap-3 border-b border-white/[0.07] pb-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#14F195]/70">Selecionar IA</p>
@@ -1912,7 +1964,9 @@ function ModelSelector({ selectedModel, onModelChange }: { selectedModel: AIMode
             <p className="px-1 pt-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/30">Pro / admin</p>
             <div className="space-y-1.5">{proRoutes.map(renderRouteButton)}</div>
           </div>
-        </div>
+        </div>,
+        document.body,
+        ) : null}
       </div>
     </>
   );
