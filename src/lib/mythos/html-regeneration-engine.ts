@@ -129,10 +129,13 @@ export function buildMythosRegenerationBrief(userRequest: string, presetName?: M
       'Use a deliberate product-page structure, not a generic template.',
       'Make the first viewport immediately communicate brand, offer, and safe next step.',
       'Keep all actions read-only and informational.',
+      'The output must look like a finished product demo, not a prompt placeholder or centered splash screen.',
     ],
     sectionBlueprint: makeSectionBlueprint(preset, mode),
     componentSystem: [
       'Use reusable visual patterns: badges, stat cards, proof rails, feature grids, timelines, comparison rows, and CTA bands.',
+      'Create one substantial CSS-only product visual: protocol console, launch dashboard, token card, market terminal, agent operating panel, docs browser, or roadmap board.',
+      'Use asymmetric desktop composition where possible: copy and actions on one side, product visual/data surface on the other.',
       'Use CSS custom properties for color, spacing, radius, border, glow, and shadow tokens.',
       'Use semantic HTML sections, readable headings, and compact labels.',
       'Use mobile-first responsive grids with minmax(0, 1fr), max-width constraints, and overflow-wrap.',
@@ -141,9 +144,10 @@ export function buildMythosRegenerationBrief(userRequest: string, presetName?: M
     contentRules: [
       'Prefer concrete product language over vague AI marketing.',
       'Do not invent real prices, market caps, liquidity, holders, partnerships, exchange listings, or guarantees.',
-      'If the user did not provide a logo or asset, create a CSS-only symbolic mark or labeled placeholder.',
+      'If the user did not provide a logo or asset, create a CSS-only symbolic mark integrated into a useful product surface, not an isolated square placeholder.',
       'If the user provided a URL or screenshot, reinterpret structure and rhythm only.',
       'Avoid long walls of text; make the result easy to scan and demo on video.',
+      'Every section should answer a useful user question: what it is, why it matters, how it works, what is safe, what comes next.',
     ],
     interactionRules: [
       'Buttons are visual/read-only CTAs only.',
@@ -157,6 +161,9 @@ export function buildMythosRegenerationBrief(userRequest: string, presetName?: M
       'Hero, next section, and CTA must be visible or hinted in first viewport.',
       'Every data/stat area must be source-labeled or clearly marked demo.',
       'Visual style should feel like a premium Mythos/CongChain artifact, not a default AI page.',
+      'Reject generic centered poster pages with only a logo, headline, chips, and one button.',
+      'Reject meaningless placeholder graphics; use purposeful CSS-built product visuals.',
+      'Include at least 5 meaningful sections unless the user explicitly asks for a compact component.',
     ],
   };
 }

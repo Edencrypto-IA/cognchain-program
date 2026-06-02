@@ -6173,7 +6173,8 @@ export default function MythosLabConsole() {
                               </div>
                               <div className="flex flex-wrap items-center gap-2">
                                 {[
-                                  ['Premium', '/editar html deixe mais premium, com melhor hierarquia, espaçamento e acabamento visual'],
+                                  ['Redesign', '/editar html faça um redesenho premium completo: transforme em uma interface de produto real com hero assimétrico, visual de produto em CSS, pelo menos 5 seções úteis e acabamento tipo Lovable/v0'],
+                                  ['Premium', '/editar html eleve para qualidade premium de produto: melhore hierarquia, composição, espaçamento, visual principal, seções e acabamento geral'],
                                   ['Mobile', '/editar html refine o mobile, corrija overflow e melhore touch targets'],
                                   ['Cores', '/editar html melhore a paleta, contraste e profundidade mantendo o estilo Mythos'],
                                 ].map(([label, command]) => (

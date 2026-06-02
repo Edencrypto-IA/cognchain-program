@@ -53,6 +53,12 @@ Visual quality bar:
 - Add CSS-only visual richness: gradients, borders, shadows, subtle scanline or grid texture, and restrained keyframe animation.
 - Use cards only for repeated items or framed tools; avoid card-in-card clutter.
 - Use concise copy and label placeholder/demo values honestly.
+- The page must feel like a real product interface, not a centered poster. Use a nav/header, hero content, one meaningful product visual, proof/status rail, and at least 5 distinct sections.
+- Avoid single-column centered layouts unless the user asks for a simple splash page. Prefer asymmetric desktop composition with a visual panel, data console, product mock, timeline, or dashboard surface.
+- Never use a meaningless square/circle placeholder as the main visual. If no asset exists, build a CSS-only product mockup, protocol console, token card, agent terminal, or abstract brand mark with labels.
+- Do not overuse huge neon pills. Buttons and chips should feel polished, compact, and proportional.
+- Do not output thin demo pages. Include enough real structure for a founder to record a launch demo: hero, value, product mechanics, feature grid, proof/security, roadmap/process, and footer.
+- Use original copy with specific product language. Avoid vague phrases like "AGI-ready", "always on-chain", or "premium AI" unless supported by surrounding explanation.
 
 Safety rules:
 - Do not create wallet connect, signing, submit, buy, sell, swap, airdrop claim, payment, or fund movement flows.
@@ -81,6 +87,9 @@ Improve the HTML while preserving safety and meaning:
 - mobile-safe grids;
 - no text overflow;
 - better contrast;
+- replace generic centered hero/poster layouts with a fuller product interface;
+- replace meaningless placeholder icons with CSS-only product mockups, consoles, dashboards, or branded marks;
+- add missing sections when the artifact feels thin, but keep them read-only and honest;
 - no external dependencies;
 - no wallet, transaction, storage, clipboard, or network behavior.
 
@@ -131,6 +140,15 @@ export function buildMythosHtmlGenerationPrompt(brief: MythosHtmlGenerationBrief
     '',
     'Mythos design system CSS guidance:',
     MYTHOS_PREMIUM_CSS_GUIDE,
+    '',
+    'Hard quality directive:',
+    [
+      '- First draft must be demo-worthy, not a placeholder.',
+      '- Use a real information architecture with multiple sections and visible product mechanics.',
+      '- Build at least one substantial visual object in CSS: dashboard, terminal, protocol graph, token identity panel, roadmap board, or data console.',
+      '- Avoid default centered hero with a small abstract icon.',
+      '- The result should look like a premium product team designed it, not like a model generated a simple landing page.',
+    ].join('\n'),
     '',
     'Generate a polished, production-grade, read-only HTML preview. Keep it safe, self-contained, responsive, and visually premium.',
   ].filter(Boolean).join('\n');
