@@ -6,6 +6,11 @@ import {
 } from './html-design-skills';
 import { MYTHOS_PREMIUM_CSS_GUIDE } from './design-system';
 import { buildSkillPipelinePrompt } from './skill-engine';
+import {
+  buildMythosRegenerationBrief,
+  formatRegenerationBriefForPrompt,
+  type MythosRegenerationBrief,
+} from './html-regeneration-engine';
 
 export type MythosHtmlGenerationBrief = {
   userRequest: string;
@@ -14,6 +19,7 @@ export type MythosHtmlGenerationBrief = {
   ticker?: string;
   websiteDna?: string;
   screenshotDna?: string;
+  regenerationBrief?: MythosRegenerationBrief;
 };
 
 export const MYTHOS_HTML_SYSTEM_PROMPT = `
@@ -85,10 +91,14 @@ export function buildMythosHtmlGenerationPrompt(brief: MythosHtmlGenerationBrief
   const presetName = brief.presetName || inferMythosHtmlPreset(brief.userRequest);
   const preset = MYTHOS_DESIGN_PRESETS[presetName];
   const skills = resolveMythosHtmlSkills(brief.userRequest);
+  const regenerationBrief = brief.regenerationBrief || buildMythosRegenerationBrief(brief.userRequest, presetName);
 
   return [
     'User request:',
     brief.userRequest,
+    '',
+    'Mythos regeneration engine brief:',
+    formatRegenerationBriefForPrompt(regenerationBrief),
     '',
     `Selected preset: ${preset.label}`,
     `Sections: ${preset.sections.join(' -> ')}`,

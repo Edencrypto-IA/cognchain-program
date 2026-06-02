@@ -5133,11 +5133,15 @@ export default function MythosLabConsole() {
       const safetyWarnings = getArray(safety, 'warnings').map(String);
       const screenshotAnalyzed = Boolean(safety.screenshotReferenceAnalyzed);
       const screenshotCount = asNumber(safety.screenshotReferenceCount, 0);
+      const regeneration = getRecord(data, 'regeneration');
+      const regenerationSections = getArray(regeneration, 'sections').map(String);
       appendTerminalResponse([
         terminalSection('Intent', 'Generate a read-only Mythos HTML artifact'),
         terminalSection('Decision', asString(data.text, 'Artifact generated for admin review.')),
         terminalSection('Design pipeline', [
           'Mythos used the premium HTML design prompt, selected a visual preset, and ran the sandbox safety gate before rendering.',
+          `Regeneration engine: ${asString(regeneration.intent, 'Premium artifact')} (${asString(regeneration.preset, 'auto-preset')}).`,
+          regenerationSections.length ? `Section blueprint: ${regenerationSections.join(' -> ')}.` : 'Section blueprint: automatic.',
           screenshotAnalyzed ? `Screenshot DNA analyzer used ${screenshotCount} visual reference(s).` : 'Screenshot DNA analyzer: no screenshot reference attached.',
         ]),
         terminalSection('Safety boundary', [

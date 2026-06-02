@@ -19,6 +19,7 @@ import {
   formatScreenshotDnaForPrompt,
   type MythosScreenshotInput,
 } from '@/lib/mythos/screenshot-dna-analyzer';
+import { buildMythosRegenerationBrief } from '@/lib/mythos/html-regeneration-engine';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
 
 type AnthropicTextBlock = {
@@ -187,10 +188,12 @@ export async function POST(req: NextRequest) {
       ? body.screenshots.filter((item: unknown): item is MythosScreenshotInput => Boolean(item) && typeof item === 'object')
       : [];
     const screenshotDna = await analyzeScreenshotDna(screenshotInputs);
+    const regenerationBrief = buildMythosRegenerationBrief(prompt);
     const generationPrompt = buildMythosHtmlGenerationPrompt({
       userRequest: prompt,
       websiteDna: websiteDnaBrief ? formatWebsiteDnaForPrompt(websiteDnaBrief) : undefined,
       screenshotDna: screenshotDna.length ? formatScreenshotDnaForPrompt(screenshotDna) : undefined,
+      regenerationBrief,
     });
     const generated = await generateArtifact(generationPrompt, provider);
     const artifact = extractMythosArtifactHtml(generated.text);
@@ -239,6 +242,13 @@ export async function POST(req: NextRequest) {
         screenshotReferenceCount: screenshotDna.length,
         warnings: safetyCheck?.warnings.map(item => item.rule) || [],
         removals: sanitized.removals,
+      },
+      regeneration: {
+        mode: regenerationBrief.mode,
+        preset: regenerationBrief.presetName,
+        intent: regenerationBrief.intent,
+        sections: regenerationBrief.sectionBlueprint.map(section => section.id),
+        qualityGates: regenerationBrief.qualityGates,
       },
     });
   } catch (error) {
