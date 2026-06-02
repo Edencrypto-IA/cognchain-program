@@ -103,6 +103,7 @@ type MythosMissionTask = {
   agentName: string;
   task: string;
   result: string;
+  fullResult?: string;
   hash: string;
   ts: number;
   isReal: true;
@@ -1979,8 +1980,8 @@ function MythosMissionControlPanel({
         </div>
       </div>
 
-      <div className="grid gap-4 p-5 xl:grid-cols-[0.82fr_1.18fr]">
-        <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-4 p-5">
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.35fr]">
           <div className="rounded-2xl border border-[#76FF03]/16 bg-black/28 p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">Intelligence</p>
@@ -2010,7 +2011,7 @@ function MythosMissionControlPanel({
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-black/28 p-4 sm:col-span-2">
+          <div className="rounded-2xl border border-white/10 bg-black/28 p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Score breakdown</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-4">
               {[
@@ -2028,7 +2029,7 @@ function MythosMissionControlPanel({
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[0.82fr_1.18fr]">
+        <div className="grid gap-3 xl:grid-cols-[0.38fr_0.62fr]">
           <div className="rounded-2xl border border-white/10 bg-black/28 p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Agentes ativos</p>
             <div className="mt-3 space-y-2">
@@ -2052,8 +2053,7 @@ function MythosMissionControlPanel({
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Historico de tarefas</p>
               <span className="text-[9px] font-black uppercase tracking-[0.12em] text-white/24">{recentTasks.length} items</span>
             </div>
-            <div className="mt-3 grid gap-3 xl:grid-cols-[0.8fr_1.2fr]">
-              <div className="space-y-2">
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
               {recentTasks.slice(0, 4).map(task => (
                 <button
                   type="button"
@@ -2075,50 +2075,52 @@ function MythosMissionControlPanel({
                 </button>
               ))}
               {recentTasks.length === 0 ? <p className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-xs text-white/42">Nenhuma tarefa real foi rodada nesta sessao ainda.</p> : null}
-              </div>
-              <div className="min-h-[220px] rounded-xl border border-[#7DE4FF]/14 bg-[#7DE4FF]/[0.045] p-4">
-                {expandedTask ? (
-                  <>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">O que ele fez</p>
-                        <h4 className="mt-2 break-words text-base font-black text-white">{expandedTask.task}</h4>
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-white/34">
-                          {expandedTask.agentName} | {expandedTask.modelLabel || expandedTask.model}
-                        </p>
-                      </div>
-                      <span className="rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-2.5 py-1 text-[9px] font-black text-[#8CFFD2]">
-                        Qualidade {expandedTask.dataQuality ?? 0}/10
-                      </span>
-                    </div>
-                    <p className="mt-4 whitespace-pre-wrap text-xs leading-5 text-white/62">{expandedTask.result}</p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-white/8 bg-black/24 p-3">
-                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Memoria salva</p>
-                        <p className="mt-2 break-all font-mono text-[11px] text-[#A7FF3D]/78">{expandedTask.hash || 'not saved'}</p>
-                      </div>
-                      <div className="rounded-xl border border-white/8 bg-black/24 p-3">
-                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Fontes</p>
-                        <p className="mt-2 text-[11px] leading-4 text-white/52">{expandedTask.sources?.length ? expandedTask.sources.join(', ') : 'O provedor nao retornou fontes explicitas.'}</p>
-                      </div>
-                    </div>
-                    {expandedTask.evidence?.length ? (
-                      <div className="mt-3 rounded-xl border border-white/8 bg-black/24 p-3">
-                        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Evidencias</p>
-                        <ul className="mt-2 space-y-1 text-[11px] leading-4 text-white/52">
-                          {expandedTask.evidence.slice(0, 4).map(item => <li key={item}>- {item}</li>)}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="flex h-full min-h-[220px] items-center justify-center text-center">
-                    <p className="max-w-xs text-xs leading-5 text-white/42">Rode Market Intel ou Wallet Risk, depois selecione uma tarefa para ver resultado, memoria salva, fontes e evidencias.</p>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#7DE4FF]/14 bg-[#7DE4FF]/[0.045] p-4">
+          {expandedTask ? (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">O que ele fez</p>
+                  <h4 className="mt-2 break-words text-xl font-black leading-tight text-white">{expandedTask.task}</h4>
+                  <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-white/34">
+                    {expandedTask.agentName} | {expandedTask.modelLabel || expandedTask.model}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-[#14F195]/18 bg-[#14F195]/8 px-2.5 py-1 text-[9px] font-black text-[#8CFFD2]">
+                  Qualidade {expandedTask.dataQuality ?? 0}/10
+                </span>
+              </div>
+              <div className="mt-4 max-h-[420px] overflow-y-auto rounded-xl border border-white/8 bg-black/28 p-4">
+                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-white/68">{expandedTask.fullResult || expandedTask.result}</p>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="min-w-0 rounded-xl border border-white/8 bg-black/24 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Memoria salva</p>
+                  <p className="mt-2 break-all font-mono text-[11px] leading-4 text-[#A7FF3D]/78">{expandedTask.hash || 'not saved'}</p>
+                </div>
+                <div className="min-w-0 rounded-xl border border-white/8 bg-black/24 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Fontes</p>
+                  <p className="mt-2 break-words text-[11px] leading-4 text-white/52">{expandedTask.sources?.length ? expandedTask.sources.join(', ') : 'O provedor nao retornou fontes explicitas.'}</p>
+                </div>
+              </div>
+              {expandedTask.evidence?.length ? (
+                <div className="mt-3 rounded-xl border border-white/8 bg-black/24 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/32">Evidencias</p>
+                  <ul className="mt-2 space-y-1 text-[11px] leading-4 text-white/52">
+                    {expandedTask.evidence.slice(0, 6).map(item => <li key={item} className="break-words">- {item}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="flex min-h-[220px] items-center justify-center text-center">
+              <p className="max-w-xs text-xs leading-5 text-white/42">Rode Market Intel ou Wallet Risk, depois selecione uma tarefa para ver resultado, memoria salva, fontes e evidencias.</p>
+            </div>
+          )}
         </div>
       </div>
 

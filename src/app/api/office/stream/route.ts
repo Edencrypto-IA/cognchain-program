@@ -676,6 +676,7 @@ export async function runRealTask(options?: string | RunRealTaskOptions): Promis
       agentName: hasContinuity ? `${agentName} ↻` : agentName,
       task: skill.name,
       result: content.replace(/\n+/g, ' ').trim().slice(0, 160),
+      fullResult: content.trim(),
       hash: mem.hash, ts: Date.now(), isReal: true, sources, evidence, decision, dataQuality: dataScore,
     });
     updateAgentSnapshot({

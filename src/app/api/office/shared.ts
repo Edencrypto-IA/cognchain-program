@@ -12,6 +12,7 @@ export interface RealEvent {
   agentName: string;
   task: string;
   result: string;
+  fullResult?: string;
   hash: string;
   ts: number;
   isReal: true;
