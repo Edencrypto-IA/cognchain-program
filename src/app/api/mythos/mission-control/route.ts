@@ -38,8 +38,7 @@ export async function GET() {
     ]);
 
     const mythosAgent = agents.find(agent => /mythos|mito/i.test(agent.name))
-      || agents.find(agent => /mythos|agent-memory|solana/i.test(`${agent.goal} ${agent.systemPrompt}`))
-      || agents[0]
+      || agents.find(agent => /mythos|agent-memory/i.test(`${agent.goal} ${agent.systemPrompt}`))
       || null;
 
     const intelligence = mythosAgent
@@ -74,9 +73,9 @@ export async function GET() {
       },
       mythos: {
         agentId: mythosAgent?.id ?? 'mythos-lab',
-        name: mythosAgent?.name ?? 'Mythos',
+        name: 'Mythos',
         model: mythosAgent?.model ?? 'nvidia',
-        goal: mythosAgent?.goal ?? 'Coordinate Solana, memory, launch, and artifact workflows with human approval.',
+        goal: mythosAgent?.goal ?? 'Coordinate Solana, memory, launch, wallet intelligence, and artifact workflows with human approval.',
         intelligence: intelligence ?? {
           total,
           level: scoreLevel(total),
