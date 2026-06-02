@@ -75,6 +75,93 @@ type MythosLabAttachment = {
   note?: string;
 };
 
+type MythosMissionAgent = {
+  id: string;
+  name: string;
+  model: string;
+  score: number;
+  status: 'idle' | 'thinking' | 'executing' | 'warning' | 'fired';
+  tasksDone: number;
+  memoryCount: number;
+  solSpent: number;
+  consecutivePoor: number;
+  updatedAt: number;
+};
+
+type MythosMissionTask = {
+  seq: number;
+  type: string;
+  agentId?: string;
+  name?: string;
+  model: string;
+  modelLabel: string;
+  agentName: string;
+  task: string;
+  result: string;
+  hash: string;
+  ts: number;
+  isReal: true;
+  sources?: string[];
+  evidence?: string[];
+  dataQuality?: number;
+};
+
+type MythosMissionMemory = {
+  hash: string;
+  model: string;
+  score: number | null;
+  verified: boolean;
+  timestamp: string | number;
+  preview: string;
+};
+
+type MythosMissionControl = {
+  ok: boolean;
+  fetchedAt: string;
+  safety: {
+    readOnly: boolean;
+    noWalletSignature: boolean;
+    noTransactionSubmit: boolean;
+    noFundsMovement: boolean;
+  };
+  mythos: {
+    agentId: string;
+    name: string;
+    model: string;
+    goal: string;
+    intelligence: {
+      total: number;
+      level: string;
+      breakdown: {
+        memories: number;
+        quality: number;
+        decisions: number;
+        onChain: number;
+      };
+    };
+  };
+  office: {
+    activeAgents: MythosMissionAgent[];
+    firedAgents: MythosMissionAgent[];
+    recentTasks: MythosMissionTask[];
+    stats: {
+      active: number;
+      fired: number;
+      tasks: number;
+      memories: number;
+      solSpent: number;
+    };
+  };
+  memories: MythosMissionMemory[];
+  capabilities: Array<{
+    id: string;
+    label: string;
+    detail: string;
+    endpoint?: string;
+    safe: boolean;
+  }>;
+};
+
 type MythosMemecoinDraft = {
   name: string;
   symbol: string;
@@ -1739,6 +1826,185 @@ function CoinRow({ coin, index, mode }: { coin: MythosCryptoCoin | SolanaAssetSu
   );
 }
 
+function missionStatusClass(status: MythosMissionAgent['status']) {
+  if (status === 'executing') return 'border-[#14F195]/20 bg-[#14F195]/10 text-[#8CFFD2]';
+  if (status === 'thinking') return 'border-[#7DE4FF]/20 bg-[#7DE4FF]/10 text-[#9AEAFF]';
+  if (status === 'warning') return 'border-[#FFD166]/24 bg-[#FFD166]/10 text-[#FFE08A]';
+  if (status === 'fired') return 'border-[#FF5C7A]/20 bg-[#FF5C7A]/10 text-[#FF9AB1]';
+  return 'border-white/10 bg-white/[0.035] text-white/46';
+}
+
+function MythosMissionControlPanel({
+  data,
+  loading,
+  runningTask,
+  connectedAddress,
+  onRefresh,
+  onRunTask,
+}: {
+  data: MythosMissionControl | null;
+  loading: boolean;
+  runningTask: 'market' | 'wallet' | null;
+  connectedAddress: string;
+  onRefresh: () => void;
+  onRunTask: (task: 'market' | 'wallet') => void;
+}) {
+  const intelligence = data?.mythos.intelligence;
+  const activeAgents = data?.office.activeAgents ?? [];
+  const recentTasks = data?.office.recentTasks ?? [];
+  const memories = data?.memories ?? [];
+  const score = intelligence?.total ?? 0;
+  const statusLabel = loading && !data ? 'loading' : data?.ok ? 'online' : 'waiting';
+
+  return (
+    <div className="mb-5 overflow-hidden rounded-[28px] border border-[#14F195]/18 bg-[radial-gradient(circle_at_top_left,rgba(20,241,149,0.13),transparent_32%),linear-gradient(180deg,rgba(2,20,12,0.88),rgba(0,0,0,0.78))] shadow-[0_22px_70px_rgba(0,0,0,0.36)]">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/8 px-5 py-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-[#14F195]/24 bg-[#14F195]/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#8CFFD2]">
+              Mission Control
+            </span>
+            <span className={`rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${statusLabel === 'online' ? 'border-[#76FF03]/24 bg-[#76FF03]/10 text-[#A7FF3D]' : 'border-white/10 bg-white/[0.035] text-white/42'}`}>
+              {statusLabel}
+            </span>
+          </div>
+          <h3 className="mt-3 text-2xl font-black text-white">{data?.mythos.name ?? 'Mythos'} operational brain</h3>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-white/50">
+            Live read-only view of agents, memory inheritance, intelligence score, and safe task runners. No signature, submit, swap, buy, or fund movement is automatic.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={loading}
+            className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-white/58 transition hover:border-[#14F195]/22 hover:text-[#8CFFD2] disabled:opacity-45"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radar className="h-3.5 w-3.5" />}
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => onRunTask('market')}
+            disabled={!!runningTask}
+            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#FFD166]/22 bg-[#FFD166]/10 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#FFE08A] transition hover:bg-[#FFD166]/16 disabled:opacity-45"
+          >
+            {runningTask === 'market' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
+            Market Intel
+          </button>
+          <button
+            type="button"
+            onClick={() => onRunTask('wallet')}
+            disabled={!!runningTask || !connectedAddress}
+            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#14F195]/22 bg-[#14F195]/10 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#8CFFD2] transition hover:bg-[#14F195]/16 disabled:opacity-45"
+            title={connectedAddress ? 'Run read-only wallet risk for the connected public address' : 'Connect a wallet before Wallet Risk'}
+          >
+            {runningTask === 'wallet' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+            Wallet Risk
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-[#76FF03]/16 bg-black/28 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">Intelligence</p>
+              <Brain className="h-4 w-4 text-[#A7FF3D]/70" />
+            </div>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <p className="text-4xl font-black text-white">{score}</p>
+              <p className="pb-1 text-xs font-black uppercase tracking-[0.12em] text-white/40">{intelligence?.level ?? 'Nascente'}</p>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
+              <div className="h-full rounded-full bg-[#76FF03]" style={{ width: `${Math.max(5, Math.min(100, score))}%` }} />
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#7DE4FF]/16 bg-black/28 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">Office Live</p>
+              <Gauge className="h-4 w-4 text-[#9AEAFF]/70" />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-2xl font-black text-white">{data?.office.stats.active ?? activeAgents.length}</p>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-white/35">agents</p>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-white">{data?.office.stats.memories ?? memories.length}</p>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-white/35">memories</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/28 p-4 sm:col-span-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Score breakdown</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-4">
+              {[
+                ['Memory', intelligence?.breakdown.memories ?? 0],
+                ['Quality', intelligence?.breakdown.quality ?? 0],
+                ['Decisions', intelligence?.breakdown.decisions ?? 0],
+                ['On-chain', intelligence?.breakdown.onChain ?? 0],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-white/8 bg-white/[0.025] p-3">
+                  <p className="text-lg font-black text-white">{value}</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-white/34">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-black/28 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Active agents</p>
+            <div className="mt-3 space-y-2">
+              {activeAgents.slice(0, 5).map(agent => (
+                <div key={agent.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.025] p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-black text-white">{agent.name}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/35">{agent.model} | {agent.tasksDone} tasks</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-black uppercase ${missionStatusClass(agent.status)}`}>
+                    {agent.status}
+                  </span>
+                </div>
+              ))}
+              {activeAgents.length === 0 ? <p className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-xs text-white/42">No live office agents yet. Run Market Intel to create a real event.</p> : null}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/28 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/36">Recent real tasks</p>
+            <div className="mt-3 space-y-2">
+              {recentTasks.slice(0, 4).map(task => (
+                <div key={task.seq} className="rounded-xl border border-white/8 bg-white/[0.025] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-xs font-black text-white">{task.agentName}</p>
+                    <span className="rounded-full border border-[#14F195]/16 bg-[#14F195]/8 px-2 py-0.5 text-[9px] font-black text-[#8CFFD2]">{task.dataQuality ?? 0}/10</span>
+                  </div>
+                  <p className="mt-1 truncate text-[10px] uppercase tracking-[0.12em] text-white/34">{task.task}</p>
+                  <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-white/48">{task.result}</p>
+                </div>
+              ))}
+              {recentTasks.length === 0 ? <p className="rounded-xl border border-white/8 bg-white/[0.025] p-3 text-xs text-white/42">No real task has been pushed in this server session yet.</p> : null}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-white/8 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/38">
+          <ShieldCheck className="h-3.5 w-3.5 text-[#8CFFD2]" />
+          <span>Read-only mission layer.</span>
+          <span>No wallet signature.</span>
+          <span>No transaction submit.</span>
+          <span>No buy, sell, swap, payment, or fund movement.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MythosCryptoReportCard({ report }: { report: MythosCryptoMarketReport }) {
   return (
     <div className="mt-2 overflow-hidden rounded-[28px] border border-[#76FF03]/22 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.18),transparent_34%),linear-gradient(180deg,rgba(11,38,5,0.92),rgba(1,8,3,0.96))] p-5 shadow-[0_0_50px_rgba(118,255,3,0.08)]">
@@ -3244,6 +3510,9 @@ export default function MythosLabConsole() {
   const [pumpfunSubmittedPayloads, setPumpfunSubmittedPayloads] = useState<Record<string, MythosPumpfunSubmittedPayload>>({});
   const [pumpfunSubmittingIds, setPumpfunSubmittingIds] = useState<Record<string, boolean>>({});
   const [pumpfunBuySpendSol, setPumpfunBuySpendSol] = useState<Record<string, string>>({});
+  const [missionControl, setMissionControl] = useState<MythosMissionControl | null>(null);
+  const [missionLoading, setMissionLoading] = useState(false);
+  const [missionRunningTask, setMissionRunningTask] = useState<'market' | 'wallet' | null>(null);
 
   useEffect(() => {
     const loaded = safeLoadSessions();
@@ -3290,6 +3559,14 @@ export default function MythosLabConsole() {
   }, [sessions]);
 
   useEffect(() => {
+    void refreshMissionControl(true);
+    const interval = window.setInterval(() => {
+      void refreshMissionControl(true);
+    }, 12_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (!loading) {
       setLoadingStep(0);
       return;
@@ -3316,6 +3593,57 @@ export default function MythosLabConsole() {
     : currentModel.label;
   const connectedAddress = publicKey?.toString() || '';
   const walletShortAddress = connectedAddress ? `${connectedAddress.slice(0, 4)}...${connectedAddress.slice(-4)}` : '';
+
+  async function refreshMissionControl(silent = false) {
+    if (!silent) setMissionLoading(true);
+    try {
+      const response = await fetch('/api/mythos/mission-control', { cache: 'no-store' });
+      const data = await response.json();
+      if (response.ok && data?.ok) {
+        setMissionControl(data as MythosMissionControl);
+      }
+    } catch {
+      if (!silent) setNotice('Mission Control could not refresh right now.');
+    } finally {
+      if (!silent) setMissionLoading(false);
+    }
+  }
+
+  async function runMissionTask(task: 'market' | 'wallet') {
+    if (missionRunningTask) return;
+    if (task === 'wallet' && !connectedAddress) {
+      setNotice('Connect Phantom or Solflare before running Wallet Risk. This is read-only and uses only the public address.');
+      return;
+    }
+
+    setMissionRunningTask(task);
+    setNotice(task === 'market'
+      ? 'Mythos is running read-only Market Intel through the agent office...'
+      : 'Mythos is running read-only Wallet Risk for the connected public wallet...');
+    try {
+      const response = await fetch('/api/office/run-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task,
+          walletAddress: task === 'wallet' ? connectedAddress : undefined,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(asString(data.error, 'Mission task failed.'));
+      }
+      setNotice(task === 'market'
+        ? 'Market Intel finished and was saved as agent memory when the provider returned data.'
+        : 'Wallet Risk finished and was saved as agent memory when the provider returned data.');
+      window.setTimeout(() => void refreshMissionControl(true), 1200);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Mission task failed.');
+    } finally {
+      setMissionRunningTask(null);
+      void refreshMissionControl(true);
+    }
+  }
 
   useEffect(() => {
     if (!pendingWalletName || !wallet || wallet.adapter.name !== pendingWalletName || connected) return;
@@ -5360,7 +5688,15 @@ export default function MythosLabConsole() {
 
           <div className="relative flex flex-1 flex-col overflow-y-auto px-4 pb-4 sm:px-6">
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
-              <div className={`flex flex-1 flex-col ${hasConversation ? 'justify-start pt-6' : 'justify-center'}`}>
+              <div className="flex flex-1 flex-col justify-start pt-6">
+                <MythosMissionControlPanel
+                  data={missionControl}
+                  loading={missionLoading}
+                  runningTask={missionRunningTask}
+                  connectedAddress={connectedAddress}
+                  onRefresh={() => void refreshMissionControl()}
+                  onRunTask={task => void runMissionTask(task)}
+                />
                 {!hasConversation ? (
                   <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
                     <img
