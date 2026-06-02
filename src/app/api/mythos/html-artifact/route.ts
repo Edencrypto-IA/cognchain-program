@@ -3,6 +3,7 @@ import { verifyAdminToken } from '@/app/api/auth/verify/route';
 import {
   MYTHOS_HTML_SYSTEM_PROMPT,
   buildMythosHtmlGenerationPrompt,
+  buildMythosHtmlRevisionPrompt,
 } from '@/lib/mythos/html-artifact-prompts';
 import {
   checkMythosHtmlSafety,
@@ -175,7 +176,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A prompt between 1 and 6000 characters is required.' }, { status: 400 });
     }
 
-    if (hasSecretLikeContent(prompt)) {
+    const currentHtml = typeof body.currentHtml === 'string' ? body.currentHtml.trim() : '';
+    if (currentHtml && currentHtml.length > 120_000) {
+      return NextResponse.json({ error: 'Current HTML is too large for a safe Mythos revision pass.' }, { status: 400 });
+    }
+
+    if (hasSecretLikeContent(prompt) || (currentHtml && hasSecretLikeContent(currentHtml))) {
       return NextResponse.json({
         error: 'The artifact prompt appears to contain a secret or sensitive payload. Remove it and try again.',
       }, { status: 400 });
@@ -189,12 +195,15 @@ export async function POST(req: NextRequest) {
       : [];
     const screenshotDna = await analyzeScreenshotDna(screenshotInputs);
     const regenerationBrief = buildMythosRegenerationBrief(prompt);
-    const generationPrompt = buildMythosHtmlGenerationPrompt({
-      userRequest: prompt,
-      websiteDna: websiteDnaBrief ? formatWebsiteDnaForPrompt(websiteDnaBrief) : undefined,
-      screenshotDna: screenshotDna.length ? formatScreenshotDnaForPrompt(screenshotDna) : undefined,
-      regenerationBrief,
-    });
+    const revisionMode = Boolean(currentHtml);
+    const generationPrompt = revisionMode
+      ? buildMythosHtmlRevisionPrompt(currentHtml, prompt)
+      : buildMythosHtmlGenerationPrompt({
+        userRequest: prompt,
+        websiteDna: websiteDnaBrief ? formatWebsiteDnaForPrompt(websiteDnaBrief) : undefined,
+        screenshotDna: screenshotDna.length ? formatScreenshotDnaForPrompt(screenshotDna) : undefined,
+        regenerationBrief,
+      });
     const generated = await generateArtifact(generationPrompt, provider);
     const artifact = extractMythosArtifactHtml(generated.text);
 
@@ -244,6 +253,7 @@ export async function POST(req: NextRequest) {
         removals: sanitized.removals,
       },
       regeneration: {
+        revisionMode,
         mode: regenerationBrief.mode,
         preset: regenerationBrief.presetName,
         intent: regenerationBrief.intent,

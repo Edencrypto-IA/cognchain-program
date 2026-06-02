@@ -136,12 +136,22 @@ export function buildMythosHtmlGenerationPrompt(brief: MythosHtmlGenerationBrief
   ].filter(Boolean).join('\n');
 }
 
-export function buildMythosHtmlRevisionPrompt(html: string) {
+export function buildMythosHtmlRevisionPrompt(html: string, instruction = 'Improve this artifact while preserving its intent.') {
+  const regenerationBrief = buildMythosRegenerationBrief(instruction);
+
   return [
     MYTHOS_HTML_REVISION_PROMPT,
     '',
+    'User revision instruction:',
+    instruction,
+    '',
+    'Mythos regeneration engine brief for this iteration:',
+    formatRegenerationBriefForPrompt(regenerationBrief),
+    '',
     'Current HTML:',
     html,
+    '',
+    'Return only the revised artifact wrapper. Preserve the existing concept, improve the requested parts, and do not start from a blank page unless the user explicitly asks for a full redesign.',
   ].join('\n');
 }
 
@@ -168,8 +178,8 @@ export function buildGenerationPrompt(brief: MythosHtmlGenerationBrief) {
   return buildMythosHtmlGenerationPrompt(brief);
 }
 
-export function buildReviewPrompt(html: string) {
-  return buildMythosHtmlRevisionPrompt(html);
+export function buildReviewPrompt(html: string, instruction?: string) {
+  return buildMythosHtmlRevisionPrompt(html, instruction);
 }
 
 export function buildSkillPrompt(skillPrompt: string) {

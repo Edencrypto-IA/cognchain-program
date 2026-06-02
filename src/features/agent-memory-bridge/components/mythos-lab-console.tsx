@@ -1259,6 +1259,21 @@ function parseHtmlArtifactPrompt(command: string) {
   return '';
 }
 
+function parseHtmlArtifactRevisionPrompt(command: string) {
+  const trimmed = command.trim();
+  const patterns = [
+    /^\/(?:editar|edit|melhorar|improve|refinar|refine)\s+(?:html|site|pagina|p[aÃ¡]gina|artifact|artefato)\s+(.+)$/i,
+    /^\/(?:html|artifact|artefato)\s+(?:editar|edit|melhorar|improve|refinar|refine)\s+(.+)$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match?.[1]?.trim()) return match[1].trim();
+  }
+
+  return '';
+}
+
 function parseMemecoinDraft(content: string, walletAddress?: string): MythosMemecoinDraft | null {
   const lower = content.toLowerCase();
   const isCommand = /^\/create\s+(?:meme|memecoin)\b/i.test(content.trim());
@@ -1668,6 +1683,9 @@ function helpResponse() {
     '/solana protocols',
     '/solana volume',
     '/solana memes',
+    '/criar html landing page do meu token',
+    '/editar html deixe mais premium e melhore o mobile',
+    '/melhorar html adicione uma seção de tokenomics demo',
     '/create meme Anubis Dog symbol ADOG buy 0.1 SOL image neon anubis dog mascot',
     '/quote swap 0.1 SOL to USDC',
     '/plan pay 0.05 SOL to <wallet>',
@@ -5091,6 +5109,92 @@ export default function MythosLabConsole() {
       return;
     }
 
+    const htmlArtifactRevisionPrompt = parseHtmlArtifactRevisionPrompt(command);
+    if (htmlArtifactRevisionPrompt) {
+      const latestArtifact = [...nextMessages].reverse().find(message => message.htmlArtifact)?.htmlArtifact;
+      if (!latestArtifact?.html) {
+        appendTerminalResponse([
+          terminalSection('Intent', 'Iterate on an existing Mythos HTML artifact'),
+          terminalSection('Decision', 'Blocked because no previous HTML artifact was found in this conversation.'),
+          terminalSection('Next safe step', 'Generate one first with: /criar html landing page do meu token'),
+        ].join('\n\n'));
+        return;
+      }
+
+      const response = await fetch('/api/mythos/html-artifact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: htmlArtifactRevisionPrompt,
+          currentHtml: latestArtifact.html,
+          screenshots: attachments
+            .filter(attachment => attachment.kind === 'image' && attachment.dataUrl)
+            .slice(0, 2)
+            .map((attachment, index) => ({
+              label: attachment.name || `revision-screenshot-${index + 1}`,
+              dataUrl: attachment.dataUrl,
+              mimeType: attachment.type,
+            })),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        const message = response.status === 401
+          ? 'HTML iteration is admin-only right now. Log in as admin, then run /editar html again.'
+          : isRecord(data)
+            ? asString(data.error, 'Mythos artifact revision failed.')
+            : 'Mythos artifact revision failed.';
+        throw new Error(message);
+      }
+
+      const artifact = getRecord(data, 'artifact');
+      const safety = getRecord(data, 'safety');
+      const regeneration = getRecord(data, 'regeneration');
+      const safetyRemovals = getArray(safety, 'removals').map(String);
+      const safetyWarnings = getArray(safety, 'warnings').map(String);
+      const regenerationSections = getArray(regeneration, 'sections').map(String);
+
+      appendTerminalResponse([
+        terminalSection('Intent', 'Revise the latest read-only Mythos HTML artifact'),
+        terminalSection('Decision', asString(data.text, 'Artifact revised for admin review.')),
+        terminalSection('Iteration pipeline', [
+          `Instruction: ${htmlArtifactRevisionPrompt}`,
+          `Base artifact: ${latestArtifact.title}`,
+          `Regeneration engine: ${asString(regeneration.intent, 'Premium artifact')} (${asString(regeneration.preset, 'auto-preset')}).`,
+          regenerationSections.length ? `Section blueprint: ${regenerationSections.join(' -> ')}.` : 'Section blueprint: preserved from current artifact.',
+        ]),
+        terminalSection('Safety boundary', [
+          'Admin-only route.',
+          'Provider API keys stay on the server.',
+          'Revised artifact iframe is sandboxed and cannot sign, buy, sell, pay, schedule, or move funds.',
+          safetyRemovals.length ? `Safety removals: ${safetyRemovals.join(', ')}` : 'Safety removals: none.',
+          safetyWarnings.length ? `Safety warnings: ${safetyWarnings.join(', ')}` : 'Safety warnings: none.',
+        ]),
+      ].join('\n\n'), {
+        htmlArtifact: asString(artifact.html, '') ? {
+          title: asString(artifact.title, latestArtifact.title),
+          html: asString(artifact.html, ''),
+          model: asString(data.model, latestArtifact.model || 'artifact-provider'),
+        } : undefined,
+        trace: {
+          perception: 'Admin requested a revision of an existing visual HTML artifact.',
+          selectedSkill: 'Mythos HTML Iteration Engine',
+          decision: 'Revise and sandbox the current preview.',
+          prediction: 'The artifact should preserve the original concept while improving the requested areas.',
+          safetyBoundary: 'Admin-only, server-side model key, sandboxed preview, no execution authority.',
+          nextHumanStep: 'Review the revised preview. Continue iterating with /editar html if needed.',
+        },
+        observability: {
+          model: asString(data.model, 'artifact-provider'),
+          modelLabel: `${asString(data.provider, 'provider')} HTML artifact editor`,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-html-artifact-revision/v1',
+          latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
     const htmlArtifactPrompt = parseHtmlArtifactPrompt(command);
     if (htmlArtifactPrompt) {
       const prompt = htmlArtifactPrompt;
@@ -6062,18 +6166,34 @@ export default function MythosLabConsole() {
                         ) : null}
                         {message.htmlArtifact ? (
                           <div className="mt-4 overflow-hidden rounded-2xl border border-[#76FF03]/18 bg-black/70">
-                            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.035] px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-white/[0.035] px-4 py-3">
                               <div>
                                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#A7FF3D]">HTML artifact</p>
                                 <p className="mt-1 text-xs text-white/52">{message.htmlArtifact.title}</p>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => navigator.clipboard.writeText(message.htmlArtifact?.html || '')}
-                                className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-bold text-white/62 transition hover:border-[#76FF03]/24 hover:text-[#A7FF3D]"
-                              >
-                                Copy HTML
-                              </button>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {[
+                                  ['Premium', '/editar html deixe mais premium, com melhor hierarquia, espaçamento e acabamento visual'],
+                                  ['Mobile', '/editar html refine o mobile, corrija overflow e melhore touch targets'],
+                                  ['Cores', '/editar html melhore a paleta, contraste e profundidade mantendo o estilo Mythos'],
+                                ].map(([label, command]) => (
+                                  <button
+                                    key={label}
+                                    type="button"
+                                    onClick={() => setInput(command)}
+                                    className="rounded-full border border-[#7DE4FF]/12 bg-[#7DE4FF]/[0.045] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.09em] text-[#9AEAFF]/70 transition hover:border-[#7DE4FF]/28 hover:text-[#9AEAFF]"
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => navigator.clipboard.writeText(message.htmlArtifact?.html || '')}
+                                  className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-bold text-white/62 transition hover:border-[#76FF03]/24 hover:text-[#A7FF3D]"
+                                >
+                                  Copy HTML
+                                </button>
+                              </div>
                             </div>
                             <iframe
                               title={message.htmlArtifact.title}
