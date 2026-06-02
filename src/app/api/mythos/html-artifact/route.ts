@@ -9,6 +9,11 @@ import {
   extractMythosArtifactHtml,
   sanitizeMythosHtml,
 } from '@/lib/mythos/html-artifact-safety';
+import {
+  extractFirstUrl,
+  fetchWebsiteDnaBrief,
+  formatWebsiteDnaForPrompt,
+} from '@/lib/mythos/website-dna-extractor';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
 
 type AnthropicTextBlock = {
@@ -171,7 +176,12 @@ export async function POST(req: NextRequest) {
     }
 
     const provider = typeof body.provider === 'string' ? body.provider : process.env.MYTHOS_HTML_ARTIFACT_PROVIDER || 'nvidia';
-    const generationPrompt = buildMythosHtmlGenerationPrompt({ userRequest: prompt });
+    const referenceUrl = extractFirstUrl(prompt);
+    const websiteDnaBrief = referenceUrl ? await fetchWebsiteDnaBrief(referenceUrl) : null;
+    const generationPrompt = buildMythosHtmlGenerationPrompt({
+      userRequest: prompt,
+      websiteDna: websiteDnaBrief ? formatWebsiteDnaForPrompt(websiteDnaBrief) : undefined,
+    });
     const generated = await generateArtifact(generationPrompt, provider);
     const artifact = extractMythosArtifactHtml(generated.text);
 
@@ -213,6 +223,8 @@ export async function POST(req: NextRequest) {
         keyExposedToBrowser: false,
         canMoveFunds: false,
         canSignTransactions: false,
+        websiteReferenceFetched: Boolean(websiteDnaBrief),
+        websiteReferenceUrl: websiteDnaBrief?.url || null,
         warnings: safetyCheck?.warnings.map(item => item.rule) || [],
         removals: sanitized.removals,
       },

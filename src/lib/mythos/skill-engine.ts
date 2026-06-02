@@ -5,6 +5,8 @@ import { MOBILE_NATIVE_SKILL } from './skills/mobile-native-skill';
 import { VISUAL_INTELLIGENCE_SKILL } from './skills/visual-intelligence-skill';
 import { AI_ARTIFACT_REFINER_SKILL } from './skills/ai-artifact-refiner';
 import { MYTHOS_TERMINAL_SKILL } from './skills/mythos-terminal-skill';
+import { WEBSITE_DNA_EXTRACTOR_SKILL } from './skills/website-dna-extractor-skill';
+import { UI_EVOLUTION_SKILL } from './skills/ui-evolution-skill';
 
 export type MythosSkillStage = 'generation' | 'review' | 'polish' | 'mobile' | 'safety';
 
@@ -39,8 +41,10 @@ export interface SkillExecutionResult {
 }
 
 export const MYTHOS_PREMIUM_UI_SKILLS: MythosSkill[] = [
+  WEBSITE_DNA_EXTRACTOR_SKILL,
   APPLE_DESIGN_SKILL,
   NVIDIA_INTERFACE_SKILL,
+  UI_EVOLUTION_SKILL,
   MAGIC_UX_SKILL,
   VISUAL_INTELLIGENCE_SKILL,
   MOBILE_NATIVE_SKILL,

@@ -12,6 +12,7 @@ export type MythosHtmlGenerationBrief = {
   presetName?: MythosHtmlPresetName;
   projectName?: string;
   ticker?: string;
+  websiteDna?: string;
 };
 
 export const MYTHOS_HTML_SYSTEM_PROMPT = `
@@ -54,6 +55,11 @@ Safety rules:
 - Do not invent real market data, holder counts, prices, market caps, liquidity, or guaranteed returns.
 - If tokenomics, stats, or market values are shown, label them as demo, placeholder, or estimated.
 - Use informational CTAs only: Explore, Learn More, Read Docs, Join Community, View Demo.
+
+Website reference rules:
+- If a URL was analyzed, treat it as visual/structural inspiration only.
+- Do not clone source code, protected assets, logos, exact branding, or full page copy.
+- Rebuild an original, improved Mythos/CongChain-style version with better hierarchy, spacing, responsiveness, and safety.
 `.trim();
 
 export const MYTHOS_HTML_REVISION_PROMPT = `
@@ -92,6 +98,13 @@ export function buildMythosHtmlGenerationPrompt(brief: MythosHtmlGenerationBrief
     '',
     brief.projectName ? `Project name: ${brief.projectName}` : '',
     brief.ticker ? `Ticker: ${brief.ticker}` : '',
+    '',
+    brief.websiteDna ? [
+      'Website reinterpretation context:',
+      brief.websiteDna,
+      '',
+      'Important: use this as abstract design DNA only. Do not copy source code, protected assets, logos, full text, or brand identity.',
+    ].join('\n') : '',
     '',
     `Internal skill pipeline: ${skills.join(' -> ')}`,
     '',
