@@ -2186,15 +2186,13 @@ export default function ChatArea({ orbMode, setOrbMode, onSessionUpdate, activeC
     return () => document.removeEventListener('click', close);
   }, [showLangMenu]);
 
-  // #8 Model switch with modal
+  // #8 Model switch
   const handleModelSwitch = useCallback((newModel: AIModel) => {
-    if (newModel === selectedModel || messages.length <= 1) {
-      setSelectedModel(newModel);
-      setPreviousModel(selectedModel);
-      return;
-    }
-    setPendingModel(newModel);
-    setShowSwitchModal(true);
+    if (newModel === selectedModel) return;
+    setPreviousModel(selectedModel);
+    setSelectedModel(newModel);
+    setContextActive(messages.length > 1);
+    setShowSwitchModal(false);
   }, [selectedModel, messages.length]);
 
   const handleSwitchConfirm = useCallback((keepMemory: boolean) => {
