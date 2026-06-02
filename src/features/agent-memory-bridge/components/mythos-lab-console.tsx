@@ -4887,21 +4887,17 @@ export default function MythosLabConsole() {
 
   async function saveMessageAsMemory(message: MythosLabMessage) {
     if (!message.content) return;
-    if (!apiKey.trim().startsWith('cog_live_')) {
-      setPendingSaveMessageId(message.id);
-      setNotice('Paste a full CongChain key under this Mythos answer, then save. The key is sent once and never displayed back.');
-      return;
-    }
 
     setSavingMemoryId(message.id);
     setNotice('');
     try {
-      const response = await fetch(profile.endpoints.writeMemory, {
+      const useManualKey = apiKey.trim().startsWith('cog_live_');
+      const response = await fetch(useManualKey ? profile.endpoints.writeMemory : '/api/mythos/memory/write', {
         method: 'POST',
-        headers: {
+        headers: useManualKey ? {
           Authorization: `Bearer ${apiKey.trim()}`,
           'Content-Type': 'application/json',
-        },
+        } : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...memoryPayload,
           content: message.content,
@@ -4919,7 +4915,7 @@ export default function MythosLabConsole() {
       if (!response.ok) throw new Error(data.error || 'Could not save Mythos memory.');
       markMessageSaved(message.id, data);
       setPendingSaveMessageId('');
-      setNotice(`CongChain memory saved: ${shortHash(data.hash, 18)}. ZK ${data.zkPersisted ? 'ready' : data.zkEnabled ? 'requested' : 'available by proof route'}. Anchor remains manual.`);
+      setNotice(`CongChain hash generated: ${shortHash(data.hash, 18)}. ZK ${data.zkPersisted ? 'ready' : data.zkEnabled ? 'requested' : 'available by proof route'}. Anchor remains manual.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not save Mythos memory.');
     } finally {
