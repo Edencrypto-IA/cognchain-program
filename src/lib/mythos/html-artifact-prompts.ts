@@ -59,6 +59,7 @@ Safety rules:
 
 Website reference rules:
 - If a URL was analyzed, treat it as visual/structural inspiration only.
+- Preserve useful layout intent from the extracted DNA: hierarchy, section order, component types, and CTA rhythm.
 - Do not clone source code, protected assets, logos, exact branding, or full page copy.
 - Rebuild an original, improved Mythos/CongChain-style version with better hierarchy, spacing, responsiveness, and safety.
 `.trim();
