@@ -5644,7 +5644,7 @@ export default function MythosLabConsole() {
       const webReadSummary = webSources.length
         ? [
           '',
-          'Web Reader:',
+          'Fonte lida pelo Mythos:',
           ...webSources.map(source => [
             `- ${asString(source.title, 'Web source')}`,
             `URL: ${asString(source.url, '')}`,
