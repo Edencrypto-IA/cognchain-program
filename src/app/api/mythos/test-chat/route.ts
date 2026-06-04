@@ -13,8 +13,9 @@ const MYTHOS_TEST_SYSTEM = [
   'Voce e Mythos, o primeiro agente externo oficial conectado ao Agent Memory Bridge da CongChain.',
   'Responda em portugues claro, natural e inteligente, como um assistente senior conversando com o usuario.',
   'Nao use markdown bruto: nao escreva asteriscos, cercas de codigo, titulos com hash, tabelas markdown ou marcadores decorativos.',
-  'Nao responda em formato robotico com Percepcao, Decisao, Skill provavel, Previsao ou Limite seguro, a menos que o usuario peca explicitamente auditoria, trace ou diagnostico operacional.',
-  'Para perguntas normais, explique direto: o que voce encontrou, por que importa, pontos principais e proximo passo util.',
+  'Nunca responda em formato robotico com Percepcao, Decisao, Skill provavel, Previsao, Limite seguro, Identidade Mythos ou Continuidade.',
+  'Mesmo quando houver skill, memoria, rota de modelo ou web reader, esconda o jargao interno e responda como um assistente util.',
+  'Explique direto: o que voce encontrou, por que importa, pontos principais e proximo passo util.',
   'Mostre a identidade do Mythos apenas quando fizer sentido, sem transformar toda resposta em relatorio operacional.',
   'Explique quando algo e demonstracao, contrato visual ou recurso real.',
   'Nao afirme que executou ferramentas externas, salvou memoria ou moveu fundos se isso nao aconteceu na chamada.',
@@ -25,6 +26,24 @@ const MYTHOS_TEST_SYSTEM = [
   'Quando o usuario pedir uma acao pratica, explique o proximo passo seguro dentro da CongChain.',
   'Mantenha respostas objetivas, mas completas o suficiente para serem uteis. Use pequenos blocos com titulos naturais quando ajudar.',
 ].join(' ');
+
+const OPERATIONAL_LABELS = [
+  'percepcao',
+  'percepção',
+  'decisao',
+  'decisão',
+  'skill provavel',
+  'skill provável',
+  'previsao',
+  'previsão',
+  'limite seguro',
+  'proximo passo',
+  'próximo passo',
+  'identidade mythos',
+  'continuidade',
+  'memoria',
+  'memória',
+];
 
 type MythosTestMessage = {
   role: 'user' | 'assistant';
@@ -265,6 +284,54 @@ function buildCognitiveTrace(messages: MythosTestMessage[], model: string, selec
   };
 }
 
+function humanizeOperationalResponse(content: string) {
+  const lines = content
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const parsed: Record<string, string> = {};
+  const normalLines: string[] = [];
+  let operationalLabelCount = 0;
+
+  for (const line of lines) {
+    const match = line.match(/^([A-Za-zÀ-ÿ\s]+):\s*(.+)$/);
+    if (!match) {
+      normalLines.push(line);
+      continue;
+    }
+
+    const label = match[1].trim().toLowerCase();
+    const value = match[2].trim();
+    const knownLabel = OPERATIONAL_LABELS.find(item => label === item);
+
+    if (knownLabel) {
+      operationalLabelCount += 1;
+      parsed[knownLabel] = value;
+    } else {
+      normalLines.push(line);
+    }
+  }
+
+  if (operationalLabelCount < 2) return content;
+
+  const perception = parsed.percepcao || parsed['percepção'] || '';
+  const decision = parsed.decisao || parsed['decisão'] || '';
+  const prediction = parsed.previsao || parsed['previsão'] || '';
+  const nextStep = parsed['proximo passo'] || parsed['próximo passo'] || '';
+  const safeLimit = parsed['limite seguro'] || '';
+
+  return [
+    perception || normalLines[0] || 'Analisei o pedido com base no contexto disponível.',
+    decision ? `O ponto principal: ${decision}` : '',
+    prediction ? `O que isso indica: ${prediction}` : '',
+    nextStep ? `Um bom próximo passo é ${nextStep.replace(/^\s*(o\s+)?/i, '')}` : '',
+    safeLimit ? `Observação: ${safeLimit}` : '',
+    ...normalLines.slice(perception ? 0 : 1),
+  ].filter(Boolean).join('\n\n');
+}
+
 function sanitizeMessages(messages: unknown): MythosTestMessage[] {
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new Error('Envie pelo menos uma mensagem para testar o Mythos.');
@@ -355,10 +422,11 @@ export async function POST(request: NextRequest) {
           useContext: false,
           agentName: 'Mythos',
         });
+    const responseContent = humanizeOperationalResponse(result.content);
 
     return NextResponse.json({
       ok: true,
-      response: result.content,
+      response: responseContent,
       model: result.model,
       modelLabel: result.modelLabel,
       nvidiaModelRoute: 'routeId' in result ? result.routeId : undefined,
