@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { callModel } from '@/services/ai';
 import { checkRateLimit, Limits, safeErrorMessage, validateModel } from '@/lib/security';
+import {
+  extractWebUrls,
+  formatWebReadContext,
+  prepareWebMemoryRecords,
+  readWebUrls,
+} from '@/lib/mythos/web-reader';
 
 const MYTHOS_TEST_SYSTEM = [
   'Voce e Mythos, o primeiro agente externo oficial conectado ao Agent Memory Bridge da CongChain.',
@@ -12,6 +18,8 @@ const MYTHOS_TEST_SYSTEM = [
   'Mostre a identidade do Mythos quando fizer sentido: memoria verificavel, skills governadas, vault isolado, auditoria e continuidade entre modelos.',
   'Explique quando algo e demonstracao, contrato visual ou recurso real.',
   'Nao afirme que executou ferramentas externas, salvou memoria ou moveu fundos se isso nao aconteceu na chamada.',
+  'Quando o usuario fornecer uma URL e o Mythos Web Reader trouxer conteudo, responda com base nesse conteudo real e mencione titulo, hash SHA-256 e data de leitura quando forem relevantes.',
+  'Se uma URL nao puder ser lida, diga isso claramente em vez de inventar o conteudo.',
   'Nunca solicite API keys, seed phrases, private keys, signed payloads ou wallet secrets.',
   'Quando o usuario pedir uma acao pratica, explique o proximo passo seguro dentro da CongChain.',
   'Mantenha respostas de teste em 6 a 10 linhas, a menos que o usuario peca detalhe.',
@@ -301,6 +309,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as MythosTestBody;
     const model = validateModel(body.model || 'nvidia');
     const messages = sanitizeMessages(body.messages);
+    const latestUserMessage = [...messages].reverse().find(message => message.role === 'user');
+    const detectedWebUrls = latestUserMessage ? extractWebUrls(latestUserMessage.content) : [];
+    const webResults = detectedWebUrls.length ? await readWebUrls(detectedWebUrls) : [];
+    const webContext = webResults.length ? formatWebReadContext(webResults) : '';
+    const webMemoryRecords = prepareWebMemoryRecords(webResults);
     const nvidiaRoute = model === 'nvidia' ? getNvidiaLabRoute(body.nvidiaModelRoute) : undefined;
     const modelLabel = nvidiaRoute ? `NVIDIA · ${nvidiaRoute.label}` : model;
     const cognitiveTrace = buildCognitiveTrace(messages, model, body.selectedSkill, modelLabel);
@@ -311,7 +324,15 @@ export async function POST(request: NextRequest) {
     const modelMessages = [
         {
           role: 'user',
-          content: skillContext,
+          content: webContext
+            ? [
+              skillContext,
+              '',
+              webContext,
+              '',
+              'Use the web reader context above only when relevant to the user request. Do not invent facts outside it.',
+            ].join('\n')
+            : skillContext,
         },
         ...messages,
       ];
@@ -347,6 +368,20 @@ export async function POST(request: NextRequest) {
         movesFunds: false,
         writesMemoryAutomatically: false,
       },
+      webReader: webResults.length ? {
+        read: webResults.length,
+        successful: webResults.filter(result => result.success).length,
+        failed: webResults.filter(result => !result.success).length,
+        sources: webResults.map(result => ({
+          url: result.normalizedUrl,
+          title: result.title,
+          contentHash: result.contentHash || null,
+          readAt: result.readAt,
+          success: result.success,
+          error: result.error,
+        })),
+        memoryRecords: webMemoryRecords,
+      } : undefined,
     });
   } catch (error) {
     return NextResponse.json({ error: safeErrorMessage(error) }, { status: 500 });

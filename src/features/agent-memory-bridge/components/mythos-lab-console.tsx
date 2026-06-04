@@ -596,6 +596,7 @@ type MythosObservability = {
   mode?: string;
   memoryHash?: string;
   savedAt?: string;
+  webReads?: string;
 };
 
 type MemoryWriteResponse = {
@@ -5638,12 +5639,27 @@ export default function MythosLabConsole() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Mythos Lab request failed.');
+      const webReader = isRecord(data.webReader) ? data.webReader : null;
+      const webSources = webReader ? getArray(webReader, 'sources').filter(isRecord) : [];
+      const webReadSummary = webSources.length
+        ? [
+          '',
+          'Web Reader:',
+          ...webSources.map(source => [
+            `- ${asString(source.title, 'Web source')}`,
+            `URL: ${asString(source.url, '')}`,
+            `Hash: ${asString(source.contentHash, 'unavailable')}`,
+            `Lido em: ${asString(source.readAt, 'unavailable')}`,
+            asString(source.error, '') ? `Erro: ${asString(source.error, '')}` : '',
+          ].filter(Boolean).join('\n')),
+        ].join('\n')
+        : '';
 
       const assistantMessage: MythosLabMessage = {
         id: createId('msg'),
         role: 'assistant',
         createdAt: nowIso(),
-        content: cleanTerminalText(data.response || 'Mythos returned an empty response.'),
+        content: cleanTerminalText(`${data.response || 'Mythos returned an empty response.'}${webReadSummary}`),
       };
       const latencyMs = Date.now() - started;
       updateActive(session => ({
@@ -5658,6 +5674,7 @@ export default function MythosLabConsole() {
           mode: data.mode,
           memoryHash: session.lastObservability?.memoryHash,
           savedAt: session.lastObservability?.savedAt,
+          webReads: webSources.length ? String(webSources.length) : undefined,
         },
         updatedAt: nowIso(),
       }));
