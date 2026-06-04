@@ -27,12 +27,15 @@ import {
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
+import type { MythosMarketHeatmap, MythosTokenChart } from '@/lib/market/crypto-visuals';
 import type { MythosSolanaEcosystemReport, MythosSolanaReportMode } from '@/lib/market/solana-ecosystem-report';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_FEATURED_SKILLS,
 } from '../mythos';
 import type { MythosSkillRouteResult } from '../skill-router';
+import { MythosMarketHeatmapCard } from './mythos-market-heatmap-card';
+import { MythosTokenChartCard } from './mythos-token-chart-card';
 
 type MythosLabMessage = {
   id: string;
@@ -46,6 +49,9 @@ type MythosLabMessage = {
     model?: string;
   };
   cryptoReport?: MythosCryptoMarketReport;
+  marketHeatmap?: MythosMarketHeatmap;
+  tokenChart?: MythosTokenChart;
+  marketVisualError?: string;
   solanaReport?: MythosSolanaEcosystemReport;
   solanaAnalysis?: Record<string, unknown>;
   walletIntelligence?: MythosWalletIntelligence;
@@ -657,6 +663,14 @@ const TERMINAL_COMMANDS = [
   {
     command: '/market report',
     detail: 'Generate a visual crypto market report with CoinGecko data, gainers, losers, trends, and opportunity watchlist.',
+  },
+  {
+    command: '/hm ou /heatmap',
+    detail: 'Open a Telegram-style crypto market heatmap using live CoinGecko market data.',
+  },
+  {
+    command: '/chart <token> ou /grafico <token>',
+    detail: 'Open a real token price chart for symbols like SOL, BTC, ETH, PENGU, WIF, BONK, or TRUMP.',
   },
   {
     command: '/solana report',
@@ -1679,6 +1693,9 @@ function helpResponse() {
     '/analyze tx 5ycrKxWCw4Px...',
     '/analyze wallet 2snAwv3rui3kcjBZbwN2uigN7yYTNnhEsZh6k5ZAg1Vs',
     '/analyze token EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    '/hm',
+    '/chart sol',
+    '/grafico btc',
     '/market report',
     '/solana report',
     '/solana protocols',
@@ -1700,6 +1717,33 @@ function isMarketReportRequest(content: string) {
   return /^\/(?:market|crypto)\s+report$/i.test(content.trim()) ||
     /\b(relatorio|relatório|report|market|mercado|oportunidades)\b/i.test(content) &&
     /\b(crypto|cripto|bitcoin|solana|altcoin|tokens?)\b/i.test(content);
+}
+
+function isMarketHeatmapRequest(content: string) {
+  const normalized = content.trim().toLowerCase();
+  return /^\/(?:hm|heatmap|mapa|mapa-mercado|market\s+heatmap)$/.test(normalized) ||
+    /\b(mapa de calor|heatmap)\b/i.test(content) && /\b(crypto|cripto|mercado|market|tokens?)\b/i.test(content);
+}
+
+function parseTokenChartRequest(content: string) {
+  const trimmed = content.trim();
+  const slash = trimmed.match(/^\/(?:chart|grafico|gr[aá]fico|price|preco|pre[cç]o)\s+([$]?[a-zA-Z0-9][a-zA-Z0-9\-_.]{1,24})(?:\s+(\d{1,3})d?)?$/i);
+  if (slash) {
+    return {
+      symbol: slash[1].replace(/^\$/, '').toLowerCase(),
+      days: slash[2] ? Number(slash[2]) : 30,
+    };
+  }
+
+  const natural = trimmed.match(/\b(?:grafico|gr[aá]fico|chart|preco|pre[cç]o|cotacao|cota[cç][aã]o)\s+(?:do|da|de)?\s*([$]?[a-zA-Z0-9][a-zA-Z0-9\-_.]{1,24})\b/i);
+  if (natural && /\b(token|crypto|cripto|moeda|solana|bitcoin|ethereum|mercado|price|preco|pre[cç]o|chart|grafico|gr[aá]fico)\b/i.test(trimmed)) {
+    return {
+      symbol: natural[1].replace(/^\$/, '').toLowerCase(),
+      days: 30,
+    };
+  }
+
+  return null;
 }
 
 function isSolanaEcosystemRequest(content: string) {
@@ -1743,6 +1787,27 @@ function formatMarketReportText(report: MythosCryptoMarketReport) {
       'Not financial advice.',
     ]),
   ].join('\n\n'));
+}
+
+function formatHeatmapText(heatmap: MythosMarketHeatmap) {
+  return cleanTerminalText([
+    'Aqui esta o mapa de calor do mercado crypto com dados publicos da CoinGecko.',
+    '',
+    heatmap.summary,
+    '',
+    'Use isso para leitura rapida do mercado. Nao e recomendacao de compra ou venda, e o Mythos nao executou nenhuma operacao.',
+  ].join('\n'));
+}
+
+function formatTokenChartText(chart: MythosTokenChart) {
+  return cleanTerminalText([
+    `Aqui esta o grafico de ${chart.name} (${chart.symbol}).`,
+    '',
+    `${chart.symbol} esta em ${chart.priceLabel} no dado mais recente da CoinGecko, com ${chart.change24hLabel} em 24h.`,
+    `Market cap: ${chart.marketCapLabel}. Volume 24h: ${chart.volume24hLabel}.`,
+    '',
+    'Isso e leitura de mercado em tempo real, nao ordem, nao swap e nao conselho financeiro.',
+  ].join('\n'));
 }
 
 function formatSolanaReportText(report: MythosSolanaEcosystemReport) {
@@ -4996,6 +5061,9 @@ export default function MythosLabConsole() {
       trace?: MythosCognitiveTrace;
       observability?: MythosObservability;
       htmlArtifact?: MythosLabMessage['htmlArtifact'];
+      marketHeatmap?: MythosMarketHeatmap;
+      tokenChart?: MythosTokenChart;
+      marketVisualError?: string;
       solanaAnalysis?: Record<string, unknown>;
       walletIntelligence?: MythosWalletIntelligence;
       walletIntelligenceError?: string;
@@ -5007,6 +5075,9 @@ export default function MythosLabConsole() {
         createdAt: nowIso(),
         content: cleanTerminalText(responseContent),
         htmlArtifact: extra?.htmlArtifact,
+        marketHeatmap: extra?.marketHeatmap,
+        tokenChart: extra?.tokenChart,
+        marketVisualError: extra?.marketVisualError,
         solanaAnalysis: extra?.solanaAnalysis,
         walletIntelligence: extra?.walletIntelligence,
         walletIntelligenceError: extra?.walletIntelligenceError,
@@ -5276,6 +5347,97 @@ export default function MythosLabConsole() {
           mode: activeSession.mode,
           traceSchema: 'mythos-html-artifact/v1',
           latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    if (isMarketHeatmapRequest(command)) {
+      const response = await fetch('/api/mythos/market/heatmap', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        const error = isRecord(data) ? asString(data.error, 'Mythos heatmap failed.') : 'Mythos heatmap failed.';
+        appendTerminalResponse([
+          'Nao consegui montar o mapa de calor agora.',
+          '',
+          `Motivo: ${error}`,
+          '',
+          'Tente novamente em alguns minutos. Nenhuma operacao de carteira ou mercado foi executada.',
+        ].join('\n'), {
+          marketVisualError: error,
+        });
+        return;
+      }
+      const heatmap = data as MythosMarketHeatmap;
+      appendTerminalResponse(formatHeatmapText(heatmap), {
+        marketHeatmap: heatmap,
+        trace: {
+          perception: 'User requested a Telegram-style crypto heatmap.',
+          memoryContext: 'No private wallet memory was used. Only public CoinGecko market data was fetched.',
+          selectedSkill: 'Mythos Market Heatmap',
+          reasoningPath: 'Top market-cap assets were fetched server-side and rendered as a read-only visual heatmap.',
+          prediction: 'User can inspect market breadth and then request a focused token chart.',
+          decision: 'Render a compact visual market heatmap.',
+          confidence: 84,
+          safetyBoundary: 'Read-only market data. No buy, sell, swap, signature, submit, or fund movement.',
+          nextHumanStep: 'Run /chart <token> for a focused chart.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: 'CoinGecko + Mythos heatmap renderer',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-market-heatmap/v1',
+        },
+      });
+      return;
+    }
+
+    const tokenChartRequest = parseTokenChartRequest(command);
+    if (tokenChartRequest) {
+      const response = await fetch(`/api/mythos/market/chart?symbol=${encodeURIComponent(tokenChartRequest.symbol)}&days=${encodeURIComponent(String(tokenChartRequest.days))}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        const error = isRecord(data) ? asString(data.error, 'Mythos token chart failed.') : 'Mythos token chart failed.';
+        appendTerminalResponse([
+          `Nao consegui abrir o grafico de ${tokenChartRequest.symbol.toUpperCase()} agora.`,
+          '',
+          `Motivo: ${error}`,
+          '',
+          'Tente outro simbolo, como /chart sol ou /chart btc. Nenhuma operacao foi executada.',
+        ].join('\n'), {
+          marketVisualError: error,
+        });
+        return;
+      }
+      const chart = data as MythosTokenChart;
+      appendTerminalResponse(formatTokenChartText(chart), {
+        tokenChart: chart,
+        trace: {
+          perception: `User requested a token chart for ${tokenChartRequest.symbol}.`,
+          memoryContext: 'No private wallet memory was used. Only public CoinGecko market data was fetched.',
+          selectedSkill: 'Mythos Token Chart',
+          reasoningPath: 'CoinGecko market and market_chart endpoints were fetched server-side and rendered as a read-only SVG chart.',
+          prediction: 'User can compare chart action with liquidity, holders, and wallet risk before any decision.',
+          decision: 'Render a focused token market chart.',
+          confidence: 84,
+          safetyBoundary: 'Read-only market data. No buy, sell, swap, signature, submit, or fund movement.',
+          nextHumanStep: 'Review source-backed price data before any wallet action.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: 'CoinGecko + Mythos chart renderer',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-token-chart/v1',
         },
       });
       return;
@@ -6096,6 +6258,14 @@ export default function MythosLabConsole() {
                           </div>
                         ) : null}
                         {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
+                        {message.marketHeatmap ? <MythosMarketHeatmapCard heatmap={message.marketHeatmap} /> : null}
+                        {message.tokenChart ? <MythosTokenChartCard chart={message.tokenChart} /> : null}
+                        {message.marketVisualError ? (
+                          <div className="mt-4 rounded-2xl border border-[#FFD166]/18 bg-[#FFD166]/[0.06] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FFE08A]">Market visual indisponivel</p>
+                            <p className="mt-2 text-xs leading-5 text-white/62">{message.marketVisualError}</p>
+                          </div>
+                        ) : null}
                         {message.solanaReport ? <MythosSolanaReportCard report={message.solanaReport} /> : null}
                         {message.solanaAnalysis ? <MythosSolanaAnalysisCard data={message.solanaAnalysis} /> : null}
                         {message.walletIntelligence || message.walletIntelligenceError ? (
@@ -6170,6 +6340,9 @@ export default function MythosLabConsole() {
                           />
                         ) : null}
                         {!message.cryptoReport
+                          && !message.marketHeatmap
+                          && !message.tokenChart
+                          && !message.marketVisualError
                           && !message.solanaReport
                           && !message.solanaAnalysis
                           && !message.memecoinDraft
