@@ -26,6 +26,8 @@ import {
   X,
 } from 'lucide-react';
 import { createMythosWalletCommandPlan } from '@/features/wallet-agent/mythos-wallet-command';
+import type { MythosProductFinderReport } from '@/lib/commerce/product-finder';
+import { parseProductFinderPrompt } from '@/lib/commerce/product-finder-parser';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
 import type { MythosMarketHeatmap, MythosTokenChart } from '@/lib/market/crypto-visuals';
 import type { MythosSolanaEcosystemReport, MythosSolanaReportMode } from '@/lib/market/solana-ecosystem-report';
@@ -35,6 +37,7 @@ import {
 } from '../mythos';
 import type { MythosSkillRouteResult } from '../skill-router';
 import { MythosMarketHeatmapCard } from './mythos-market-heatmap-card';
+import { MythosProductFinderCard } from './mythos-product-finder-card';
 import { MythosTokenChartCard } from './mythos-token-chart-card';
 
 type MythosLabMessage = {
@@ -52,6 +55,8 @@ type MythosLabMessage = {
   marketHeatmap?: MythosMarketHeatmap;
   tokenChart?: MythosTokenChart;
   marketVisualError?: string;
+  productFinder?: MythosProductFinderReport;
+  productFinderError?: string;
   solanaReport?: MythosSolanaEcosystemReport;
   solanaAnalysis?: Record<string, unknown>;
   walletIntelligence?: MythosWalletIntelligence;
@@ -659,6 +664,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/wallet intelligence',
     detail: 'Open a real read-only financial snapshot for the connected wallet. No signing or fund movement.',
+  },
+  {
+    command: '/procurar <produto> ate <valor>',
+    detail: 'Find product opportunities in live marketplaces, rank seller/price/shipping risk, and return the best link.',
   },
   {
     command: '/market report',
@@ -1693,6 +1702,8 @@ function helpResponse() {
     '/analyze tx 5ycrKxWCw4Px...',
     '/analyze wallet 2snAwv3rui3kcjBZbwN2uigN7yYTNnhEsZh6k5ZAg1Vs',
     '/analyze token EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    '/procurar powerbank ate 150',
+    'quero comprar um powerbank ate 150 reais',
     '/hm',
     '/chart sol',
     '/grafico btc',
@@ -1864,6 +1875,27 @@ function formatWalletIntelligenceText(intelligence: MythosWalletIntelligence) {
       'No transaction was created or submitted.',
     ]),
   ].join('\n\n'));
+}
+
+function formatProductFinderText(report: MythosProductFinderReport) {
+  const best = report.bestOffer;
+  if (!best) {
+    return cleanTerminalText([
+      `Nao encontrei uma boa oportunidade para "${report.query}" agora.`,
+      '',
+      'O Mythos consultou fontes publicas e nao executou nenhuma compra ou pagamento.',
+    ].join('\n'));
+  }
+
+  return cleanTerminalText([
+    `Encontrei uma oportunidade forte para "${report.query}".`,
+    '',
+    `${best.title}`,
+    `${best.marketplaceLabel} - ${best.priceLabel} - score Mythos ${best.score}/100.`,
+    best.freeShipping ? 'Frete gratis informado pelo marketplace.' : 'Frete precisa ser conferido no checkout.',
+    '',
+    'Eu comparei preco, orcamento, frete, reputacao visivel do vendedor e sinais basicos de risco. Nenhuma compra ou pagamento foi executado.',
+  ].join('\n'));
 }
 
 function isWalletIntelligenceCommand(content: string) {
@@ -5064,6 +5096,8 @@ export default function MythosLabConsole() {
       marketHeatmap?: MythosMarketHeatmap;
       tokenChart?: MythosTokenChart;
       marketVisualError?: string;
+      productFinder?: MythosProductFinderReport;
+      productFinderError?: string;
       solanaAnalysis?: Record<string, unknown>;
       walletIntelligence?: MythosWalletIntelligence;
       walletIntelligenceError?: string;
@@ -5078,6 +5112,8 @@ export default function MythosLabConsole() {
         marketHeatmap: extra?.marketHeatmap,
         tokenChart: extra?.tokenChart,
         marketVisualError: extra?.marketVisualError,
+        productFinder: extra?.productFinder,
+        productFinderError: extra?.productFinderError,
         solanaAnalysis: extra?.solanaAnalysis,
         walletIntelligence: extra?.walletIntelligence,
         walletIntelligenceError: extra?.walletIntelligenceError,
@@ -5176,6 +5212,53 @@ export default function MythosLabConsole() {
           latencyMs: Date.now() - started,
           mode: activeSession.mode,
           traceSchema: 'mythos-wallet-intelligence/v1',
+        },
+      });
+      return;
+    }
+
+    const productFinderRequest = parseProductFinderPrompt(command);
+    if (productFinderRequest) {
+      const response = await fetch(`/api/mythos/commerce/product-finder?prompt=${encodeURIComponent(command)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        const error = isRecord(data) ? asString(data.error, 'Mythos product finder failed.') : 'Mythos product finder failed.';
+        appendTerminalResponse([
+          `Nao consegui pesquisar "${productFinderRequest.query}" agora.`,
+          '',
+          `Motivo: ${error}`,
+          '',
+          'Tente com outro termo ou valor. Nenhuma compra, pagamento ou reserva foi executada.',
+        ].join('\n'), {
+          productFinderError: error,
+        });
+        return;
+      }
+
+      const report = data as MythosProductFinderReport;
+      appendTerminalResponse(formatProductFinderText(report), {
+        productFinder: report,
+        trace: {
+          perception: `User requested shopping research for ${report.query}.`,
+          memoryContext: 'No private account, payment, wallet, or marketplace login was used. Only public marketplace data was fetched.',
+          selectedSkill: 'Mythos Product Finder Agent',
+          reasoningPath: 'Mercado Livre public search and seller endpoints were fetched server-side, then offers were scored by price, budget, shipping, seller status, and visible risk signals.',
+          prediction: 'User can open the recommended link and decide manually whether to buy.',
+          decision: 'Return a read-only opportunity card with the best link and alternatives.',
+          confidence: report.bestOffer ? report.bestOffer.score : 45,
+          safetyBoundary: 'Read-only marketplace research. No purchase, payment, checkout, login, reservation, or card action.',
+          nextHumanStep: 'Open the offer, check final shipping and warranty, then buy manually only if it makes sense.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: 'Mercado Livre + Mythos product finder',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-product-finder/v1',
         },
       });
       return;
@@ -5763,7 +5846,7 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
-      if (content.startsWith('/') || isMarketReportRequest(content) || isSolanaEcosystemRequest(content) || isMemecoinLaunchRequest(content)) {
+      if (content.startsWith('/') || parseProductFinderPrompt(content) || isMarketReportRequest(content) || isSolanaEcosystemRequest(content) || isMemecoinLaunchRequest(content)) {
         await runTerminalCommand(content, nextMessages, started, attachments);
         return;
       }
@@ -6258,6 +6341,13 @@ export default function MythosLabConsole() {
                           </div>
                         ) : null}
                         {message.cryptoReport ? <MythosCryptoReportCard report={message.cryptoReport} /> : null}
+                        {message.productFinder ? <MythosProductFinderCard report={message.productFinder} /> : null}
+                        {message.productFinderError ? (
+                          <div className="mt-4 rounded-2xl border border-[#FFD166]/18 bg-[#FFD166]/[0.06] p-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FFE08A]">Product Finder indisponivel</p>
+                            <p className="mt-2 text-xs leading-5 text-white/62">{message.productFinderError}</p>
+                          </div>
+                        ) : null}
                         {message.marketHeatmap ? <MythosMarketHeatmapCard heatmap={message.marketHeatmap} /> : null}
                         {message.tokenChart ? <MythosTokenChartCard chart={message.tokenChart} /> : null}
                         {message.marketVisualError ? (
@@ -6340,6 +6430,8 @@ export default function MythosLabConsole() {
                           />
                         ) : null}
                         {!message.cryptoReport
+                          && !message.productFinder
+                          && !message.productFinderError
                           && !message.marketHeatmap
                           && !message.tokenChart
                           && !message.marketVisualError
