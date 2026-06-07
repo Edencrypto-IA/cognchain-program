@@ -31,11 +31,13 @@ import { parseProductFinderPrompt } from '@/lib/commerce/product-finder-parser';
 import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
 import type { MythosMarketHeatmap, MythosTokenChart } from '@/lib/market/crypto-visuals';
 import type { MythosSolanaEcosystemReport, MythosSolanaReportMode } from '@/lib/market/solana-ecosystem-report';
+import type { MythosExternalConnectorReadiness } from '@/lib/mythos/external-data-connectors';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_FEATURED_SKILLS,
 } from '../mythos';
 import type { MythosSkillRouteResult } from '../skill-router';
+import { MythosDataConnectorsCard } from './mythos-data-connectors-card';
 import { MythosMarketHeatmapCard } from './mythos-market-heatmap-card';
 import { MythosProductFinderCard } from './mythos-product-finder-card';
 import { MythosTokenChartCard } from './mythos-token-chart-card';
@@ -57,6 +59,7 @@ type MythosLabMessage = {
   marketVisualError?: string;
   productFinder?: MythosProductFinderReport;
   productFinderError?: string;
+  dataConnectors?: MythosExternalConnectorReadiness;
   solanaReport?: MythosSolanaEcosystemReport;
   solanaAnalysis?: Record<string, unknown>;
   walletIntelligence?: MythosWalletIntelligence;
@@ -668,6 +671,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/procurar <produto> ate <valor>',
     detail: 'Find product opportunities in live marketplaces, rank seller/price/shipping risk, and return the best link.',
+  },
+  {
+    command: '/apis ou /fontes',
+    detail: 'Show Mythos external data connectors for Brazil, weather, maps, crypto, public records, B3, Fed/FRED, and finance.',
   },
   {
     command: '/market report',
@@ -5098,6 +5105,7 @@ export default function MythosLabConsole() {
       marketVisualError?: string;
       productFinder?: MythosProductFinderReport;
       productFinderError?: string;
+      dataConnectors?: MythosExternalConnectorReadiness;
       solanaAnalysis?: Record<string, unknown>;
       walletIntelligence?: MythosWalletIntelligence;
       walletIntelligenceError?: string;
@@ -5114,6 +5122,7 @@ export default function MythosLabConsole() {
         marketVisualError: extra?.marketVisualError,
         productFinder: extra?.productFinder,
         productFinderError: extra?.productFinderError,
+        dataConnectors: extra?.dataConnectors,
         solanaAnalysis: extra?.solanaAnalysis,
         walletIntelligence: extra?.walletIntelligence,
         walletIntelligenceError: extra?.walletIntelligenceError,
@@ -5148,6 +5157,60 @@ export default function MythosLabConsole() {
           mode: activeSession.mode,
           traceSchema: 'mythos-command-terminal/v1',
           latencyMs: Date.now() - started,
+        },
+      });
+      return;
+    }
+
+    if (lower === '/apis' || lower === '/fontes' || lower === '/dados') {
+      const response = await fetch('/api/mythos/data/connectors', {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data)) {
+        const error = isRecord(data) ? asString(data.error, 'Nao consegui carregar as fontes externas agora.') : 'Nao consegui carregar as fontes externas agora.';
+        appendTerminalResponse([
+          'Nao consegui abrir o mapa de APIs do Mythos agora.',
+          '',
+          `Motivo: ${error}`,
+          '',
+          'Nenhuma chave foi exibida e nenhuma acao financeira foi executada.',
+        ].join('\n'));
+        return;
+      }
+
+      const readiness = data as MythosExternalConnectorReadiness;
+      const ready = readiness.counts.ready || 0;
+      const needsKey = readiness.counts.needs_key || 0;
+      const optionalKey = readiness.counts.optional_key || 0;
+      appendTerminalResponse([
+        'Abri o mapa de fontes externas do Mythos.',
+        '',
+        `${ready}/${readiness.total} conectores estao prontos agora.`,
+        `${needsKey} precisam de chave no Railway e ${optionalKey} aceitam chave opcional para melhorar limite/qualidade.`,
+        '',
+        'As chaves ficam server-side. O Mythos mostra apenas nomes de variaveis e status, nunca valores secretos.',
+      ].join('\n'), {
+        dataConnectors: readiness,
+        trace: {
+          perception: 'User requested the Mythos external data connector map.',
+          memoryContext: 'Only connector readiness metadata was fetched. No secret values were exposed.',
+          selectedSkill: 'Mythos External Data Network',
+          reasoningPath: 'Mythos read server-side connector readiness and grouped sources for finance, Brazil, public records, maps, weather, crypto, science, and knowledge.',
+          prediction: 'User can configure missing Railway variables and then build specialized research/finance commands on top of these sources.',
+          decision: 'Return a read-only connector readiness card.',
+          confidence: 96,
+          safetyBoundary: 'Read-only status view. No purchase, order, signing, payment, PIX, swap, transaction submit, or fund movement.',
+          nextHumanStep: 'Add only the needed API keys in Railway variables, then test the related command.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: 'Mythos connector readiness',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-data-connectors/v1',
         },
       });
       return;
@@ -6348,6 +6411,7 @@ export default function MythosLabConsole() {
                             <p className="mt-2 text-xs leading-5 text-white/62">{message.productFinderError}</p>
                           </div>
                         ) : null}
+                        {message.dataConnectors ? <MythosDataConnectorsCard readiness={message.dataConnectors} /> : null}
                         {message.marketHeatmap ? <MythosMarketHeatmapCard heatmap={message.marketHeatmap} /> : null}
                         {message.tokenChart ? <MythosTokenChartCard chart={message.tokenChart} /> : null}
                         {message.marketVisualError ? (
@@ -6432,6 +6496,7 @@ export default function MythosLabConsole() {
                         {!message.cryptoReport
                           && !message.productFinder
                           && !message.productFinderError
+                          && !message.dataConnectors
                           && !message.marketHeatmap
                           && !message.tokenChart
                           && !message.marketVisualError
