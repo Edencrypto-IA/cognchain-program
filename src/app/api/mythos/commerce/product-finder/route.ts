@@ -7,6 +7,19 @@ function getIp(request: NextRequest) {
   return request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
 }
 
+function productFinderErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    if (
+      /^Mercado Livre bloqueou/.test(error.message) ||
+      /^Nao encontrei/.test(error.message) ||
+      /^Informe o produto/.test(error.message)
+    ) {
+      return error.message;
+    }
+  }
+  return safeErrorMessage(error);
+}
+
 export async function GET(request: NextRequest) {
   const rate = checkRateLimit(getIp(request), '/api/mythos/commerce/product-finder');
   if (!rate.allowed) {
@@ -30,6 +43,6 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(report);
   } catch (error) {
-    return NextResponse.json({ error: safeErrorMessage(error) }, { status: 500 });
+    return NextResponse.json({ error: productFinderErrorMessage(error) }, { status: 500 });
   }
 }
