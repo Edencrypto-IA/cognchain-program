@@ -429,6 +429,7 @@ Quando pesquisar produtos, sempre:
 - Nunca diga que comprou, pagou, reservou ou executou qualquer acao. A resposta e somente leitura.
 - Nao use Markdown: nao use ###, **negrito**, tabelas ou listas gigantes.
 - Nao use emojis. O card do Mythos ja tem visual proprio.
+- Seja compacto. A resposta inteira deve caber em ate 900 palavras.
 
 Formato obrigatorio:
 Resumo:
@@ -450,6 +451,23 @@ Escolha direta e por que.
 
 Cuidados:
 Preco pode mudar por frete, cupom, estoque e reputacao do vendedor.`;
+}
+
+function cleanWebSearchSummary(text: string) {
+  const cleaned = text
+    .replace(/\r/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (cleaned.length <= 2400) return cleaned;
+
+  const slice = cleaned.slice(0, 2200);
+  const cutAt = Math.max(slice.lastIndexOf('\n\n'), slice.lastIndexOf('\nRecomendacao:'), 1500);
+  return `${slice.slice(0, cutAt).trim()}\n\nCuidados:\nPrecos podem mudar por frete, cupom, estoque e reputacao do vendedor. Abra a loja e confira antes de comprar.`;
 }
 
 function buildProductSearchUserPrompt(input: ProductFinderInput) {
@@ -586,14 +604,14 @@ async function findProductWithWebFallback(input: ProductFinderInput, mlError: un
   const failures: string[] = [];
   try {
     const text = await anthropicWebSearch(input);
-    return buildWebSearchReport(input, text, 'anthropic_web_search', mlError);
+    return buildWebSearchReport(input, cleanWebSearchSummary(text), 'anthropic_web_search', mlError);
   } catch (error) {
     failures.push(`Anthropic: ${error instanceof Error ? error.message : 'failed'}`);
   }
 
   try {
     const text = await openAiWebSearch(input);
-    return buildWebSearchReport(input, text, 'openai_web_search', mlError);
+    return buildWebSearchReport(input, cleanWebSearchSummary(text), 'openai_web_search', mlError);
   } catch (error) {
     failures.push(`OpenAI: ${error instanceof Error ? error.message : 'failed'}`);
   }
