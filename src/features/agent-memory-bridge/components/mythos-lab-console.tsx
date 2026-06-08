@@ -672,8 +672,8 @@ const TERMINAL_COMMANDS = [
     detail: 'Open a real read-only financial snapshot for the connected wallet. No signing or fund movement.',
   },
   {
-    command: '/procurar <produto> ate <valor>',
-    detail: 'Find product opportunities in live marketplaces, rank seller/price/shipping risk, and return the best link.',
+    command: '/procurar ou /monitorar <produto> ate <valor>',
+    detail: 'Find product opportunities, compare price intelligence, rank seller/shipping risk, and prepare a safe future price alert plan.',
   },
   {
     command: '/apis ou /fontes',
@@ -1961,8 +1961,11 @@ function formatProductFinderText(report: MythosProductFinderReport) {
     `${best.title}`,
     `${best.marketplaceLabel} - ${best.priceLabel} - score Mythos ${best.score}/100.`,
     best.freeShipping ? 'Frete gratis informado pelo marketplace.' : 'Frete precisa ser conferido no checkout.',
+    `Motivo da escolha: ${best.rankReason || 'melhor equilibrio entre preco e risco visivel'}.`,
+    report.priceStats?.medianLabel ? `Mediana das ofertas analisadas: ${report.priceStats.medianLabel}.` : '',
+    report.watchPlan?.targetPriceLabel ? `Alvo de alerta futuro: ${report.watchPlan.targetPriceLabel}.` : '',
     '',
-    'Eu comparei preco, orcamento, frete, reputacao visivel do vendedor e sinais basicos de risco. Nenhuma compra ou pagamento foi executado.',
+    'Eu comparei preco, orcamento, frete, reputacao visivel do vendedor e sinais basicos de risco. Nenhuma compra, pagamento ou monitor recorrente foi executado.',
   ].join('\n'));
 }
 

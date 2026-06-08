@@ -24,8 +24,31 @@ export type MythosProductOffer = {
   availableQuantity: number | null;
   score: number;
   scoreLabel: string;
+  rankReason: string;
   strengths: string[];
   risks: string[];
+};
+
+export type MythosProductPriceStats = {
+  min: number | null;
+  minLabel: string | null;
+  median: number | null;
+  medianLabel: string | null;
+  average: number | null;
+  averageLabel: string | null;
+  max: number | null;
+  maxLabel: string | null;
+  withinBudgetCount: number;
+  scannedCount: number;
+};
+
+export type MythosProductWatchPlan = {
+  available: true;
+  targetPrice: number | null;
+  targetPriceLabel: string | null;
+  trigger: string;
+  cadence: string;
+  note: string;
 };
 
 export type MythosProductFinderReport = {
@@ -37,6 +60,8 @@ export type MythosProductFinderReport = {
   budgetLabel: string | null;
   bestOffer: MythosProductOffer | null;
   offers: MythosProductOffer[];
+  priceStats: MythosProductPriceStats;
+  watchPlan: MythosProductWatchPlan;
   providerStatus: Array<{
     marketplace: string;
     status: 'live' | 'pending_connector';
@@ -96,6 +121,18 @@ function fmtBrl(value: number | null | undefined) {
     currency: 'BRL',
     maximumFractionDigits: 2,
   });
+}
+
+function average(values: number[]) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function median(values: number[]) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
 function normalizeImage(url: string | undefined) {
@@ -193,6 +230,16 @@ function buildRisks(offer: MythosProductOffer, budgetBrl: number | null) {
   return risks.slice(0, 4);
 }
 
+function buildRankReason(offer: MythosProductOffer, budgetBrl: number | null) {
+  const parts: string[] = [];
+  if (budgetBrl && offer.price <= budgetBrl) parts.push('fica dentro do orcamento');
+  if (offer.freeShipping) parts.push('tem frete gratis informado');
+  if (offer.sellerStatus) parts.push(`vendedor com reputacao ${offer.sellerStatus}`);
+  if ((offer.sellerTransactions ?? 0) > 1000) parts.push('alto historico do vendedor');
+  if (!parts.length) parts.push('melhor equilibrio entre preco, dados do vendedor e risco visivel');
+  return parts.slice(0, 3).join(', ');
+}
+
 async function hydrateSeller(result: MercadoLivreSearchResult) {
   const sellerId = result.seller?.id;
   if (!sellerId) return null;
@@ -240,12 +287,50 @@ function toOffer(result: MercadoLivreSearchResult, seller: MercadoLivreUser | nu
     availableQuantity: typeof result.available_quantity === 'number' ? result.available_quantity : null,
     score,
     scoreLabel: offerLabels(score),
+    rankReason: '',
     strengths: [],
     risks: [],
   };
   offer.strengths = buildStrengths(offer, budgetBrl);
   offer.risks = buildRisks(offer, budgetBrl);
+  offer.rankReason = buildRankReason(offer, budgetBrl);
   return offer;
+}
+
+function buildPriceStats(offers: MythosProductOffer[], budgetBrl: number | null): MythosProductPriceStats {
+  const prices = offers.map(offer => offer.price).filter(price => Number.isFinite(price));
+  const min = prices.length ? Math.min(...prices) : null;
+  const max = prices.length ? Math.max(...prices) : null;
+  const avg = average(prices);
+  const med = median(prices);
+  return {
+    min,
+    minLabel: fmtBrl(min),
+    median: med,
+    medianLabel: fmtBrl(med),
+    average: avg,
+    averageLabel: fmtBrl(avg),
+    max,
+    maxLabel: fmtBrl(max),
+    withinBudgetCount: budgetBrl ? offers.filter(offer => offer.price <= budgetBrl).length : 0,
+    scannedCount: offers.length,
+  };
+}
+
+function buildWatchPlan(bestOffer: MythosProductOffer | null, budgetBrl: number | null): MythosProductWatchPlan {
+  const targetPrice = bestOffer
+    ? Math.max(1, Math.round((budgetBrl ? Math.min(budgetBrl, bestOffer.price * 0.95) : bestOffer.price * 0.9) * 100) / 100)
+    : null;
+  return {
+    available: true,
+    targetPrice,
+    targetPriceLabel: fmtBrl(targetPrice),
+    trigger: targetPrice
+      ? `Avisar quando uma oferta confiavel ficar em ${fmtBrl(targetPrice)} ou menos.`
+      : 'Avisar quando aparecer uma oferta confiavel dentro do orcamento informado.',
+    cadence: 'Futuro monitor: checagem diaria ou sob demanda, sem compra automatica.',
+    note: 'Nesta fase o Mythos apenas prepara o plano de alerta. Nenhum monitor recorrente foi criado automaticamente.',
+  };
 }
 
 export async function findProductOpportunities(input: { query: string; budgetBrl?: number | null }): Promise<MythosProductFinderReport> {
@@ -267,8 +352,10 @@ export async function findProductOpportunities(input: { query: string; budgetBrl
 
   const bestOffer = offers[0] || null;
   const budgetLabel = fmtBrl(input.budgetBrl ?? null);
+  const priceStats = buildPriceStats(offers, input.budgetBrl ?? null);
+  const watchPlan = buildWatchPlan(bestOffer, input.budgetBrl ?? null);
   const summary = bestOffer
-    ? `A melhor oportunidade encontrada agora foi "${bestOffer.title}" no ${bestOffer.marketplaceLabel} por ${bestOffer.priceLabel}${bestOffer.freeShipping ? ' com frete gratis informado' : ''}. Score Mythos: ${bestOffer.score}/100.`
+    ? `A melhor oportunidade encontrada agora foi "${bestOffer.title}" no ${bestOffer.marketplaceLabel} por ${bestOffer.priceLabel}${bestOffer.freeShipping ? ' com frete gratis informado' : ''}. Score Mythos: ${bestOffer.score}/100 porque ${bestOffer.rankReason}.`
     : `O Mythos consultou o Mercado Livre, mas nao encontrou uma oferta confiavel para "${query}".`;
 
   return {
@@ -280,6 +367,8 @@ export async function findProductOpportunities(input: { query: string; budgetBrl
     budgetLabel,
     bestOffer,
     offers,
+    priceStats,
+    watchPlan,
     providerStatus: [
       {
         marketplace: 'Mercado Livre',

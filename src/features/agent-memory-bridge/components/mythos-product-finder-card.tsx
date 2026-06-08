@@ -32,6 +32,18 @@ function OfferMini({ offer }: { offer: MythosProductOffer }) {
 
 export function MythosProductFinderCard({ report }: { report: MythosProductFinderReport }) {
   const best = report.bestOffer;
+  const priceStats = report.priceStats || {
+    minLabel: null,
+    medianLabel: null,
+    withinBudgetCount: 0,
+    scannedCount: report.offers.length,
+  };
+  const watchPlan = report.watchPlan || {
+    targetPriceLabel: null,
+    trigger: 'Preparar alerta quando uma oferta confiavel aparecer abaixo do alvo definido.',
+    cadence: 'Futuro monitor: checagem diaria ou sob demanda, sem compra automatica.',
+    note: 'Nenhum monitor recorrente foi criado automaticamente.',
+  };
 
   return (
     <div className="mt-4 overflow-hidden rounded-[22px] border border-[#7DE4FF]/18 bg-[radial-gradient(circle_at_top_left,rgba(125,228,255,0.13),transparent_36%),rgba(2,13,16,0.92)]">
@@ -44,6 +56,20 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
         <div className="rounded-full border border-white/10 bg-black/28 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-white/56">
           {report.budgetLabel ? `orcamento ${report.budgetLabel}` : 'sem orcamento'}
         </div>
+      </div>
+
+      <div className="grid gap-3 border-b border-white/8 p-4 sm:grid-cols-4">
+        {[
+          ['Menor preco', priceStats.minLabel || 'indisponivel'],
+          ['Mediana', priceStats.medianLabel || 'indisponivel'],
+          ['Dentro do orcamento', report.budgetLabel ? `${priceStats.withinBudgetCount}/${priceStats.scannedCount}` : 'sem orcamento'],
+          ['Alerta alvo', watchPlan.targetPriceLabel || 'sob demanda'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-[#7DE4FF]/12 bg-black/24 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9AEAFF]/70">{label}</p>
+            <p className="mt-1 text-sm font-black text-white">{value}</p>
+          </div>
+        ))}
       </div>
 
       {best ? (
@@ -78,7 +104,7 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
             <div className="rounded-2xl border border-white/10 bg-black/24 p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#76FF03]">Recomendacao</p>
               <h4 className="mt-2 text-xl font-black leading-7 text-white">{best.title}</h4>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {[
                   ['Marketplace', best.marketplaceLabel],
                   ['Vendedor', best.sellerName || 'nao informado'],
@@ -90,6 +116,9 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
                   </div>
                 ))}
               </div>
+              <p className="mt-4 rounded-2xl border border-[#7DE4FF]/12 bg-[#7DE4FF]/[0.045] p-3 text-xs leading-5 text-white/62">
+                Escolha Mythos: {best.rankReason || 'melhor equilibrio entre preco, reputacao visivel e risco aparente'}.
+              </p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -134,10 +163,16 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
         <div className="border-t border-white/8 p-4">
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">Alternativas</p>
           <div className="mt-3 grid gap-3">
-            {report.offers.slice(1, 4).map(offer => <OfferMini key={offer.id} offer={offer} />)}
+            {report.offers.slice(1, 6).map(offer => <OfferMini key={offer.id} offer={offer} />)}
           </div>
         </div>
       ) : null}
+
+      <div className="border-t border-white/8 p-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD166]">Plano de alerta futuro</p>
+        <p className="mt-2 text-xs leading-5 text-white/58">{watchPlan.trigger}</p>
+        <p className="mt-1 text-[11px] leading-5 text-white/40">{watchPlan.cadence} {watchPlan.note}</p>
+      </div>
 
       <div className="border-t border-white/8 px-4 py-3 text-[11px] leading-5 text-white/42">
         {report.providerStatus.map(item => `${item.marketplace}: ${item.status === 'live' ? 'ao vivo' : 'pendente'} (${item.detail})`).join(' | ')}
