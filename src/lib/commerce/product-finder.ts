@@ -183,6 +183,14 @@ async function getMercadoLivreAccessToken() {
   return mercadoLivreTokenCache.token;
 }
 
+function hasMercadoLivreCredentials() {
+  return Boolean(
+    process.env.MERCADOLIBRE_ACCESS_TOKEN?.trim() ||
+    process.env.MERCADO_LIVRE_ACCESS_TOKEN?.trim() ||
+    (process.env.ML_CLIENT_ID?.trim() && process.env.ML_CLIENT_SECRET?.trim())
+  );
+}
+
 async function safeFetchJson<T>(url: string, timeoutMs = 8500): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -201,7 +209,9 @@ async function safeFetchJson<T>(url: string, timeoutMs = 8500): Promise<T | null
     clearTimeout(timer);
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        throw new Error('Mercado Livre bloqueou a consulta. Configure MERCADOLIBRE_ACCESS_TOKEN ou ML_CLIENT_ID/ML_CLIENT_SECRET no Railway.');
+        throw new Error(hasMercadoLivreCredentials()
+          ? 'Mercado Livre rejeitou a busca mesmo com credenciais server-side. Gere um MERCADOLIBRE_ACCESS_TOKEN oficial OAuth e coloque no Railway, ou confira as permissoes do app Mercado Livre.'
+          : 'Mercado Livre bloqueou a consulta e nenhuma credencial server-side foi detectada. Configure MERCADOLIBRE_ACCESS_TOKEN ou ML_CLIENT_ID/ML_CLIENT_SECRET no Railway.');
       }
       return null;
     }
