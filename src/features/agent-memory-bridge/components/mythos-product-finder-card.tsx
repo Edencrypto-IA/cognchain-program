@@ -15,6 +15,75 @@ function providerStatusLabel(status: MythosProductFinderReport['providerStatus']
   return 'pendente';
 }
 
+function normalizeFinderSummary(text: string) {
+  return text
+    .replace(/\r/g, '')
+    .replace(/\s*#{2,6}\s*/g, '\n')
+    .replace(/\*\*/g, '')
+    .replace(/\s+(?=\d+\.\s)/g, '\n')
+    .replace(/\s+-\s+(?=[A-ZÀ-Úa-zà-ú])/g, '\n- ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanFinderLine(line: string) {
+  return line
+    .replace(/^[-*]\s*/, '- ')
+    .replace(/^Resumo\s*:\s*/i, 'Resumo:')
+    .replace(/^Op[cç][oõ]es\s*:\s*/i, 'Opcoes:')
+    .replace(/^Recomenda[cç][aã]o\s*:\s*/i, 'Recomendacao:')
+    .replace(/^Cuidados\s*:\s*/i, 'Cuidados:')
+    .trim();
+}
+
+function FinderSummary({ summary }: { summary: string }) {
+  const lines = normalizeFinderSummary(summary)
+    .split('\n')
+    .map(cleanFinderLine)
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-3">
+      {lines.map((line, index) => {
+        const isSection = /^(Resumo|Opcoes|Recomendacao|Cuidados|Importante):?$/i.test(line);
+        const isProduct = /^\d+\.\s/.test(line);
+        const isBullet = line.startsWith('- ');
+        const key = `${index}-${line.slice(0, 18)}`;
+
+        if (isSection) {
+          return (
+            <p key={key} className="pt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">
+              {line.replace(/:$/, '')}
+            </p>
+          );
+        }
+
+        if (isProduct) {
+          return (
+            <p key={key} className="rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm font-black leading-5 text-white">
+              {line}
+            </p>
+          );
+        }
+
+        if (isBullet) {
+          return (
+            <p key={key} className="pl-3 text-xs leading-5 text-white/60">
+              {line}
+            </p>
+          );
+        }
+
+        return (
+          <p key={key} className="text-xs leading-5 text-white/66">
+            {line}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function OfferMini({ offer }: { offer: MythosProductOffer }) {
   return (
     <a
@@ -40,6 +109,9 @@ function OfferMini({ offer }: { offer: MythosProductOffer }) {
 
 export function MythosProductFinderCard({ report }: { report: MythosProductFinderReport }) {
   const best = report.bestOffer;
+  const intro = best
+    ? report.summary
+    : `Busca web ativa para ${report.normalizedQuery || report.query}. Resultados organizados abaixo com precos sujeitos a variacao.`;
   const priceStats = report.priceStats || {
     minLabel: null,
     medianLabel: null,
@@ -59,7 +131,7 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Product Finder Agent</p>
           <h3 className="mt-1 text-2xl font-black text-white">Melhor oportunidade encontrada</h3>
-          <p className="mt-2 max-w-2xl whitespace-pre-wrap text-xs leading-5 text-white/54">{report.summary}</p>
+          <p className="mt-2 max-w-2xl text-xs leading-5 text-white/54">{intro}</p>
         </div>
         <div className="rounded-full border border-white/10 bg-black/28 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-white/56">
           {report.budgetLabel ? `orcamento ${report.budgetLabel}` : 'sem orcamento'}
@@ -84,8 +156,8 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
         <div className="border-b border-white/8 p-4">
           <div className="rounded-2xl border border-[#7DE4FF]/12 bg-black/24 p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">Recomendacao por busca web</p>
-            <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-white/72">
-              {report.summary}
+            <div className="mt-3">
+              <FinderSummary summary={report.summary} />
             </div>
           </div>
         </div>

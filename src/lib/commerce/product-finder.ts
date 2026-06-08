@@ -426,7 +426,30 @@ Quando pesquisar produtos, sempre:
 - Avise quando o preco for estimado ou puder mudar por frete/cupom/estoque.
 - De uma recomendacao direta no final.
 - Responda em portugues brasileiro, de forma amigavel e util.
-- Nunca diga que comprou, pagou, reservou ou executou qualquer acao. A resposta e somente leitura.`;
+- Nunca diga que comprou, pagou, reservou ou executou qualquer acao. A resposta e somente leitura.
+- Nao use Markdown: nao use ###, **negrito**, tabelas ou listas gigantes.
+- Nao use emojis. O card do Mythos ja tem visual proprio.
+
+Formato obrigatorio:
+Resumo:
+Uma frase curta dizendo o que encontrou.
+
+Opcoes:
+1. Nome do produto - preco estimado
+Specs: capacidade, potencia, portas ou detalhe importante.
+Por que vale: motivo objetivo em uma frase.
+Link: URL se existir; se nao existir, escreva "verificar na loja".
+
+2. Nome do produto - preco estimado
+Specs: ...
+Por que vale: ...
+Link: ...
+
+Recomendacao:
+Escolha direta e por que.
+
+Cuidados:
+Preco pode mudar por frete, cupom, estoque e reputacao do vendedor.`;
 }
 
 function buildProductSearchUserPrompt(input: ProductFinderInput) {
