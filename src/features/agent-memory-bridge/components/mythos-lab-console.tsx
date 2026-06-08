@@ -704,6 +704,10 @@ const TERMINAL_COMMANDS = [
     detail: 'Open a Brazil + US financial radar with Selic, IPCA, dollar, Fed Funds, and optional B3 quote. Example: /financeiro petr4.',
   },
   {
+    command: '/radar brasil',
+    detail: 'Open a Brazil context radar with macro, B3, Brasilia weather, public calendar, and public-data next steps.',
+  },
+  {
     command: '/transparencia contrato <orgao|numero|processo|cnpj>',
     detail: 'Search public contract records through Portal da Transparencia. Example: /transparencia contrato orgao 26298.',
   },

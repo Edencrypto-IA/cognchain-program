@@ -8,6 +8,7 @@ export type MythosExternalDataKind =
   | 'b3'
   | 'fed'
   | 'finance'
+  | 'radar_brasil'
   | 'transparencia';
 
 export type MythosExternalDataReport = {
@@ -314,6 +315,67 @@ async function financeReport(query: string): Promise<MythosExternalDataReport> {
   };
 }
 
+async function nextBrazilHolidayReport(): Promise<MythosExternalDataReport> {
+  const now = new Date();
+  const year = now.getFullYear();
+  const holidays = asArray(await fetchJson(`https://brasilapi.com.br/api/feriados/v1/${year}`))
+    .map(item => asRecord(item))
+    .filter(item => typeof item.date === 'string');
+  const next = holidays.find(item => new Date(`${asString(item.date)}T12:00:00Z`).getTime() >= now.getTime()) || holidays[holidays.length - 1] || {};
+  return {
+    ok: true,
+    kind: 'radar_brasil',
+    title: 'Proximo feriado nacional',
+    summary: `${asString(next.name)} em ${asString(next.date)}.`,
+    facts: [
+      { label: 'Feriado', value: asString(next.name) },
+      { label: 'Data', value: asString(next.date) },
+      { label: 'Tipo', value: asString(next.type, 'national') },
+    ],
+    source: 'BrasilAPI Feriados',
+    generatedAt: new Date().toISOString(),
+    safety: 'Calendario publico nacional. Confirme feriados estaduais/municipais localmente.',
+  };
+}
+
+async function radarBrasilReport(): Promise<MythosExternalDataReport> {
+  const [finance, ibov, weather, holiday] = await Promise.all([
+    financeReport(''),
+    optionalReport('Brapi - IBOV', () => b3Report('IBOV')),
+    optionalReport('Open-Meteo - Brasilia', () => weatherReport('brasilia')),
+    optionalReport('BrasilAPI - feriados', () => nextBrazilHolidayReport()),
+  ]);
+
+  const ibovText = findFact(ibov, 'Status') === 'indisponivel'
+    ? 'Ibovespa indisponivel na Brapi nesta leitura.'
+    : `${ibov.title}: ${findFact(ibov, 'Preco')} / ${findFact(ibov, 'Variacao')}`;
+  const weatherText = findFact(weather, 'Status') === 'indisponivel'
+    ? 'Clima de Brasilia indisponivel agora.'
+    : `${weather.title}: ${weather.summary}`;
+  const holidayText = findFact(holiday, 'Status') === 'indisponivel'
+    ? 'Calendario nacional indisponivel agora.'
+    : `${findFact(holiday, 'Feriado')} em ${findFact(holiday, 'Data')}`;
+
+  return {
+    ok: true,
+    kind: 'radar_brasil',
+    title: 'Radar Brasil',
+    summary: `${finance.summary} ${ibovText} ${weatherText}`,
+    facts: [
+      { label: 'Macro Brasil/EUA', value: finance.summary },
+      { label: 'Bolsa brasileira', value: ibovText },
+      { label: 'Clima institucional', value: weatherText },
+      { label: 'Calendario publico', value: holidayText },
+      { label: 'Dados publicos', value: 'Portal da Transparencia esta disponivel por identificador: orgao SIAFI, numero, processo ou CNPJ.' },
+      { label: 'Leitura Mythos', value: 'Radar de contexto. Use para orientar pesquisa, risco e pauta do dia, nao para executar decisoes financeiras automaticamente.' },
+    ],
+    source: 'Banco Central do Brasil + FRED + Brapi + Open-Meteo + BrasilAPI',
+    generatedAt: new Date().toISOString(),
+    safety: 'Radar somente leitura. Nao compra, vende, assina, faz PIX, abre ordem, agenda pagamento ou movimenta fundos.',
+    nextStep: 'Aprofunde um bloco com /financeiro petr4, /tempo brasilia, /transparencia contrato orgao 26298 ou /market report.',
+  };
+}
+
 async function transparenciaReport(query: string): Promise<MythosExternalDataReport> {
   if (!query.trim()) throw new Error('Use /transparencia contrato <orgao|numero|processo|cnpj>. Exemplo: /transparencia contrato orgao 26298');
   const key = getEnv(['TRANSPARENCIA_KEY', 'TRANSPARENCIA_API_KEY', 'PORTAL_TRANSPARENCIA_API_KEY']);
@@ -391,6 +453,7 @@ export function parseMythosExternalDataCommand(command: string): { kind: MythosE
     [/^\/b3\s+(.+)/i, 'b3'],
     [/^\/fed(?:\s+rates)?\s*$/i, 'fed'],
     [/^\/(?:financeiro|macro|radar financeiro)(?:\s+(.+))?$/i, 'finance'],
+    [/^\/(?:radar brasil|brasil radar|radar br)\s*$/i, 'radar_brasil'],
     [/^\/transparencia\s+(.+)/i, 'transparencia'],
   ];
   for (const [regex, kind] of matchers) {
@@ -411,6 +474,7 @@ export async function runMythosExternalDataQuery(kind: MythosExternalDataKind, q
   if (kind === 'b3') return b3Report(query);
   if (kind === 'fed') return fedReport();
   if (kind === 'finance') return financeReport(query);
+  if (kind === 'radar_brasil') return radarBrasilReport();
   if (kind === 'transparencia') return transparenciaReport(query);
   throw new Error('Comando de dados nao suportado.');
 }
