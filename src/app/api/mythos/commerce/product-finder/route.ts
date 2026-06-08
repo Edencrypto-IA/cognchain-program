@@ -13,6 +13,8 @@ function productFinderErrorMessage(error: unknown) {
       /^Mercado Livre bloqueou/.test(error.message) ||
       /^Mercado Livre rejeitou/.test(error.message) ||
       /^Mercado Livre nao gerou token/.test(error.message) ||
+      /^Mercado Livre credentials missing/.test(error.message) ||
+      /^Mercado Livre rejected/.test(error.message) ||
       /^Nao encontrei/.test(error.message) ||
       /^Informe o produto/.test(error.message)
     ) {

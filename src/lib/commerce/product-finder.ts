@@ -114,6 +114,13 @@ type MercadoLivreUser = {
   };
 };
 
+type MercadoLivreTokenResponse = {
+  access_token?: string;
+  expires_in?: number;
+  message?: string;
+  error?: string;
+};
+
 function fmtBrl(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) return null;
   return value.toLocaleString('pt-BR', {
@@ -143,15 +150,12 @@ function normalizeImage(url: string | undefined) {
 let mercadoLivreTokenCache: { token: string; expiresAt: number } | null = null;
 
 async function getMercadoLivreAccessToken() {
-  const clientId = process.env.ML_CLIENT_ID?.trim();
+  const clientId = process.env.ML_APP_ID?.trim() || process.env.ML_CLIENT_ID?.trim();
   const clientSecret = process.env.ML_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret) {
-    const staticToken = process.env.MERCADOLIBRE_ACCESS_TOKEN || process.env.MERCADO_LIVRE_ACCESS_TOKEN;
-    return staticToken?.trim() || '';
-  }
+  if (!clientId || !clientSecret) throw new Error('Mercado Livre credentials missing: configure ML_APP_ID and ML_CLIENT_SECRET on Railway.');
 
   const now = Date.now();
-  if (mercadoLivreTokenCache && mercadoLivreTokenCache.expiresAt > now + 60_000) {
+  if (mercadoLivreTokenCache && now < mercadoLivreTokenCache.expiresAt) {
     return mercadoLivreTokenCache.token;
   }
 
@@ -170,25 +174,18 @@ async function getMercadoLivreAccessToken() {
     cache: 'no-store',
   });
 
-  const payload = await response.json().catch(() => ({})) as { access_token?: string; expires_in?: number; message?: string; error?: string };
+  const payload = await response.json().catch(() => ({})) as MercadoLivreTokenResponse;
   if (!response.ok || !payload.access_token) {
     const detail = payload.message || payload.error || `HTTP ${response.status}`;
-    throw new Error(`Mercado Livre nao gerou token com ML_CLIENT_ID/ML_CLIENT_SECRET: ${detail}`);
+    throw new Error(`Mercado Livre nao gerou token com ML_APP_ID/ML_CLIENT_SECRET: ${detail}`);
   }
 
+  const expiresInSeconds = Number(payload.expires_in || 21600);
   mercadoLivreTokenCache = {
     token: payload.access_token,
-    expiresAt: now + Math.max(60, Number(payload.expires_in || 300)) * 1000,
+    expiresAt: now + Math.max(60, expiresInSeconds - 300) * 1000,
   };
   return mercadoLivreTokenCache.token;
-}
-
-function hasMercadoLivreCredentials() {
-  return Boolean(
-    process.env.MERCADOLIBRE_ACCESS_TOKEN?.trim() ||
-    process.env.MERCADO_LIVRE_ACCESS_TOKEN?.trim() ||
-    (process.env.ML_CLIENT_ID?.trim() && process.env.ML_CLIENT_SECRET?.trim())
-  );
 }
 
 async function safeFetchJson<T>(url: string, timeoutMs = 8500): Promise<T | null> {
@@ -209,19 +206,8 @@ async function safeFetchJson<T>(url: string, timeoutMs = 8500): Promise<T | null
     clearTimeout(timer);
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        if (accessToken) {
-          const fallbackResponse = await fetch(url, {
-            headers: {
-              Accept: 'application/json',
-              'User-Agent': 'CongChain-Mythos-ProductFinder/1.0',
-            },
-            next: { revalidate: 90 },
-          });
-          if (fallbackResponse.ok) return await fallbackResponse.json() as T;
-        }
-        throw new Error(hasMercadoLivreCredentials()
-          ? 'Mercado Livre rejeitou a busca com token server-side e tambem bloqueou o fallback publico. Confira permissoes do app Mercado Livre ou remova token fixo expirado do Railway para usar Client Credentials dinamico.'
-          : 'Mercado Livre bloqueou a consulta e nenhuma credencial server-side foi detectada. Configure MERCADOLIBRE_ACCESS_TOKEN ou ML_CLIENT_ID/ML_CLIENT_SECRET no Railway.');
+        mercadoLivreTokenCache = null;
+        throw new Error('Mercado Livre rejected the authenticated request. Check ML_APP_ID/ML_CLIENT_SECRET permissions on Railway.');
       }
       return null;
     }
@@ -400,7 +386,15 @@ export async function findProductOpportunities(input: { query: string; budgetBrl
   const query = input.query.trim().slice(0, 120);
   if (!query) throw new Error('Informe o produto. Exemplo: /procurar powerbank ate 150');
 
-  const url = `${MERCADO_LIVRE_API}/sites/MLB/search?q=${encodeURIComponent(query)}&limit=12`;
+  const params = new URLSearchParams({
+    q: query,
+    limit: '10',
+    sort: 'price_asc',
+  });
+  if (input.budgetBrl && Number.isFinite(input.budgetBrl)) {
+    params.set('price', `*-${Math.round(input.budgetBrl)}`);
+  }
+  const url = `${MERCADO_LIVRE_API}/sites/MLB/search?${params.toString()}`;
   const raw = await safeFetchJson<MercadoLivreSearchResponse>(url);
   const results = (raw?.results || []).slice(0, 10);
   if (!results.length) {
