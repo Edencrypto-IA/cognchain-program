@@ -32,6 +32,8 @@ import type { MythosCryptoMarketReport } from '@/lib/market/crypto-report';
 import type { MythosMarketHeatmap, MythosTokenChart } from '@/lib/market/crypto-visuals';
 import type { MythosSolanaEcosystemReport, MythosSolanaReportMode } from '@/lib/market/solana-ecosystem-report';
 import type { MythosExternalConnectorReadiness } from '@/lib/mythos/external-data-connectors';
+import type { MythosExternalDataReport } from '@/lib/mythos/external-data-query';
+import { parseMythosExternalDataCommand } from '@/lib/mythos/external-data-query';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_FEATURED_SKILLS,
@@ -60,6 +62,7 @@ type MythosLabMessage = {
   productFinder?: MythosProductFinderReport;
   productFinderError?: string;
   dataConnectors?: MythosExternalConnectorReadiness;
+  dataReport?: MythosExternalDataReport;
   solanaReport?: MythosSolanaEcosystemReport;
   solanaAnalysis?: Record<string, unknown>;
   walletIntelligence?: MythosWalletIntelligence;
@@ -677,6 +680,30 @@ const TERMINAL_COMMANDS = [
     detail: 'Show Mythos external data connectors for Brazil, weather, maps, crypto, public records, B3, Fed/FRED, and finance.',
   },
   {
+    command: '/tempo <cidade>',
+    detail: 'Read real weather now with Open-Meteo. Example: /tempo sao paulo.',
+  },
+  {
+    command: '/cep <numero> ou /cnpj <numero>',
+    detail: 'Check public Brazilian address/company data through BrasilAPI.',
+  },
+  {
+    command: '/selic, /ipca ou /dolar',
+    detail: 'Read official macro data from Banco Central do Brasil.',
+  },
+  {
+    command: '/b3 <ticker>',
+    detail: 'Read a Brazilian stock quote through Brapi. Example: /b3 petr4.',
+  },
+  {
+    command: '/fed rates',
+    detail: 'Read the latest Federal Funds rate through FRED/Federal Reserve data.',
+  },
+  {
+    command: '/transparencia contrato <termo>',
+    detail: 'Search public contract records through Portal da Transparencia.',
+  },
+  {
     command: '/market report',
     detail: 'Generate a visual crypto market report with CoinGecko data, gainers, losers, trends, and opportunity watchlist.',
   },
@@ -940,6 +967,32 @@ function terminalSection(title: string, body: string | string[]) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function MythosExternalDataCard({ report }: { report: MythosExternalDataReport }) {
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-[#00E5FF]/18 bg-[#021316]/82">
+      <div className="border-b border-white/10 bg-white/[0.035] px-4 py-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#76F6FF]">Real Data Readout</p>
+        <h3 className="mt-2 text-2xl font-black text-white">{report.title}</h3>
+        <p className="mt-2 text-sm leading-6 text-white/70">{report.summary}</p>
+      </div>
+      <div className="grid gap-3 p-4 sm:grid-cols-2">
+        {report.facts.map(fact => (
+          <div key={`${fact.label}-${fact.value}`} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">{fact.label}</p>
+            <p className="mt-2 break-words text-base font-black text-white">{fact.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-3 border-t border-white/10 px-4 py-3 text-[11px] leading-5 text-white/48 sm:grid-cols-2">
+        <p><span className="font-black text-white/65">Fonte:</span> {report.source}</p>
+        <p><span className="font-black text-white/65">Atualizado:</span> {new Date(report.generatedAt).toLocaleString('pt-BR')}</p>
+        <p className="sm:col-span-2"><span className="font-black text-white/65">Seguranca:</span> {report.safety}</p>
+        {report.nextStep ? <p className="sm:col-span-2"><span className="font-black text-white/65">Proximo passo:</span> {report.nextStep}</p> : null}
+      </div>
+    </div>
+  );
 }
 
 function asString(value: unknown, fallback = 'not available') {
@@ -5106,6 +5159,7 @@ export default function MythosLabConsole() {
       productFinder?: MythosProductFinderReport;
       productFinderError?: string;
       dataConnectors?: MythosExternalConnectorReadiness;
+      dataReport?: MythosExternalDataReport;
       solanaAnalysis?: Record<string, unknown>;
       walletIntelligence?: MythosWalletIntelligence;
       walletIntelligenceError?: string;
@@ -5123,6 +5177,7 @@ export default function MythosLabConsole() {
         productFinder: extra?.productFinder,
         productFinderError: extra?.productFinderError,
         dataConnectors: extra?.dataConnectors,
+        dataReport: extra?.dataReport,
         solanaAnalysis: extra?.solanaAnalysis,
         walletIntelligence: extra?.walletIntelligence,
         walletIntelligenceError: extra?.walletIntelligenceError,
@@ -5211,6 +5266,56 @@ export default function MythosLabConsole() {
           latencyMs: Date.now() - started,
           mode: activeSession.mode,
           traceSchema: 'mythos-data-connectors/v1',
+        },
+      });
+      return;
+    }
+
+    const externalDataRequest = parseMythosExternalDataCommand(command);
+    if (externalDataRequest) {
+      const response = await fetch(`/api/mythos/data/query?command=${encodeURIComponent(command)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data) || data.ok !== true) {
+        const error = isRecord(data) ? asString(data.error, 'Nao consegui consultar essa fonte agora.') : 'Nao consegui consultar essa fonte agora.';
+        appendTerminalResponse([
+          'Nao consegui buscar esse dado agora.',
+          '',
+          `Motivo: ${error}`,
+          '',
+          'Tente novamente em instantes ou confira se a chave correspondente esta ativa no Railway. Nenhuma acao financeira foi executada.',
+        ].join('\n'));
+        return;
+      }
+
+      const report = data as MythosExternalDataReport;
+      appendTerminalResponse([
+        report.summary,
+        '',
+        `Fonte: ${report.source}`,
+        `Seguranca: ${report.safety}`,
+      ].join('\n'), {
+        dataReport: report,
+        trace: {
+          perception: `User requested real external data: ${command}.`,
+          memoryContext: 'Only public/provider data was fetched server-side. No API key value was exposed to the browser.',
+          selectedSkill: 'Mythos Real Data Commands',
+          reasoningPath: 'Mythos routed the slash command to the matching provider, normalized the response, and returned only source-backed fields.',
+          prediction: 'User can use this readout as context for research, planning, or future CongChain memory.',
+          decision: 'Return a human-readable data card with source, timestamp, and safety boundary.',
+          confidence: 92,
+          safetyBoundary: 'Read-only external data. No wallet signature, PIX, order, buy, sell, swap, payment, or fund movement.',
+          nextHumanStep: report.nextStep || 'Ask a follow-up or save this answer as CongChain memory if useful.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: report.source,
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-external-data/v1',
         },
       });
       return;
@@ -6412,6 +6517,7 @@ export default function MythosLabConsole() {
                           </div>
                         ) : null}
                         {message.dataConnectors ? <MythosDataConnectorsCard readiness={message.dataConnectors} /> : null}
+                        {message.dataReport ? <MythosExternalDataCard report={message.dataReport} /> : null}
                         {message.marketHeatmap ? <MythosMarketHeatmapCard heatmap={message.marketHeatmap} /> : null}
                         {message.tokenChart ? <MythosTokenChartCard chart={message.tokenChart} /> : null}
                         {message.marketVisualError ? (
@@ -6497,6 +6603,7 @@ export default function MythosLabConsole() {
                           && !message.productFinder
                           && !message.productFinderError
                           && !message.dataConnectors
+                          && !message.dataReport
                           && !message.marketHeatmap
                           && !message.tokenChart
                           && !message.marketVisualError
