@@ -7,6 +7,14 @@ function scoreColor(score: number) {
   return 'text-[#FF9AB1]';
 }
 
+function providerStatusLabel(status: MythosProductFinderReport['providerStatus'][number]['status']) {
+  if (status === 'live') return 'ao vivo';
+  if (status === 'fallback') return 'fallback IA';
+  if (status === 'blocked') return 'bloqueado';
+  if (status === 'unavailable') return 'indisponivel';
+  return 'pendente';
+}
+
 function OfferMini({ offer }: { offer: MythosProductOffer }) {
   return (
     <a
@@ -51,7 +59,7 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9AEAFF]">Product Finder Agent</p>
           <h3 className="mt-1 text-2xl font-black text-white">Melhor oportunidade encontrada</h3>
-          <p className="mt-2 max-w-2xl text-xs leading-5 text-white/54">{report.summary}</p>
+          <p className="mt-2 max-w-2xl whitespace-pre-wrap text-xs leading-5 text-white/54">{report.summary}</p>
         </div>
         <div className="rounded-full border border-white/10 bg-black/28 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-white/56">
           {report.budgetLabel ? `orcamento ${report.budgetLabel}` : 'sem orcamento'}
@@ -71,6 +79,17 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
           </div>
         ))}
       </div>
+
+      {!best && report.summary ? (
+        <div className="border-b border-white/8 p-4">
+          <div className="rounded-2xl border border-[#7DE4FF]/12 bg-black/24 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">Recomendacao por busca web</p>
+            <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-white/72">
+              {report.summary}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {best ? (
         <div className="grid gap-4 p-4 lg:grid-cols-[280px_1fr]">
@@ -175,7 +194,7 @@ export function MythosProductFinderCard({ report }: { report: MythosProductFinde
       </div>
 
       <div className="border-t border-white/8 px-4 py-3 text-[11px] leading-5 text-white/42">
-        {report.providerStatus.map(item => `${item.marketplace}: ${item.status === 'live' ? 'ao vivo' : 'pendente'} (${item.detail})`).join(' | ')}
+        {report.providerStatus.map(item => `${item.marketplace}: ${providerStatusLabel(item.status)} (${item.detail})`).join(' | ')}
       </div>
     </div>
   );

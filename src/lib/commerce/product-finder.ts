@@ -1,4 +1,6 @@
 const MERCADO_LIVRE_API = 'https://api.mercadolibre.com';
+const ANTHROPIC_MESSAGES_API = 'https://api.anthropic.com/v1/messages';
+const OPENAI_RESPONSES_API = 'https://api.openai.com/v1/responses';
 
 export type MythosProductMarketplace = 'mercado_livre';
 
@@ -51,9 +53,12 @@ export type MythosProductWatchPlan = {
   note: string;
 };
 
+export type MythosProductFinderSource = 'mercado_livre' | 'anthropic_web_search' | 'openai_web_search';
+
 export type MythosProductFinderReport = {
   ok: true;
   generatedAt: string;
+  source: MythosProductFinderSource;
   query: string;
   normalizedQuery: string;
   budgetBrl: number | null;
@@ -64,7 +69,7 @@ export type MythosProductFinderReport = {
   watchPlan: MythosProductWatchPlan;
   providerStatus: Array<{
     marketplace: string;
-    status: 'live' | 'pending_connector';
+    status: 'live' | 'blocked' | 'fallback' | 'unavailable' | 'pending_connector';
     detail: string;
   }>;
   summary: string;
@@ -76,6 +81,8 @@ export type MythosProductFinderReport = {
     sources: string[];
   };
 };
+
+type ProductFinderInput = { query: string; budgetBrl?: number | null };
 
 type MercadoLivreSearchResult = {
   id?: string;
@@ -119,6 +126,19 @@ type MercadoLivreTokenResponse = {
   expires_in?: number;
   message?: string;
   error?: string;
+};
+
+type AnthropicMessageResponse = {
+  content?: Array<{ type?: string; text?: string }>;
+  error?: { message?: string };
+};
+
+type OpenAIResponse = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{ type?: string; text?: string }>;
+  }>;
+  error?: { message?: string };
 };
 
 function fmtBrl(value: number | null | undefined) {
@@ -366,10 +386,25 @@ function buildPriceStats(offers: MythosProductOffer[], budgetBrl: number | null)
   };
 }
 
+function buildEmptyPriceStats(scannedCount = 0): MythosProductPriceStats {
+  return {
+    min: null,
+    minLabel: null,
+    median: null,
+    medianLabel: null,
+    average: null,
+    averageLabel: null,
+    max: null,
+    maxLabel: null,
+    withinBudgetCount: 0,
+    scannedCount,
+  };
+}
+
 function buildWatchPlan(bestOffer: MythosProductOffer | null, budgetBrl: number | null): MythosProductWatchPlan {
   const targetPrice = bestOffer
     ? Math.max(1, Math.round((budgetBrl ? Math.min(budgetBrl, bestOffer.price * 0.95) : bestOffer.price * 0.9) * 100) / 100)
-    : null;
+    : budgetBrl || null;
   return {
     available: true,
     targetPrice,
@@ -382,7 +417,169 @@ function buildWatchPlan(bestOffer: MythosProductOffer | null, budgetBrl: number 
   };
 }
 
-export async function findProductOpportunities(input: { query: string; budgetBrl?: number | null }): Promise<MythosProductFinderReport> {
+function webSearchSystemPrompt() {
+  return `Voce e um assistente de compras brasileiro especializado.
+Quando pesquisar produtos, sempre:
+- Busque as melhores opcoes dentro do orcamento informado.
+- Liste no maximo 4 produtos com nome, capacidade/especificacoes, preco estimado e por que vale.
+- Inclua links quando a busca retornar URLs confiaveis.
+- Avise quando o preco for estimado ou puder mudar por frete/cupom/estoque.
+- De uma recomendacao direta no final.
+- Responda em portugues brasileiro, de forma amigavel e util.
+- Nunca diga que comprou, pagou, reservou ou executou qualquer acao. A resposta e somente leitura.`;
+}
+
+function buildProductSearchUserPrompt(input: ProductFinderInput) {
+  const budget = input.budgetBrl ? ` ate ${fmtBrl(input.budgetBrl)}` : '';
+  return `Quero comprar ${input.query}${budget}. Pesquise opcoes atuais no Brasil, priorize custo-beneficio e confiabilidade, e entregue uma recomendacao clara.`;
+}
+
+function extractOpenAIText(data: OpenAIResponse) {
+  if (data.output_text) return data.output_text;
+  return (data.output || [])
+    .flatMap(item => item.content || [])
+    .filter(block => (block.type === 'output_text' || block.type === 'text') && typeof block.text === 'string')
+    .map(block => block.text)
+    .join('\n');
+}
+
+async function anthropicWebSearch(input: ProductFinderInput) {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured.');
+
+  const response = await fetch(ANTHROPIC_MESSAGES_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: process.env.MYTHOS_PRODUCT_FINDER_ANTHROPIC_MODEL?.trim() || 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      tools: [
+        {
+          type: 'web_search_20250305',
+          name: 'web_search',
+        },
+      ],
+      system: webSearchSystemPrompt(),
+      messages: [
+        { role: 'user', content: buildProductSearchUserPrompt(input) },
+      ],
+    }),
+    cache: 'no-store',
+  });
+  const data = await response.json().catch(() => ({})) as AnthropicMessageResponse;
+  const text = (data.content || [])
+    .filter(block => block.type === 'text' && typeof block.text === 'string')
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+  if (!response.ok || !text) {
+    throw new Error(data.error?.message || `Anthropic web search failed with HTTP ${response.status}.`);
+  }
+  return text;
+}
+
+async function openAiWebSearch(input: ProductFinderInput) {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
+
+  const response = await fetch(OPENAI_RESPONSES_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: process.env.MYTHOS_PRODUCT_FINDER_OPENAI_MODEL?.trim() || 'gpt-4.1-mini',
+      tools: [{ type: 'web_search_preview' }],
+      input: [
+        { role: 'system', content: webSearchSystemPrompt() },
+        { role: 'user', content: buildProductSearchUserPrompt(input) },
+      ],
+    }),
+    cache: 'no-store',
+  });
+  const data = await response.json().catch(() => ({})) as OpenAIResponse;
+  const text = extractOpenAIText(data).trim();
+  if (!response.ok || !text) {
+    throw new Error(data.error?.message || `OpenAI web search failed with HTTP ${response.status}.`);
+  }
+  return text;
+}
+
+function buildWebSearchReport(
+  input: ProductFinderInput,
+  summary: string,
+  source: Exclude<MythosProductFinderSource, 'mercado_livre'>,
+  mlError: unknown
+): MythosProductFinderReport {
+  const normalizedQuery = input.query.trim().slice(0, 120);
+  const mlDetail = mlError instanceof Error ? mlError.message : 'Mercado Livre indisponivel no momento.';
+  const aiLabel = source === 'anthropic_web_search' ? 'Anthropic web_search' : 'OpenAI web search';
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    source,
+    query: input.query,
+    normalizedQuery,
+    budgetBrl: input.budgetBrl ?? null,
+    budgetLabel: fmtBrl(input.budgetBrl ?? null),
+    bestOffer: null,
+    offers: [],
+    priceStats: buildEmptyPriceStats(),
+    watchPlan: buildWatchPlan(null, input.budgetBrl ?? null),
+    providerStatus: [
+      {
+        marketplace: 'Mercado Livre',
+        status: 'blocked',
+        detail: `API principal falhou; Mythos usou fallback de busca IA. Motivo: ${mlDetail}`,
+      },
+      {
+        marketplace: aiLabel,
+        status: 'fallback',
+        detail: 'Busca web server-side usada para recomendacao textual com links e precos sujeitos a variacao.',
+      },
+      {
+        marketplace: 'Amazon / Shopee / Magalu',
+        status: 'pending_connector',
+        detail: 'Conectores oficiais ainda podem melhorar estoque, frete e reputacao sem depender de busca generica.',
+      },
+    ],
+    summary,
+    safety: {
+      readOnlySearch: true,
+      noPurchaseExecution: true,
+      noPaymentExecution: true,
+      notSponsored: true,
+      sources: [aiLabel, 'Mercado Livre API attempted first'],
+    },
+  };
+}
+
+async function findProductWithWebFallback(input: ProductFinderInput, mlError: unknown): Promise<MythosProductFinderReport> {
+  const failures: string[] = [];
+  try {
+    const text = await anthropicWebSearch(input);
+    return buildWebSearchReport(input, text, 'anthropic_web_search', mlError);
+  } catch (error) {
+    failures.push(`Anthropic: ${error instanceof Error ? error.message : 'failed'}`);
+  }
+
+  try {
+    const text = await openAiWebSearch(input);
+    return buildWebSearchReport(input, text, 'openai_web_search', mlError);
+  } catch (error) {
+    failures.push(`OpenAI: ${error instanceof Error ? error.message : 'failed'}`);
+  }
+
+  const mlDetail = mlError instanceof Error ? mlError.message : 'Mercado Livre indisponivel.';
+  throw new Error(`Product Finder indisponivel. Mercado Livre: ${mlDetail}. Fallbacks IA: ${failures.join(' | ')}`);
+}
+
+async function findMercadoLivreOpportunities(input: ProductFinderInput): Promise<MythosProductFinderReport> {
   const query = input.query.trim().slice(0, 120);
   if (!query) throw new Error('Informe o produto. Exemplo: /procurar powerbank ate 150');
 
@@ -418,6 +615,7 @@ export async function findProductOpportunities(input: { query: string; budgetBrl
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
+    source: 'mercado_livre',
     query: input.query,
     normalizedQuery: query,
     budgetBrl: input.budgetBrl ?? null,
@@ -447,4 +645,12 @@ export async function findProductOpportunities(input: { query: string; budgetBrl
       sources: ['Mercado Livre public search API', 'Mercado Livre public seller API'],
     },
   };
+}
+
+export async function findProductOpportunities(input: { query: string; budgetBrl?: number | null }): Promise<MythosProductFinderReport> {
+  try {
+    return await findMercadoLivreOpportunities(input);
+  } catch (error) {
+    return findProductWithWebFallback(input, error);
+  }
 }
