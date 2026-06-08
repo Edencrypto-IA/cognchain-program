@@ -345,7 +345,7 @@ async function nextBrazilHolidayReport(): Promise<MythosExternalDataReport> {
 async function radarBrasilReport(): Promise<MythosExternalDataReport> {
   const [finance, ibov, weather, holiday] = await Promise.all([
     financeReport(''),
-    optionalReport('Brapi - IBOV', () => b3Report('IBOV')),
+    optionalReport('Brapi - Ibovespa', () => b3Report('^BVSP')),
     optionalReport('Open-Meteo - Brasilia', () => weatherReport('brasilia')),
     optionalReport('BrasilAPI - feriados', () => nextBrazilHolidayReport()),
   ]);
