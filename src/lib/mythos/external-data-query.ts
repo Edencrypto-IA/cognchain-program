@@ -7,6 +7,7 @@ export type MythosExternalDataKind =
   | 'dolar'
   | 'b3'
   | 'fed'
+  | 'finance'
   | 'transparencia';
 
 export type MythosExternalDataReport = {
@@ -238,6 +239,81 @@ async function fedReport(): Promise<MythosExternalDataReport> {
   };
 }
 
+function findFact(report: MythosExternalDataReport, label: string) {
+  return report.facts.find(fact => fact.label.toLowerCase() === label.toLowerCase())?.value || 'indisponivel';
+}
+
+async function optionalReport(label: string, loader: () => Promise<MythosExternalDataReport>) {
+  try {
+    return await loader();
+  } catch (error) {
+    return {
+      ok: true as const,
+      kind: 'finance' as const,
+      title: label,
+      summary: error instanceof Error ? error.message : 'Fonte indisponivel agora.',
+      facts: [{ label: 'Status', value: 'indisponivel' }],
+      source: label,
+      generatedAt: new Date().toISOString(),
+      safety: 'Fonte opcional indisponivel. Nao preencher com estimativa.',
+    };
+  }
+}
+
+async function financeReport(query: string): Promise<MythosExternalDataReport> {
+  const ticker = query.trim().replace(/^brasil\s*/i, '').replace(/^macro\s*/i, '').trim();
+  const [selic, ipca, dolar, fed, b3] = await Promise.all([
+    optionalReport('Banco Central - Selic', () => bcbSeriesReport('selic')),
+    optionalReport('Banco Central - IPCA', () => bcbSeriesReport('ipca')),
+    optionalReport('Banco Central - dolar PTAX', () => bcbSeriesReport('dolar')),
+    optionalReport('FRED - Fed Funds', () => fedReport()),
+    ticker ? optionalReport(`Brapi - ${ticker.toUpperCase()}`, () => b3Report(ticker)) : Promise.resolve(null),
+  ]);
+
+  const selicValue = findFact(selic, 'Valor');
+  const ipcaValue = findFact(ipca, 'Valor');
+  const dolarValue = findFact(dolar, 'Valor');
+  const fedValue = findFact(fed, 'Valor');
+  const b3Price = b3 ? findFact(b3, 'Preco') : '';
+  const b3Change = b3 ? findFact(b3, 'Variacao') : '';
+
+  const plainRead = [
+    `Brasil: Selic ${selicValue}, IPCA ${ipcaValue}, dolar PTAX ${dolarValue}.`,
+    fedValue !== 'indisponivel' ? `EUA: Fed Funds ${fedValue}.` : 'EUA: Fed Funds indisponivel nesta leitura.',
+    b3 ? `B3: ${b3.title} em ${b3Price}, variacao ${b3Change}.` : '',
+  ].filter(Boolean).join(' ');
+
+  const notes = [
+    'Juros altos favorecem caixa/renda fixa e deixam valuation de risco mais sensivel.',
+    'Dolar e Fed ajudam a medir pressao externa sobre Brasil, crypto e bolsa.',
+    'Use isso como contexto, nao como sinal automatico de compra ou venda.',
+  ];
+
+  return {
+    ok: true,
+    kind: 'finance',
+    title: ticker ? `Radar financeiro com ${ticker.toUpperCase()}` : 'Radar financeiro Brasil + EUA',
+    summary: plainRead,
+    facts: [
+      { label: 'Selic', value: `${selicValue} (${findFact(selic, 'Data-base')})` },
+      { label: 'IPCA', value: `${ipcaValue} (${findFact(ipca, 'Data-base')})` },
+      { label: 'Dolar PTAX', value: `${dolarValue} (${findFact(dolar, 'Data-base')})` },
+      { label: 'Fed Funds', value: `${fedValue} (${findFact(fed, 'Data-base')})` },
+      ...(b3 ? [
+        { label: 'Ativo B3', value: b3.title },
+        { label: 'Preco/variacao', value: `${b3Price} / ${b3Change}` },
+      ] : []),
+      { label: 'Leitura Mythos', value: notes.join(' ') },
+    ],
+    source: 'Banco Central do Brasil + FRED + Brapi',
+    generatedAt: new Date().toISOString(),
+    safety: 'Assistente financeiro somente leitura. Nao e recomendacao individual, ordem, promessa de retorno ou execucao.',
+    nextStep: ticker
+      ? 'Compare fundamentos, liquidez, noticias e risco antes de qualquer decisao.'
+      : 'Passe um ticker para incluir B3: /financeiro petr4 ou /macro vale3.',
+  };
+}
+
 async function transparenciaReport(query: string): Promise<MythosExternalDataReport> {
   if (!query.trim()) throw new Error('Use /transparencia contrato <orgao|numero|processo|cnpj>. Exemplo: /transparencia contrato orgao 26298');
   const key = getEnv(['TRANSPARENCIA_KEY', 'TRANSPARENCIA_API_KEY', 'PORTAL_TRANSPARENCIA_API_KEY']);
@@ -314,6 +390,7 @@ export function parseMythosExternalDataCommand(command: string): { kind: MythosE
     [/^\/cnpj\s+(.+)/i, 'cnpj'],
     [/^\/b3\s+(.+)/i, 'b3'],
     [/^\/fed(?:\s+rates)?\s*$/i, 'fed'],
+    [/^\/(?:financeiro|macro|radar financeiro)(?:\s+(.+))?$/i, 'finance'],
     [/^\/transparencia\s+(.+)/i, 'transparencia'],
   ];
   for (const [regex, kind] of matchers) {
@@ -333,6 +410,7 @@ export async function runMythosExternalDataQuery(kind: MythosExternalDataKind, q
   if (kind === 'selic' || kind === 'ipca' || kind === 'dolar') return bcbSeriesReport(kind);
   if (kind === 'b3') return b3Report(query);
   if (kind === 'fed') return fedReport();
+  if (kind === 'finance') return financeReport(query);
   if (kind === 'transparencia') return transparenciaReport(query);
   throw new Error('Comando de dados nao suportado.');
 }

@@ -700,6 +700,10 @@ const TERMINAL_COMMANDS = [
     detail: 'Read the latest Federal Funds rate through FRED/Federal Reserve data.',
   },
   {
+    command: '/financeiro ou /macro <ticker opcional>',
+    detail: 'Open a Brazil + US financial radar with Selic, IPCA, dollar, Fed Funds, and optional B3 quote. Example: /financeiro petr4.',
+  },
+  {
     command: '/transparencia contrato <orgao|numero|processo|cnpj>',
     detail: 'Search public contract records through Portal da Transparencia. Example: /transparencia contrato orgao 26298.',
   },
