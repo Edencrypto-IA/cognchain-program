@@ -11,6 +11,7 @@ function productFinderErrorMessage(error: unknown) {
   if (error instanceof Error) {
     if (
       /^Mercado Livre bloqueou/.test(error.message) ||
+      /^Mercado Livre nao gerou token/.test(error.message) ||
       /^Nao encontrei/.test(error.message) ||
       /^Informe o produto/.test(error.message)
     ) {

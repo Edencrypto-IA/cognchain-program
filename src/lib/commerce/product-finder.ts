@@ -140,10 +140,53 @@ function normalizeImage(url: string | undefined) {
   return url.replace(/^http:\/\//i, 'https://');
 }
 
+let mercadoLivreTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getMercadoLivreAccessToken() {
+  const staticToken = process.env.MERCADOLIBRE_ACCESS_TOKEN || process.env.MERCADO_LIVRE_ACCESS_TOKEN;
+  if (staticToken?.trim()) return staticToken.trim();
+
+  const clientId = process.env.ML_CLIENT_ID?.trim();
+  const clientSecret = process.env.ML_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) return '';
+
+  const now = Date.now();
+  if (mercadoLivreTokenCache && mercadoLivreTokenCache.expiresAt > now + 60_000) {
+    return mercadoLivreTokenCache.token;
+  }
+
+  const response = await fetch(`${MERCADO_LIVRE_API}/oauth/token`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'CongChain-Mythos-ProductFinder/1.0',
+    },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+    cache: 'no-store',
+  });
+
+  const payload = await response.json().catch(() => ({})) as { access_token?: string; expires_in?: number; message?: string; error?: string };
+  if (!response.ok || !payload.access_token) {
+    const detail = payload.message || payload.error || `HTTP ${response.status}`;
+    throw new Error(`Mercado Livre nao gerou token com ML_CLIENT_ID/ML_CLIENT_SECRET: ${detail}`);
+  }
+
+  mercadoLivreTokenCache = {
+    token: payload.access_token,
+    expiresAt: now + Math.max(60, Number(payload.expires_in || 300)) * 1000,
+  };
+  return mercadoLivreTokenCache.token;
+}
+
 async function safeFetchJson<T>(url: string, timeoutMs = 8500): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const accessToken = process.env.MERCADOLIBRE_ACCESS_TOKEN || process.env.MERCADO_LIVRE_ACCESS_TOKEN;
+  const accessToken = await getMercadoLivreAccessToken();
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'User-Agent': 'CongChain-Mythos-ProductFinder/1.0',
@@ -158,14 +201,14 @@ async function safeFetchJson<T>(url: string, timeoutMs = 8500): Promise<T | null
     clearTimeout(timer);
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        throw new Error('Mercado Livre bloqueou a consulta publica. Configure MERCADOLIBRE_ACCESS_TOKEN no Railway para usar o conector oficial.');
+        throw new Error('Mercado Livre bloqueou a consulta. Configure MERCADOLIBRE_ACCESS_TOKEN ou ML_CLIENT_ID/ML_CLIENT_SECRET no Railway.');
       }
       return null;
     }
     return await response.json() as T;
   } catch (error) {
     clearTimeout(timer);
-    if (error instanceof Error && /Mercado Livre bloqueou/.test(error.message)) throw error;
+    if (error instanceof Error && /Mercado Livre/.test(error.message)) throw error;
     return null;
   }
 }
