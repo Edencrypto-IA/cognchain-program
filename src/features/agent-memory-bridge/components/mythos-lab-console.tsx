@@ -700,8 +700,8 @@ const TERMINAL_COMMANDS = [
     detail: 'Read the latest Federal Funds rate through FRED/Federal Reserve data.',
   },
   {
-    command: '/transparencia contrato <termo>',
-    detail: 'Search public contract records through Portal da Transparencia.',
+    command: '/transparencia contrato <orgao|numero|processo|cnpj>',
+    detail: 'Search public contract records through Portal da Transparencia. Example: /transparencia contrato orgao 26298.',
   },
   {
     command: '/market report',

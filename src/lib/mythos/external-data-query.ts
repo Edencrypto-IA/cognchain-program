@@ -239,22 +239,61 @@ async function fedReport(): Promise<MythosExternalDataReport> {
 }
 
 async function transparenciaReport(query: string): Promise<MythosExternalDataReport> {
-  if (!query.trim()) throw new Error('Use /transparencia contrato <termo>. Exemplo: /transparencia contrato tecnologia');
+  if (!query.trim()) throw new Error('Use /transparencia contrato <orgao|numero|processo|cnpj>. Exemplo: /transparencia contrato orgao 26298');
   const key = getEnv(['TRANSPARENCIA_KEY', 'TRANSPARENCIA_API_KEY', 'PORTAL_TRANSPARENCIA_API_KEY']);
   if (!key) throw new Error('Configure TRANSPARENCIA_KEY no Railway para usar o Portal da Transparencia.');
   const term = query.replace(/^contrato\s+/i, '').trim();
-  const url = `https://api.portaldatransparencia.gov.br/api-de-dados/contratos?termo=${encodeURIComponent(term)}&pagina=1&tamanhoPagina=5`;
+
+  let url = '';
+  let mode = 'parametro';
+  const cnpj = onlyDigits(term);
+  const orgao = term.match(/\borgao\s+(\d{4,10})\b/i)?.[1] || term.match(/\borgao[:=]\s*(\d{4,10})\b/i)?.[1];
+  const numero = term.match(/\bnumero\s+([a-z0-9./-]{3,40})\b/i)?.[1] || term.match(/\bcontrato\s+([a-z0-9./-]{3,40})\b/i)?.[1];
+  const processo = term.match(/\bprocesso\s+([a-z0-9./-]{3,60})\b/i)?.[1];
+
+  if (cnpj.length === 14) {
+    mode = 'cpf/cnpj fornecedor';
+    url = `https://api.portaldatransparencia.gov.br/api-de-dados/contratos/cpf-cnpj?cpfCnpj=${encodeURIComponent(cnpj)}&pagina=1`;
+  } else if (processo) {
+    mode = 'processo';
+    url = `https://api.portaldatransparencia.gov.br/api-de-dados/contratos/processo?processo=${encodeURIComponent(processo)}&pagina=1`;
+  } else if (numero) {
+    mode = 'numero do contrato';
+    url = `https://api.portaldatransparencia.gov.br/api-de-dados/contratos/numero?numero=${encodeURIComponent(numero)}&pagina=1`;
+  } else if (orgao) {
+    mode = 'codigoOrgao SIAFI';
+    url = `https://api.portaldatransparencia.gov.br/api-de-dados/contratos?codigoOrgao=${encodeURIComponent(orgao)}&pagina=1`;
+  } else {
+    return {
+      ok: true,
+      kind: 'transparencia',
+      title: 'Portal da Transparencia precisa de um identificador',
+      summary: 'A API oficial de contratos nao pesquisa por palavra solta. Ela exige codigoOrgao SIAFI, numero do contrato, numero do processo ou CPF/CNPJ do fornecedor.',
+      facts: [
+        { label: 'Consulta recebida', value: term || 'vazia' },
+        { label: 'Exemplo por orgao', value: '/transparencia contrato orgao 26298' },
+        { label: 'Exemplo por CNPJ', value: '/transparencia contrato 00000000000191' },
+        { label: 'Exemplo por processo', value: '/transparencia contrato processo 00190.000000/2024-00' },
+      ],
+      source: 'Portal da Transparencia API - Swagger oficial',
+      generatedAt: new Date().toISOString(),
+      safety: 'Dado publico. O Mythos nao acusa irregularidade sem documento, periodo e contexto.',
+      nextStep: 'Informe codigoOrgao, numero, processo ou CNPJ para a consulta real de contratos.',
+    };
+  }
+
   const rows = asArray(await fetchJson(url, { headers: { 'chave-api-dados': key } }));
   const first = asRecord(rows[0]);
   return {
     ok: true,
     kind: 'transparencia',
-    title: rows.length ? `Contratos encontrados para "${term}"` : `Nenhum contrato encontrado para "${term}"`,
+    title: rows.length ? `Contratos encontrados por ${mode}` : `Nenhum contrato encontrado por ${mode}`,
     summary: rows.length
       ? `Encontrei ${rows.length} resultado(s) iniciais. Primeiro registro: ${asString(first.objeto || first.descricao || first.numero, 'sem descricao no retorno')}.`
       : 'O Portal da Transparencia respondeu sem contratos para esse termo nesta consulta.',
     facts: [
-      { label: 'Termo', value: term },
+      { label: 'Parametro', value: term },
+      { label: 'Modo', value: mode },
       { label: 'Resultados lidos', value: String(rows.length) },
       { label: 'Primeiro orgao/fornecedor', value: asString(first.orgao || first.fornecedor || first.nomeFornecedor) },
       { label: 'Valor', value: asString(first.valor || first.valorInicialCompra || first.valorContrato) },
