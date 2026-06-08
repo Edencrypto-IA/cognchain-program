@@ -143,12 +143,12 @@ function normalizeImage(url: string | undefined) {
 let mercadoLivreTokenCache: { token: string; expiresAt: number } | null = null;
 
 async function getMercadoLivreAccessToken() {
-  const staticToken = process.env.MERCADOLIBRE_ACCESS_TOKEN || process.env.MERCADO_LIVRE_ACCESS_TOKEN;
-  if (staticToken?.trim()) return staticToken.trim();
-
   const clientId = process.env.ML_CLIENT_ID?.trim();
   const clientSecret = process.env.ML_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret) return '';
+  if (!clientId || !clientSecret) {
+    const staticToken = process.env.MERCADOLIBRE_ACCESS_TOKEN || process.env.MERCADO_LIVRE_ACCESS_TOKEN;
+    return staticToken?.trim() || '';
+  }
 
   const now = Date.now();
   if (mercadoLivreTokenCache && mercadoLivreTokenCache.expiresAt > now + 60_000) {
@@ -209,8 +209,18 @@ async function safeFetchJson<T>(url: string, timeoutMs = 8500): Promise<T | null
     clearTimeout(timer);
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
+        if (accessToken) {
+          const fallbackResponse = await fetch(url, {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'CongChain-Mythos-ProductFinder/1.0',
+            },
+            next: { revalidate: 90 },
+          });
+          if (fallbackResponse.ok) return await fallbackResponse.json() as T;
+        }
         throw new Error(hasMercadoLivreCredentials()
-          ? 'Mercado Livre rejeitou a busca mesmo com credenciais server-side. Gere um MERCADOLIBRE_ACCESS_TOKEN oficial OAuth e coloque no Railway, ou confira as permissoes do app Mercado Livre.'
+          ? 'Mercado Livre rejeitou a busca com token server-side e tambem bloqueou o fallback publico. Confira permissoes do app Mercado Livre ou remova token fixo expirado do Railway para usar Client Credentials dinamico.'
           : 'Mercado Livre bloqueou a consulta e nenhuma credencial server-side foi detectada. Configure MERCADOLIBRE_ACCESS_TOKEN ou ML_CLIENT_ID/ML_CLIENT_SECRET no Railway.');
       }
       return null;
