@@ -244,6 +244,10 @@ function findFact(report: MythosExternalDataReport, label: string) {
   return report.facts.find(fact => fact.label.toLowerCase() === label.toLowerCase())?.value || 'indisponivel';
 }
 
+function isUnavailableReport(report: MythosExternalDataReport) {
+  return report.facts.some(fact => fact.label.toLowerCase() === 'status' && fact.value === 'indisponivel');
+}
+
 async function optionalReport(label: string, loader: () => Promise<MythosExternalDataReport>) {
   try {
     return await loader();
@@ -346,13 +350,13 @@ async function radarBrasilReport(): Promise<MythosExternalDataReport> {
     optionalReport('BrasilAPI - feriados', () => nextBrazilHolidayReport()),
   ]);
 
-  const ibovText = findFact(ibov, 'Status') === 'indisponivel'
+  const ibovText = isUnavailableReport(ibov)
     ? 'Ibovespa indisponivel na Brapi nesta leitura.'
     : `${ibov.title}: ${findFact(ibov, 'Preco')} / ${findFact(ibov, 'Variacao')}`;
-  const weatherText = findFact(weather, 'Status') === 'indisponivel'
+  const weatherText = isUnavailableReport(weather)
     ? 'Clima de Brasilia indisponivel agora.'
     : `${weather.title}: ${weather.summary}`;
-  const holidayText = findFact(holiday, 'Status') === 'indisponivel'
+  const holidayText = isUnavailableReport(holiday)
     ? 'Calendario nacional indisponivel agora.'
     : `${findFact(holiday, 'Feriado')} em ${findFact(holiday, 'Data')}`;
 
