@@ -14,6 +14,7 @@ export type MythosTriggerIntent =
   | 'html_artifact'
   | 'html_revision'
   | 'external_data'
+  | 'radar_politico'
   | 'unknown';
 
 export type MythosTriggerRoute = {
@@ -158,7 +159,15 @@ export function routeMythosTrigger(content: string, context: MythosTriggerContex
   }
 
   const externalData = parseMythosExternalDataCommand(prompt);
-  if (externalData) return route('external_data', 0.96, prompt, 'Matched external data command parser.', externalData);
+  if (externalData) {
+    return route(
+      externalData.kind === 'radar_politico' ? 'radar_politico' : 'external_data',
+      0.96,
+      prompt,
+      externalData.kind === 'radar_politico' ? 'Matched Radar Politico BR public intelligence intent.' : 'Matched external data command parser.',
+      externalData
+    );
+  }
 
   const productFinder = parseProductFinderPrompt(prompt);
   if (productFinder) return route('product_finder', 0.92, prompt, 'Matched product shopping intent.', productFinder);

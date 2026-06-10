@@ -9,6 +9,7 @@ export type MythosExternalDataKind =
   | 'fed'
   | 'finance'
   | 'radar_brasil'
+  | 'radar_politico'
   | 'transparencia';
 
 export type MythosExternalDataReport = {
@@ -26,6 +27,7 @@ export type MythosExternalDataReport = {
 type JsonRecord = Record<string, unknown>;
 
 const DATA_TIMEOUT_MS = 12_000;
+const ANTHROPIC_MESSAGES_API = 'https://api.anthropic.com/v1/messages';
 
 function asRecord(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
@@ -380,6 +382,115 @@ async function radarBrasilReport(): Promise<MythosExternalDataReport> {
   };
 }
 
+type AnthropicMessageResponse = {
+  content?: Array<{ type?: string; text?: string }>;
+  error?: { message?: string };
+};
+
+function cleanPoliticalRadarText(text: string) {
+  return text
+    .replace(/\r/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 2600);
+}
+
+function politicalRadarMode(query: string) {
+  if (/\b(prefeitura|municipio|munic[ií]pio|cidade|vereador|camara|c[âa]mara)\b/i.test(query)) return 'municipal';
+  if (/\b(eleicao|elei[cç][aã]o|eleicoes|elei[cç][oõ]es|2026|candidato|campanha)\b/i.test(query)) return 'eleitoral';
+  if (/\b(deputado|senador|governador|ministro|presidente|partido|politico|pol[ií]tico)\b/i.test(query)) return 'perfil_publico';
+  return 'radar_publico';
+}
+
+async function anthropicPoliticalRadar(query: string) {
+  const apiKey = getEnv(['ANTHROPIC_API_KEY']);
+  if (!apiKey) throw new Error('Configure ANTHROPIC_API_KEY no Railway para usar o Radar Politico com busca web.');
+
+  const response = await fetch(ANTHROPIC_MESSAGES_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: process.env.MYTHOS_RADAR_POLITICO_MODEL?.trim() || 'claude-sonnet-4-20250514',
+      max_tokens: 1200,
+      tools: [
+        {
+          type: 'web_search_20250305',
+          name: 'web_search',
+        },
+      ],
+      system: [
+        'Voce e o Radar Politico BR dentro do Mythos.',
+        'Use busca web para analisar apenas informacoes publicas e verificaveis.',
+        'Responda em portugues brasileiro, com tom claro e util.',
+        'Nao acuse crime, corrupcao ou irregularidade sem fonte oficial e linguagem cautelosa.',
+        'Quando falar de risco, use termos como "ponto de atencao", "precisa verificar" e "sinal publico", nunca condenacao.',
+        'Priorize fontes oficiais quando existirem: TSE, Camara, Senado, TCU, CGU, Portal da Transparencia, tribunais, prefeitura, governo estadual e imprensa reconhecida.',
+        'Formato obrigatorio sem markdown pesado:',
+        'Resumo: uma leitura curta.',
+        'Sinais publicos: 3 a 5 pontos objetivos.',
+        'Riscos e limites: o que ainda precisa checar.',
+        'Fontes a verificar: liste os tipos de fonte ou links quando encontrados.',
+        'Proximo passo: uma acao segura de pesquisa.',
+      ].join('\n'),
+      messages: [
+        {
+          role: 'user',
+          content: `Analise este tema politico brasileiro com fontes publicas: ${query}`,
+        },
+      ],
+    }),
+    cache: 'no-store',
+  });
+
+  const data = await response.json().catch(() => ({})) as AnthropicMessageResponse;
+  const text = (data.content || [])
+    .filter(block => block.type === 'text' && typeof block.text === 'string')
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+
+  if (!response.ok || !text) {
+    throw new Error(data.error?.message || `Radar Politico web search failed with HTTP ${response.status}.`);
+  }
+  return cleanPoliticalRadarText(text);
+}
+
+async function radarPoliticoReport(query: string): Promise<MythosExternalDataReport> {
+  const target = query.trim().replace(/^politico\s+/i, '').replace(/^pol[ií]tico\s+/i, '').trim();
+  if (!target) {
+    throw new Error('Use /radar politico <nome, cidade, prefeitura, candidato ou tema>. Exemplo: /radar politico prefeitura de sao paulo');
+  }
+
+  const mode = politicalRadarMode(target);
+  const analysis = await anthropicPoliticalRadar(target);
+  const firstLine = analysis.split('\n').map(line => line.trim()).find(Boolean) || `Radar publico para ${target}.`;
+
+  return {
+    ok: true,
+    kind: 'radar_politico',
+    title: `Radar Politico BR: ${target}`,
+    summary: analysis,
+    facts: [
+      { label: 'Consulta', value: target },
+      { label: 'Modo', value: mode },
+      { label: 'Fonte principal', value: 'Anthropic web_search com fontes publicas' },
+      { label: 'Resumo curto', value: firstLine.replace(/^Resumo:\s*/i, '') },
+      { label: 'Padrao de seguranca', value: 'Nao acusa irregularidade sem fonte oficial, documento e contexto.' },
+    ],
+    source: 'Radar Politico BR model + Anthropic web_search + fontes publicas brasileiras',
+    generatedAt: new Date().toISOString(),
+    safety: 'Analise politica somente leitura. Pode conter informacoes publicas recentes, mas exige verificacao em fonte oficial antes de conclusao, publicacao ou decisao.',
+    nextStep: 'Aprofunde com TSE, Portal da Transparencia, TCU/CGU, camara/senado, prefeitura/governo estadual ou imprensa reconhecida.',
+  };
+}
+
 async function transparenciaReport(query: string): Promise<MythosExternalDataReport> {
   if (!query.trim()) throw new Error('Use /transparencia contrato <orgao|numero|processo|cnpj>. Exemplo: /transparencia contrato orgao 26298');
   const key = getEnv(['TRANSPARENCIA_KEY', 'TRANSPARENCIA_API_KEY', 'PORTAL_TRANSPARENCIA_API_KEY']);
@@ -458,6 +569,7 @@ export function parseMythosExternalDataCommand(command: string): { kind: MythosE
     [/^\/fed(?:\s+rates)?\s*$/i, 'fed'],
     [/^\/(?:financeiro|macro|radar financeiro)(?:\s+(.+))?$/i, 'finance'],
     [/^\/(?:radar brasil|brasil radar|radar br)\s*$/i, 'radar_brasil'],
+    [/^\/(?:radar politico|radar pol[ií]tico|politica|pol[ií]tica)\s+(.+)/i, 'radar_politico'],
     [/^\/transparencia\s+(.+)/i, 'transparencia'],
   ];
   for (const [regex, kind] of matchers) {
@@ -479,6 +591,12 @@ export function parseMythosExternalDataCommand(command: string): { kind: MythosE
 
   const naturalTransparencia = trimmed.match(/\b(?:transparencia|transpar[êe]ncia|contrato publico|contrato p[úu]blico)\s+(?:sobre|de|do|da|por)?\s+(.{3,100})$/i);
   if (naturalTransparencia) return { kind: 'transparencia', query: naturalTransparencia[1].trim() };
+
+  const naturalPoliticalRadar = trimmed.match(/\b(?:radar politico|radar pol[ií]tico|analise politica|an[aá]lise pol[ií]tica|risco politico|risco pol[ií]tico)\s+(?:sobre|de|do|da|para)?\s+(.{3,120})$/i);
+  if (naturalPoliticalRadar) return { kind: 'radar_politico', query: naturalPoliticalRadar[1].trim() };
+
+  const naturalPublicOffice = trimmed.match(/\b(?:analise|an[aá]lise|pesquise|investigue|verifique)\s+(?:a|o|sobre)?\s*(prefeitura|camara|c[aâ]mara|vereador|deputado|senador|governador|candidato|elei[cç][aã]o|elei[cç][oõ]es|politico|pol[ií]tico)\s+(.{2,120})$/i);
+  if (naturalPublicOffice) return { kind: 'radar_politico', query: `${naturalPublicOffice[1]} ${naturalPublicOffice[2]}`.trim() };
 
   if (/\b(selic|taxa selic)\b/i.test(trimmed)) return { kind: 'selic', query: '' };
   if (/\b(ipca|inflacao|infla[cç][aã]o)\b/i.test(trimmed)) return { kind: 'ipca', query: '' };
@@ -502,6 +620,7 @@ export async function runMythosExternalDataQuery(kind: MythosExternalDataKind, q
   if (kind === 'fed') return fedReport();
   if (kind === 'finance') return financeReport(query);
   if (kind === 'radar_brasil') return radarBrasilReport();
+  if (kind === 'radar_politico') return radarPoliticoReport(query);
   if (kind === 'transparencia') return transparenciaReport(query);
   throw new Error('Comando de dados nao suportado.');
 }

@@ -1785,6 +1785,8 @@ function helpResponse() {
     '/chart sol',
     '/grafico btc',
     '/market report',
+    '/radar politico prefeitura de sao paulo',
+    'analise politica eleicoes 2026',
     '/solana report',
     '/solana protocols',
     '/solana volume',
