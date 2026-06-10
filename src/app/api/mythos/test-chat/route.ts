@@ -9,6 +9,9 @@ import {
   readWebUrls,
 } from '@/lib/mythos/web-reader';
 import { logAgentShieldReport, scanPrompt } from '@/security/agentShield'; // ECC_INTEGRATION: warn-only Mythos gateway security scan.
+import { listSkillSummaries } from '@/skills'; // ECC_INTEGRATION: expose catalog skills to TriggerEngine.
+import { saveSession } from '@/store/sessionStore'; // ECC_INTEGRATION: persist TriggerReport beside existing memory flow.
+import { analyzeIntent } from '@/trigger/triggerEngine'; // ECC_INTEGRATION: classify Mythos input before model call.
 
 const MYTHOS_TEST_SYSTEM = [
   'Voce e Mythos, o primeiro agente externo oficial conectado ao Agent Memory Bridge da CongChain.',
@@ -382,6 +385,29 @@ export async function POST(request: NextRequest) {
     const shieldReport = scanPrompt(messages.map(message => message.content).join('\n'));
     logAgentShieldReport('/api/mythos/test-chat', shieldReport);
     const latestUserMessage = [...messages].reverse().find(message => message.role === 'user');
+    // ECC_INTEGRATION: TriggerEngine runs after AgentShield and before model execution.
+    const availableSkillSummaries = await listSkillSummaries().catch((error: unknown) => {
+      console.warn('[TriggerEngine] skill catalog unavailable', error);
+      return [];
+    });
+    const triggerReport = await analyzeIntent(latestUserMessage?.content || '', availableSkillSummaries);
+    const triggerSessionId = `mythos:test-chat:${ip}:${triggerReport.timestamp}`;
+    try {
+      saveSession(triggerSessionId, {
+        kind: 'mythos-trigger-report',
+        triggerReport: {
+          skill: triggerReport.skill,
+          risk: triggerReport.risk,
+          source: triggerReport.source,
+          reason: triggerReport.reason,
+          timestamp: triggerReport.timestamp,
+        },
+        model,
+        selectedSkill: typeof body.selectedSkill === 'string' ? body.selectedSkill : null,
+      });
+    } catch (error: unknown) {
+      console.warn('[TriggerEngine] session persistence skipped', error);
+    }
     const detectedWebUrls = latestUserMessage ? extractWebUrls(latestUserMessage.content) : [];
     const webResults = detectedWebUrls.length ? await readWebUrls(detectedWebUrls) : [];
     const webContext = webResults.length ? formatWebReadContext(webResults) : '';
@@ -399,6 +425,7 @@ export async function POST(request: NextRequest) {
           content: webContext
             ? [
               skillContext,
+              `// [TriggerEngine] ${JSON.stringify({ skill: triggerReport.skill, risk: triggerReport.risk, source: triggerReport.source })}`,
               '',
               webContext,
               '',
@@ -406,7 +433,10 @@ export async function POST(request: NextRequest) {
               'Answer naturally. For a site analysis, summarize what the site is, what content/structure matters, who it helps, and what the user should do next. Do not output Percepcao/Decisao/Previsao labels.',
               'Do not put SHA-256 hashes in the main answer unless the user asks for proof; the interface will show Web Reader metadata separately.',
             ].join('\n')
-            : skillContext,
+            : [
+              skillContext,
+              `// [TriggerEngine] ${JSON.stringify({ skill: triggerReport.skill, risk: triggerReport.risk, source: triggerReport.source })}`,
+            ].join('\n'),
         },
         ...messages,
       ];
@@ -443,6 +473,7 @@ export async function POST(request: NextRequest) {
         movesFunds: false,
         writesMemoryAutomatically: false,
       },
+      triggerReport,
       webReader: webResults.length ? {
         read: webResults.length,
         successful: webResults.filter(result => result.success).length,
