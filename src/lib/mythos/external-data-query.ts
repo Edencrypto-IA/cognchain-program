@@ -395,7 +395,7 @@ function cleanPoliticalRadarText(text: string) {
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-    .slice(0, 2600);
+    .slice(0, 4200);
 }
 
 function politicalRadarSourceMatrix(mode: string) {

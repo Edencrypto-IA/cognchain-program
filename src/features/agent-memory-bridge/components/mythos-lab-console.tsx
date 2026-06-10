@@ -981,6 +981,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function splitRadarPoliticalSections(summary: string) {
   const sectionNames = [
     'Resumo',
+    'Sinais publicos',
     'Identidade publica',
     'Historico eleitoral',
     'Patrimonio e declaracoes',
@@ -994,19 +995,24 @@ function splitRadarPoliticalSections(summary: string) {
   const sections: Array<{ title: string; body: string }> = [];
   let currentTitle = 'Resumo';
   let currentBody: string[] = [];
+  const normalizeTitle = (value: string) => value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
   for (const rawLine of summary.replace(/\r/g, '').split('\n')) {
     const line = rawLine.trim();
     if (!line) continue;
-    const normalizedLine = line.replace(/:$/, '').toLowerCase();
-    const found = sectionNames.find(name => name.toLowerCase() === normalizedLine);
+    const normalizedLine = normalizeTitle(line.replace(/:$/, ''));
+    const found = sectionNames.find(name => normalizeTitle(name) === normalizedLine);
     if (found) {
       if (currentBody.length) sections.push({ title: currentTitle, body: currentBody.join('\n') });
       currentTitle = found;
       currentBody = [];
       continue;
     }
-    const inline = sectionNames.find(name => line.toLowerCase().startsWith(`${name.toLowerCase()}:`));
+    const normalizedInlineLine = normalizeTitle(line);
+    const inline = sectionNames.find(name => normalizedInlineLine.startsWith(`${normalizeTitle(name)}:`));
     if (inline) {
       if (currentBody.length) sections.push({ title: currentTitle, body: currentBody.join('\n') });
       currentTitle = inline;
