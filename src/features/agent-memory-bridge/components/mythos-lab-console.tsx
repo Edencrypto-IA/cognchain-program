@@ -34,6 +34,7 @@ import type { MythosSolanaEcosystemReport, MythosSolanaReportMode } from '@/lib/
 import type { MythosExternalConnectorReadiness } from '@/lib/mythos/external-data-connectors';
 import type { MythosExternalDataReport } from '@/lib/mythos/external-data-query';
 import { parseMythosExternalDataCommand } from '@/lib/mythos/external-data-query';
+import { routeMythosTrigger } from '@/lib/mythos/trigger-engine';
 import {
   MYTHOS_AGENT_PROFILE,
   MYTHOS_FEATURED_SKILLS,
@@ -1348,6 +1349,10 @@ function parseHtmlArtifactPrompt(command: string) {
     if (match?.[1]?.trim()) return match[1].trim();
   }
 
+  if (/\b(?:crie|criar|gere|gerar|create|generate)\b.*\b(?:html|site|website|landing page|pagina|p[aÃ¡]gina)\b/i.test(trimmed)) {
+    return trimmed;
+  }
+
   return '';
 }
 
@@ -1361,6 +1366,10 @@ function parseHtmlArtifactRevisionPrompt(command: string) {
   for (const pattern of patterns) {
     const match = trimmed.match(pattern);
     if (match?.[1]?.trim()) return match[1].trim();
+  }
+
+  if (/\b(?:edite|editar|melhore|melhorar|refine|refinar|improve)\b.*\b(?:html|site|pagina|p[aÃ¡]gina|landing|artefato)\b/i.test(trimmed)) {
+    return trimmed;
   }
 
   return '';
@@ -2077,6 +2086,12 @@ function formatProductFinderFollowup(content: string, report: MythosProductFinde
 }
 
 function isWalletIntelligenceCommand(content: string) {
+  if (
+    /\b(minha carteira|carteira|wallet|portfolio|portf[oÃ³]lio)\b/i.test(content) &&
+    /\b(analisa|analisar|inteligencia|inteligÃªncia|financeira|saldo|valoriza|valorizacao|valorizaÃ§Ã£o|risco)\b/i.test(content)
+  ) {
+    return true;
+  }
   const normalized = content.trim().toLowerCase();
   return /^\/wallet\s+(intelligence|intel|finance|financial|snapshot|portfolio)$/.test(normalized) ||
     /^\/carteira\s+(inteligencia|inteligência|financeira|snapshot|portfolio|portfólio)$/.test(normalized);
@@ -6158,7 +6173,19 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
-      if (content.startsWith('/') || parseProductFinderPrompt(content) || isProductFinderFollowup(content, nextMessages) || isMarketReportRequest(content) || isSolanaEcosystemRequest(content) || isMemecoinLaunchRequest(content)) {
+      const triggerRoute = routeMythosTrigger(content, {
+        hasProductFinderReport: Boolean(findLatestProductFinder(nextMessages)),
+        hasHtmlArtifact: Boolean([...nextMessages].reverse().find(message => message.htmlArtifact)?.htmlArtifact),
+      });
+      if (
+        triggerRoute.matched ||
+        content.startsWith('/') ||
+        parseProductFinderPrompt(content) ||
+        isProductFinderFollowup(content, nextMessages) ||
+        isMarketReportRequest(content) ||
+        isSolanaEcosystemRequest(content) ||
+        isMemecoinLaunchRequest(content)
+      ) {
         await runTerminalCommand(content, nextMessages, started, attachments);
         return;
       }

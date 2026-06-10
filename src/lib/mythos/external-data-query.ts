@@ -464,6 +464,29 @@ export function parseMythosExternalDataCommand(command: string): { kind: MythosE
     const match = trimmed.match(regex);
     if (match) return { kind, query: match[1] || '' };
   }
+
+  const naturalWeather = trimmed.match(/\b(?:tempo|clima|previs[aã]o)\s+(?:em|de|para)?\s+(.{2,80})$/i);
+  if (naturalWeather) return { kind: 'weather', query: naturalWeather[1].trim() };
+
+  const naturalCep = trimmed.match(/\bcep\s+(\d{5}-?\d{3})\b/i);
+  if (naturalCep) return { kind: 'cep', query: naturalCep[1] };
+
+  const naturalCnpj = trimmed.match(/\bcnpj\s+([\d./-]{14,20})\b/i);
+  if (naturalCnpj) return { kind: 'cnpj', query: naturalCnpj[1] };
+
+  const naturalB3 = trimmed.match(/\b(?:b3|acao|a[cç][aã]o|bolsa)\s+(?:da|de|do)?\s*([a-z]{4}\d{1,2})\b/i);
+  if (naturalB3) return { kind: 'b3', query: naturalB3[1].toUpperCase() };
+
+  const naturalTransparencia = trimmed.match(/\b(?:transparencia|transpar[êe]ncia|contrato publico|contrato p[úu]blico)\s+(?:sobre|de|do|da|por)?\s+(.{3,100})$/i);
+  if (naturalTransparencia) return { kind: 'transparencia', query: naturalTransparencia[1].trim() };
+
+  if (/\b(selic|taxa selic)\b/i.test(trimmed)) return { kind: 'selic', query: '' };
+  if (/\b(ipca|inflacao|infla[cç][aã]o)\b/i.test(trimmed)) return { kind: 'ipca', query: '' };
+  if (/\b(dolar|d[oó]lar|usd|cambio|c[âa]mbio)\b/i.test(trimmed)) return { kind: 'dolar', query: '' };
+  if (/\b(fed|federal reserve|juros americanos|taxa americana)\b/i.test(trimmed)) return { kind: 'fed', query: '' };
+  if (/\b(radar brasil|brasil radar|macro brasil)\b/i.test(trimmed)) return { kind: 'radar_brasil', query: '' };
+  if (/\b(radar financeiro|cenario financeiro|cen[aá]rio financeiro|macro)\b/i.test(trimmed)) return { kind: 'finance', query: '' };
+
   if (lower === '/selic') return { kind: 'selic', query: '' };
   if (lower === '/ipca') return { kind: 'ipca', query: '' };
   if (lower === '/dolar') return { kind: 'dolar', query: '' };
