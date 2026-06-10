@@ -4,6 +4,7 @@ import { generateZkForMemory } from '@/services/zk';
 import { checkRateLimit, sanitizeString, validateModel, Limits, safeErrorMessage } from '@/lib/security';
 import { extractRawKey, requireApiKey } from '@/lib/api-key-auth';
 import { trackMemorySaved, PLAN_LIMITS } from '@/services/api-keys/api-key.service';
+import { defaultHookManager } from '@/hooks'; // ECC_INTEGRATION: register PostToolUse memory hook.
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,6 +72,24 @@ export async function POST(request: NextRequest) {
         zkPersistReason = error instanceof Error ? error.message : 'Failed to persist ZK bundle';
       }
     }
+
+    // ECC_INTEGRATION: fire PostToolUse memory hook without changing the API response contract.
+    void defaultHookManager.emit({
+      id: `post-memory-write:${memory.hash}:${memory.timestamp}`,
+      type: 'post-memory-write',
+      occurredAt: new Date().toISOString(),
+      payload: {
+        hash: memory.hash,
+        model: safeModel,
+        timestamp: memory.timestamp,
+        source: externalKeyId ? 'external-api-key' : 'internal-api',
+        metadata: {
+          externalKeyId,
+          zkRequested: Boolean(generateZkProof),
+          zkPersisted,
+        },
+      },
+    });
 
     return NextResponse.json({
       hash: memory.hash,
