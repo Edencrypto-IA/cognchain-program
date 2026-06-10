@@ -398,6 +398,36 @@ function cleanPoliticalRadarText(text: string) {
     .slice(0, 2600);
 }
 
+function politicalRadarSourceMatrix(mode: string) {
+  const base = [
+    'TSE/TRE: candidaturas, partido, bens declarados, contas eleitorais e situacao eleitoral.',
+    'Portal da Transparencia: CEIS, CNEP, contratos, convenios, licitacoes e fornecedores quando aplicavel.',
+    'CGU: CEAF, punicoes, acordos de leniencia e dados de controle federal.',
+    'Camara/Senado APIs: votacoes, presencas, proposicoes, emendas e atividade parlamentar quando aplicavel.',
+    'IBGE: populacao, PIB municipal, territorio e indicadores do municipio quando aplicavel.',
+    'SICONFI/Tesouro: orcamento municipal, execucao fiscal, receitas, despesas e endividamento quando aplicavel.',
+    'Google News/web search: noticias recentes, investigacoes, escandalos alegados e contexto jornalistico.',
+  ];
+  if (mode === 'municipal') {
+    return [
+      ...base,
+      'TCE estadual/municipal: contas municipais, obras, alertas, julgamentos e irregularidades apontadas. Exemplo: TCE-PE para Pernambuco, TCM-SP para Sao Paulo.',
+      'Prefeitura/Camara municipal: portal da transparencia local, diario oficial, licitacoes e contratos.',
+    ];
+  }
+  if (mode === 'eleitoral') {
+    return [
+      ...base,
+      'TRE local: registro de candidatura, impugnacoes, prestacao de contas e contexto eleitoral estadual.',
+      'TSE DivulgaCand/DivulgaContas: declaracao de bens, receitas, despesas e doadores quando disponivel.',
+    ];
+  }
+  return [
+    ...base,
+    'Tribunais de contas e justica: somente citar processos, contas ou decisoes quando a busca encontrar fonte identificavel.',
+  ];
+}
+
 function politicalRadarMode(query: string) {
   if (/\b(prefeitura|municipio|munic[ií]pio|cidade|vereador|camara|c[âa]mara)\b/i.test(query)) return 'municipal';
   if (/\b(eleicao|elei[cç][aã]o|eleicoes|elei[cç][oõ]es|2026|candidato|campanha)\b/i.test(query)) return 'eleitoral';
@@ -427,16 +457,23 @@ async function anthropicPoliticalRadar(query: string) {
       ],
       system: [
         'Voce e o Radar Politico BR dentro do Mythos.',
-        'Use busca web para analisar apenas informacoes publicas e verificaveis.',
+        'Use web search puro para analisar apenas informacoes publicas e verificaveis.',
         'Responda em portugues brasileiro, com tom claro e util.',
         'Nao acuse crime, corrupcao ou irregularidade sem fonte oficial e linguagem cautelosa.',
         'Quando falar de risco, use termos como "ponto de atencao", "precisa verificar" e "sinal publico", nunca condenacao.',
-        'Priorize fontes oficiais quando existirem: TSE, Camara, Senado, TCU, CGU, Portal da Transparencia, tribunais, prefeitura, governo estadual e imprensa reconhecida.',
-        'Formato obrigatorio sem markdown pesado:',
+        'Dados de web search podem ter defasagem de horas ou dias. Avise isso no limite.',
+        'Matriz obrigatoria de fontes a tentar, conforme aplicavel:',
+        ...politicalRadarSourceMatrix(politicalRadarMode(query)),
+        'Formato obrigatorio sem markdown pesado, sem tabela e sem emoji:',
         'Resumo: uma leitura curta.',
-        'Sinais publicos: 3 a 5 pontos objetivos.',
-        'Riscos e limites: o que ainda precisa checar.',
-        'Fontes a verificar: liste os tipos de fonte ou links quando encontrados.',
+        'Identidade publica: cargo, partido, localidade, periodo ou entidade analisada quando encontrado.',
+        'Historico eleitoral: candidatura, resultado, bens declarados, contas ou fonte TSE/TRE quando aplicavel.',
+        'Patrimonio e declaracoes: bens declarados, evolucao aparente ou "nao encontrado nesta busca".',
+        'Contratos e licitacoes: CEIS/CNEP/Portal da Transparencia/portal local; diga se nao encontrou ligacao direta.',
+        'Contas publicas e obras: TCE/TCU/SICONFI/Tesouro/IBGE; destaque apenas sinais publicos.',
+        'Noticias recentes: fatos recentes, investigacoes ou controversias com linguagem cautelosa.',
+        'Riscos e limites: o que ainda precisa checar e onde pode haver defasagem.',
+        'Fontes a verificar: liste 5 a 8 fontes especificas ou tipos de fonte.',
         'Proximo passo: uma acao segura de pesquisa.',
       ].join('\n'),
       messages: [

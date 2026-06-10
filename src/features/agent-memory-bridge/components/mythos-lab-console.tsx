@@ -978,7 +978,95 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function splitRadarPoliticalSections(summary: string) {
+  const sectionNames = [
+    'Resumo',
+    'Identidade publica',
+    'Historico eleitoral',
+    'Patrimonio e declaracoes',
+    'Contratos e licitacoes',
+    'Contas publicas e obras',
+    'Noticias recentes',
+    'Riscos e limites',
+    'Fontes a verificar',
+    'Proximo passo',
+  ];
+  const sections: Array<{ title: string; body: string }> = [];
+  let currentTitle = 'Resumo';
+  let currentBody: string[] = [];
+
+  for (const rawLine of summary.replace(/\r/g, '').split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const normalizedLine = line.replace(/:$/, '').toLowerCase();
+    const found = sectionNames.find(name => name.toLowerCase() === normalizedLine);
+    if (found) {
+      if (currentBody.length) sections.push({ title: currentTitle, body: currentBody.join('\n') });
+      currentTitle = found;
+      currentBody = [];
+      continue;
+    }
+    const inline = sectionNames.find(name => line.toLowerCase().startsWith(`${name.toLowerCase()}:`));
+    if (inline) {
+      if (currentBody.length) sections.push({ title: currentTitle, body: currentBody.join('\n') });
+      currentTitle = inline;
+      currentBody = [line.slice(inline.length + 1).trim()].filter(Boolean);
+      continue;
+    }
+    currentBody.push(line);
+  }
+  if (currentBody.length) sections.push({ title: currentTitle, body: currentBody.join('\n') });
+  return sections.length ? sections : [{ title: 'Resumo', body: summary }];
+}
+
+function MythosPoliticalRadarCard({ report }: { report: MythosExternalDataReport }) {
+  const sections = splitRadarPoliticalSections(report.summary);
+  const identity = report.facts.find(fact => fact.label === 'Consulta')?.value || report.title;
+  const mode = report.facts.find(fact => fact.label === 'Modo')?.value || 'radar_publico';
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-[#FFD166]/18 bg-[radial-gradient(circle_at_top_left,rgba(255,209,102,0.12),transparent_34%),rgba(17,12,3,0.88)]">
+      <div className="border-b border-white/10 bg-white/[0.035] px-4 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFE08A]">Radar Politico BR</p>
+            <h3 className="mt-2 text-2xl font-black text-white">{identity}</h3>
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-white/60">
+              Web search publico com checklist TSE/TRE, Transparencia, TCE/TCU, CGU, Camara/Senado, IBGE, SICONFI/Tesouro e noticias recentes.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[#FFD166]/18 bg-black/30 px-4 py-3 text-right">
+            <p className="text-sm font-black uppercase text-[#FFE08A]">{mode}</p>
+            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/38">somente leitura</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 p-4 md:grid-cols-2">
+        {sections.map(section => (
+          <div
+            key={`${section.title}-${section.body.slice(0, 24)}`}
+            className={`rounded-2xl border border-white/10 bg-black/28 p-4 ${section.title === 'Resumo' || section.title === 'Riscos e limites' ? 'md:col-span-2' : ''}`}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FFE08A]/80">{section.title}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/70">{section.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-3 border-t border-white/10 px-4 py-3 text-[11px] leading-5 text-white/48 sm:grid-cols-2">
+        <p><span className="font-black text-white/65">Fonte:</span> {report.source}</p>
+        <p><span className="font-black text-white/65">Atualizado:</span> {new Date(report.generatedAt).toLocaleString('pt-BR')}</p>
+        <p className="sm:col-span-2"><span className="font-black text-white/65">Seguranca:</span> {report.safety}</p>
+        {report.nextStep ? <p className="sm:col-span-2"><span className="font-black text-white/65">Proximo passo:</span> {report.nextStep}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function MythosExternalDataCard({ report }: { report: MythosExternalDataReport }) {
+  if (report.kind === 'radar_politico') return <MythosPoliticalRadarCard report={report} />;
+
   return (
     <div className="mt-4 overflow-hidden rounded-2xl border border-[#00E5FF]/18 bg-[#021316]/82">
       <div className="border-b border-white/10 bg-white/[0.035] px-4 py-4">
