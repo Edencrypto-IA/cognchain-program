@@ -149,22 +149,64 @@ async function cepReport(cepInput: string): Promise<MythosExternalDataReport> {
 async function cnpjReport(cnpjInput: string): Promise<MythosExternalDataReport> {
   const cnpj = onlyDigits(cnpjInput);
   if (cnpj.length !== 14) throw new Error('Use /cnpj com 14 digitos. Exemplo: /cnpj 00000000000191');
-  const data = asRecord(await fetchJson(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`));
+  const [brasilApiResult, cnpjWsResult] = await Promise.allSettled([
+    fetchJson(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`),
+    fetchJson(`https://publica.cnpj.ws/cnpj/${cnpj}`),
+  ]);
+
+  if (brasilApiResult.status === 'rejected' && cnpjWsResult.status === 'rejected') {
+    throw new Error('Nenhum provedor publico de CNPJ respondeu agora. Tente novamente em instantes.');
+  }
+
+  const data = brasilApiResult.status === 'fulfilled' ? asRecord(brasilApiResult.value) : {};
+  const cnpjWs = cnpjWsResult.status === 'fulfilled' ? asRecord(cnpjWsResult.value) : {};
+  const cnpjWsEstabelecimento = asRecord(cnpjWs.estabelecimento);
+  const cnpjWsAtividade = asRecord(cnpjWsEstabelecimento.atividade_principal);
+  const cnpjWsCidade = asRecord(cnpjWsEstabelecimento.cidade);
+  const cnpjWsEstado = asRecord(cnpjWsEstabelecimento.estado);
+  const cnpjWsRazao = asString(cnpjWs.razao_social, '');
+  const brasilApiRazao = asString(data.razao_social, '');
+  const razaoSocial = brasilApiRazao || cnpjWsRazao || `CNPJ ${cnpj}`;
+  const nomeFantasia = asString(data.nome_fantasia, '') ||
+    asString(cnpjWsEstabelecimento.nome_fantasia, 'Sem nome fantasia informado');
+  const situacao = asString(data.descricao_situacao_cadastral, '') ||
+    asString(cnpjWsEstabelecimento.situacao_cadastral, 'indisponivel');
+  const municipio = asString(data.municipio, '') || asString(cnpjWsCidade.nome, 'indisponivel');
+  const uf = asString(data.uf, '') || asString(cnpjWsEstado.sigla, 'indisponivel');
+  const abertura = asString(data.data_inicio_atividade, '') ||
+    asString(cnpjWsEstabelecimento.data_inicio_atividade, 'indisponivel');
+  const atividade = asString(data.cnae_fiscal_descricao, '') ||
+    asString(cnpjWsAtividade.descricao, 'indisponivel');
+  const bothSourcesAvailable = Boolean(brasilApiRazao && cnpjWsRazao);
+  const sourcesAgree = bothSourcesAvailable
+    ? brasilApiRazao.toLowerCase() === cnpjWsRazao.toLowerCase()
+    : true;
+
   return {
     ok: true,
     kind: 'cnpj',
-    title: asString(data.razao_social, `CNPJ ${cnpj}`),
-    summary: `${asString(data.nome_fantasia, 'Sem nome fantasia informado')} - ${asString(data.descricao_situacao_cadastral)} - ${asString(data.municipio)}/${asString(data.uf)}`,
+    title: sourcesAgree ? razaoSocial : `CNPJ ${cnpj} precisa de revisao`,
+    summary: sourcesAgree
+      ? `${nomeFantasia} - ${situacao} - ${municipio}/${uf}`
+      : `Fontes publicas divergiram: BrasilAPI retornou "${brasilApiRazao || 'indisponivel'}" e cnpj.ws retornou "${cnpjWsRazao || 'indisponivel'}".`,
     facts: [
       { label: 'CNPJ', value: cnpj },
-      { label: 'Situacao', value: asString(data.descricao_situacao_cadastral) },
-      { label: 'Abertura', value: asString(data.data_inicio_atividade) },
-      { label: 'Atividade principal', value: asString(data.cnae_fiscal_descricao) },
-      { label: 'Cidade/UF', value: `${asString(data.municipio)}/${asString(data.uf)}` },
+      { label: 'Razao social', value: razaoSocial },
+      { label: 'Nome fantasia', value: nomeFantasia },
+      { label: 'Situacao', value: situacao },
+      { label: 'Abertura', value: abertura },
+      { label: 'Atividade principal', value: atividade },
+      { label: 'Cidade/UF', value: `${municipio}/${uf}` },
+      { label: 'Validacao cruzada', value: bothSourcesAvailable ? (sourcesAgree ? 'BrasilAPI e cnpj.ws concordam' : 'divergencia entre BrasilAPI e cnpj.ws') : 'somente uma fonte respondeu' },
     ],
-    source: 'BrasilAPI CNPJ v1',
+    source: bothSourcesAvailable ? 'BrasilAPI CNPJ v1 + cnpj.ws publica' : brasilApiRazao ? 'BrasilAPI CNPJ v1' : 'cnpj.ws publica',
     generatedAt: new Date().toISOString(),
-    safety: 'Dado cadastral publico. Nao conclui idoneidade sem verificacoes adicionais.',
+    safety: sourcesAgree
+      ? 'Dado cadastral publico validado em fonte(s) publica(s). Nao conclui idoneidade sem verificacoes adicionais.'
+      : 'Fontes publicas divergiram. Nao use este resultado como verdade final antes de confirmar na Receita Federal ou fonte oficial.',
+    nextStep: sourcesAgree
+      ? 'Para auditoria, cruze com Receita Federal, Sintegra/SEFAZ, Portal da Transparencia, CEIS/CNEP e processos publicos quando aplicavel.'
+      : 'Confirme manualmente na Receita Federal antes de salvar ou publicar esta consulta.',
   };
 }
 
