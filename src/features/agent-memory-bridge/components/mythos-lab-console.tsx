@@ -1969,6 +1969,113 @@ function formatProductFinderText(report: MythosProductFinderReport) {
   ].join('\n'));
 }
 
+function findLatestProductFinder(messages: MythosLabMessage[]) {
+  return [...messages].reverse().find(message => message.productFinder)?.productFinder || null;
+}
+
+function isProductFinderFollowup(content: string, messages: MythosLabMessage[]) {
+  if (!findLatestProductFinder(messages)) return false;
+  const normalized = content.trim().toLowerCase();
+  if (!normalized) return false;
+  return /\b(compara|comparar|comparacao|compara[cç][aã]o|melhor dos|qual voce|qual voc[eê]|qual escolher|qual compra|qual compraria|menos risco|mais seguro|mais barato|custo beneficio|custo-beneficio|vale mais|vale a pena|recomenda|recomendar|entre os|dos dois|das opcoes|das op[cç][oõ]es)\b/i.test(normalized);
+}
+
+function extractWebProductOptions(summary: string) {
+  const lines = summary
+    .replace(/\r/g, '')
+    .split('\n')
+    .map(line => line.replace(/\*\*/g, '').replace(/#{1,6}\s*/g, '').trim())
+    .filter(Boolean);
+
+  const options: Array<{ name: string; price: string; specs: string; reason: string }> = [];
+  let current: { name: string; price: string; specs: string; reason: string } | null = null;
+
+  for (const line of lines) {
+    const product = line.match(/^(\d+)\.\s+(.+?)(?:\s+-\s+(.+))?$/);
+    if (product) {
+      current = {
+        name: product[2].trim(),
+        price: product[3]?.trim() || 'preco a conferir',
+        specs: '',
+        reason: '',
+      };
+      options.push(current);
+      continue;
+    }
+    if (!current) continue;
+    if (/^Specs:/i.test(line)) current.specs = line.replace(/^Specs:\s*/i, '').trim();
+    if (/^Por que vale:/i.test(line)) current.reason = line.replace(/^Por que vale:\s*/i, '').trim();
+  }
+
+  return options.slice(0, 4);
+}
+
+function formatProductFinderFollowup(content: string, report: MythosProductFinderReport) {
+  const normalized = content.trim().toLowerCase();
+  const offers = report.offers || [];
+
+  if (offers.length >= 2) {
+    const ranked = [...offers].sort((a, b) => b.score - a.score || a.price - b.price).slice(0, 3);
+    const cheapest = [...offers].sort((a, b) => a.price - b.price)[0];
+    const safest = [...offers].sort((a, b) => {
+      const aRisk = a.risks.length + (a.sellerStatus ? 0 : 1) + (a.freeShipping ? 0 : 1);
+      const bRisk = b.risks.length + (b.sellerStatus ? 0 : 1) + (b.freeShipping ? 0 : 1);
+      return aRisk - bRisk || b.score - a.score;
+    })[0];
+    const choice = /mais barato|barato|menor preco|menor pre[cç]o/.test(normalized)
+      ? cheapest
+      : /menos risco|mais seguro|seguro/.test(normalized)
+        ? safest
+        : ranked[0];
+
+    return cleanTerminalText([
+      `Com base na busca anterior de "${report.query}", eu escolheria:`,
+      '',
+      `${choice.title}`,
+      `${choice.marketplaceLabel} - ${choice.priceLabel} - score ${choice.score}/100.`,
+      `Motivo: ${choice.rankReason || 'melhor equilibrio entre preco e risco visivel'}.`,
+      '',
+      'Comparacao rapida',
+      ...ranked.map((offer, index) => `${index + 1}. ${offer.title} - ${offer.priceLabel} - score ${offer.score}/100 - ${offer.freeShipping ? 'frete gratis informado' : 'frete a conferir'}`),
+      '',
+      cheapest?.id !== choice.id ? `Mais barato analisado: ${cheapest.title} por ${cheapest.priceLabel}.` : '',
+      safest?.id !== choice.id ? `Menor risco aparente: ${safest.title} por ${safest.priceLabel}.` : '',
+      '',
+      'Nenhuma compra, pagamento, login ou reserva foi executada. Abra a oferta e confira frete, garantia e vendedor antes de comprar.',
+    ].join('\n'));
+  }
+
+  const webOptions = extractWebProductOptions(report.summary);
+  if (webOptions.length) {
+    const choice = /mais barato|barato|menor preco|menor pre[cç]o/.test(normalized)
+      ? webOptions[0]
+      : webOptions.find(option => /i2go|geonav|anker|baseus/i.test(option.name)) || webOptions[0];
+
+    return cleanTerminalText([
+      `Com base na busca web anterior de "${report.query}", minha escolha seria:`,
+      '',
+      `${choice.name} - ${choice.price}`,
+      choice.specs ? `Specs: ${choice.specs}` : '',
+      choice.reason ? `Por que vale: ${choice.reason}` : '',
+      '',
+      'Comparacao rapida',
+      ...webOptions.map((option, index) => `${index + 1}. ${option.name} - ${option.price}${option.specs ? ` - ${option.specs}` : ''}`),
+      '',
+      'Minha leitura: prefira a opcao com marca mais confiavel, capacidade realista e loja com boa reputacao. O preco da busca web pode mudar por frete, cupom e estoque.',
+      '',
+      'Nenhuma compra, pagamento, login ou reserva foi executada.',
+    ].join('\n'));
+  }
+
+  return cleanTerminalText([
+    `Eu posso comparar a busca anterior de "${report.query}", mas ela veio sem ofertas estruturadas suficientes.`,
+    '',
+    report.summary,
+    '',
+    'Se quiser uma comparacao melhor, rode uma nova busca com mais detalhe. Exemplo: quero comprar um powerbank 10000mAh ate 150 reais.',
+  ].join('\n'));
+}
+
 function isWalletIntelligenceCommand(content: string) {
   const normalized = content.trim().toLowerCase();
   return /^\/wallet\s+(intelligence|intel|finance|financial|snapshot|portfolio)$/.test(normalized) ||
@@ -5443,6 +5550,32 @@ export default function MythosLabConsole() {
       return;
     }
 
+    const latestProductFinder = findLatestProductFinder(nextMessages);
+    if (latestProductFinder && isProductFinderFollowup(command, nextMessages)) {
+      appendTerminalResponse(formatProductFinderFollowup(command, latestProductFinder), {
+        productFinder: latestProductFinder,
+        trace: {
+          perception: `User asked a follow-up about the latest product search for ${latestProductFinder.query}.`,
+          memoryContext: 'The answer reused the latest read-only Product Finder report already present in this Mythos conversation.',
+          selectedSkill: 'Mythos Product Finder Agent',
+          reasoningPath: 'Mythos compared visible prices, specs, score, seller/shipping signals when available, and fallback web-search notes when marketplace API data was unavailable.',
+          prediction: 'User can decide which offer to inspect manually and can request a fresh search with stricter specs.',
+          decision: 'Return a read-only comparison based on the latest Product Finder result.',
+          confidence: latestProductFinder.bestOffer ? latestProductFinder.bestOffer.score : 55,
+          safetyBoundary: 'Read-only comparison. No purchase, payment, checkout, login, reservation, monitor creation, or fund movement.',
+          nextHumanStep: 'Open the chosen offer manually and verify final price, frete, warranty, seller reputation, and stock.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: 'Mythos product finder follow-up',
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-product-finder-followup/v1',
+        },
+      });
+      return;
+    }
+
     const htmlArtifactRevisionPrompt = parseHtmlArtifactRevisionPrompt(command);
     if (htmlArtifactRevisionPrompt) {
       const latestArtifact = [...nextMessages].reverse().find(message => message.htmlArtifact)?.htmlArtifact;
@@ -6025,7 +6158,7 @@ export default function MythosLabConsole() {
 
     const started = Date.now();
     try {
-      if (content.startsWith('/') || parseProductFinderPrompt(content) || isMarketReportRequest(content) || isSolanaEcosystemRequest(content) || isMemecoinLaunchRequest(content)) {
+      if (content.startsWith('/') || parseProductFinderPrompt(content) || isProductFinderFollowup(content, nextMessages) || isMarketReportRequest(content) || isSolanaEcosystemRequest(content) || isMemecoinLaunchRequest(content)) {
         await runTerminalCommand(content, nextMessages, started, attachments);
         return;
       }
