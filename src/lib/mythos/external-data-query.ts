@@ -577,7 +577,7 @@ export function parseMythosExternalDataCommand(command: string): { kind: MythosE
     if (match) return { kind, query: match[1] || '' };
   }
 
-  const naturalWeather = trimmed.match(/\b(?:tempo|clima|previs[aã]o)\s+(?:em|de|para)?\s+(.{2,80})$/i);
+  const naturalWeather = trimmed.match(/\b(?:tempo|clima|previs[aã]o)\s+(?:(?:em|de|para)\s+)?(.{2,80})$/i);
   if (naturalWeather) return { kind: 'weather', query: naturalWeather[1].trim() };
 
   const naturalCep = trimmed.match(/\bcep\s+(\d{5}-?\d{3})\b/i);
@@ -589,10 +589,10 @@ export function parseMythosExternalDataCommand(command: string): { kind: MythosE
   const naturalB3 = trimmed.match(/\b(?:b3|acao|a[cç][aã]o|bolsa)\s+(?:da|de|do)?\s*([a-z]{4}\d{1,2})\b/i);
   if (naturalB3) return { kind: 'b3', query: naturalB3[1].toUpperCase() };
 
-  const naturalTransparencia = trimmed.match(/\b(?:transparencia|transpar[êe]ncia|contrato publico|contrato p[úu]blico)\s+(?:sobre|de|do|da|por)?\s+(.{3,100})$/i);
+  const naturalTransparencia = trimmed.match(/\b(?:transparencia|transpar[êe]ncia|contrato publico|contrato p[úu]blico)\s+(?:(?:sobre|de|do|da|por)\s+)?(.{3,100})$/i);
   if (naturalTransparencia) return { kind: 'transparencia', query: naturalTransparencia[1].trim() };
 
-  const naturalPoliticalRadar = trimmed.match(/\b(?:radar politico|radar pol[ií]tico|analise politica|an[aá]lise pol[ií]tica|risco politico|risco pol[ií]tico)\s+(?:sobre|de|do|da|para)?\s+(.{3,120})$/i);
+  const naturalPoliticalRadar = trimmed.match(/\b(?:radar politico|radar pol[ií]tico|analise politica|an[aá]lise pol[ií]tica|risco politico|risco pol[ií]tico)\s+(?:(?:sobre|de|do|da|para)\s+)?(.{3,120})$/i);
   if (naturalPoliticalRadar) return { kind: 'radar_politico', query: naturalPoliticalRadar[1].trim() };
 
   const naturalPublicOffice = trimmed.match(/\b(?:analise|an[aá]lise|pesquise|investigue|verifique)\s+(?:a|o|sobre)?\s*(prefeitura|camara|c[aâ]mara|vereador|deputado|senador|governador|candidato|elei[cç][aã]o|elei[cç][oõ]es|politico|pol[ií]tico)\s+(.{2,120})$/i);
