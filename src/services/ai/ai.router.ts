@@ -103,7 +103,7 @@ class DeepSeekHandler implements AIHandler {
       'Você é um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain. Responda em portugues de forma precisa e eficiente.';
 
     const response = await client.chat.completions.create({
-      model: 'deepseek-chat',
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),

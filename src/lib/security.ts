@@ -38,6 +38,8 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/mythos/market/heatmap': { windowMs: 60_000, maxRequests: 14 },
   '/api/mythos/market/chart': { windowMs: 60_000, maxRequests: 18 },
   '/api/mythos/commerce/product-finder': { windowMs: 60_000, maxRequests: 10 },
+  '/api/mythos/deepseek/route': { windowMs: 60_000, maxRequests: 20 },
+  '/api/mythos/deepseek/validate': { windowMs: 60_000, maxRequests: 14 },
   '/api/mythos/data/connectors': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/data/query': { windowMs: 60_000, maxRequests: 24 },
   '/api/mythos/wallet/intelligence': { windowMs: 60_000, maxRequests: 12 },
