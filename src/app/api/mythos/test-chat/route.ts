@@ -8,6 +8,7 @@ import {
   prepareWebMemoryRecords,
   readWebUrls,
 } from '@/lib/mythos/web-reader';
+import { logAgentShieldReport, scanPrompt } from '@/security/agentShield'; // ECC_INTEGRATION: warn-only Mythos gateway security scan.
 
 const MYTHOS_TEST_SYSTEM = [
   'Voce e Mythos, o primeiro agente externo oficial conectado ao Agent Memory Bridge da CongChain.',
@@ -377,6 +378,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as MythosTestBody;
     const model = validateModel(body.model || 'nvidia');
     const messages = sanitizeMessages(body.messages);
+    // ECC_INTEGRATION: AgentShield runs warn-only and never blocks current Mythos responses.
+    const shieldReport = scanPrompt(messages.map(message => message.content).join('\n'));
+    logAgentShieldReport('/api/mythos/test-chat', shieldReport);
     const latestUserMessage = [...messages].reverse().find(message => message.role === 'user');
     const detectedWebUrls = latestUserMessage ? extractWebUrls(latestUserMessage.content) : [];
     const webResults = detectedWebUrls.length ? await readWebUrls(detectedWebUrls) : [];
