@@ -1,4 +1,4 @@
-import { ExternalLink, ShieldCheck, Star, Truck } from 'lucide-react';
+import { ExternalLink, SearchCheck, ShieldCheck, Star, Truck } from 'lucide-react';
 import type { MythosProductFinderReport, MythosProductOffer } from '@/lib/commerce/product-finder';
 
 function scoreColor(score: number) {
@@ -36,50 +36,189 @@ function cleanFinderLine(line: string) {
     .trim();
 }
 
-function FinderSummary({ summary }: { summary: string }) {
+type WebProductOption = {
+  name: string;
+  price: string | null;
+  specs: string | null;
+  reason: string | null;
+  link: string | null;
+};
+
+function splitTitleAndPrice(value: string) {
+  const clean = value.replace(/^\d+\.\s*/, '').trim();
+  const parts = clean.split(/\s+-\s+/);
+  if (parts.length < 2) return { name: clean, price: null };
+  return {
+    name: parts.slice(0, -1).join(' - ').trim(),
+    price: parts[parts.length - 1].trim(),
+  };
+}
+
+function extractUrl(value: string) {
+  const match = value.match(/https?:\/\/[^\s)]+/i);
+  return match?.[0] || null;
+}
+
+function parseWebSearchSummary(summary: string) {
   const lines = normalizeFinderSummary(summary)
     .split('\n')
     .map(cleanFinderLine)
     .filter(Boolean);
 
+  const products: WebProductOption[] = [];
+  const recommendation: string[] = [];
+  const cautions: string[] = [];
+  const intro: string[] = [];
+  let current: WebProductOption | null = null;
+  let section: 'intro' | 'options' | 'recommendation' | 'cautions' = 'intro';
+
+  for (const line of lines) {
+    if (/^Resumo:?$/i.test(line)) {
+      section = 'intro';
+      continue;
+    }
+    if (/^Opcoes:?$/i.test(line)) {
+      section = 'options';
+      continue;
+    }
+    if (/^(Recomendacao|Importante):?$/i.test(line)) {
+      section = 'recommendation';
+      current = null;
+      continue;
+    }
+    if (/^Cuidados:?$/i.test(line)) {
+      section = 'cautions';
+      current = null;
+      continue;
+    }
+
+    if (/^\d+\.\s/.test(line)) {
+      const { name, price } = splitTitleAndPrice(line);
+      current = { name, price, specs: null, reason: null, link: null };
+      products.push(current);
+      section = 'options';
+      continue;
+    }
+
+    if (current && section === 'options') {
+      if (/^Specs:/i.test(line)) {
+        current.specs = line.replace(/^Specs:\s*/i, '').trim();
+        continue;
+      }
+      if (/^Por que vale:/i.test(line)) {
+        current.reason = line.replace(/^Por que vale:\s*/i, '').trim();
+        continue;
+      }
+      if (/^Link:/i.test(line)) {
+        current.link = extractUrl(line) || line.replace(/^Link:\s*/i, '').trim();
+        continue;
+      }
+      if (!current.reason) current.reason = line;
+      continue;
+    }
+
+    if (section === 'recommendation') recommendation.push(line);
+    else if (section === 'cautions') cautions.push(line);
+    else intro.push(line);
+  }
+
+  return { intro, products, recommendation, cautions, lines };
+}
+
+function WebOptionCard({ option, index }: { option: WebProductOption; index: number }) {
+  const hasUrl = option.link ? /^https?:\/\//i.test(option.link) : false;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(118,255,3,0.1),transparent_38%),rgba(255,255,255,0.035)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#76FF03]">Opcao {index + 1}</p>
+          <h4 className="mt-1 text-base font-black leading-5 text-white">{option.name}</h4>
+        </div>
+        <div className="shrink-0 rounded-full border border-[#FFD166]/20 bg-[#FFD166]/10 px-3 py-1 text-xs font-black text-[#FFE08A]">
+          {option.price || 'preco a conferir'}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-[#7DE4FF]/12 bg-black/24 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#9AEAFF]/70">Specs</p>
+          <p className="mt-1 text-xs leading-5 text-white/66">{option.specs || 'Verificar capacidade, potencia e portas na loja.'}</p>
+        </div>
+        <div className="rounded-2xl border border-[#76FF03]/12 bg-black/24 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#B8FF79]/70">Por que vale</p>
+          <p className="mt-1 text-xs leading-5 text-white/66">{option.reason || 'Boa opcao dentro do filtro informado.'}</p>
+        </div>
+      </div>
+
+      {option.link ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+          <p className="min-w-0 truncate text-[11px] text-white/44">{option.link}</p>
+          {hasUrl ? (
+            <a
+              href={option.link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#7DE4FF]/20 bg-[#7DE4FF]/10 px-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#BDF4FF] transition hover:bg-[#7DE4FF]/16"
+            >
+              Abrir <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FinderSummary({ summary }: { summary: string }) {
+  const parsed = parseWebSearchSummary(summary);
+
+  if (parsed.products.length) {
+    return (
+      <div className="space-y-4">
+        {parsed.intro.length ? (
+          <div className="rounded-2xl border border-[#7DE4FF]/12 bg-[#7DE4FF]/[0.045] p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">Resumo</p>
+            <p className="mt-1 text-xs leading-5 text-white/66">{parsed.intro.join(' ')}</p>
+          </div>
+        ) : null}
+
+        <div className="grid gap-3">
+          {parsed.products.slice(0, 4).map((option, index) => (
+            <WebOptionCard key={`${option.name}-${index}`} option={option} index={index} />
+          ))}
+        </div>
+
+        {parsed.recommendation.length ? (
+          <div className="rounded-2xl border border-[#76FF03]/14 bg-[#76FF03]/[0.055] p-4">
+            <div className="flex items-center gap-2 text-[#B8FF79]">
+              <SearchCheck className="h-4 w-4" />
+              <p className="text-[10px] font-black uppercase tracking-[0.14em]">Escolha Mythos</p>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-white/74">{parsed.recommendation.join(' ')}</p>
+          </div>
+        ) : null}
+
+        {parsed.cautions.length ? (
+          <div className="rounded-2xl border border-[#FFD166]/14 bg-[#FFD166]/[0.045] p-4">
+            <div className="flex items-center gap-2 text-[#FFE08A]">
+              <ShieldCheck className="h-4 w-4" />
+              <p className="text-[10px] font-black uppercase tracking-[0.14em]">Checar antes</p>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-white/62">{parsed.cautions.join(' ')}</p>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      {lines.map((line, index) => {
-        const isSection = /^(Resumo|Opcoes|Recomendacao|Cuidados|Importante):?$/i.test(line);
-        const isProduct = /^\d+\.\s/.test(line);
-        const isBullet = line.startsWith('- ');
-        const key = `${index}-${line.slice(0, 18)}`;
-
-        if (isSection) {
-          return (
-            <p key={key} className="pt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#9AEAFF]">
-              {line.replace(/:$/, '')}
-            </p>
-          );
-        }
-
-        if (isProduct) {
-          return (
-            <p key={key} className="rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm font-black leading-5 text-white">
-              {line}
-            </p>
-          );
-        }
-
-        if (isBullet) {
-          return (
-            <p key={key} className="pl-3 text-xs leading-5 text-white/60">
-              {line}
-            </p>
-          );
-        }
-
-        return (
-          <p key={key} className="text-xs leading-5 text-white/66">
-            {line}
-          </p>
-        );
-      })}
+      {parsed.lines.map((line, index) => (
+        <p key={`${index}-${line.slice(0, 18)}`} className="text-xs leading-5 text-white/66">
+          {line}
+        </p>
+      ))}
     </div>
   );
 }
