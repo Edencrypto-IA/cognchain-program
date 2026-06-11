@@ -9,6 +9,13 @@ export type ForgeRunStatus = 'idle' | 'connecting' | 'streaming' | 'complete' | 
 
 export type ForgePanelTab = 'preview' | 'code' | 'files' | 'diff';
 
+export interface ForgeDiffProposal {
+  action: 'edit';
+  path: string;
+  diff: string;
+  createdAt: string;
+}
+
 export interface ForgeAgent {
   id: ForgeAgentId;
   name: string;
@@ -74,4 +81,5 @@ export interface ForgeSessionSnapshot {
   panelTab: ForgePanelTab;
   sandboxSessions: ForgeSandboxSession[];
   activeSandboxSessionId: string;
+  diffProposal?: ForgeDiffProposal | null;
 }

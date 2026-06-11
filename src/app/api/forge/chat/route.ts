@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { checkRateLimit, validateModel, Limits, MODEL_TIER, ValidationError } from '@/lib/security';
 import { verifyAdminToken } from '@/app/api/auth/verify/route';
 import { requireApiKey } from '@/lib/api-key-auth';
-import type { ForgeFile } from '@/lib/forge/types';
+import type { ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -94,6 +94,49 @@ function extractForgeFiles(markdown: string): ForgeFile[] {
   }
 
   return files;
+}
+
+function extractJsonCandidates(markdown: string): string[] {
+  const candidates: string[] = [];
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/gi;
+  let match: RegExpExecArray | null;
+  while ((match = fenced.exec(markdown))) {
+    const body = (match[1] ?? '').trim();
+    if (body.startsWith('{') && body.endsWith('}')) candidates.push(body);
+  }
+  const firstBrace = markdown.indexOf('{');
+  const lastBrace = markdown.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(markdown.slice(firstBrace, lastBrace + 1));
+  }
+  return candidates;
+}
+
+function isForgeEditPayload(value: unknown): value is { action: 'edit'; path: string; diff: string } {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  return item.action === 'edit' && typeof item.path === 'string' && typeof item.diff === 'string';
+}
+
+function extractForgeEditProposal(markdown: string): ForgeDiffProposal | null {
+  // FORGE_UPGRADE: capture review-only edit diffs; the frontend still requires explicit user acceptance.
+  for (const candidate of extractJsonCandidates(markdown)) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      if (!isForgeEditPayload(parsed)) continue;
+      const path = normalizeForgePath(parsed.path);
+      if (!isSafeForgePath(path) || parsed.diff.length > 260_000) continue;
+      return {
+        action: 'edit',
+        path,
+        diff: parsed.diff,
+        createdAt: new Date().toISOString(),
+      };
+    } catch {
+      // Continue scanning other candidates.
+    }
+  }
+  return null;
 }
 
 async function streamOpenAI(messages: { role: string; content: string }[], model: string, system: string, controller: ReadableStreamDefaultController) {
@@ -224,11 +267,15 @@ export async function POST(req: NextRequest) {
         }
 
         const files = extractForgeFiles(full);
+        const editProposal = extractForgeEditProposal(full);
         if (files.length) {
           controller.enqueue(encStatus(`${files.length} ficheiro${files.length > 1 ? 's' : ''} estruturado${files.length > 1 ? 's' : ''} extraido${files.length > 1 ? 's' : ''}.`));
         }
-        console.log(`[forge:chat] done model=${selectedModel} chars=${full.length} files=${files.length}`);
-        controller.enqueue(encDone({ model: selectedModel, files }));
+        if (editProposal) {
+          controller.enqueue(encStatus(`Diff review prepared for ${editProposal.path}.`));
+        }
+        console.log(`[forge:chat] done model=${selectedModel} chars=${full.length} files=${files.length} edit=${editProposal ? editProposal.path : 'none'}`);
+        controller.enqueue(encDone({ model: selectedModel, files, editProposal }));
       } catch (err) {
         const message = err instanceof ValidationError ? err.message : (err instanceof Error ? err.message : String(err));
         console.error(`[forge:chat] error model=${selectedModel}`, message);

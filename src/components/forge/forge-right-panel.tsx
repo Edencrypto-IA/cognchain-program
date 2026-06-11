@@ -1,8 +1,8 @@
 'use client';
 
-import { memo, useMemo } from 'react';
-import { CheckCircle2, Files, GitCompareArrows, MonitorPlay, PanelsTopLeft } from 'lucide-react';
-import type { ForgeFile, ForgePanelTab, ForgePhase, ForgeRunStatus, ForgeSandboxSession } from '@/lib/forge/types';
+import { memo, useMemo, useState } from 'react';
+import { CheckCircle2, Files, GitCompareArrows, MonitorPlay, PanelsTopLeft, XCircle } from 'lucide-react';
+import type { ForgeDiffProposal, ForgeFile, ForgePanelTab, ForgePhase, ForgeRunStatus, ForgeSandboxSession } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GlassPanel } from './glass-panel';
@@ -33,6 +33,9 @@ function ForgeRightPanelComponent({
   canReplay,
   busy,
   latestSandboxSession,
+  diffProposal,
+  onDiffAccepted,
+  onDiffRejected,
 }: {
   phase: ForgePhase;
   runStatus: ForgeRunStatus;
@@ -49,7 +52,12 @@ function ForgeRightPanelComponent({
   canReplay: boolean;
   busy: boolean;
   latestSandboxSession?: ForgeSandboxSession;
+  diffProposal?: ForgeDiffProposal | null;
+  onDiffAccepted: (path: string, contents: string) => void;
+  onDiffRejected: () => void;
 }) {
+  const [applyingDiff, setApplyingDiff] = useState(false);
+  const [diffError, setDiffError] = useState('');
   const statusLine = useMemo(() => {
     const deploy = deployStatus ?? '—';
     return `${RUN_STATUS_LABELS[runStatus]} · ${deploy}`;
@@ -69,6 +77,44 @@ function ForgeRightPanelComponent({
     ].join('\n');
   }, [selected]);
   const canApplyProposal = files.some(file => file.status === 'created' || file.status === 'modified') && !busy;
+  const diffLines = useMemo(() => {
+    const source = diffProposal?.diff || diffPreview;
+    return source.split('\n').slice(0, 600).map((line, index) => {
+      const variant = line.startsWith('+') && !line.startsWith('+++')
+        ? 'add'
+        : line.startsWith('-') && !line.startsWith('---')
+          ? 'remove'
+          : line.startsWith('@@')
+            ? 'hunk'
+            : 'context';
+      return { id: `${index}-${line.slice(0, 12)}`, line, variant };
+    });
+  }, [diffPreview, diffProposal]);
+
+  const acceptDiff = async () => {
+    if (!diffProposal || applyingDiff) return;
+    setApplyingDiff(true);
+    setDiffError('');
+    try {
+      const response = await fetch('/api/forge/file/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ path: diffProposal.path, diff: diffProposal.diff }),
+      });
+      const data = await response.json() as { content?: unknown; error?: unknown };
+      if (!response.ok || typeof data.content !== 'string') {
+        throw new Error(typeof data.error === 'string' ? data.error : 'Diff apply failed');
+      }
+      onDiffAccepted(diffProposal.path, data.content);
+      onDiffRejected();
+      onTabChange('code');
+    } catch (error) {
+      setDiffError(error instanceof Error ? error.message : 'Diff apply failed');
+    } finally {
+      setApplyingDiff(false);
+    }
+  };
 
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-[#111113]/40">
@@ -132,26 +178,77 @@ function ForgeRightPanelComponent({
           <TabsContent value="diff" className="min-h-0 p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3 py-2">
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-white/72">Sandbox proposal</p>
+                <p className="text-xs font-semibold text-white/72">
+                  {diffProposal ? `Inline diff · ${diffProposal.path}` : 'Sandbox proposal'}
+                </p>
                 <p className="truncate text-[11px] text-white/35">
-                  {latestSandboxSession ? `Applied ${latestSandboxSession.hash}` : 'Review generated files before applying.'}
+                  {diffProposal
+                    ? 'Review changes. Nothing is written until you click Accept.'
+                    : latestSandboxSession ? `Applied ${latestSandboxSession.hash}` : 'Review generated files before applying.'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={onApplyProposal}
-                disabled={!canApplyProposal}
-                className="flex min-h-8 items-center gap-1.5 rounded-lg border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <CheckCircle2 className="size-3.5" />
-                Apply Proposal
-              </button>
+              <div className="flex items-center gap-2">
+                {diffProposal ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDiffRejected();
+                        setDiffError('');
+                      }}
+                      className="flex min-h-8 items-center gap-1.5 rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-1.5 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/15"
+                    >
+                      <XCircle className="size-3.5" />
+                      Rejeitar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void acceptDiff()}
+                      disabled={applyingDiff}
+                      className="flex min-h-8 items-center gap-1.5 rounded-lg border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                      {applyingDiff ? 'Aplicando...' : 'Aceitar'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onApplyProposal}
+                    disabled={!canApplyProposal}
+                    className="flex min-h-8 items-center gap-1.5 rounded-lg border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <CheckCircle2 className="size-3.5" />
+                    Apply Proposal
+                  </button>
+                )}
+              </div>
             </div>
-            <pre className="h-[min(380px,42vh)] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 text-[12px] leading-6 text-white/55">
-{`${diffPreview}
-
-Sandbox only - this proposal is not written to the production project.`}
-            </pre>
+            {diffError ? (
+              <div className="mb-3 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">{diffError}</div>
+            ) : null}
+            {/* FORGE_UPGRADE: render inline diffs manually so the review gate works without extra dependencies. */}
+            <div className="h-[min(380px,42vh)] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 font-mono text-[12px] leading-6">
+              {diffLines.map(item => (
+                <div
+                  key={item.id}
+                  className={cn(
+                    'whitespace-pre-wrap border-l-2 px-2',
+                    item.variant === 'add' && 'border-[#14F195]/45 bg-[#14F195]/10 text-[#B8FFD9]',
+                    item.variant === 'remove' && 'border-red-400/45 bg-red-500/10 text-red-200',
+                    item.variant === 'hunk' && 'border-[#00D4FF]/45 bg-[#00D4FF]/10 text-[#A7F3FF]',
+                    item.variant === 'context' && 'border-transparent text-white/50',
+                  )}
+                >
+                  {item.line || ' '}
+                </div>
+              ))}
+              {!diffProposal ? (
+                <div className="mt-4 border-l-2 border-transparent px-2 text-white/35">
+                  Sandbox only - this proposal is not written to the production project.
+                </div>
+              ) : null}
+            </div>
           </TabsContent>
         </Tabs>
       </GlassPanel>

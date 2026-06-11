@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef } from 'react';
 import { PRIVATE_PAY_DEMO_PROMPT } from '@/lib/forge/demo-data';
 import { forgeId, nowLabel } from '@/lib/forge/simulation';
 import { useForgeStore } from './use-forge-store';
-import type { ForgeAgentId, ForgeFile } from '@/lib/forge/types';
+import type { ForgeAgentId, ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
 
 const FORGE_MODEL = 'nvidia';
 
-type StreamEvent = { status?: string; token?: string; done?: boolean; error?: string; files?: ForgeFile[] };
+type StreamEvent = { status?: string; token?: string; done?: boolean; error?: string; files?: ForgeFile[]; editProposal?: ForgeDiffProposal };
 
 function parseSseData(raw: string): string | null {
   const data = raw
@@ -32,6 +32,7 @@ export function useForgeSimulation() {
     updateAgent,
     updateBuildStep,
     upsertFile,
+    setDiffProposal,
     upsertMemory,
     setDeployStatus,
     setPhase,
@@ -184,6 +185,18 @@ export function useForgeSimulation() {
             text: `${evt.files.length} proposta${evt.files.length > 1 ? 's' : ''} de ficheiro pronta${evt.files.length > 1 ? 's' : ''} no explorer.`,
           });
         }
+        if (evt.editProposal) {
+          // FORGE_UPGRADE: agent edits open as review-only diffs until the user accepts.
+          setDiffProposal(evt.editProposal);
+          updateBuildStep('verify', 'running');
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'warning',
+            source: 'Forge Diff',
+            text: `Edit proposal ready for ${evt.editProposal.path}. Review Diff, then Accept or Reject.`,
+          });
+        }
         if (evt.done) {
           finalizeSuccess();
         }
@@ -284,6 +297,7 @@ export function useForgeSimulation() {
       updateBuildStep,
       updateAgent,
       upsertFile,
+      setDiffProposal,
       upsertMemory,
       setDeployStatus,
       setPhase,

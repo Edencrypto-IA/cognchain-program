@@ -46,9 +46,11 @@ function ForgeWorkspaceInner() {
     promptHistory,
     sandboxSessions,
     activeSandboxSessionId,
+    diffProposal,
     setPanelTab,
     setSelectedFile,
     updateFileContents,
+    setDiffProposal,
     appendTerminal,
     applyProposal,
     resetSession,
@@ -67,9 +69,11 @@ function ForgeWorkspaceInner() {
       promptHistory: s.promptHistory,
       sandboxSessions: s.sandboxSessions,
       activeSandboxSessionId: s.activeSandboxSessionId,
+      diffProposal: s.diffProposal,
       setPanelTab: s.setPanelTab,
       setSelectedFile: s.setSelectedFile,
       updateFileContents: s.updateFileContents,
+      setDiffProposal: s.setDiffProposal,
       appendTerminal: s.appendTerminal,
       applyProposal: s.applyProposal,
       resetSession: s.resetSession,
@@ -309,6 +313,10 @@ function ForgeWorkspaceInner() {
                   canReplay={canReplay}
                   busy={busy}
                   latestSandboxSession={latestSandboxSession}
+                  diffProposal={diffProposal}
+                  // FORGE_UPGRADE: Diff proposals can be accepted only from the explicit review button.
+                  onDiffAccepted={updateFileContents}
+                  onDiffRejected={() => setDiffProposal(null)}
                 />
               </ResizablePanel>
               <ResizableHandle className="bg-white/[0.06]" />
@@ -350,6 +358,10 @@ function ForgeWorkspaceInner() {
             canReplay={canReplay}
             busy={busy}
             latestSandboxSession={latestSandboxSession}
+            diffProposal={diffProposal}
+            // FORGE_UPGRADE: Diff proposals can be accepted only from the explicit review button.
+            onDiffAccepted={updateFileContents}
+            onDiffRejected={() => setDiffProposal(null)}
           />
         </motion.div>
         <motion.div
