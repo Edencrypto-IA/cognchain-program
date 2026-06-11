@@ -2,8 +2,8 @@
 
 import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUp, Bot, Boxes, Braces, Layers3, Loader2, Square, Terminal } from 'lucide-react';
-import type { ForgePhase, ForgeRunStatus, ForgeTerminalLine } from '@/lib/forge/types';
+import { ArrowUp, Bot, Boxes, Braces, FileCode2, Layers3, Loader2, Square, Terminal, X } from 'lucide-react';
+import type { ForgeFile, ForgePhase, ForgeRunStatus, ForgeTerminalLine } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { suggestedPrompts } from '@/lib/forge/demo-data';
 
@@ -75,6 +75,7 @@ function ForgeTerminalComponent({
   runStatus,
   terminal,
   streamedResponse,
+  files,
   onRunPrompt,
   onStop,
 }: {
@@ -82,12 +83,19 @@ function ForgeTerminalComponent({
   runStatus: ForgeRunStatus;
   terminal: ForgeTerminalLine[];
   streamedResponse: string;
+  files: ForgeFile[];
   onRunPrompt: (prompt: string) => void;
   onStop: () => void;
 }) {
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<ForgeComposerMode>('App');
+  const [fileOptions, setFileOptions] = useState<Array<{ path: string; name: string }>>([]);
+  const [fileDropdownOpen, setFileDropdownOpen] = useState(false);
+  const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
+  const [contextWarning, setContextWarning] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const scrollRafRef = useRef<number | null>(null);
 
   const running = ['thinking', 'planning', 'building', 'deploying'].includes(phase);
@@ -113,11 +121,112 @@ function ForgeTerminalComponent({
     if (scrollRafRef.current != null) cancelAnimationFrame(scrollRafRef.current);
   }, []);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    function onDocumentPointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Node && formRef.current?.contains(target)) return;
+      setFileDropdownOpen(false);
+    }
+    document.addEventListener('mousedown', onDocumentPointerDown);
+    return () => document.removeEventListener('mousedown', onDocumentPointerDown);
+  }, []);
+
+  const loadFileOptions = useCallback(async () => {
+    try {
+      const response = await fetch('/api/forge/files', { credentials: 'include' });
+      const data = await response.json() as { files?: unknown };
+      if (Array.isArray(data.files)) {
+        const options = data.files
+          .map(item => {
+            if (!item || typeof item !== 'object') return null;
+            const record = item as Record<string, unknown>;
+            if (typeof record.path !== 'string') return null;
+            return { path: record.path, name: record.path.split('/').at(-1) ?? record.path };
+          })
+          .filter((item): item is { path: string; name: string } => Boolean(item));
+        setFileOptions(options);
+        return;
+      }
+    } catch {
+      // Use local Forge file graph below.
+    }
+    setFileOptions(files.map(file => ({ path: file.path, name: file.path.split('/').at(-1) ?? file.path })));
+  }, [files]);
+
+  const handlePromptChange = useCallback((value: string) => {
+    setPrompt(value);
+    setContextWarning('');
+    const cursor = textareaRef.current?.selectionStart ?? value.length;
+    const prefix = value.slice(0, cursor);
+    const atIndex = prefix.lastIndexOf('@');
+    const hasActiveMention = atIndex >= 0 && !/\s/.test(prefix.slice(atIndex + 1));
+    if (hasActiveMention && !running && !connecting) {
+      setFileDropdownOpen(true);
+      void loadFileOptions();
+    } else {
+      setFileDropdownOpen(false);
+    }
+  }, [connecting, loadFileOptions, running]);
+
+  const selectContextFile = useCallback((path: string) => {
+    if (selectedContextFiles.includes(path)) {
+      setFileDropdownOpen(false);
+      return;
+    }
+    if (selectedContextFiles.length >= 5) {
+      setContextWarning('Maximo de 5 arquivos em contexto.');
+      setFileDropdownOpen(false);
+      return;
+    }
+    const cursor = textareaRef.current?.selectionStart ?? prompt.length;
+    const prefix = prompt.slice(0, cursor);
+    const suffix = prompt.slice(cursor);
+    const atIndex = prefix.lastIndexOf('@');
+    const nextPrompt = atIndex >= 0
+      ? `${prefix.slice(0, atIndex)}[FILE:${path}] ${suffix}`
+      : `${prompt} [FILE:${path}]`;
+    setPrompt(nextPrompt);
+    setSelectedContextFiles(current => [...current, path]);
+    setFileDropdownOpen(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [prompt, selectedContextFiles]);
+
+  const removeContextFile = useCallback((path: string) => {
+    setSelectedContextFiles(current => current.filter(item => item !== path));
+    setPrompt(current => current.replaceAll(`[FILE:${path}]`, '').replace(/\s{2,}/g, ' ').trimStart());
+  }, []);
+
+  async function buildPromptWithFileContext(basePrompt: string): Promise<string> {
+    const filesInPrompt = Array.from(new Set([...selectedContextFiles, ...Array.from(basePrompt.matchAll(/\[FILE:([^\]]+)]/g)).map(match => match[1] ?? '')].filter(Boolean))).slice(0, 5);
+    if (!filesInPrompt.length) return basePrompt;
+
+    const blocks: string[] = [];
+    for (const path of filesInPrompt) {
+      try {
+        const response = await fetch(`/api/forge/file?path=${encodeURIComponent(path)}`, { credentials: 'include' });
+        const data = await response.json() as { content?: unknown };
+        if (response.ok && typeof data.content === 'string') {
+          blocks.push(`--- FILE: ${path} ---\n${data.content.slice(0, 24_000)}\n--- END FILE ---`);
+        }
+      } catch {
+        const fallback = files.find(file => file.path === path);
+        if (fallback) blocks.push(`--- FILE: ${path} ---\n${fallback.contents.slice(0, 24_000)}\n--- END FILE ---`);
+      }
+    }
+
+    if (!blocks.length) return basePrompt;
+    // FORGE_UPGRADE: file context is prepended client-side without changing the main chat endpoint.
+    return `Contexto de arquivos selecionados:\n${blocks.join('\n\n')}\n\nPedido do usuario:\n${basePrompt}`;
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!prompt.trim() || running || connecting) return;
-    onRunPrompt(`[${mode}] ${prompt}`);
+    const enrichedPrompt = await buildPromptWithFileContext(prompt);
+    onRunPrompt(`[${mode}] ${enrichedPrompt}`);
     setPrompt('');
+    setSelectedContextFiles([]);
+    setFileDropdownOpen(false);
   }
 
   const footerLabel =
@@ -153,7 +262,7 @@ function ForgeTerminalComponent({
       </div>
 
       <div className="shrink-0 border-t border-white/[0.07] p-2 sm:p-3">
-        <form onSubmit={submit} className="rounded-2xl border border-white/[0.09] bg-[#101013]/95 p-2 shadow-2xl shadow-black/25">
+        <form ref={formRef} onSubmit={event => { void submit(event); }} className="relative rounded-2xl border border-white/[0.09] bg-[#101013]/95 p-2 shadow-2xl shadow-black/25">
           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex w-full rounded-xl border border-white/[0.07] bg-black/25 p-1 sm:w-auto">
               {COMPOSER_MODES.map(({ mode: itemMode, icon: Icon }) => (
@@ -190,18 +299,56 @@ function ForgeTerminalComponent({
             )}
           </div>
 
+          {selectedContextFiles.length || contextWarning ? (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {selectedContextFiles.map(path => (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => removeContextFile(path)}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.05] px-2 py-1 text-[10px] text-white/58 hover:border-red-400/25 hover:text-red-200"
+                >
+                  <FileCode2 className="size-3 shrink-0 text-[#00D4FF]" />
+                  <span className="max-w-[12rem] truncate font-mono">{path}</span>
+                  <X className="size-3 shrink-0" />
+                </button>
+              ))}
+              {contextWarning ? <span className="text-[10px] text-[#FBBF24]">{contextWarning}</span> : null}
+            </div>
+          ) : null}
+
           <div className="flex items-end gap-2">
             <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-white/[0.035] text-white/42">
               <ActiveModeIcon className="size-4" />
             </div>
             <textarea
+              ref={textareaRef}
               value={prompt}
-              onChange={event => setPrompt(event.target.value)}
+              onChange={event => handlePromptChange(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Escape') setFileDropdownOpen(false);
+              }}
               rows={1}
               placeholder={activeMode.placeholder}
               className="min-h-[2.75rem] flex-1 resize-y bg-transparent px-1 py-2 text-sm leading-5 text-white/82 outline-none placeholder:text-white/24 sm:min-h-9"
               disabled={running || connecting}
             />
+            {fileDropdownOpen && fileOptions.length > 0 ? (
+              <div className="absolute bottom-[4.25rem] left-2 right-2 z-20 max-h-56 overflow-y-auto rounded-2xl border border-[#00D4FF]/20 bg-[#080b0b] p-2 shadow-2xl shadow-black/50">
+                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#00D4FF]/75">Adicionar arquivo ao contexto</p>
+                {fileOptions.slice(0, 8).map(option => (
+                  <button
+                    key={option.path}
+                    type="button"
+                    onClick={() => selectContextFile(option.path)}
+                    className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-[11px] text-white/54 transition-colors hover:bg-white/[0.06] hover:text-white/86"
+                  >
+                    <FileCode2 className="size-3.5 shrink-0 text-[#14F195]/70" />
+                    <span className="min-w-0 flex-1 truncate font-mono">{option.path}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <button
               type={running || connecting ? 'button' : 'submit'}
               onClick={running || connecting ? onStop : undefined}

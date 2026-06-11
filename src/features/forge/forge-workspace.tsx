@@ -326,6 +326,8 @@ function ForgeWorkspaceInner() {
                   runStatus={runStatus}
                   terminal={terminal}
                   streamedResponse={streamedResponse}
+                  // FORGE_UPGRADE: Terminal composer can attach @file context from the explorer graph.
+                  files={files}
                   onRunPrompt={runPrompt}
                   onStop={stop}
                 />
@@ -375,6 +377,8 @@ function ForgeWorkspaceInner() {
             runStatus={runStatus}
             terminal={terminal}
             streamedResponse={streamedResponse}
+            // FORGE_UPGRADE: Terminal composer can attach @file context from the explorer graph.
+            files={files}
             onRunPrompt={runPrompt}
             onStop={stop}
           />
