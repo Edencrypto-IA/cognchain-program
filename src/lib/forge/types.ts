@@ -1,3 +1,5 @@
+import type { TriggerReport } from '@/trigger/triggerEngine';
+
 export type ForgeAgentId = 'architect' | 'solana' | 'backend' | 'ui' | 'security';
 
 export type ForgeAgentStatus = 'idle' | 'thinking' | 'running' | 'blocked' | 'complete';
@@ -33,6 +35,7 @@ export interface ForgeTerminalLine {
   source: string;
   text: string;
   timestamp: string;
+  triggerReport?: TriggerReport;
 }
 
 export interface ForgeFile {

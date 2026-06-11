@@ -39,9 +39,34 @@ const TerminalLineList = memo(function TerminalLineList({ lines }: { lines: Forg
         >
           <span className="text-white/22">{line.timestamp}</span>
           <div className="min-w-0">
-            <span className={lineColors[line.kind]}>{line.source}</span>
-            <span className="text-white/25"> :: </span>
-            <span className="break-words text-white/58">{line.text}</span>
+            {line.triggerReport ? (
+              // FORGE_UPGRADE: render TriggerReport badges without changing regular terminal lines.
+              <span className="break-words">
+                <span className="font-semibold text-[#00D4FF]">[TRIGGER]</span>
+                <span className="text-white/25"> skill: </span>
+                <span className="font-semibold text-[#00FF9C]">{line.triggerReport.skill}</span>
+                <span className="text-white/25"> | risk: </span>
+                <span
+                  className={
+                    line.triggerReport.risk === 'high'
+                      ? 'font-semibold text-red-300'
+                      : line.triggerReport.risk === 'medium'
+                        ? 'font-semibold text-[#FBBF24]'
+                        : 'font-semibold text-[#14F195]'
+                  }
+                >
+                  {line.triggerReport.risk}
+                </span>
+                <span className="text-white/25"> | source: </span>
+                <span className="text-white/42">{line.triggerReport.source}</span>
+              </span>
+            ) : (
+              <>
+                <span className={lineColors[line.kind]}>{line.source}</span>
+                <span className="text-white/25"> :: </span>
+                <span className="break-words text-white/58">{line.text}</span>
+              </>
+            )}
           </div>
         </motion.div>
       ))}

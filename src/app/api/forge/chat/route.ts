@@ -5,6 +5,8 @@ import { checkRateLimit, validateModel, Limits, MODEL_TIER, ValidationError } fr
 import { verifyAdminToken } from '@/app/api/auth/verify/route';
 import { requireApiKey } from '@/lib/api-key-auth';
 import type { ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
+import { listSkillSummaries } from '@/skills/skill-loader';
+import { analyzeIntent } from '@/trigger/triggerEngine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -231,6 +233,10 @@ export async function POST(req: NextRequest) {
   }
 
   const validMsgs = messages.map(m => ({ role: m.role, content: String(m.content).slice(0, Limits.MAX_PROMPT_LENGTH) }));
+  // FORGE_UPGRADE: classify each Forge prompt for the terminal TriggerReport badge.
+  const triggerReport = await listSkillSummaries()
+    .then(skills => analyzeIntent(prompt, skills))
+    .catch(() => analyzeIntent(prompt, []));
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -275,7 +281,7 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encStatus(`Diff review prepared for ${editProposal.path}.`));
         }
         console.log(`[forge:chat] done model=${selectedModel} chars=${full.length} files=${files.length} edit=${editProposal ? editProposal.path : 'none'}`);
-        controller.enqueue(encDone({ model: selectedModel, files, editProposal }));
+        controller.enqueue(encDone({ model: selectedModel, files, editProposal, triggerReport }));
       } catch (err) {
         const message = err instanceof ValidationError ? err.message : (err instanceof Error ? err.message : String(err));
         console.error(`[forge:chat] error model=${selectedModel}`, message);

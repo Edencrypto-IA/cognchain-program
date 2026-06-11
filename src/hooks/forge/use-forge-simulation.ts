@@ -4,11 +4,20 @@ import { useCallback, useEffect, useRef } from 'react';
 import { PRIVATE_PAY_DEMO_PROMPT } from '@/lib/forge/demo-data';
 import { forgeId, nowLabel } from '@/lib/forge/simulation';
 import { useForgeStore } from './use-forge-store';
+import type { TriggerReport } from '@/trigger/triggerEngine';
 import type { ForgeAgentId, ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
 
 const FORGE_MODEL = 'nvidia';
 
-type StreamEvent = { status?: string; token?: string; done?: boolean; error?: string; files?: ForgeFile[]; editProposal?: ForgeDiffProposal };
+type StreamEvent = {
+  status?: string;
+  token?: string;
+  done?: boolean;
+  error?: string;
+  files?: ForgeFile[];
+  editProposal?: ForgeDiffProposal;
+  triggerReport?: TriggerReport;
+};
 
 function parseSseData(raw: string): string | null {
   const data = raw
@@ -195,6 +204,17 @@ export function useForgeSimulation() {
             kind: 'warning',
             source: 'Forge Diff',
             text: `Edit proposal ready for ${evt.editProposal.path}. Review Diff, then Accept or Reject.`,
+          });
+        }
+        if (evt.triggerReport) {
+          // FORGE_UPGRADE: show TriggerEngine classification immediately after model response.
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'shell',
+            source: 'TriggerEngine',
+            text: `[TRIGGER] skill: ${evt.triggerReport.skill} | risk: ${evt.triggerReport.risk} | source: ${evt.triggerReport.source}`,
+            triggerReport: evt.triggerReport,
           });
         }
         if (evt.done) {
