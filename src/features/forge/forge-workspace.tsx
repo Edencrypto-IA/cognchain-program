@@ -92,6 +92,10 @@ function ForgeWorkspaceInner() {
     sandboxSessions.find(session => session.id === activeSandboxSessionId) ?? sandboxSessions[0];
   const selectedFile = files.find(file => file.path === selectedFilePath) ?? files[0];
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  // FORGE_UPGRADE: Ctrl+P opens a safe fuzzy picker without changing explorer or terminal state.
+  const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const [filePickerQuery, setFilePickerQuery] = useState('');
+  const [filePickerIndex, setFilePickerIndex] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +123,12 @@ function ForgeWorkspaceInner() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setCommandPaletteOpen(value => !value);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        setFilePickerOpen(true);
+        setFilePickerQuery('');
+        setFilePickerIndex(0);
       }
     }
     window.addEventListener('keydown', onKeyDown);
@@ -217,6 +227,34 @@ function ForgeWorkspaceInner() {
     { label: 'Review diff', detail: 'Focus accept/reject diff gate', action: () => setPanelTab('diff') },
     { label: 'Save memory', detail: 'Anchor current Forge decision locally', action: () => void saveForgeMemory() },
   ], [runSafeCommand, saveForgeMemory, setPanelTab]);
+
+  const fuzzyMatch = useCallback((query: string, target: string): number[] | null => {
+    if (!query.trim()) return [];
+    const hits: number[] = [];
+    let cursor = 0;
+    const cleanQuery = query.toLowerCase();
+    const cleanTarget = target.toLowerCase();
+    for (const char of cleanQuery) {
+      const found = cleanTarget.indexOf(char, cursor);
+      if (found < 0) return null;
+      hits.push(found);
+      cursor = found + 1;
+    }
+    return hits;
+  }, []);
+
+  const pickerResults = useMemo(() => {
+    return files
+      .map(file => ({ file, hits: fuzzyMatch(filePickerQuery, file.path) }))
+      .filter((item): item is { file: typeof files[number]; hits: number[] } => item.hits !== null)
+      .slice(0, 80);
+  }, [filePickerQuery, files, fuzzyMatch]);
+
+  const openPickerFile = useCallback((path: string) => {
+    openFile(path);
+    setPanelTab('code');
+    setFilePickerOpen(false);
+  }, [openFile, setPanelTab]);
 
   const handleReset = useCallback(() => {
     stop();
@@ -588,6 +626,66 @@ function ForgeWorkspaceInner() {
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {filePickerOpen && (
+        <div
+          className="absolute bottom-0 left-[21%] right-0 top-10 z-40 bg-black/40 pt-8"
+          onClick={() => setFilePickerOpen(false)}
+        >
+          <div
+            className="mx-auto w-[min(480px,92%)] overflow-hidden rounded-[10px] border border-[#1f3a1f] bg-[#0d120d] shadow-2xl shadow-black"
+            onClick={event => event.stopPropagation()}
+          >
+            <input
+              value={filePickerQuery}
+              onChange={event => {
+                setFilePickerQuery(event.target.value);
+                setFilePickerIndex(0);
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Escape') setFilePickerOpen(false);
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setFilePickerIndex(index => Math.min(index + 1, Math.max(0, pickerResults.length - 1)));
+                }
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setFilePickerIndex(index => Math.max(0, index - 1));
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  const picked = pickerResults[filePickerIndex]?.file;
+                  if (picked) openPickerFile(picked.path);
+                }
+              }}
+              autoFocus
+              placeholder="Buscar arquivo..."
+              className="w-full border-0 border-b border-[#1f3a1f] bg-transparent px-4 py-3 font-mono text-[13px] text-[#b8d4b8] outline-none"
+            />
+            <div className="max-h-[17rem] overflow-y-auto py-1">
+              {pickerResults.slice(0, 32).map((item, index) => {
+                const hitSet = new Set(item.hits);
+                return (
+                  <button
+                    key={item.file.path}
+                    type="button"
+                    onClick={() => openPickerFile(item.file.path)}
+                    className={`block w-full px-4 py-2 text-left font-mono text-[12px] ${
+                      index === filePickerIndex ? 'bg-[#0d2a1a] text-[#00FF9C]' : 'text-white/55 hover:bg-[#111a11]'
+                    }`}
+                  >
+                    {item.file.path.split('').map((char, charIndex) => (
+                      <span key={`${item.file.path}-${charIndex}`} className={hitSet.has(charIndex) ? 'text-[#00FF9C]' : undefined}>
+                        {char}
+                      </span>
+                    ))}
+                  </button>
+                );
+              })}
+              {pickerResults.length === 0 ? <p className="px-4 py-6 text-center text-xs text-white/28">Nenhum arquivo encontrado.</p> : null}
             </div>
           </div>
         </div>
