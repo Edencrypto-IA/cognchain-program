@@ -12,6 +12,8 @@ const ALLOWED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.md'
 type ApplyBody = {
   path?: unknown;
   diff?: unknown;
+  originalCode?: unknown;
+  proposedCode?: unknown;
 };
 
 type ResolvedForgePath = {
@@ -102,6 +104,12 @@ function applyUnifiedDiff(original: string, diff: string): string {
   return next.join('\n');
 }
 
+function applyExactReplacement(original: string, originalCode: string, proposedCode: string): string {
+  const index = original.indexOf(originalCode);
+  if (index < 0) throw new Error('Selected code was not found in the current file');
+  return `${original.slice(0, index)}${proposedCode}${original.slice(index + originalCode.length)}`;
+}
+
 export async function POST(request: NextRequest) {
   let body: ApplyBody;
   try {
@@ -123,7 +131,9 @@ export async function POST(request: NextRequest) {
   }
 
   const original = await readFile(target.absolutePath, 'utf8').catch(() => '');
-  const content = applyUnifiedDiff(original, body.diff);
+  const content = typeof body.originalCode === 'string' && typeof body.proposedCode === 'string'
+    ? applyExactReplacement(original, body.originalCode, body.proposedCode)
+    : applyUnifiedDiff(original, body.diff);
   await writeFile(target.absolutePath, content, 'utf8');
 
   return NextResponse.json({

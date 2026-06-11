@@ -16,6 +16,8 @@ export interface ForgeDiffProposal {
   path: string;
   diff: string;
   createdAt: string;
+  originalCode?: string;
+  proposedCode?: string;
 }
 
 export interface ForgeAgent {

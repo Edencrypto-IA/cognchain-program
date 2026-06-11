@@ -37,6 +37,7 @@ function ForgeRightPanelComponent({
   onDiffAccepted,
   onDiffRejected,
   onRunSafeCommand,
+  onInlineDiff,
 }: {
   phase: ForgePhase;
   runStatus: ForgeRunStatus;
@@ -57,6 +58,7 @@ function ForgeRightPanelComponent({
   onDiffAccepted: (path: string, contents: string) => void;
   onDiffRejected: () => void;
   onRunSafeCommand: (command: 'npm run lint' | 'npm run build') => void;
+  onInlineDiff: (proposal: ForgeDiffProposal) => void;
 }) {
   const [applyingDiff, setApplyingDiff] = useState(false);
   const [diffError, setDiffError] = useState('');
@@ -110,7 +112,12 @@ function ForgeRightPanelComponent({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ path: diffProposal.path, diff: diffProposal.diff }),
+        body: JSON.stringify({
+          path: diffProposal.path,
+          diff: diffProposal.diff,
+          originalCode: diffProposal.originalCode,
+          proposedCode: diffProposal.proposedCode,
+        }),
       });
       const data = await response.json() as { content?: unknown; error?: unknown };
       if (!response.ok || typeof data.content !== 'string') {
@@ -183,7 +190,7 @@ function ForgeRightPanelComponent({
           </TabsContent>
           <TabsContent value="code" className="min-h-0">
             {/* FORGE_UPGRADE: Code tab now hosts an editable CodeMirror-backed editor. */}
-            <CodeViewer files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} onFileSaved={onFileSaved} />
+            <CodeViewer files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} onFileSaved={onFileSaved} onInlineDiff={onInlineDiff} />
           </TabsContent>
           <TabsContent value="files" className="min-h-0 p-3">
             <div className="space-y-2">

@@ -1,12 +1,16 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, Edit3, FileCode2, Loader2, Save } from 'lucide-react';
-import type { ForgeFile } from '@/lib/forge/types';
+import { Check, Copy, Edit3, FileCode2, Loader2, Save, WandSparkles, X } from 'lucide-react';
+import type { ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
 import { cn } from '@/lib/utils';
 
 type CodeMirrorView = {
-  state: { doc: { toString: () => string } };
+  state: {
+    doc: { toString: () => string; sliceString: (from: number, to: number) => string };
+    selection: { main: { from: number; to: number } };
+  };
+  coordsAtPos?: (pos: number) => { left: number; right: number; top: number; bottom: number } | null;
   dispatch: (spec: { effects?: unknown }) => void;
   destroy: () => void;
 };
@@ -95,11 +99,13 @@ function CodeViewerComponent({
   selectedFile,
   onSelectFile,
   onFileSaved,
+  onInlineDiff,
 }: {
   files: ForgeFile[];
   selectedFile: string;
   onSelectFile: (path: string) => void;
   onFileSaved: (path: string, contents: string) => void;
+  onInlineDiff: (proposal: ForgeDiffProposal) => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<CodeMirrorView | null>(null);
@@ -111,6 +117,12 @@ function CodeViewerComponent({
   const [saving, setSaving] = useState(false);
   const [editorReady, setEditorReady] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [inlineOpen, setInlineOpen] = useState(false);
+  const [inlineInstruction, setInlineInstruction] = useState('');
+  const [inlineSelection, setInlineSelection] = useState('');
+  const [inlineError, setInlineError] = useState('');
+  const [inlineLoading, setInlineLoading] = useState(false);
+  const [inlineTop, setInlineTop] = useState(96);
 
   const file = useMemo(
     () => files.find(item => item.path === selectedFile) ?? files[0],
@@ -210,6 +222,29 @@ function CodeViewerComponent({
                 saveRef.current();
                 return true;
               },
+            }, {
+              key: 'Mod-l',
+              preventDefault: true,
+              run: () => {
+                const view = viewRef.current;
+                if (!view) return true;
+                const { from, to } = view.state.selection.main;
+                if (from === to) return true;
+                const selectedCode = view.state.doc.sliceString(from, to);
+                setInlineSelection(selectedCode);
+                setInlineInstruction('');
+                setInlineError('');
+                const coords = view.coordsAtPos?.(to);
+                setInlineTop(Math.max(54, Math.min(360, (coords?.bottom ?? 96) - (hostRef.current?.getBoundingClientRect().top ?? 0) + 8)));
+                setInlineOpen(true);
+                return true;
+              },
+            }, {
+              key: 'Escape',
+              run: () => {
+                setInlineOpen(false);
+                return false;
+              },
             }]),
             ...language,
           ],
@@ -236,6 +271,52 @@ function CodeViewerComponent({
     if (!view || !readOnly || !cm) return;
     view.dispatch({ effects: readOnly.reconfigure(cm.EditorState.readOnly.of(!editing)) });
   }, [editing]);
+
+  const runInlineEdit = useCallback(async () => {
+    if (!file || !inlineSelection.trim() || !inlineInstruction.trim()) return;
+    setInlineLoading(true);
+    setInlineError('');
+    try {
+      const fullFileContent = viewRef.current?.state.doc.toString() ?? draft;
+      const response = await fetch('/api/forge/inline-edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          filePath: file.path,
+          selectedCode: inlineSelection,
+          instruction: inlineInstruction,
+          fullFileContent,
+        }),
+      });
+      const data = await response.json() as { proposedCode?: unknown; originalCode?: unknown; filePath?: unknown; error?: unknown };
+      if (!response.ok || typeof data.proposedCode !== 'string' || typeof data.originalCode !== 'string' || typeof data.filePath !== 'string') {
+        throw new Error(typeof data.error === 'string' ? data.error : 'inline-edit failed');
+      }
+      const originalLines = data.originalCode.split('\n');
+      const proposedLines = data.proposedCode.split('\n');
+      const diff = [
+        `--- ${data.filePath}`,
+        `+++ ${data.filePath}`,
+        '@@ selected code @@',
+        ...originalLines.map(line => `-${line}`),
+        ...proposedLines.map(line => `+${line}`),
+      ].join('\n');
+      onInlineDiff({
+        action: 'edit',
+        path: data.filePath,
+        diff,
+        originalCode: data.originalCode,
+        proposedCode: data.proposedCode,
+        createdAt: new Date().toISOString(),
+      });
+      setInlineOpen(false);
+    } catch (error) {
+      setInlineError(error instanceof Error ? error.message : 'inline-edit failed');
+    } finally {
+      setInlineLoading(false);
+    }
+  }, [draft, file, inlineInstruction, inlineSelection, onInlineDiff]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -309,9 +390,45 @@ function CodeViewerComponent({
               </button>
             </div>
           </div>
-          <div className="h-[min(440px,50vh)] overflow-hidden bg-[#0d120d]">
+          <div className="relative h-[min(440px,50vh)] overflow-hidden bg-[#0d120d]">
             {/* FORGE_UPGRADE: CodeMirror is loaded from CDN with a textarea fallback for offline/dev cases. */}
             <div ref={hostRef} className={cn('h-full', !editorReady && 'hidden')} />
+            {inlineOpen ? (
+              <div
+                className="absolute left-4 z-[100] w-[min(600px,calc(100%-2rem))] rounded-lg border border-[#1f3a1f] bg-[#0d120d] p-3 shadow-2xl shadow-black/60"
+                style={{ top: inlineTop }}
+              >
+                <div className="mb-2 max-h-28 overflow-auto rounded-md border border-white/[0.06] bg-white/[0.035] p-2 font-mono text-[11px] leading-5 text-white/42">
+                  {inlineSelection}
+                </div>
+                <div className="flex items-center gap-2">
+                  <WandSparkles className="size-4 shrink-0 text-[#00FF9C]" />
+                  <input
+                    value={inlineInstruction}
+                    onChange={event => setInlineInstruction(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === 'Escape') setInlineOpen(false);
+                      if (event.key === 'Enter') void runInlineEdit();
+                    }}
+                    autoFocus
+                    placeholder="O que fazer com esse trecho?"
+                    className="min-h-9 flex-1 bg-transparent text-sm text-white/82 outline-none placeholder:text-white/24"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void runInlineEdit()}
+                    disabled={inlineLoading || !inlineInstruction.trim()}
+                    className="rounded-md border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] disabled:opacity-40"
+                  >
+                    {inlineLoading ? '...' : 'Aplicar'}
+                  </button>
+                  <button type="button" onClick={() => setInlineOpen(false)} className="rounded-md border border-white/[0.08] p-2 text-white/35">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                {inlineError ? <p className="mt-2 text-[11px] text-red-300">[FORGE] inline-edit falhou: {inlineError}</p> : null}
+              </div>
+            ) : null}
             {!editorReady && (
               <textarea
                 value={draft}

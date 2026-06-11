@@ -450,6 +450,7 @@ function ForgeWorkspaceInner() {
                   onDiffAccepted={updateFileContents}
                   onDiffRejected={() => setDiffProposal(null)}
                   onRunSafeCommand={runSafeCommand}
+                  onInlineDiff={setDiffProposal}
                 />
               </ResizablePanel>
               <ResizableHandle className="bg-white/[0.06]" />
@@ -498,6 +499,7 @@ function ForgeWorkspaceInner() {
             onDiffAccepted={updateFileContents}
             onDiffRejected={() => setDiffProposal(null)}
             onRunSafeCommand={runSafeCommand}
+            onInlineDiff={setDiffProposal}
           />
         </motion.div>
         <motion.div
