@@ -1,7 +1,8 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, Edit3, FileCode2, Loader2, Save, WandSparkles, X } from 'lucide-react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import { Check, Columns2, Copy, Edit3, FileCode2, Loader2, Save, WandSparkles, X } from 'lucide-react';
 import type { ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
 import { cn } from '@/lib/utils';
 
@@ -107,8 +108,11 @@ function CodeViewerComponent({
   onFileSaved: (path: string, contents: string) => void;
   onInlineDiff: (proposal: ForgeDiffProposal) => void;
 }) {
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const rightHostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<CodeMirrorView | null>(null);
+  const rightViewRef = useRef<CodeMirrorView | null>(null);
   const readOnlyRef = useRef<CodeMirrorCompartment | null>(null);
   const saveRef = useRef<() => void>(() => {});
   const cmRef = useRef<CodeMirrorModule | null>(null);
@@ -123,11 +127,22 @@ function CodeViewerComponent({
   const [inlineError, setInlineError] = useState('');
   const [inlineLoading, setInlineLoading] = useState(false);
   const [inlineTop, setInlineTop] = useState(96);
+  // FORGE_UPGRADE: Split View keeps the active editor intact while opening a second read-only file pane.
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitRatio, setSplitRatio] = useState(52);
+  const [rightFilePath, setRightFilePath] = useState('');
+  const [rightDraft, setRightDraft] = useState('');
+  const [rightReady, setRightReady] = useState(false);
 
   const file = useMemo(
     () => files.find(item => item.path === selectedFile) ?? files[0],
     [files, selectedFile],
   );
+
+  const rightFile = useMemo(() => {
+    const fallback = files.find(item => item.path !== file?.path) ?? files[0];
+    return files.find(item => item.path === rightFilePath) ?? fallback;
+  }, [file?.path, files, rightFilePath]);
 
   const saveDraft = useCallback(async () => {
     if (!file || saving) return;
@@ -164,6 +179,13 @@ function CodeViewerComponent({
     setEditing(false);
     setSaveState('idle');
   }, [file?.contents, file?.path]);
+
+  useEffect(() => {
+    if (!rightFilePath || rightFilePath === file?.path) {
+      const nextPath = files.find(item => item.path !== file?.path)?.path ?? files[0]?.path ?? '';
+      setRightFilePath(nextPath);
+    }
+  }, [file?.path, files, rightFilePath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,6 +287,88 @@ function CodeViewerComponent({
   }, [file]);
 
   useEffect(() => {
+    let cancelled = false;
+    const host = rightHostRef.current;
+    if (!host || !splitOpen || !rightFile) return undefined;
+
+    rightViewRef.current?.destroy();
+    rightViewRef.current = null;
+    host.innerHTML = '';
+    setRightReady(false);
+    setRightDraft(rightFile.contents ?? '');
+
+    void (async () => {
+      try {
+        const cm = await loadCodeMirror();
+        if (cancelled || !rightHostRef.current) return;
+        const language = await loadLanguage(rightFile.path);
+        if (cancelled || !rightHostRef.current) return;
+
+        const forgeTheme = cm.EditorView.theme({
+          '&': {
+            height: '100%',
+            minHeight: '100%',
+            backgroundColor: '#0b100b',
+            color: 'rgba(255,255,255,0.68)',
+            fontSize: '12px',
+          },
+          '.cm-scroller': { fontFamily: 'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace' },
+          '.cm-content': { caretColor: '#00FF9C', padding: '16px 0' },
+          '.cm-cursor': { borderLeftColor: '#00FF9C' },
+          '.cm-activeLine': { backgroundColor: 'rgba(0,212,255,0.05)' },
+          '.cm-activeLineGutter': { backgroundColor: 'rgba(0,212,255,0.06)', color: '#00D4FF' },
+          '.cm-gutters': { backgroundColor: '#0b100b', color: 'rgba(255,255,255,0.25)', borderRightColor: 'rgba(255,255,255,0.07)' },
+          '.cm-selectionBackground': { backgroundColor: 'rgba(0,255,156,0.18) !important' },
+        }, { dark: true });
+
+        const state = cm.EditorState.create({
+          doc: rightFile.contents,
+          extensions: [
+            cm.basicSetup,
+            cm.lineNumbers(),
+            cm.highlightActiveLine(),
+            cm.EditorView.lineWrapping,
+            forgeTheme,
+            cm.EditorState.readOnly.of(true),
+            ...language,
+          ],
+        });
+
+        rightViewRef.current = new cm.EditorView({ state, parent: rightHostRef.current });
+        setRightReady(true);
+      } catch {
+        setRightReady(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      rightViewRef.current?.destroy();
+      rightViewRef.current = null;
+    };
+  }, [rightFile, splitOpen]);
+
+  const startSplitResize = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const container = splitContainerRef.current;
+    if (!container) return;
+
+    function onMove(moveEvent: MouseEvent) {
+      const rect = container.getBoundingClientRect();
+      const next = ((moveEvent.clientX - rect.left) / rect.width) * 100;
+      setSplitRatio(Math.max(32, Math.min(68, next)));
+    }
+
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
+  useEffect(() => {
     const view = viewRef.current;
     const readOnly = readOnlyRef.current;
     const cm = cmRef.current;
@@ -360,6 +464,18 @@ function CodeViewerComponent({
               </span>
               <button
                 type="button"
+                disabled={!file || files.length < 2}
+                onClick={() => setSplitOpen(value => !value)}
+                className={cn(
+                  'flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-30',
+                  splitOpen ? 'border-[#00D4FF]/25 bg-[#00D4FF]/10 text-[#00D4FF]' : 'border-white/[0.08] bg-white/[0.03] text-white/48 hover:text-white/80',
+                )}
+              >
+                <Columns2 className="size-3.5" />
+                Split
+              </button>
+              <button
+                type="button"
                 disabled={!file}
                 onClick={() => setEditing(value => !value)}
                 className={cn(
@@ -390,60 +506,102 @@ function CodeViewerComponent({
               </button>
             </div>
           </div>
-          <div className="relative h-[min(440px,50vh)] overflow-hidden bg-[#0d120d]">
-            {/* FORGE_UPGRADE: CodeMirror is loaded from CDN with a textarea fallback for offline/dev cases. */}
-            <div ref={hostRef} className={cn('h-full', !editorReady && 'hidden')} />
-            {inlineOpen ? (
-              <div
-                className="absolute left-4 z-[100] w-[min(600px,calc(100%-2rem))] rounded-lg border border-[#1f3a1f] bg-[#0d120d] p-3 shadow-2xl shadow-black/60"
-                style={{ top: inlineTop }}
-              >
-                <div className="mb-2 max-h-28 overflow-auto rounded-md border border-white/[0.06] bg-white/[0.035] p-2 font-mono text-[11px] leading-5 text-white/42">
-                  {inlineSelection}
-                </div>
-                <div className="flex items-center gap-2">
-                  <WandSparkles className="size-4 shrink-0 text-[#00FF9C]" />
-                  <input
-                    value={inlineInstruction}
-                    onChange={event => setInlineInstruction(event.target.value)}
-                    onKeyDown={event => {
-                      if (event.key === 'Escape') setInlineOpen(false);
-                      if (event.key === 'Enter') void runInlineEdit();
-                    }}
-                    autoFocus
-                    placeholder="O que fazer com esse trecho?"
-                    className="min-h-9 flex-1 bg-transparent text-sm text-white/82 outline-none placeholder:text-white/24"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void runInlineEdit()}
-                    disabled={inlineLoading || !inlineInstruction.trim()}
-                    className="rounded-md border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] disabled:opacity-40"
+          <div ref={splitContainerRef} className="relative h-[min(440px,50vh)] overflow-hidden bg-[#0d120d]">
+            <div className="flex h-full min-w-0">
+              <div className="relative min-w-0" style={{ width: splitOpen ? `${splitRatio}%` : '100%' }}>
+                {/* FORGE_UPGRADE: CodeMirror is loaded from CDN with a textarea fallback for offline/dev cases. */}
+                <div ref={hostRef} className={cn('h-full', !editorReady && 'hidden')} />
+                {inlineOpen ? (
+                  <div
+                    className="absolute left-4 z-[100] w-[min(600px,calc(100%-2rem))] rounded-lg border border-[#1f3a1f] bg-[#0d120d] p-3 shadow-2xl shadow-black/60"
+                    style={{ top: inlineTop }}
                   >
-                    {inlineLoading ? '...' : 'Aplicar'}
-                  </button>
-                  <button type="button" onClick={() => setInlineOpen(false)} className="rounded-md border border-white/[0.08] p-2 text-white/35">
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-                {inlineError ? <p className="mt-2 text-[11px] text-red-300">[FORGE] inline-edit falhou: {inlineError}</p> : null}
+                    <div className="mb-2 max-h-28 overflow-auto rounded-md border border-white/[0.06] bg-white/[0.035] p-2 font-mono text-[11px] leading-5 text-white/42">
+                      {inlineSelection}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <WandSparkles className="size-4 shrink-0 text-[#00FF9C]" />
+                      <input
+                        value={inlineInstruction}
+                        onChange={event => setInlineInstruction(event.target.value)}
+                        onKeyDown={event => {
+                          if (event.key === 'Escape') setInlineOpen(false);
+                          if (event.key === 'Enter') void runInlineEdit();
+                        }}
+                        autoFocus
+                        placeholder="O que fazer com esse trecho?"
+                        className="min-h-9 flex-1 bg-transparent text-sm text-white/82 outline-none placeholder:text-white/24"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void runInlineEdit()}
+                        disabled={inlineLoading || !inlineInstruction.trim()}
+                        className="rounded-md border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] disabled:opacity-40"
+                      >
+                        {inlineLoading ? '...' : 'Aplicar'}
+                      </button>
+                      <button type="button" onClick={() => setInlineOpen(false)} className="rounded-md border border-white/[0.08] p-2 text-white/35">
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                    {inlineError ? <p className="mt-2 text-[11px] text-red-300">[FORGE] inline-edit falhou: {inlineError}</p> : null}
+                  </div>
+                ) : null}
+                {!editorReady && (
+                  <textarea
+                    value={draft}
+                    readOnly={!editing}
+                    onChange={event => setDraft(event.target.value)}
+                    onKeyDown={event => {
+                      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+                        event.preventDefault();
+                        void saveDraft();
+                      }
+                    }}
+                    className="h-full w-full resize-none bg-[#0d120d] p-4 font-mono text-[12px] leading-6 text-white/65 outline-none caret-[#00FF9C] selection:bg-cyan-400/20"
+                    spellCheck={false}
+                  />
+                )}
               </div>
-            ) : null}
-            {!editorReady && (
-              <textarea
-                value={draft}
-                readOnly={!editing}
-                onChange={event => setDraft(event.target.value)}
-                onKeyDown={event => {
-                  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-                    event.preventDefault();
-                    void saveDraft();
-                  }
-                }}
-                className="h-full w-full resize-none bg-[#0d120d] p-4 font-mono text-[12px] leading-6 text-white/65 outline-none caret-[#00FF9C] selection:bg-cyan-400/20"
-                spellCheck={false}
-              />
-            )}
+              {splitOpen ? (
+                <>
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    onMouseDown={startSplitResize}
+                    className="w-1 cursor-col-resize border-x border-white/[0.06] bg-[#071007] transition-colors hover:bg-[#00D4FF]/25"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col border-l border-white/[0.05] bg-[#0b100b]">
+                    <div className="flex min-h-9 items-center gap-2 border-b border-white/[0.07] px-3">
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-[#00D4FF]/70">Right</span>
+                      <select
+                        value={rightFile?.path ?? ''}
+                        onChange={event => setRightFilePath(event.target.value)}
+                        className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-white/58 outline-none"
+                        aria-label="Split view file"
+                      >
+                        {files.map(item => (
+                          <option key={item.path} value={item.path} className="bg-[#0d120d] text-white">
+                            {item.path}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="min-h-0 flex-1">
+                      <div ref={rightHostRef} className={cn('h-full', !rightReady && 'hidden')} />
+                      {!rightReady ? (
+                        <textarea
+                          value={rightDraft}
+                          readOnly
+                          className="h-full w-full resize-none bg-[#0b100b] p-4 font-mono text-[12px] leading-6 text-white/55 outline-none selection:bg-[#00FF9C]/15"
+                          spellCheck={false}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
