@@ -26,6 +26,7 @@ function ForgeRightPanelComponent({
   tab,
   onTabChange,
   onSelectFile,
+  onFileSaved,
   onPrivatePayDemo,
   onReplayLast,
   onApplyProposal,
@@ -41,6 +42,7 @@ function ForgeRightPanelComponent({
   tab: ForgePanelTab;
   onTabChange: (tab: ForgePanelTab) => void;
   onSelectFile: (path: string) => void;
+  onFileSaved: (path: string, contents: string) => void;
   onPrivatePayDemo: () => void;
   onReplayLast: () => void;
   onApplyProposal: () => void;
@@ -106,7 +108,8 @@ function ForgeRightPanelComponent({
             />
           </TabsContent>
           <TabsContent value="code" className="min-h-0">
-            <CodeViewer files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} />
+            {/* FORGE_UPGRADE: Code tab now hosts an editable CodeMirror-backed editor. */}
+            <CodeViewer files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} onFileSaved={onFileSaved} />
           </TabsContent>
           <TabsContent value="files" className="min-h-0 p-3">
             <div className="space-y-2">

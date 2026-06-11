@@ -48,6 +48,7 @@ interface ForgeState {
   appendResponse: (chunk: string) => void;
   addPromptHistory: (prompt: string) => void;
   upsertFile: (file: ForgeFile) => void;
+  updateFileContents: (path: string, contents: string) => void;
   upsertMemory: (node: ForgeMemoryNode) => void;
   updateAgent: (id: ForgeAgentId, patch: Partial<ForgeAgent>) => void;
   updateBuildStep: (id: string, status: ForgeBuildStep['status']) => void;
@@ -128,6 +129,10 @@ export const useForgeStore = create<ForgeState>()(
           panelTab: state.panelTab === 'preview' ? 'preview' : 'code',
         };
       }),
+      // FORGE_UPGRADE: keep CodeMirror saves reflected in the local Forge file graph.
+      updateFileContents: (path, contents) => set(state => ({
+        files: state.files.map(file => file.path === path ? { ...file, contents, status: 'modified' } : file),
+      })),
       upsertMemory: node => set(state => {
         const exists = state.memoryNodes.some(item => item.id === node.id);
         return {

@@ -48,6 +48,7 @@ function ForgeWorkspaceInner() {
     activeSandboxSessionId,
     setPanelTab,
     setSelectedFile,
+    updateFileContents,
     appendTerminal,
     applyProposal,
     resetSession,
@@ -68,6 +69,7 @@ function ForgeWorkspaceInner() {
       activeSandboxSessionId: s.activeSandboxSessionId,
       setPanelTab: s.setPanelTab,
       setSelectedFile: s.setSelectedFile,
+      updateFileContents: s.updateFileContents,
       appendTerminal: s.appendTerminal,
       applyProposal: s.applyProposal,
       resetSession: s.resetSession,
@@ -299,6 +301,8 @@ function ForgeWorkspaceInner() {
                   tab={panelTab}
                   onTabChange={setPanelTab}
                   onSelectFile={setSelectedFile}
+                  // FORGE_UPGRADE: Code tab can persist edited content and update the Forge store.
+                  onFileSaved={updateFileContents}
                   onPrivatePayDemo={runPrivatePayDemo}
                   onReplayLast={replayLastBuild}
                   onApplyProposal={handleApplyProposal}
@@ -338,6 +342,8 @@ function ForgeWorkspaceInner() {
             tab={panelTab}
             onTabChange={setPanelTab}
             onSelectFile={setSelectedFile}
+            // FORGE_UPGRADE: Code tab can persist edited content and update the Forge store.
+            onFileSaved={updateFileContents}
             onPrivatePayDemo={runPrivatePayDemo}
             onReplayLast={replayLastBuild}
             onApplyProposal={handleApplyProposal}
