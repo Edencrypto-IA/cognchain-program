@@ -43,6 +43,8 @@ export interface ForgeFile {
   language: string;
   status: 'created' | 'modified' | 'queued';
   contents: string;
+  real?: boolean;
+  size?: number;
 }
 
 export interface ForgeSandboxSession {
@@ -59,6 +61,10 @@ export interface ForgeBuildStep {
   id: string;
   label: string;
   status: 'pending' | 'running' | 'complete' | 'error';
+  detail?: string;
+  result?: string;
+  files?: string[];
+  updatedAt?: string;
 }
 
 export interface ForgeMemoryNode {
@@ -66,6 +72,16 @@ export interface ForgeMemoryNode {
   label: string;
   detail: string;
   confidence: number;
+  hash?: string;
+  source?: 'session' | 'cognchain' | 'local';
+}
+
+export interface ForgeCommandRun {
+  command: 'npm run lint' | 'npm run build';
+  status: 'idle' | 'running' | 'complete' | 'error';
+  output: string;
+  startedAt?: string;
+  finishedAt?: string;
 }
 
 export interface ForgeSessionSnapshot {
@@ -85,4 +101,5 @@ export interface ForgeSessionSnapshot {
   sandboxSessions: ForgeSandboxSession[];
   activeSandboxSessionId: string;
   diffProposal?: ForgeDiffProposal | null;
+  commandRun?: ForgeCommandRun | null;
 }

@@ -14,6 +14,7 @@ import type {
   ForgeAgent,
   ForgeAgentId,
   ForgeBuildStep,
+  ForgeCommandRun,
   ForgeDiffProposal,
   ForgeFile,
   ForgeMemoryNode,
@@ -41,6 +42,7 @@ interface ForgeState {
   sandboxSessions: ForgeSandboxSession[];
   activeSandboxSessionId: string;
   diffProposal: ForgeDiffProposal | null;
+  commandRun: ForgeCommandRun | null;
   setPhase: (phase: ForgePhase) => void;
   setRunStatus: (runStatus: ForgeRunStatus) => void;
   setActivePrompt: (prompt: string) => void;
@@ -51,7 +53,10 @@ interface ForgeState {
   addPromptHistory: (prompt: string) => void;
   upsertFile: (file: ForgeFile) => void;
   updateFileContents: (path: string, contents: string) => void;
+  hydrateFileContents: (path: string, contents: string) => void;
   setDiffProposal: (proposal: ForgeDiffProposal | null) => void;
+  setFiles: (files: ForgeFile[]) => void;
+  setCommandRun: (run: ForgeCommandRun | null) => void;
   upsertMemory: (node: ForgeMemoryNode) => void;
   updateAgent: (id: ForgeAgentId, patch: Partial<ForgeAgent>) => void;
   updateBuildStep: (id: string, status: ForgeBuildStep['status']) => void;
@@ -115,6 +120,7 @@ export const useForgeStore = create<ForgeState>()(
       sandboxSessions: [],
       activeSandboxSessionId: '',
       diffProposal: null,
+      commandRun: null,
       setPhase: phase => set({ phase }),
       setRunStatus: runStatus => set({ runStatus }),
       setActivePrompt: activePrompt => set({ activePrompt }),
@@ -133,9 +139,18 @@ export const useForgeStore = create<ForgeState>()(
           panelTab: state.panelTab === 'preview' ? 'preview' : 'code',
         };
       }),
+      // FORGE_UPGRADE: hydrate Explorer with real repository files while preserving sandbox proposals.
+      setFiles: files => set(state => ({
+        files: files.length ? files : state.files,
+        selectedFile: files.some(file => file.path === state.selectedFile) ? state.selectedFile : files[0]?.path ?? state.selectedFile,
+      })),
       // FORGE_UPGRADE: keep CodeMirror saves reflected in the local Forge file graph.
       updateFileContents: (path, contents) => set(state => ({
         files: state.files.map(file => file.path === path ? { ...file, contents, status: 'modified' } : file),
+      })),
+      // FORGE_UPGRADE: opening real repository files should not mark them modified.
+      hydrateFileContents: (path, contents) => set(state => ({
+        files: state.files.map(file => file.path === path ? { ...file, contents } : file),
       })),
       // FORGE_UPGRADE: hold agent edit diffs until the user accepts or rejects them.
       setDiffProposal: diffProposal => set(state => ({
@@ -143,6 +158,8 @@ export const useForgeStore = create<ForgeState>()(
         panelTab: diffProposal ? 'diff' : 'code',
         selectedFile: diffProposal?.path ?? state.selectedFile,
       })),
+      // FORGE_UPGRADE: safe command runs are tracked as first-class terminal state.
+      setCommandRun: commandRun => set({ commandRun }),
       upsertMemory: node => set(state => {
         const exists = state.memoryNodes.some(item => item.id === node.id);
         return {
@@ -206,6 +223,7 @@ export const useForgeStore = create<ForgeState>()(
         deployStatus: 'Planning',
         panelTab: 'preview',
         diffProposal: null,
+        commandRun: null,
       }),
       resetSession: () => set({
         phase: 'idle',
@@ -223,6 +241,7 @@ export const useForgeStore = create<ForgeState>()(
         panelTab: 'preview',
         activeSandboxSessionId: '',
         diffProposal: null,
+        commandRun: null,
       }),
       restoreIdle: () => set(state => ({
         phase: state.phase === 'error' ? 'error' : 'idle',
@@ -253,6 +272,7 @@ export const useForgeStore = create<ForgeState>()(
         sandboxSessions: state.sandboxSessions,
         activeSandboxSessionId: state.activeSandboxSessionId,
         diffProposal: state.diffProposal,
+        commandRun: state.commandRun,
       }),
     },
   ),

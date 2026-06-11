@@ -2,15 +2,17 @@
 
 import { memo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Code2, ExternalLink, LockKeyhole, Play, ReceiptText, ShieldCheck, Sparkles, WalletCards } from 'lucide-react';
-import type { ForgePhase, ForgeRunStatus } from '@/lib/forge/types';
+import { Check, Code2, ExternalLink, Globe2, LockKeyhole, Play, ReceiptText, ShieldCheck, Sparkles, WalletCards } from 'lucide-react';
+import type { ForgeFile, ForgePhase, ForgeRunStatus } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 
-type PreviewMode = 'product' | 'receipt' | 'code';
+type PreviewMode = 'product' | 'receipt' | 'code' | 'live';
 
 function ForgePreviewComponent({
   phase,
   runStatus,
+  files,
+  selectedFile,
   busy,
   canReplay,
   onPrivatePayDemo,
@@ -18,6 +20,8 @@ function ForgePreviewComponent({
 }: {
   phase: ForgePhase;
   runStatus: ForgeRunStatus;
+  files: ForgeFile[];
+  selectedFile: string;
   busy: boolean;
   canReplay: boolean;
   onPrivatePayDemo: () => void;
@@ -29,6 +33,16 @@ function ForgePreviewComponent({
   const active = ['building', 'deploying', 'complete'].includes(phase);
   const streaming = runStatus === 'streaming';
   const connecting = runStatus === 'connecting';
+  const selected = files.find(file => file.path === selectedFile) ?? files.find(file => file.contents);
+  const htmlFile = files.find(file => file.path.endsWith('.html') && file.contents.trim());
+  const previewDoc = htmlFile?.contents || `<!doctype html>
+<html><head><meta charset="utf-8" /><style>
+body{margin:0;background:#050505;color:white;font-family:Inter,system-ui,sans-serif}
+main{min-height:100vh;display:grid;place-items:center;padding:32px;background:radial-gradient(circle at 70% 20%,rgba(0,255,156,.18),transparent 32%),radial-gradient(circle at 20% 80%,rgba(0,212,255,.14),transparent 30%)}
+.card{width:min(720px,92vw);border:1px solid rgba(255,255,255,.12);border-radius:28px;background:rgba(255,255,255,.045);padding:34px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
+p{color:rgba(255,255,255,.58);line-height:1.7} h1{font-size:clamp(34px,7vw,74px);line-height:.95;margin:10px 0 18px}.pill{color:#00ff9c;letter-spacing:.22em;font-size:12px;text-transform:uppercase}.btn{display:inline-flex;margin-top:18px;padding:13px 18px;border-radius:999px;background:#00ff9c;color:#04110b;font-weight:800}
+code{color:#00d4ff}
+</style></head><body><main><section class="card"><div class="pill">Forge live preview</div><h1>${selected?.path ?? 'CognChain app'}</h1><p>This sandbox renders the selected Forge artifact as an isolated preview. It cannot sign, submit, buy, sell, schedule, or move funds.</p><p><code>${(selected?.contents || 'Select or generate a file to preview.').slice(0, 220).replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] ?? char))}</code></p><span class="btn">Preview only</span></section></main></body></html>`;
 
   const bumpPulse = useCallback(() => {
     setPulseKey(k => k + 1);
@@ -90,6 +104,7 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
               ['product', WalletCards],
               ['receipt', ReceiptText],
               ['code', Code2],
+              ['live', Globe2],
             ] as const
           ).map(([itemMode, Icon]) => (
             <button
@@ -183,7 +198,14 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
                 transition={{ duration: 0.28, ease: 'easeOut' }}
                 className="flex min-h-0 flex-col rounded-2xl border border-white/[0.07] bg-black/30 p-3 sm:p-4"
               >
-                {mode === 'code' ? (
+                {mode === 'live' ? (
+                  <iframe
+                    title="Forge live sandbox preview"
+                    sandbox=""
+                    srcDoc={previewDoc}
+                    className="min-h-[28rem] flex-1 rounded-2xl border border-[#00D4FF]/20 bg-black"
+                  />
+                ) : mode === 'code' ? (
                   <div className="flex min-h-0 flex-1 flex-col">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>

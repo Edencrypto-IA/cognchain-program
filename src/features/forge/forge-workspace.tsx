@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bot, Box, CheckCircle2, Clipboard, Copy, FilePlus2, Play, RotateCcw, Search, ShieldCheck, Sparkles, Square } from 'lucide-react';
+import { ArrowLeft, Bot, Box, CheckCircle2, Clipboard, Command, Copy, FilePlus2, Play, RotateCcw, Search, ShieldCheck, Sparkles, Square } from 'lucide-react';
 import Link from 'next/link';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -50,6 +50,9 @@ function ForgeWorkspaceInner() {
     setPanelTab,
     setSelectedFile,
     updateFileContents,
+    hydrateFileContents,
+    setFiles,
+    setCommandRun,
     setDiffProposal,
     appendTerminal,
     applyProposal,
@@ -73,6 +76,9 @@ function ForgeWorkspaceInner() {
       setPanelTab: s.setPanelTab,
       setSelectedFile: s.setSelectedFile,
       updateFileContents: s.updateFileContents,
+      hydrateFileContents: s.hydrateFileContents,
+      setFiles: s.setFiles,
+      setCommandRun: s.setCommandRun,
       setDiffProposal: s.setDiffProposal,
       appendTerminal: s.appendTerminal,
       applyProposal: s.applyProposal,
@@ -85,6 +91,132 @@ function ForgeWorkspaceInner() {
   const latestSandboxSession =
     sandboxSessions.find(session => session.id === activeSandboxSessionId) ?? sandboxSessions[0];
   const selectedFile = files.find(file => file.path === selectedFilePath) ?? files[0];
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/forge/files', { credentials: 'include' })
+      .then(response => response.json() as Promise<{ files?: Array<{ path: string; language?: string; size?: number }> }>)
+      .then(data => {
+        if (cancelled || !Array.isArray(data.files) || data.files.length === 0) return;
+        setFiles(data.files.slice(0, 180).map(file => ({
+          path: file.path,
+          language: file.language ?? 'txt',
+          status: 'queued',
+          contents: '',
+          real: true,
+          size: file.size ?? 0,
+        })));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [setFiles]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setCommandPaletteOpen(value => !value);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const openFile = useCallback((path: string) => {
+    setSelectedFile(path);
+    const existing = useForgeStore.getState().files.find(file => file.path === path);
+    if (existing?.contents) return;
+    void fetch(`/api/forge/file?path=${encodeURIComponent(path)}`, { credentials: 'include' })
+      .then(response => response.json() as Promise<{ content?: string }>)
+      .then(data => {
+        if (typeof data.content === 'string') hydrateFileContents(path, data.content);
+      })
+      .catch(() => {});
+  }, [hydrateFileContents, setSelectedFile]);
+
+  const runSafeCommand = useCallback((command: 'npm run lint' | 'npm run build') => {
+    setCommandRun({ command, status: 'running', output: '', startedAt: new Date().toISOString() });
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'shell',
+      source: 'Forge Exec',
+      text: `Running ${command} in safe allowlist mode...`,
+    });
+    void fetch('/api/forge/command/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ command }),
+    })
+      .then(response => response.json() as Promise<{ status?: 'complete' | 'error'; output?: string }>)
+      .then(data => {
+        const status = data.status === 'complete' ? 'complete' : 'error';
+        setCommandRun({ command, status, output: data.output ?? '', finishedAt: new Date().toISOString() });
+        appendTerminal({
+          id: forgeId('line'),
+          timestamp: nowLabel(),
+          kind: status === 'complete' ? 'success' : 'error',
+          source: 'Forge Exec',
+          text: `${command} ${status === 'complete' ? 'passed' : 'failed'}.\n${(data.output ?? '').slice(0, 900)}`,
+        });
+      })
+      .catch(error => {
+        setCommandRun({ command, status: 'error', output: error instanceof Error ? error.message : 'Command failed', finishedAt: new Date().toISOString() });
+      });
+  }, [appendTerminal, setCommandRun]);
+
+  const saveForgeMemory = useCallback(async () => {
+    const content = [
+      `Forge session: ${promptHistory[0] ?? 'manual session'}`,
+      `Selected file: ${selectedFile?.path ?? 'none'}`,
+      `Status: ${deployStatus}`,
+      `Files loaded: ${files.length}`,
+    ].join('\n');
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'shell',
+      source: 'Memory Core',
+      text: 'Saving Forge decision to CognChain memory layer...',
+    });
+    try {
+      const response = await fetch('/api/save-memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content, source: 'forge' }),
+      });
+      const data = await response.json() as { hash?: string };
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: response.ok ? 'success' : 'warning',
+        source: 'Memory Core',
+        text: response.ok ? `Forge memory saved${data.hash ? `: ${data.hash}` : '.'}` : 'Memory save endpoint returned a warning.',
+      });
+    } catch {
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'warning',
+        source: 'Memory Core',
+        text: 'Memory save unavailable; session remains local.',
+      });
+    }
+  }, [appendTerminal, deployStatus, files.length, promptHistory, selectedFile]);
+
+  const commandActions = useMemo(() => [
+    { label: 'Run lint', detail: 'Execute npm run lint safely', action: () => runSafeCommand('npm run lint') },
+    { label: 'Run build', detail: 'Execute npm run build safely', action: () => runSafeCommand('npm run build') },
+    { label: 'Open preview', detail: 'Focus real sandbox preview', action: () => setPanelTab('preview') },
+    { label: 'Open code', detail: 'Focus CodeMirror editor', action: () => setPanelTab('code') },
+    { label: 'Review diff', detail: 'Focus accept/reject diff gate', action: () => setPanelTab('diff') },
+    { label: 'Save memory', detail: 'Anchor current Forge decision locally', action: () => void saveForgeMemory() },
+  ], [runSafeCommand, saveForgeMemory, setPanelTab]);
 
   const handleReset = useCallback(() => {
     stop();
@@ -289,7 +421,7 @@ function ForgeWorkspaceInner() {
               buildSteps={buildSteps}
               sandboxSessions={sandboxSessions}
               busy={busy}
-              onSelectFile={setSelectedFile}
+              onSelectFile={openFile}
             />
           </ResizablePanel>
           <ResizableHandle className="bg-white/[0.06]" />
@@ -304,7 +436,7 @@ function ForgeWorkspaceInner() {
                   deployStatus={deployStatus}
                   tab={panelTab}
                   onTabChange={setPanelTab}
-                  onSelectFile={setSelectedFile}
+                  onSelectFile={openFile}
                   // FORGE_UPGRADE: Code tab can persist edited content and update the Forge store.
                   onFileSaved={updateFileContents}
                   onPrivatePayDemo={runPrivatePayDemo}
@@ -317,6 +449,7 @@ function ForgeWorkspaceInner() {
                   // FORGE_UPGRADE: Diff proposals can be accepted only from the explicit review button.
                   onDiffAccepted={updateFileContents}
                   onDiffRejected={() => setDiffProposal(null)}
+                  onRunSafeCommand={runSafeCommand}
                 />
               </ResizablePanel>
               <ResizableHandle className="bg-white/[0.06]" />
@@ -351,7 +484,7 @@ function ForgeWorkspaceInner() {
             deployStatus={deployStatus}
             tab={panelTab}
             onTabChange={setPanelTab}
-            onSelectFile={setSelectedFile}
+            onSelectFile={openFile}
             // FORGE_UPGRADE: Code tab can persist edited content and update the Forge store.
             onFileSaved={updateFileContents}
             onPrivatePayDemo={runPrivatePayDemo}
@@ -364,6 +497,7 @@ function ForgeWorkspaceInner() {
             // FORGE_UPGRADE: Diff proposals can be accepted only from the explicit review button.
             onDiffAccepted={updateFileContents}
             onDiffRejected={() => setDiffProposal(null)}
+            onRunSafeCommand={runSafeCommand}
           />
         </motion.div>
         <motion.div
@@ -395,7 +529,7 @@ function ForgeWorkspaceInner() {
             buildSteps={buildSteps}
             sandboxSessions={sandboxSessions}
             busy={busy}
-            onSelectFile={setSelectedFile}
+            onSelectFile={openFile}
           />
         </motion.div>
       </section>
@@ -424,6 +558,38 @@ function ForgeWorkspaceInner() {
           />
         </SheetContent>
       </Sheet>
+      {commandPaletteOpen && (
+        <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[12vh]" onClick={() => setCommandPaletteOpen(false)}>
+          <div className="w-full max-w-xl rounded-2xl border border-white/[0.09] bg-[#08080a] p-2 shadow-2xl shadow-black" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center gap-2 border-b border-white/[0.07] px-3 py-2 text-white/50">
+              <Command className="size-4 text-[#00D4FF]" />
+              <span className="text-xs font-semibold uppercase tracking-[0.18em]">Forge Command Palette</span>
+              <span className="ml-auto font-mono text-[10px] text-white/25">Ctrl K</span>
+            </div>
+            <div className="p-2">
+              {commandActions.map(item => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    item.action();
+                    setCommandPaletteOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-white/[0.06]"
+                >
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/[0.07] bg-white/[0.035] text-[#14F195]">
+                    <Command className="size-3.5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-white/82">{item.label}</span>
+                    <span className="block truncate text-[11px] text-white/35">{item.detail}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

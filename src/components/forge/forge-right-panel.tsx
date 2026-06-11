@@ -36,6 +36,7 @@ function ForgeRightPanelComponent({
   diffProposal,
   onDiffAccepted,
   onDiffRejected,
+  onRunSafeCommand,
 }: {
   phase: ForgePhase;
   runStatus: ForgeRunStatus;
@@ -55,6 +56,7 @@ function ForgeRightPanelComponent({
   diffProposal?: ForgeDiffProposal | null;
   onDiffAccepted: (path: string, contents: string) => void;
   onDiffRejected: () => void;
+  onRunSafeCommand: (command: 'npm run lint' | 'npm run build') => void;
 }) {
   const [applyingDiff, setApplyingDiff] = useState(false);
   const [diffError, setDiffError] = useState('');
@@ -90,6 +92,14 @@ function ForgeRightPanelComponent({
       return { id: `${index}-${line.slice(0, 12)}`, line, variant };
     });
   }, [diffPreview, diffProposal]);
+  const diffStats = useMemo(() => {
+    const lines = (diffProposal?.diff || '').split('\n');
+    return {
+      added: lines.filter(line => line.startsWith('+') && !line.startsWith('+++')).length,
+      removed: lines.filter(line => line.startsWith('-') && !line.startsWith('---')).length,
+      hunks: lines.filter(line => line.startsWith('@@')).length,
+    };
+  }, [diffProposal]);
 
   const acceptDiff = async () => {
     if (!diffProposal || applyingDiff) return;
@@ -141,12 +151,30 @@ function ForgeRightPanelComponent({
             >
               {statusLine}
             </p>
+            <div className="hidden items-center gap-1 sm:flex">
+              <button
+                type="button"
+                onClick={() => onRunSafeCommand('npm run lint')}
+                className="rounded-md border border-white/[0.06] bg-white/[0.025] px-2 py-1 text-[10px] text-white/38 hover:border-[#14F195]/25 hover:text-[#14F195]"
+              >
+                lint
+              </button>
+              <button
+                type="button"
+                onClick={() => onRunSafeCommand('npm run build')}
+                className="rounded-md border border-white/[0.06] bg-white/[0.025] px-2 py-1 text-[10px] text-white/38 hover:border-[#00D4FF]/25 hover:text-[#00D4FF]"
+              >
+                build
+              </button>
+            </div>
           </div>
 
           <TabsContent value="preview" forceMount className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
             <ForgePreview
               phase={phase}
               runStatus={runStatus}
+              files={files}
+              selectedFile={selectedFile}
               busy={busy}
               canReplay={canReplay}
               onPrivatePayDemo={onPrivatePayDemo}
@@ -226,6 +254,20 @@ function ForgeRightPanelComponent({
             </div>
             {diffError ? (
               <div className="mb-3 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">{diffError}</div>
+            ) : null}
+            {diffProposal ? (
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                {[
+                  ['adições', diffStats.added, 'text-[#14F195]'],
+                  ['remoções', diffStats.removed, 'text-red-300'],
+                  ['blocos', diffStats.hunks, 'text-[#00D4FF]'],
+                ].map(([label, value, color]) => (
+                  <div key={label} className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-white/25">{label}</p>
+                    <p className={cn('mt-1 text-lg font-bold', color as string)}>{value}</p>
+                  </div>
+                ))}
+              </div>
             ) : null}
             {/* FORGE_UPGRADE: render inline diffs manually so the review gate works without extra dependencies. */}
             <div className="h-[min(380px,42vh)] overflow-auto rounded-2xl border border-white/[0.07] bg-black/25 p-4 font-mono text-[12px] leading-6">

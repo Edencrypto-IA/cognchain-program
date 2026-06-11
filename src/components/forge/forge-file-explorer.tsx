@@ -80,9 +80,12 @@ function ForgeFileExplorerComponent({
           {buildSteps.map(step => {
             const Icon = step.status === 'complete' ? CheckCircle2 : step.status === 'running' ? Loader2 : Circle;
             return (
-              <div key={step.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-white/42">
-                <Icon className={cn('size-3.5 shrink-0', step.status === 'complete' && 'text-[#14F195]', step.status === 'running' && 'animate-spin text-[#38BDF8]', step.status === 'pending' && 'text-white/18')} />
-                <span className="min-w-0 flex-1 truncate">{step.label}</span>
+              <div key={step.id} className="rounded-lg px-2 py-1.5 text-[11px] text-white/42">
+                <div className="flex items-center gap-2">
+                  <Icon className={cn('size-3.5 shrink-0', step.status === 'complete' && 'text-[#14F195]', step.status === 'running' && 'animate-spin text-[#38BDF8]', step.status === 'pending' && 'text-white/18')} />
+                  <span className="min-w-0 flex-1 truncate">{step.label}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 pl-5 text-[10px] leading-4 text-white/26">{step.result || step.detail}</p>
               </div>
             );
           })}

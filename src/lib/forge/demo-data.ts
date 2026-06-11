@@ -145,11 +145,11 @@ export function createPrivatePaymentIntent(intent: PrivatePaymentIntent) {
 ];
 
 export const initialBuildSteps: ForgeBuildStep[] = [
-  { id: 'intent', label: 'Parse product intent', status: 'pending' },
-  { id: 'plan', label: 'Coordinate agent plan', status: 'pending' },
-  { id: 'files', label: 'Generate files', status: 'pending' },
-  { id: 'verify', label: 'Run simulated checks', status: 'pending' },
-  { id: 'deploy', label: 'Prepare deploy capsule', status: 'pending' },
+  { id: 'intent', label: 'Parse product intent', status: 'pending', detail: 'Waiting for a user build request.', result: 'No intent captured yet.' },
+  { id: 'plan', label: 'Coordinate agent plan', status: 'pending', detail: 'Architect, UI, backend, Solana, and security agents will coordinate.', result: 'No plan emitted yet.' },
+  { id: 'files', label: 'Generate files', status: 'pending', detail: 'Generated files stay in Forge until reviewed.', result: 'No files generated yet.' },
+  { id: 'verify', label: 'Run simulated checks', status: 'pending', detail: 'Safe checks can run without wallet signing or fund movement.', result: 'No checks run yet.' },
+  { id: 'deploy', label: 'Prepare deploy capsule', status: 'pending', detail: 'Deployment is a capsule summary only until explicitly connected.', result: 'No deploy capsule prepared.' },
 ];
 
 export const initialMemoryNodes: ForgeMemoryNode[] = [

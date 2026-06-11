@@ -12,7 +12,19 @@ const MAX_FILES = 500;
 type ForgeFileEntry = {
   path: string;
   name: string;
+  language: string;
+  size: number;
 };
+
+function inferLanguage(filePath: string): string {
+  if (filePath.endsWith('.tsx')) return 'tsx';
+  if (filePath.endsWith('.ts')) return 'ts';
+  if (filePath.endsWith('.json')) return 'json';
+  if (filePath.endsWith('.md')) return 'md';
+  if (filePath.endsWith('.css')) return 'css';
+  if (filePath.endsWith('.rs')) return 'rs';
+  return 'txt';
+}
 
 async function listFiles(root: string, bucket: ForgeFileEntry[]): Promise<void> {
   if (bucket.length >= MAX_FILES) return;
@@ -32,7 +44,7 @@ async function listFiles(root: string, bucket: ForgeFileEntry[]): Promise<void> 
       continue;
     }
     if (!entry.isFile() || !EXTENSIONS.has(path.extname(entry.name).toLowerCase())) continue;
-    bucket.push({ path: relative, name: entry.name });
+    bucket.push({ path: relative, name: entry.name, language: inferLanguage(relative), size: 0 });
   }
 }
 
