@@ -89,31 +89,66 @@ class NVIDIAHandler implements AIHandler {
   }
 }
 
+// ── Web-search need detector ─────────────────────────────────
+function needsWebSearch(messages: ChatMessage[]): boolean {
+  const lastMessage = messages[messages.length - 1]?.content || '';
+  const searchKeywords = /\b(notícia|noticia|atualidade|hoje|agora|últimas|ultimas|recentes|data|hora|clima|preço|preco|cotação|cotacao|evento|lançamento|lancamento|novidade|breaking|latest|current|today|now|recent)\b/i;
+  return searchKeywords.test(lastMessage);
+}
+
 // ── DeepSeek via API compatível com OpenAI ───────────────────
 class DeepSeekHandler implements AIHandler {
   name = 'DeepSeek V3';
   model = 'deepseek';
 
   async chat(messages: ChatMessage[], systemPromptOverride?: string): Promise<string> {
-    const client = new OpenAI({
-      apiKey: process.env.DEEPSEEK_API_KEY,
-      baseURL: 'https://api.deepseek.com',
-    });
     const systemPrompt = systemPromptOverride ||
       'Você é um assistente de IA integrado ao CognChain. NUNCA invente dados sobre o CognChain. Responda em portugues de forma precisa e eficiente.';
 
-    const response = await client.chat.completions.create({
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-      ],
-      max_tokens: getMaxTokens('deepseek'),
-    });
+    try {
+      const client = new OpenAI({
+        apiKey: process.env.DEEPSEEK_API_KEY,
+        baseURL: 'https://api.deepseek.com',
+      });
 
-    const content = response.choices[0]?.message?.content || 'Sem resposta do DeepSeek.';
-    trackUsage('deepseek', response.usage?.prompt_tokens ?? estimateTokens(systemPrompt), response.usage?.completion_tokens ?? estimateTokens(content));
-    return content;
+      const requestBody: any = {
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        ],
+        temperature: 0.7,
+        max_tokens: getMaxTokens('deepseek'),
+      };
+
+      if (needsWebSearch(messages)) {
+        requestBody.search_enable = true;
+      }
+
+      const response = await client.chat.completions.create(requestBody);
+
+      const content = response.choices[0]?.message?.content || '';
+      if (!content) throw new Error('DeepSeek returned empty content');
+
+      trackUsage('deepseek', response.usage?.prompt_tokens ?? estimateTokens(systemPrompt), response.usage?.completion_tokens ?? estimateTokens(content));
+      return content;
+    } catch (error) {
+      console.warn('[DeepSeek] request failed, falling back to Claude with web_search:', error);
+
+      const claudeClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const claudeResponse = await claudeClient.messages.create({
+        model: 'claude-opus-4-7',
+        max_tokens: getMaxTokens('deepseek'),
+        system: systemPrompt,
+        messages: messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        ...(needsWebSearch(messages) && { tools: [{ type: 'web_search' as const }] }),
+      });
+
+      const block = claudeResponse.content.find(b => b.type === 'text');
+      const fallbackContent = block?.type === 'text' ? block.text : 'Fallback indisponível.';
+      trackUsage('claude', claudeResponse.usage.input_tokens, claudeResponse.usage.output_tokens);
+      return fallbackContent;
+    }
   }
 }
 
