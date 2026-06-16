@@ -11,6 +11,44 @@ export type ForgeRunStatus = 'idle' | 'connecting' | 'streaming' | 'complete' | 
 
 export type ForgePanelTab = 'preview' | 'code' | 'files' | 'diff';
 
+export type ForgeNexusNodeStatus = 'pending' | 'ready' | 'running' | 'blocked' | 'complete' | 'needs_review';
+
+export type ForgeNexusNodeType = 'analysis' | 'design' | 'edit' | 'test' | 'security' | 'build' | 'review';
+
+export type ForgeNexusTactica = 'strategus' | 'architect' | 'backend' | 'ui' | 'security' | 'solana' | 'test';
+
+export type ForgeNexusRisk = 'low' | 'medium' | 'high';
+
+export interface ForgeNexusNode {
+  id: string;
+  title: string;
+  detail: string;
+  type: ForgeNexusNodeType;
+  tactica: ForgeNexusTactica;
+  dependencies: string[];
+  status: ForgeNexusNodeStatus;
+  risk: ForgeNexusRisk;
+  confidence: number;
+  files: string[];
+  checks: string[];
+}
+
+export interface ForgeNexusPlan {
+  id: string;
+  prompt: string;
+  summary: string;
+  strategy: string;
+  risk: ForgeNexusRisk;
+  estimatedSteps: number;
+  createdAt: string;
+  nodes: ForgeNexusNode[];
+  reviewGate: {
+    required: boolean;
+    reason: string;
+  };
+  safety: string[];
+}
+
 export interface ForgeDiffProposal {
   action: 'edit';
   path: string;
@@ -104,4 +142,5 @@ export interface ForgeSessionSnapshot {
   activeSandboxSessionId: string;
   diffProposal?: ForgeDiffProposal | null;
   commandRun?: ForgeCommandRun | null;
+  nexusPlan?: ForgeNexusPlan | null;
 }

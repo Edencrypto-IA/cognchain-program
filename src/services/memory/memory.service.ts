@@ -21,6 +21,7 @@ function mapMemory(memory: any): MemoryEntry {
     parentHash: memory.parentHash,
     score: memory.score,
     verified: memory.verified,
+    poiTxHash: memory.poiTxHash,
     zkVerified: memory.zkVerified,
     zkMode: memory.zkMode,
     zkProofVersion: memory.zkProofVersion,

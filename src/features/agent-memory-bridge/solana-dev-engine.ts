@@ -1069,7 +1069,7 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
   const solscanTokenPreview = solscanTokens.slice(0, 6).map(item => {
     const symbol = 'token_symbol' in item
       ? item.token_symbol || item.token_name || item.token_address?.slice(0, 8)
-      : item.tokenSymbol || item.tokenName || item.tokenAddress?.slice(0, 8);
+      : (item as any).tokenSymbol || (item as any).tokenName || (item as any).tokenAddress?.slice(0, 8);
     const amount = 'amount' in item ? item.amount : '0';
     const valueAmount = 'value' in item && typeof item.value === 'number' ? ` ~$${item.value.toFixed(2)}` : '';
     return `${symbol || 'asset'} ${String(amount || '0')}${valueAmount}`;
@@ -1286,7 +1286,7 @@ async function buildTokenEvidence(subject: string, cluster: MythosSolanaCluster)
       value('CMC market pairs', cmcMarketPairCount || 'not available', cmcMarketPairCount ? 'ready' : 'review'),
       value('Listed markets preview', cmcListings || 'not available', cmcListings ? 'ready' : 'review'),
       value('Price USD', typeof cmcUsd?.price === 'number' ? `$${cmcUsd.price.toPrecision(8)}` : typeof solscanMetaValue?.price === 'number' ? `$${solscanMetaValue.price.toPrecision(8)}` : 'not available', typeof cmcUsd?.price === 'number' || typeof solscanMetaValue?.price === 'number' ? 'ready' : 'review'),
-      value('Price change 24h', typeof cmcUsd?.percent_change_24h === 'number' ? `${cmcUsd.percent_change_24h.toFixed(2)}%` : typeof solscanMetaValue?.price_change_24h === 'number' ? `${solscanMetaValue.price_change_24h.toFixed(2)}%` : 'not available', typeof cmcUsd?.percent_change_24h === 'number' || typeof solscanMetaValue?.price_change_24h === 'number' ? 'ready' : 'review'),
+      value('Price change 24h', typeof (cmcUsd as any)?.percent_change_24h === 'number' ? `${(cmcUsd as any).percent_change_24h.toFixed(2)}%` : typeof (solscanMetaValue as any)?.price_change_24h === 'number' ? `${(solscanMetaValue as any).price_change_24h.toFixed(2)}%` : 'not available', typeof (cmcUsd as any)?.percent_change_24h === 'number' || typeof (solscanMetaValue as any)?.price_change_24h === 'number' ? 'ready' : 'review'),
       value('Market cap', typeof cmcUsd?.market_cap === 'number' ? `$${cmcUsd.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.market_cap === 'number' ? `$${solscanMetaValue.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.market_cap === 'number' || typeof solscanMetaValue?.market_cap === 'number' ? 'ready' : 'review'),
       value('Volume 24h', typeof cmcUsd?.volume_24h === 'number' ? `$${cmcUsd.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.volume_24h === 'number' ? `$${solscanMetaValue.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.volume_24h === 'number' || typeof solscanMetaValue?.volume_24h === 'number' ? 'ready' : 'review'),
       value('Largest account count', largestAccounts.length, largestAccounts.length ? 'ready' : 'review'),

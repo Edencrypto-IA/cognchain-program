@@ -178,7 +178,7 @@ function getNvidiaLabRoute(routeId?: string) {
 
 async function callNvidiaLabRoute(routeId: string | undefined, messages: MythosTestMessage[], systemPrompt: string) {
   const route = getNvidiaLabRoute(routeId);
-  const apiKey = (route.apiKeyEnv ? process.env[route.apiKeyEnv] : undefined) || process.env.NVIDIA_API_KEY;
+  const apiKey = ((route as any).apiKeyEnv ? process.env[(route as any).apiKeyEnv] : undefined) || process.env.NVIDIA_API_KEY;
 
   if (!apiKey) {
     throw new Error('NVIDIA_API_KEY nao esta configurada para o Mythos Lab.');
@@ -446,12 +446,12 @@ export async function POST(request: NextRequest) {
     );
 
     const result = hasImageAttachment
-      ? await callOpenAIVisionRoute(modelMessages, `Voce e o agente "Mythos". ${MYTHOS_TEST_SYSTEM} Analise imagens anexadas apenas pelo que for visualmente observavel; se algo nao estiver claro, diga que nao consegue confirmar.`)
+      ? await callOpenAIVisionRoute(modelMessages as any, `Voce e o agente "Mythos". ${MYTHOS_TEST_SYSTEM} Analise imagens anexadas apenas pelo que for visualmente observavel; se algo nao estiver claro, diga que nao consegue confirmar.`)
       : model === 'nvidia'
-        ? await callNvidiaLabRoute(body.nvidiaModelRoute, modelMessages, `Voce sao o agente "Mythos". ${MYTHOS_TEST_SYSTEM}`)
+        ? await callNvidiaLabRoute(body.nvidiaModelRoute, modelMessages as any, `Voce sao o agente "Mythos". ${MYTHOS_TEST_SYSTEM}`)
         : await callModel({
           model,
-          messages: modelMessages,
+          messages: modelMessages as any,
           systemPrompt: MYTHOS_TEST_SYSTEM,
           useContext: false,
           agentName: 'Mythos',

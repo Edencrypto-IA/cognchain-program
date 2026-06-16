@@ -141,7 +141,8 @@ class DeepSeekHandler implements AIHandler {
         max_tokens: getMaxTokens('deepseek'),
         system: systemPrompt,
         messages: messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-        ...(needsWebSearch(messages) && { tools: [{ type: 'web_search' as const }] }),
+        // SDK @anthropic-ai/sdk 0.91+: server tool tipado como WebSearchTool20250305.
+        ...(needsWebSearch(messages) && { tools: [{ type: 'web_search_20250305', name: 'web_search' as const }] }),
       });
 
       const block = claudeResponse.content.find(b => b.type === 'text');

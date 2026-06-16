@@ -29,6 +29,7 @@ prisma/migrations/
 
 # ── ZK / Circom build artifacts ──────────────────────────────
 zk/build/
+zk-build/                 # saída de "npm run zk:compile" (--output zk-build)
 zk/*.r1cs
 zk/*.wasm
 zk/*.zkey
@@ -57,3 +58,7 @@ coverage/
 
 # Local audit/extraction workspace
 .tmp/
+
+# Local scratch / staging directories (dev-only, never commit)
+tem/
+dev.log

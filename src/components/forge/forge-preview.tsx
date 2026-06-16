@@ -3,8 +3,9 @@
 import { memo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Code2, ExternalLink, Globe2, LockKeyhole, Play, ReceiptText, ShieldCheck, Sparkles, WalletCards } from 'lucide-react';
-import type { ForgeFile, ForgePhase, ForgeRunStatus } from '@/lib/forge/types';
+import type { ForgeFile, ForgeNexusPlan, ForgePhase, ForgeRunStatus } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
+import { ForgeNexusPlan as ForgeNexusPlanView } from './forge-nexus-plan';
 
 type PreviewMode = 'product' | 'receipt' | 'code' | 'live';
 
@@ -17,6 +18,7 @@ function ForgePreviewComponent({
   canReplay,
   onPrivatePayDemo,
   onReplayLast,
+  nexusPlan,
 }: {
   phase: ForgePhase;
   runStatus: ForgeRunStatus;
@@ -26,6 +28,7 @@ function ForgePreviewComponent({
   canReplay: boolean;
   onPrivatePayDemo: () => void;
   onReplayLast: () => void;
+  nexusPlan: ForgeNexusPlan | null;
 }) {
   const [mode, setMode] = useState<PreviewMode>('product');
   const [pulseKey, setPulseKey] = useState(0);
@@ -126,6 +129,10 @@ derivePrivateReceiptProof(receipt.paymentHash);`;
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
+        {/* FORGE_UPGRADE: Nexus Fase 1 renders a read-only DAG plan before edits or execution. */}
+        <div className="relative z-[3] mb-4">
+          <ForgeNexusPlanView plan={nexusPlan} />
+        </div>
         <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#9945FF]/15 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-44 w-44 rounded-full bg-[#14F195]/10 blur-3xl" />
         <div className="absolute left-1/2 top-10 h-56 w-56 -translate-x-1/2 rounded-full bg-[#38BDF8]/10 blur-3xl" />

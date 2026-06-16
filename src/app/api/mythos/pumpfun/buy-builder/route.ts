@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import type { PumpfunBuyUnsignedResult } from '@/lib/solana/pumpfun-unsigned-serializer';
 import { checkRateLimit, safeErrorMessage } from '@/lib/security';
 import { getPumpfunBuilderConfig } from '@/lib/solana/pumpfun-builder-config';
 import { buildPumpfunBuyUnsignedTransaction } from '@/lib/solana/pumpfun-unsigned-serializer';
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     const initialBlocked = gates.filter(item => item.status === 'blocked').length;
     let builderError = '';
-    let unsignedBuy = null;
+    let unsignedBuy: PumpfunBuyUnsignedResult | null = null;
     if (initialBlocked === 0) {
       try {
         unsignedBuy = await buildPumpfunBuyUnsignedTransaction({

@@ -150,7 +150,7 @@ async function streamOpenAI(messages: { role: string; content: string }[], model
     max_tokens: FORGE_MAX_TOKENS,
   });
   let full = '';
-  for await (const chunk of stream) {
+  for await (const chunk of stream as unknown as AsyncIterable<any>) {
     const token = chunk.choices[0]?.delta?.content ?? '';
     if (token) { full += token; controller.enqueue(enc(token)); }
   }
@@ -167,7 +167,7 @@ async function streamAnthropic(messages: { role: string; content: string }[], sy
     stream: true,
   });
   let full = '';
-  for await (const event of stream) {
+  for await (const event of stream as unknown as AsyncIterable<any>) {
     if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       full += event.delta.text;
       controller.enqueue(enc(event.delta.text));
@@ -178,14 +178,27 @@ async function streamAnthropic(messages: { role: string; content: string }[], sy
 
 async function streamOpenAICompat(messages: { role: string; content: string }[], model: string, baseURL: string, apiKey: string, system: string, controller: ReadableStreamDefaultController) {
   const client = new OpenAI({ apiKey, baseURL });
-  const stream = await client.chat.completions.create({
+  // Determine if we should enable web search for DeepSeek based on the user's last message
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+  let necessidade_busca = false;
+  if (lastUserMsg && /\b(hoje|agora|ultim|últim|últimas|recentes|recentemente|not[íi]cias|noticias|data|hora|clima|tempo|pre[cç]os|cotac|cota[cç][oã]es|preco|preços|lan[cç]amento|lancamento|evento|eventos|novidade|novidades|atualidade|atualizado)\b/i.test(lastUserMsg)) {
+    necessidade_busca = true;
+  }
+
+  const body: Record<string, unknown> = {
     model,
     messages: [{ role: 'system', content: system }, ...messages] as never,
     stream: true,
     max_tokens: FORGE_MAX_TOKENS,
-  });
+  };
+  // Add DeepSeek-specific flag only when targeting DeepSeek
+  if (baseURL.includes('deepseek') || model === 'deepseek-chat') {
+    body.search_enable = necessidade_busca;
+  }
+
+  const stream = await client.chat.completions.create(body as any);
   let full = '';
-  for await (const chunk of stream) {
+  for await (const chunk of stream as unknown as AsyncIterable<any>) {
     const token = chunk.choices[0]?.delta?.content ?? '';
     if (token) { full += token; controller.enqueue(enc(token)); }
   }

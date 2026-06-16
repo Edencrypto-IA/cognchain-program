@@ -258,7 +258,14 @@ function assetToSummary(asset: CoinGeckoMarketAsset): SolanaAssetSummary {
   };
 }
 
-function readoutFor(mode: MythosSolanaReportMode, change24h: number | null, totalTvl: number, protocols: SolanaProtocolSummary[], volumeLeaders: SolanaAssetSummary[], memeLeaders: SolanaAssetSummary[]) {
+function readoutFor(
+  mode: MythosSolanaReportMode,
+  change24h: number | null,
+  totalTvl: number,
+  protocols: SolanaProtocolSummary[],
+  volumeLeaders: SolanaAssetSummary[],
+  memeLeaders: SolanaAssetSummary[],
+): MythosSolanaEcosystemReport['readout'] {
   const sentiment = change24h !== null && change24h > 2
     ? 'bullish'
     : change24h !== null && change24h < -2

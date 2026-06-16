@@ -203,7 +203,7 @@ function opportunityFor(coin: MythosCryptoCoin): MythosCryptoOpportunity {
   };
 }
 
-function buildSentiment(global: MythosCryptoMarketReport['global'], topCoins: MythosCryptoCoin[]) {
+function buildSentiment(global: MythosCryptoMarketReport['global'], topCoins: MythosCryptoCoin[]): MythosCryptoMarketReport['sentiment'] {
   const btcDominance = global.btcDominance ?? 0;
   const average7d = topCoins.slice(0, 20).reduce((sum, coin) => sum + (coin.change7d ?? 0), 0) / Math.max(1, topCoins.slice(0, 20).length);
   if (average7d > 5 && btcDominance < 62) return 'risk_on';

@@ -6,6 +6,8 @@ export interface MemoryEntry {
   parentHash?: string | null;
   score?: number | null;
   verified: boolean;
+  // Mirror do campo Prisma `poiTxHash String?` — Solana TX quando PoI é atingido.
+  poiTxHash?: string | null;
   zkVerified?: boolean;
   zkMode?: string | null;
   zkProofVersion?: string | null;

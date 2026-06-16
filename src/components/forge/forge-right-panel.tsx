@@ -2,7 +2,7 @@
 
 import { memo, useMemo, useState } from 'react';
 import { CheckCircle2, Files, GitCompareArrows, MonitorPlay, PanelsTopLeft, XCircle } from 'lucide-react';
-import type { ForgeDiffProposal, ForgeFile, ForgePanelTab, ForgePhase, ForgeRunStatus, ForgeSandboxSession } from '@/lib/forge/types';
+import type { ForgeDiffProposal, ForgeFile, ForgeNexusPlan, ForgePanelTab, ForgePhase, ForgeRunStatus, ForgeSandboxSession } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GlassPanel } from './glass-panel';
@@ -38,6 +38,7 @@ function ForgeRightPanelComponent({
   onDiffRejected,
   onRunSafeCommand,
   onInlineDiff,
+  nexusPlan,
 }: {
   phase: ForgePhase;
   runStatus: ForgeRunStatus;
@@ -59,6 +60,7 @@ function ForgeRightPanelComponent({
   onDiffRejected: () => void;
   onRunSafeCommand: (command: 'npm run lint' | 'npm run build') => void;
   onInlineDiff: (proposal: ForgeDiffProposal) => void;
+  nexusPlan: ForgeNexusPlan | null;
 }) {
   const [applyingDiff, setApplyingDiff] = useState(false);
   const [diffError, setDiffError] = useState('');
@@ -186,6 +188,7 @@ function ForgeRightPanelComponent({
               canReplay={canReplay}
               onPrivatePayDemo={onPrivatePayDemo}
               onReplayLast={onReplayLast}
+              nexusPlan={nexusPlan}
             />
           </TabsContent>
           <TabsContent value="code" className="min-h-0">
