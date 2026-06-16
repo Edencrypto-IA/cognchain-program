@@ -268,6 +268,33 @@ type SolscanAccountPortfolioResult = {
   }>;
 };
 
+// Minimal, explicit token element shapes used by Solscan portfolio responses
+type SolscanTokenSnake = {
+  token_address?: string;
+  token_name?: string;
+  token_symbol?: string;
+  amount?: number | string;
+  value?: number;
+};
+
+type SolscanTokenCamel = {
+  tokenAddress?: string;
+  tokenName?: string;
+  tokenSymbol?: string;
+  amount?: number | string;
+  value?: number;
+};
+
+type SolscanToken = SolscanTokenSnake | SolscanTokenCamel;
+
+function isTokenSnake(item: unknown): item is SolscanTokenSnake {
+  return typeof item === 'object' && item !== null && 'token_symbol' in (item as Record<string, unknown>);
+}
+
+function isTokenCamel(item: unknown): item is SolscanTokenCamel {
+  return typeof item === 'object' && item !== null && 'tokenSymbol' in (item as Record<string, unknown>);
+}
+
 type SolscanAccountTransactionsResult = {
   success?: boolean;
   data?: Array<{
@@ -1062,14 +1089,19 @@ async function buildWalletEvidence(subject: string, cluster: MythosSolanaCluster
   }).join('; ');
   const solscanDetailData = solscanDetail.status === 'fulfilled' ? solscanDetail.value.data : undefined;
   const solscanPortfolioData = solscanPortfolio.status === 'fulfilled' ? solscanPortfolio.value : undefined;
-  const solscanTokens = solscanPortfolioItems(solscanPortfolioData).filter(item => {
+  const solscanTokens = (solscanPortfolioItems(solscanPortfolioData).filter(item => {
     const amount = 'amount' in item ? item.amount : undefined;
     return tokenAmountIsNonZero(String(amount || '0'));
-  });
+  }) as SolscanToken[]);
   const solscanTokenPreview = solscanTokens.slice(0, 6).map(item => {
-    const symbol = 'token_symbol' in item
-      ? item.token_symbol || item.token_name || item.token_address?.slice(0, 8)
-      : (item as any).tokenSymbol || (item as any).tokenName || (item as any).tokenAddress?.slice(0, 8);
+    let symbol: string | undefined;
+    if (isTokenSnake(item)) {
+      symbol = item.token_symbol || item.token_name || item.token_address?.slice(0, 8);
+    } else if (isTokenCamel(item)) {
+      symbol = item.tokenSymbol || item.tokenName || item.tokenAddress?.slice(0, 8);
+    } else {
+      symbol = undefined;
+    }
     const amount = 'amount' in item ? item.amount : '0';
     const valueAmount = 'value' in item && typeof item.value === 'number' ? ` ~$${item.value.toFixed(2)}` : '';
     return `${symbol || 'asset'} ${String(amount || '0')}${valueAmount}`;
@@ -1286,7 +1318,26 @@ async function buildTokenEvidence(subject: string, cluster: MythosSolanaCluster)
       value('CMC market pairs', cmcMarketPairCount || 'not available', cmcMarketPairCount ? 'ready' : 'review'),
       value('Listed markets preview', cmcListings || 'not available', cmcListings ? 'ready' : 'review'),
       value('Price USD', typeof cmcUsd?.price === 'number' ? `$${cmcUsd.price.toPrecision(8)}` : typeof solscanMetaValue?.price === 'number' ? `$${solscanMetaValue.price.toPrecision(8)}` : 'not available', typeof cmcUsd?.price === 'number' || typeof solscanMetaValue?.price === 'number' ? 'ready' : 'review'),
-      value('Price change 24h', typeof (cmcUsd as any)?.percent_change_24h === 'number' ? `${(cmcUsd as any).percent_change_24h.toFixed(2)}%` : typeof (solscanMetaValue as any)?.price_change_24h === 'number' ? `${(solscanMetaValue as any).price_change_24h.toFixed(2)}%` : 'not available', typeof (cmcUsd as any)?.percent_change_24h === 'number' || typeof (solscanMetaValue as any)?.price_change_24h === 'number' ? 'ready' : 'review'),
+      // Determine percent change from either CoinMarketCap (percent_change_24h) or Solscan (price_change_24h)
+      value(
+        'Price change 24h',
+        ((): string => {
+            if (typeof cmcUsd === 'object' && cmcUsd !== null && typeof (cmcUsd as Record<string, unknown>).percent_change_24h === 'number') {
+              const v = (cmcUsd as Record<string, unknown>).percent_change_24h;
+              if (typeof v === 'number') return `${v.toFixed(2)}%`;
+            }
+            if (typeof solscanMetaValue === 'object' && solscanMetaValue !== null && typeof (solscanMetaValue as Record<string, unknown>).price_change_24h === 'number') {
+              const v = (solscanMetaValue as Record<string, unknown>).price_change_24h;
+              if (typeof v === 'number') return `${v.toFixed(2)}%`;
+            }
+          return 'not available';
+        })(),
+        ((): MythosSolanaEvidenceItem['status'] => {
+          if (typeof cmcUsd === 'object' && cmcUsd !== null && typeof (cmcUsd as Record<string, unknown>).percent_change_24h === 'number') return 'ready';
+          if (typeof solscanMetaValue === 'object' && solscanMetaValue !== null && typeof (solscanMetaValue as Record<string, unknown>).price_change_24h === 'number') return 'ready';
+          return 'review';
+        })(),
+      ),
       value('Market cap', typeof cmcUsd?.market_cap === 'number' ? `$${cmcUsd.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.market_cap === 'number' ? `$${solscanMetaValue.market_cap.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.market_cap === 'number' || typeof solscanMetaValue?.market_cap === 'number' ? 'ready' : 'review'),
       value('Volume 24h', typeof cmcUsd?.volume_24h === 'number' ? `$${cmcUsd.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : typeof solscanMetaValue?.volume_24h === 'number' ? `$${solscanMetaValue.volume_24h.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'not available', typeof cmcUsd?.volume_24h === 'number' || typeof solscanMetaValue?.volume_24h === 'number' ? 'ready' : 'review'),
       value('Largest account count', largestAccounts.length, largestAccounts.length ? 'ready' : 'review'),
