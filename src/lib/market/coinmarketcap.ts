@@ -110,8 +110,8 @@ async function cmcGet<T>(path: string, params: Record<string, string | number> =
 
   const data = await response.json().catch(() => null) as T | { status?: { error_message?: string } } | null;
   if (!response.ok || !data) {
-    const message = data && 'status' in data && data.status?.error_message
-      ? data.status.error_message
+    const message = (data && typeof data === 'object' && 'status' in data && (data as { status?: { error_message?: string } }).status?.error_message)
+      ? (data as { status?: { error_message?: string } }).status!.error_message!
       : `CoinMarketCap ${path} failed with HTTP ${response.status}`;
     throw new CoinMarketCapError(message, response.status);
   }

@@ -147,7 +147,7 @@ function buildDecision(
     inferredIntent === 'risco_compliance' ||
     blockedActions.length > 0;
 
-  const decision = {
+  const decision: Omit<DeepSeekRouteDecision, 'decisionHash'> = {
     intent: inferredIntent,
     mythosIntent: deterministicRoute.intent,
     complexity,

@@ -332,7 +332,7 @@ export function resolveMythosHtmlSkills(
 
 export const DESIGN_PRESETS = MYTHOS_DESIGN_PRESETS;
 
-export const MYTHOS_SKILLS: Record<MythosHtmlSkillName, MythosSkill> = Object.fromEntries(
+export const MYTHOS_SKILLS = Object.fromEntries(
   Object.entries(MYTHOS_HTML_SKILLS).map(([id, skill]) => [
     id,
     {
@@ -341,10 +341,10 @@ export const MYTHOS_SKILLS: Record<MythosHtmlSkillName, MythosSkill> = Object.fr
       description: skill.objective,
       systemPrompt: skill.internalPrompt,
       enabled: skill.enabled ?? true,
-      runWhen: () => true,
+        runWhen: (_context: SkillExecutionContext) => true,
     },
   ]),
-) as Record<MythosHtmlSkillName, MythosSkill>;
+) as unknown as Record<MythosHtmlSkillName, MythosSkill>;
 
 export function selectSkills(context: SkillExecutionContext): MythosSkill[] {
   return resolveMythosHtmlSkills(context.userPrompt, {

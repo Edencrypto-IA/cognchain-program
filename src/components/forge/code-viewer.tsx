@@ -18,6 +18,7 @@ type CodeMirrorView = {
 
 type CodeMirrorCompartment = {
   reconfigure: (extension: unknown) => unknown;
+  of: (value: unknown) => unknown;
 };
 
 type CodeMirrorModule = {
@@ -47,35 +48,35 @@ const LANGUAGE_LOADERS: Array<{ test: (path: string) => boolean; load: () => Pro
     test: path => path.endsWith('.tsx'),
     load: async () => {
       const mod = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@codemirror/lang-javascript@6.2.4/+esm');
-      return (mod as { javascript: (config?: { typescript?: boolean; jsx?: boolean }) => unknown }).javascript({ typescript: true, jsx: true });
+      return (mod as unknown as { javascript: (config?: { typescript?: boolean; jsx?: boolean }) => unknown }).javascript({ typescript: true, jsx: true });
     },
   },
   {
     test: path => path.endsWith('.ts'),
     load: async () => {
       const mod = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@codemirror/lang-javascript@6.2.4/+esm');
-      return (mod as { javascript: (config?: { typescript?: boolean }) => unknown }).javascript({ typescript: true });
+      return (mod as unknown as { javascript: (config?: { typescript?: boolean }) => unknown }).javascript({ typescript: true });
     },
   },
   {
     test: path => path.endsWith('.json'),
     load: async () => {
       const mod = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@codemirror/lang-json@6.0.2/+esm');
-      return (mod as { json: () => unknown }).json();
+      return (mod as unknown as { json: () => unknown }).json();
     },
   },
   {
     test: path => path.endsWith('.md'),
     load: async () => {
       const mod = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@codemirror/lang-markdown@6.3.4/+esm');
-      return (mod as { markdown: () => unknown }).markdown();
+      return (mod as unknown as { markdown: () => unknown }).markdown();
     },
   },
   {
     test: path => path.endsWith('.rs'),
     load: async () => {
       const mod = await import(/* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@codemirror/lang-rust@6.0.2/+esm');
-      return (mod as { rust: () => unknown }).rust();
+      return (mod as unknown as { rust: () => unknown }).rust();
     },
   },
 ];
@@ -354,7 +355,8 @@ function CodeViewerComponent({
     if (!container) return;
 
     function onMove(moveEvent: MouseEvent) {
-      const rect = container.getBoundingClientRect();
+      const rect = container?.getBoundingClientRect();
+      if (!rect) return;
       const next = ((moveEvent.clientX - rect.left) / rect.width) * 100;
       setSplitRatio(Math.max(32, Math.min(68, next)));
     }

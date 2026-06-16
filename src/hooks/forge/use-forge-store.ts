@@ -18,6 +18,7 @@ import type {
   ForgeDiffProposal,
   ForgeFile,
   ForgeMemoryNode,
+  ForgeNexusPlan,
   ForgePanelTab,
   ForgePhase,
   ForgeRunStatus,
@@ -43,6 +44,7 @@ interface ForgeState {
   activeSandboxSessionId: string;
   diffProposal: ForgeDiffProposal | null;
   commandRun: ForgeCommandRun | null;
+  nexusPlan: ForgeNexusPlan | null;
   setPhase: (phase: ForgePhase) => void;
   setRunStatus: (runStatus: ForgeRunStatus) => void;
   setActivePrompt: (prompt: string) => void;
@@ -57,6 +59,7 @@ interface ForgeState {
   setDiffProposal: (proposal: ForgeDiffProposal | null) => void;
   setFiles: (files: ForgeFile[]) => void;
   setCommandRun: (run: ForgeCommandRun | null) => void;
+  setNexusPlan: (plan: ForgeNexusPlan | null) => void;
   upsertMemory: (node: ForgeMemoryNode) => void;
   updateAgent: (id: ForgeAgentId, patch: Partial<ForgeAgent>) => void;
   updateBuildStep: (id: string, status: ForgeBuildStep['status']) => void;
@@ -121,6 +124,7 @@ export const useForgeStore = create<ForgeState>()(
       activeSandboxSessionId: '',
       diffProposal: null,
       commandRun: null,
+      nexusPlan: null,
       setPhase: phase => set({ phase }),
       setRunStatus: runStatus => set({ runStatus }),
       setActivePrompt: activePrompt => set({ activePrompt }),
@@ -160,6 +164,8 @@ export const useForgeStore = create<ForgeState>()(
       })),
       // FORGE_UPGRADE: safe command runs are tracked as first-class terminal state.
       setCommandRun: commandRun => set({ commandRun }),
+      // FORGE_UPGRADE: Nexus plans are read-only execution maps; they do not apply file changes.
+      setNexusPlan: nexusPlan => set({ nexusPlan, panelTab: nexusPlan ? 'preview' : 'preview' }),
       upsertMemory: node => set(state => {
         const exists = state.memoryNodes.some(item => item.id === node.id);
         return {
@@ -224,6 +230,7 @@ export const useForgeStore = create<ForgeState>()(
         panelTab: 'preview',
         diffProposal: null,
         commandRun: null,
+        nexusPlan: null,
       }),
       resetSession: () => set({
         phase: 'idle',
@@ -242,6 +249,7 @@ export const useForgeStore = create<ForgeState>()(
         activeSandboxSessionId: '',
         diffProposal: null,
         commandRun: null,
+        nexusPlan: null,
       }),
       restoreIdle: () => set(state => ({
         phase: state.phase === 'error' ? 'error' : 'idle',
@@ -273,6 +281,7 @@ export const useForgeStore = create<ForgeState>()(
         activeSandboxSessionId: state.activeSandboxSessionId,
         diffProposal: state.diffProposal,
         commandRun: state.commandRun,
+        nexusPlan: state.nexusPlan,
       }),
     },
   ),

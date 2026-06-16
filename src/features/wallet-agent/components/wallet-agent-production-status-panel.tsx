@@ -249,7 +249,7 @@ function buildPhase12CloseoutChecklist(status: WalletAgentProductionMonitoringSt
 function buildProductionVerificationDrill(status: WalletAgentProductionMonitoringStatus): ProductionVerificationDrillItem[] {
   const criticalFlagsBlocked = status.featureFlags.summary.criticalEnabled === 0;
   const noRequiredAuditActions = status.audit.summary.actionRequired === 0;
-  const noWarnings = status.audit.summary.warning === 0;
+  const noWarnings = status.audit.summary.warnings === 0;
 
   return [
     {
@@ -338,7 +338,7 @@ function buildProductionVerificationHandoff(status: WalletAgentProductionMonitor
     };
   }
 
-  if (focusItems.length > 0 || status.audit.summary.warning > 0) {
+  if (focusItems.length > 0 || status.audit.summary.warnings > 0) {
     return {
       status: 'review',
       label: 'Human review needed',
@@ -425,12 +425,12 @@ function buildProductionVerificationDecisionContext(status: WalletAgentProductio
     });
   }
 
-  if (status.audit.summary.warning > 0) {
+  if (status.audit.summary.warnings > 0) {
     items.push({
       id: 'audit-warnings',
       severity: 'review',
       label: 'Audit warnings',
-      detail: `${status.audit.summary.warning} readiness warning(s) should be reviewed by an operator.`,
+      detail: `${status.audit.summary.warnings} readiness warning(s) should be reviewed by an operator.`,
     });
   }
 
@@ -1675,7 +1675,7 @@ export function WalletAgentProductionStatusPanel({
   );
 
   function recordAuditEvent(action: ProductionStatusAuditEvent['action'], label: string) {
-    setAuditEvents(current => [
+    setAuditEvents(current => ([
       {
         id: `${action}-${Date.now()}`,
         action,
@@ -1684,11 +1684,11 @@ export function WalletAgentProductionStatusPanel({
         health: status.health,
       },
       ...current,
-    ].slice(0, MAX_AUDIT_EVENTS));
+    ].slice(0, MAX_AUDIT_EVENTS)) as ProductionStatusAuditEvent[]);
   }
 
   useEffect(() => {
-    setAuditEvents(current => [
+    setAuditEvents(current => ([
       {
         id: `status_loaded-${Date.now()}`,
         action: 'status_loaded',
@@ -1697,7 +1697,7 @@ export function WalletAgentProductionStatusPanel({
         health: status.health,
       },
       ...current,
-    ].slice(0, MAX_AUDIT_EVENTS));
+    ].slice(0, MAX_AUDIT_EVENTS)) as ProductionStatusAuditEvent[]);
   }, [status.generatedAt, status.health]);
 
   function copyProductionBrief() {

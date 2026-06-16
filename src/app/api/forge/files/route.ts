@@ -59,24 +59,25 @@ function isAllowedForgePath(filePath: string): boolean {
 
 async function listFiles(root: string, bucket: ForgeFileEntry[]): Promise<void> {
   if (bucket.length >= MAX_FILES) return;
-  let entries: Awaited<ReturnType<typeof readdir>>;
+  let entries: any;
   try {
     entries = await readdir(path.resolve(process.cwd(), root), { withFileTypes: true });
   } catch {
     return;
   }
 
-  for (const entry of entries) {
+  for (const entry of entries as any) {
     if (bucket.length >= MAX_FILES) return;
-    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-    const relative = `${root}/${entry.name}`.replace(/\\/g, '/');
+    const entryName = typeof entry.name === 'string' ? entry.name : entry.name.toString();
+    if (entryName.startsWith('.') || entryName === 'node_modules') continue;
+    const relative = `${root}/${entryName}`.replace(/\\/g, '/');
     if (entry.isDirectory()) {
       await listFiles(relative, bucket);
       continue;
     }
-    if (!entry.isFile() || !EXTENSIONS.has(path.extname(entry.name).toLowerCase())) continue;
+    if (!entry.isFile() || !EXTENSIONS.has(path.extname(entryName).toLowerCase())) continue;
     if (!isAllowedForgePath(relative)) continue;
-    bucket.push({ path: relative, name: entry.name, language: inferLanguage(relative), size: 0 });
+    bucket.push({ path: relative, name: entryName, language: inferLanguage(relative), size: 0 });
   }
 }
 

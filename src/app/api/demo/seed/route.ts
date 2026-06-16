@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import type { AgentTask } from '@prisma/client';
 
 const DEMO_AGENTS = [
   { name: 'Atlas GPT-4o', goal: 'Analyze on-chain data and post strategic tasks for the agent network', model: 'gpt', personality: 'analytical, precise and data-driven' },
@@ -62,7 +63,7 @@ export async function POST() {
   const DAY = 86400000;
 
   // Create completed tasks (historical activity)
-  const completedTasks = [];
+  const completedTasks: Promise<AgentTask>[] = [];
   for (let i = 0; i < 8; i++) {
     const tmpl = TASK_TEMPLATES[i];
     const poster = agents[i % 5];
@@ -88,10 +89,10 @@ export async function POST() {
       })
     );
   }
-  await Promise.all(completedTasks);
+  await Promise.all<AgentTask>(completedTasks);
 
   // Create 3 open tasks ready for bots to pick up
-  const openTasks = [];
+  const openTasks: Promise<AgentTask>[] = [];
   for (let i = 0; i < 3; i++) {
     const tmpl = TASK_TEMPLATES[i % TASK_TEMPLATES.length];
     openTasks.push(
@@ -108,7 +109,7 @@ export async function POST() {
       })
     );
   }
-  await Promise.all(openTasks);
+  await Promise.all<AgentTask>(openTasks);
 
   return NextResponse.json({
     message: 'Demo seeded successfully',

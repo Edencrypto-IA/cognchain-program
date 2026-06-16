@@ -47,6 +47,7 @@ function ForgeWorkspaceInner() {
     sandboxSessions,
     activeSandboxSessionId,
     diffProposal,
+    nexusPlan,
     setPanelTab,
     setSelectedFile,
     updateFileContents,
@@ -73,6 +74,7 @@ function ForgeWorkspaceInner() {
       sandboxSessions: s.sandboxSessions,
       activeSandboxSessionId: s.activeSandboxSessionId,
       diffProposal: s.diffProposal,
+      nexusPlan: s.nexusPlan,
       setPanelTab: s.setPanelTab,
       setSelectedFile: s.setSelectedFile,
       updateFileContents: s.updateFileContents,
@@ -489,6 +491,7 @@ function ForgeWorkspaceInner() {
                   onDiffRejected={() => setDiffProposal(null)}
                   onRunSafeCommand={runSafeCommand}
                   onInlineDiff={setDiffProposal}
+                  nexusPlan={nexusPlan}
                 />
               </ResizablePanel>
               <ResizableHandle className="bg-white/[0.06]" />
@@ -538,6 +541,7 @@ function ForgeWorkspaceInner() {
             onDiffRejected={() => setDiffProposal(null)}
             onRunSafeCommand={runSafeCommand}
             onInlineDiff={setDiffProposal}
+            nexusPlan={nexusPlan}
           />
         </motion.div>
         <motion.div
