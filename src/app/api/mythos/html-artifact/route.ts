@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminToken } from '@/app/api/auth/verify/route';
+import { verifyAdminToken } from '@/lib/auth';
 import {
   MYTHOS_HTML_SYSTEM_PROMPT,
   buildMythosHtmlGenerationPrompt,

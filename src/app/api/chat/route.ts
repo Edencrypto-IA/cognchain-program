@@ -6,7 +6,7 @@ import { checkRateLimit, validateModel, Limits, safeErrorMessage, MODEL_TIER } f
 import { needsGrounding, groundQuery } from '@/lib/grounding';
 import { getCachedResponse, cacheResponse, seedFAQCache } from '@/services/cache/response-cache';
 import { extractRawKey, requireApiKey } from '@/lib/api-key-auth';
-import { verifyAdminToken } from '@/app/api/auth/verify/route';
+import { verifyAdminToken } from '@/lib/auth';
 
 // Seed FAQ on first request
 let faqSeeded = false;
