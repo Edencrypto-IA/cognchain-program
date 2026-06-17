@@ -5,7 +5,7 @@ import { PRIVATE_PAY_DEMO_PROMPT } from '@/lib/forge/demo-data';
 import { forgeId, nowLabel } from '@/lib/forge/simulation';
 import { useForgeStore } from './use-forge-store';
 import type { TriggerReport } from '@/trigger/triggerEngine';
-import type { ForgeAgentId, ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
+import type { ForgeAgentId, ForgeDiffProposal, ForgeFile, ForgeNexusPlan } from '@/lib/forge/types';
 
 const FORGE_MODEL = 'nvidia';
 
@@ -46,6 +46,7 @@ export function useForgeSimulation() {
     setDeployStatus,
     setPhase,
     setRunStatus,
+    setNexusPlan,
   } = useForgeStore();
 
   const flushPendingTokens = useCallback(() => {
@@ -103,6 +104,44 @@ export function useForgeSimulation() {
       });
       updateBuildStep('intent', 'running');
       setDeployStatus('Modelo em execução');
+
+      // FORGE_UPGRADE: Nexus Strategus generates a read-only DAG before the LLM stream starts.
+      void fetch('/api/forge/nexus/plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          prompt: cleanPrompt,
+          files: useForgeStore.getState().files.slice(0, 120),
+        }),
+      })
+        .then(response => response.json() as Promise<{ plan?: ForgeNexusPlan; error?: string }>)
+        .then(data => {
+          if (!data.plan) throw new Error(data.error || 'Nexus plan unavailable');
+          setNexusPlan(data.plan);
+          updateBuildStep('plan', 'running');
+          updateAgent('architect', {
+            status: 'running',
+            progress: 38,
+            currentTask: `Strategus plan ready: ${data.plan.estimatedSteps} nodes`,
+          });
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'success',
+            source: 'Forge Nexus',
+            text: `Strategus generated ${data.plan.estimatedSteps} DAG nodes. Risk: ${data.plan.risk}. Review gate remains required.`,
+          });
+        })
+        .catch(error => {
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'warning',
+            source: 'Forge Nexus',
+            text: error instanceof Error ? `Nexus planner unavailable: ${error.message}` : 'Nexus planner unavailable.',
+          });
+        });
 
       let firstToken = false;
       let finalized = false;
@@ -322,6 +361,7 @@ export function useForgeSimulation() {
       setDeployStatus,
       setPhase,
       setRunStatus,
+      setNexusPlan,
     ],
   );
 
