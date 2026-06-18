@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createWalletAgentProductionMonitoringStatus } from '@/features/wallet-agent/production-readiness';
-import { verifyAdminToken } from '@/app/api/auth/verify/route';
+import { verifyAdminToken } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/security';
 
 function getClientIp(req: NextRequest) {

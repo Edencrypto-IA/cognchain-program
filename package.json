@@ -65,11 +65,12 @@
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
-    "@solana/wallet-adapter-wallets": "^0.19.38",
+    "@solana/wallet-adapter-wallets": "^0.18.2",
     "@solana/web3.js": "^1.98.4",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.82.0",
     "@tanstack/react-table": "^8.21.3",
+    "@trezor/protobuf": "^1.5.3",
     "@types/d3-drag": "^3.0.7",
     "@types/d3-force": "^3.0.10",
     "@types/d3-zoom": "^3.0.8",
@@ -86,12 +87,13 @@
     "framer-motion": "^12.23.2",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.525.0",
-    "next": "~15.3.3",
+    "next": "^15.5.19",
     "next-auth": "^4.24.11",
     "next-intl": "^4.3.4",
     "next-themes": "^0.4.6",
     "openai": "^6.34.0",
     "prisma": "^6.11.1",
+    "protobufjs": "^7.6.4",
     "react": "^19.0.0",
     "react-day-picker": "^9.8.0",
     "react-dom": "^19.0.0",
@@ -116,14 +118,19 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/node": "^20",
     "bun-types": "^1.3.4",
     "eslint": "^9",
     "eslint-config-next": "~15.3.3",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@trezor/protobuf": {
+      "protobufjs": ">=7.5.6"
+    }
   }
 }

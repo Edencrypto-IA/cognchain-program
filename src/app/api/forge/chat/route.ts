@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { checkRateLimit, validateModel, Limits, MODEL_TIER, ValidationError } from '@/lib/security';
-import { verifyAdminToken } from '@/app/api/auth/verify/route';
+import { verifyAdminToken } from '@/lib/auth';
 import { requireApiKey } from '@/lib/api-key-auth';
 import type { ForgeDiffProposal, ForgeFile } from '@/lib/forge/types';
 import { listSkillSummaries } from '@/skills/skill-loader';

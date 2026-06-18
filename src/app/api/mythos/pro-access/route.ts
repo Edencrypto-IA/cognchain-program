@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminToken } from '@/app/api/auth/verify/route';
+import { verifyAdminToken } from '@/lib/auth';
 
 const COOKIE_NAME = 'mythos_pro_access';
 const TOKEN_SUBJECT = 'mythos-pro-route';
