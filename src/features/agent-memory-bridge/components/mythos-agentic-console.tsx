@@ -17,7 +17,7 @@ type MythosAgenticEvent =
   | { type: 'tool_start'; tool: string; args: Record<string, unknown> }
   | { type: 'tool_result'; tool: string; ok: boolean; summary: string }
   | { type: 'proposal'; proposal: { kind: string; title: string; payload: Record<string, unknown> } }
-  | { type: 'done'; summary: string; tools: Array<{ tool: string; ok?: boolean }>; proposals: Array<{ kind: string }>; mode: string; cost?: { estimatedCostUSD: number; inputChars: number; outputChars: number } }
+  | { type: 'done'; summary: string; tools: Array<{ tool: string; ok?: boolean }>; proposals: Array<{ kind: string }>; mode: string; cost?: { estimatedCostUSD: number; inputChars: number; outputChars: number }; memory?: { reused: number; saved: boolean; savedHash?: string } }
   | { type: 'error'; message: string };
 
 function parseSseData(raw: string): string | null {
@@ -103,7 +103,10 @@ export function MythosAgenticConsole() {
               const costLine = event.cost
                 ? ` | 💸 Custo estimado: ${formatCostUSD(event.cost.estimatedCostUSD)} (${event.cost.inputChars} chars in / ${event.cost.outputChars} out)`
                 : '';
-              setLines(current => [...current, `✅ Concluído (${event.mode}): ${event.summary.slice(0, 200)}${costLine}`]);
+              const memoryLine = event.memory
+                ? `${event.memory.reused > 0 ? ` | ♻️ ${event.memory.reused} memória(s) reusada(s)` : ''}${event.memory.saved ? ` | 💾 memória de tarefa salva${event.memory.savedHash ? ` (${event.memory.savedHash.slice(0, 16)}…)` : ''}` : ''}`
+                : '';
+              setLines(current => [...current, `✅ Concluído (${event.mode}): ${event.summary.slice(0, 200)}${costLine}${memoryLine}`]);
             }
             if (event.type === 'error') setError(event.message);
           } catch { /* malformed */ }

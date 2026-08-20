@@ -13,6 +13,12 @@ import {
   type MythosToolCall,
 } from './agentic-loop';
 import { estimateDeepSeekCostUSD, recordMythosTask } from './agentic-metrics';
+import {
+  buildMemoryContextBlock,
+  buildTaskMemoryContent,
+  retrieveMythosMemories,
+  saveTaskMemory,
+} from './agentic-memory';
 
 export type MythosAgenticEvent =
   | { type: 'status'; text: string }
@@ -27,6 +33,7 @@ export type MythosAgenticEvent =
       proposals: MythosAgentProposal[];
       mode: 'function-calling' | 'deterministic';
       cost?: { estimatedCostUSD: number; inputChars: number; outputChars: number };
+      memory?: { reused: number; saved: boolean; savedHash?: string };
     }
   | { type: 'error'; message: string };
 
@@ -155,12 +162,33 @@ export async function runMythosAgenticLoop(
   };
   const bump = (tool: string) => callCounts.set(tool, (callCounts.get(tool) ?? 0) + 1);
 
-  const finish = (summary: string, mode: 'function-calling' | 'deterministic') => {
+  // Active memory: reuse verified memories before acting (DeepSeek-style).
+  const retrieved = await retrieveMythosMemories(command);
+  const memoryReused = retrieved.length;
+
+  const finish = async (summary: string, mode: 'function-calling' | 'deterministic') => {
     const cost = {
       estimatedCostUSD: estimateDeepSeekCostUSD(budget.inputChars, budget.outputChars),
       inputChars: budget.inputChars,
       outputChars: budget.outputChars,
     };
+
+    // Auto-memory: persist a compact summary as a verified-chain memory.
+    let memorySaved = false;
+    let savedHash: string | undefined;
+    if (summary.trim()) {
+      const content = buildTaskMemoryContent({
+        command,
+        intent: plan.intent,
+        summary,
+        toolCalls: tools.length,
+        costUSD: cost.estimatedCostUSD,
+        reusedHashes: retrieved.map(memory => memory.hash),
+      });
+      savedHash = (await saveTaskMemory(content, retrieved[0]?.hash)) ?? undefined;
+      memorySaved = Boolean(savedHash);
+    }
+
     recordMythosTask({
       command: command.slice(0, 200),
       intent: plan.intent,
@@ -170,14 +198,25 @@ export async function runMythosAgenticLoop(
       inputChars: budget.inputChars,
       outputChars: budget.outputChars,
       tools: Object.fromEntries(callCounts),
+      memoryReused,
+      memorySaved,
     });
-    emit({ type: 'done', summary, tools, proposals, mode, cost });
+    emit({
+      type: 'done',
+      summary,
+      tools,
+      proposals,
+      mode,
+      cost,
+      memory: { reused: memoryReused, saved: memorySaved, savedHash },
+    });
   };
 
   emit({ type: 'plan', plan });
   emit({ type: 'status', text: `Plano: intenção ${plan.intent} — ${plan.steps.length} passo(s).` });
 
   // ---- Mode 1: DeepSeek function calling ----
+  const memoryBlock = buildMemoryContextBlock(retrieved);
   const systemPrompt = [
     'Voce e o Mythos, agente de IA do CongChain, executando uma tarefa com ferramentas seguras.',
     'Use as ferramentas para coletar informacoes reais antes de responder.',
@@ -185,7 +224,8 @@ export async function runMythosAgenticLoop(
     'memory_save e html_draft tem efeito: chamam, mas a acao so acontece apos aprovacao humana (proposta).',
     'Ao terminar, responda em portugues brasileiro com um resumo claro e cite o que usou.',
     'Seguranca: nunca assine, envie, compre, venda ou mova fundos. Nao invente fontes nem dados.',
-  ].join(' ');
+    memoryBlock ? memoryBlock : '',
+  ].filter(Boolean).join(' ');
 
   const history: DeepSeekMessage[] = [{ role: 'system', content: systemPrompt }, { role: 'user', content: command.slice(0, 2000) }];
 
@@ -221,7 +261,7 @@ export async function runMythosAgenticLoop(
 
     // Model finished without tool calls.
     const finalText = (message.content ?? '').trim();
-    finish(finalText || 'Tarefa concluída.', 'function-calling');
+    await finish(finalText || 'Tarefa concluída.', 'function-calling');
     return;
   }
 
@@ -253,12 +293,12 @@ export async function runMythosAgenticLoop(
     const summary = `Mythos executou ${tools.filter(t => t.result?.ok).length} ferramenta(s) para "${command.slice(0, 120)}" (intenção ${plan.intent}). ${
       proposals.length ? `${proposals.length} proposta(s) aguardando sua aprovação.` : 'Tudo em modo somente leitura.'
     }`;
-    finish(summary, 'deterministic');
+    await finish(summary, 'deterministic');
     return;
   }
 
   // Remote worked but exhausted iterations without a final answer.
-  finish(
+  await finish(
     `Iterações esgotadas (${maxIterations}). ${tools.length} ferramenta(s) executadas; ${proposals.length} proposta(s) pendentes.`,
     'function-calling',
   );

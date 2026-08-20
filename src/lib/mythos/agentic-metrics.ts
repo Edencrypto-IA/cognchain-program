@@ -14,6 +14,8 @@ export interface MythosTaskMetric {
   outputChars: number;
   estimatedCostUSD: number;
   tools: Record<string, number>;
+  memoryReused: number;
+  memorySaved: boolean;
   createdAt: number;
 }
 
@@ -66,6 +68,9 @@ export interface MythosAgentStats {
   intents: Record<string, number>;
   tools: Record<string, number>;
   approvedProposals: number;
+  memoryReusedTasks: number;
+  memorySavedCount: number;
+  reuseRatePct: number;
   lastTaskAt: number | null;
 }
 
@@ -89,6 +94,8 @@ export function getMythosAgentStats(): MythosAgentStats {
 
   const count = store.length;
   const avgCostUSD = count ? totalCostUSD / count : 0;
+  const memoryReusedTasks = store.reduce((sum, task) => sum + (task.memoryReused > 0 ? 1 : 0), 0);
+  const memorySavedCount = store.reduce((sum, task) => sum + (task.memorySaved ? 1 : 0), 0);
   return {
     totalTasks: count,
     totalCostUSD: Math.round(totalCostUSD * 1_000_000) / 1_000_000,
@@ -101,6 +108,9 @@ export function getMythosAgentStats(): MythosAgentStats {
     intents,
     tools,
     approvedProposals: totals.approvedProposals,
+    memoryReusedTasks,
+    memorySavedCount,
+    reuseRatePct: count ? Math.round((memoryReusedTasks / count) * 100) : 0,
     lastTaskAt: store[0]?.createdAt ?? null,
   };
 }
