@@ -18,7 +18,10 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "db:generate:sqlite": "prisma generate --schema prisma/schema.sqlite.prisma",
+    "db:push:sqlite": "prisma db push --schema prisma/schema.sqlite.prisma",
+    "postinstall": "prisma generate && prisma generate --schema prisma/schema.sqlite.prisma"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

@@ -62,3 +62,6 @@ coverage/
 # Local scratch / staging directories (dev-only, never commit)
 tem/
 dev.log
+
+# Generated Prisma client (SQLite offline)
+src/generated/
