@@ -1,7 +1,7 @@
 'use client';
 
-import { memo, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, FileCode2, Folder, Loader2 } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, Database, FileCode2, Folder, Loader2, Upload } from 'lucide-react';
 import type { ForgeBuildStep, ForgeFile } from '@/lib/forge/types';
 import { cn } from '@/lib/utils';
 
@@ -19,11 +19,19 @@ const EXPLORER_SECTIONS: ExplorerSection[] = [
   { id: 'lib', label: '📦 Lib', prefix: 'src/lib/' },
   { id: 'hooks', label: '🪝 Hooks', prefix: 'src/hooks/' },
   { id: 'solana', label: '⬡ Solana', prefix: 'src/solana/' },
+  { id: 'uploads', label: '⬆ Uploads', prefix: 'src/forge-uploads/' },
   { id: 'core', label: 'Core', prefix: 'src/' },
 ];
 
 function shortFileName(filePath: string): string {
   return filePath.split('/').at(-1) ?? filePath;
+}
+
+export interface ForgeUploadedFile {
+  path: string;
+  name: string;
+  language: string;
+  size: number;
 }
 
 function ForgeFileExplorerComponent({
@@ -32,14 +40,53 @@ function ForgeFileExplorerComponent({
   buildSteps,
   busy,
   onSelectFile,
+  onUploaded,
+  onUploadError,
+  onSaveAsMemory,
 }: {
   files: ForgeFile[];
   selectedFile: string;
   buildSteps: ForgeBuildStep[];
   busy: boolean;
   onSelectFile: (path: string) => void;
+  onUploaded: (files: ForgeUploadedFile[]) => void;
+  onUploadError: (message: string) => void;
+  onSaveAsMemory?: (path: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const uploadFiles = useCallback(async (list: FileList | File[]) => {
+    const incoming = Array.from(list);
+    if (!incoming.length || uploading) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      incoming.forEach(file => form.append('files', file));
+      const response = await fetch('/api/forge/upload', {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+      });
+      const data = await response.json() as {
+        ok?: boolean;
+        files?: ForgeUploadedFile[];
+        errors?: string[];
+        error?: string;
+      };
+      if (!response.ok || data.ok !== true || !Array.isArray(data.files)) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'Upload falhou');
+      }
+      if (data.files.length) onUploaded(data.files);
+      if (data.errors?.length) onUploadError(data.errors.join(' · '));
+    } catch (error) {
+      onUploadError(error instanceof Error ? error.message : 'Upload falhou');
+    } finally {
+      setUploading(false);
+    }
+  }, [uploading, onUploaded, onUploadError]);
 
   useEffect(() => {
     try {
@@ -83,11 +130,48 @@ function ForgeFileExplorerComponent({
   const hasActiveTasks = buildSteps.some(step => step.status !== 'pending');
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-r border-white/[0.07] bg-[#0a0a0c]/82">
+    <aside
+      className={cn(
+        'flex h-full min-h-0 flex-col border-r border-white/[0.07] bg-[#0a0a0c]/82 transition-shadow',
+        dragOver && 'shadow-[inset_0_0_0_2px_rgba(20,241,149,0.5)]',
+      )}
+      onDragOver={event => { event.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={event => {
+        event.preventDefault();
+        setDragOver(false);
+        if (event.dataTransfer.files?.length) void uploadFiles(event.dataTransfer.files);
+      }}
+    >
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/[0.07] px-3">
         <Folder className="size-3.5 text-white/35" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/42">Explorer</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={event => {
+            if (event.target.files?.length) void uploadFiles(event.target.files);
+            event.target.value = '';
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || busy}
+          title="Carregar arquivos do seu computador (máx 1MB cada, até 10)"
+          className="ml-auto flex h-6 items-center gap-1 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 text-[10px] text-white/45 transition-colors hover:border-[#14F195]/30 hover:text-[#14F195] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {uploading ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
+          <span className="hidden sm:inline">Carregar</span>
+        </button>
       </div>
+      {dragOver ? (
+        <div className="pointer-events-none flex flex-1 items-center justify-center border-2 border-dashed border-[#14F195]/40 m-2 rounded-xl text-[11px] text-[#14F195]/70">
+          Solte os arquivos para carregar no sandbox
+        </div>
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
         <div className="space-y-1">
@@ -106,25 +190,39 @@ function ForgeFileExplorerComponent({
                 </button>
                 {!isCollapsed ? (
                   <div className="space-y-0.5">
-                    {section.files.map(file => (
-                      <button
-                        key={file.path}
-                        type="button"
-                        title={file.path}
-                        onClick={() => onSelectFile(file.path)}
-                        disabled={busy}
-                        className={cn(
-                          'flex w-full min-h-8 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] text-white/46 transition-colors hover:bg-white/[0.045] hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-50',
-                          file.path === selectedFile && 'bg-white/[0.06] text-white/85',
-                        )}
-                      >
-                        <FileCode2 className="size-3.5 shrink-0 text-[#14F195]/55" />
-                        <span className="min-w-0 flex-1 truncate font-mono">{shortFileName(file.path)}</span>
-                        <span className="hidden rounded border border-white/[0.06] px-1.5 py-0.5 text-[9px] uppercase text-white/22 xl:inline">
-                          {file.status}
-                        </span>
-                      </button>
-                    ))}
+                    {section.files.map(file => {
+                      const isUpload = file.path.startsWith('src/forge-uploads/');
+                      return (
+                        <div
+                          key={file.path}
+                          role="button"
+                          tabIndex={0}
+                          title={file.path}
+                          onClick={() => onSelectFile(file.path)}
+                          onKeyDown={event => { if (event.key === 'Enter') onSelectFile(file.path); }}
+                          className={cn(
+                            'flex w-full min-h-8 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] text-white/46 transition-colors hover:bg-white/[0.045] hover:text-white/80',
+                            file.path === selectedFile && 'bg-white/[0.06] text-white/85',
+                          )}
+                        >
+                          <FileCode2 className="size-3.5 shrink-0 text-[#14F195]/55" />
+                          <span className="min-w-0 flex-1 truncate font-mono">{shortFileName(file.path)}</span>
+                          {isUpload && onSaveAsMemory ? (
+                            <button
+                              type="button"
+                              onClick={event => { event.stopPropagation(); onSaveAsMemory(file.path); }}
+                              title="Salvar como memória verificável (hash)"
+                              className="grid size-5 shrink-0 place-items-center rounded border border-white/[0.07] bg-white/[0.03] text-white/30 transition-colors hover:border-[#00D4FF]/40 hover:text-[#5EEAD4]"
+                            >
+                              <Database className="size-3" />
+                            </button>
+                          ) : null}
+                          <span className="hidden rounded border border-white/[0.06] px-1.5 py-0.5 text-[9px] uppercase text-white/22 xl:inline">
+                            {file.status}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>

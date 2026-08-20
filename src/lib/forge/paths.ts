@@ -26,9 +26,13 @@ export const FORGE_FILE_ROOTS = [
   'src/lib/',
   'src/hooks/',
   'src/solana/',
+  'src/forge-uploads/',
 ];
 
-export const FORGE_FILE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.css', '.rs']);
+export const FORGE_FILE_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.md', '.css', '.rs',
+  '.py', '.sol', '.toml', '.yaml', '.yml', '.sh', '.html', '.sql', '.txt',
+]);
 
 export const FORGE_EXPLORER_ROOTS = [
   'src/app',
@@ -40,6 +44,7 @@ export const FORGE_EXPLORER_ROOTS = [
   'src/store',
   'src/trigger',
   'src/security',
+  'src/forge-uploads',
 ];
 
 export const FORGE_MAX_FILE_PATH = 180;
@@ -71,6 +76,13 @@ export function inferLanguage(path: string, fallback?: string): string {
   if (path.endsWith('.json')) return 'json';
   if (path.endsWith('.md')) return 'md';
   if (path.endsWith('.rs')) return 'rs';
+  if (path.endsWith('.py')) return 'python';
+  if (path.endsWith('.sol')) return 'sol';
+  if (path.endsWith('.html')) return 'html';
+  if (path.endsWith('.yaml') || path.endsWith('.yml')) return 'yaml';
+  if (path.endsWith('.toml')) return 'toml';
+  if (path.endsWith('.sh')) return 'bash';
+  if (path.endsWith('.sql')) return 'sql';
   return 'txt';
 }
 

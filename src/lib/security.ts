@@ -27,6 +27,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/chat': { windowMs: 60_000, maxRequests: 20 },
   '/api/forge/chat': { windowMs: 60_000, maxRequests: 15 },
   '/api/forge/agent/run': { windowMs: 60_000, maxRequests: 10 },
+  '/api/forge/memory/save': { windowMs: 60_000, maxRequests: 15 },
   '/api/mythos/skill-router': { windowMs: 60_000, maxRequests: 30 },
   '/api/mythos/agent/run': { windowMs: 60_000, maxRequests: 10 },
   '/api/mythos/agent/approve': { windowMs: 60_000, maxRequests: 20 },

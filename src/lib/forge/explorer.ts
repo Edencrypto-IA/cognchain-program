@@ -6,9 +6,8 @@
 
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { FORGE_EXPLORER_ROOTS } from './paths';
+import { FORGE_EXPLORER_ROOTS, FORGE_FILE_EXTENSIONS, inferLanguage } from './paths';
 
-const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.css', '.rs']);
 const MAX_FILES = 500;
 
 export interface ForgeFileEntry {
@@ -16,16 +15,6 @@ export interface ForgeFileEntry {
   name: string;
   language: string;
   size: number;
-}
-
-function inferLanguage(filePath: string): string {
-  if (filePath.endsWith('.tsx')) return 'tsx';
-  if (filePath.endsWith('.ts')) return 'ts';
-  if (filePath.endsWith('.json')) return 'json';
-  if (filePath.endsWith('.md')) return 'md';
-  if (filePath.endsWith('.css')) return 'css';
-  if (filePath.endsWith('.rs')) return 'rs';
-  return 'txt';
 }
 
 function isAllowedForgePath(filePath: string): boolean {
@@ -67,7 +56,7 @@ async function listFiles(root: string, bucket: ForgeFileEntry[]): Promise<void> 
       await listFiles(relative, bucket);
       continue;
     }
-    if (!entry.isFile() || !EXTENSIONS.has(path.extname(entryName).toLowerCase())) continue;
+    if (!entry.isFile() || !FORGE_FILE_EXTENSIONS.has(path.extname(entryName).toLowerCase())) continue;
     if (!isAllowedForgePath(relative)) continue;
     bucket.push({ path: relative, name: entryName, language: inferLanguage(relative), size: 0 });
   }

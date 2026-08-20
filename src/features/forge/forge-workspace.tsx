@@ -583,6 +583,68 @@ function ForgeWorkspaceInner() {
     }
   }, [appendTerminal, loadingTemplate, setPanelTab, upsertFile]);
 
+  // FORGE_UPLOAD: files loaded from the user's computer (sandbox).
+  const handleUploaded = useCallback((uploaded: Array<{ path: string; name: string; language: string; size: number }>) => {
+    for (const file of uploaded) {
+      upsertFile({ path: file.path, language: file.language, status: 'queued', contents: '', real: true, size: file.size });
+    }
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'success',
+      source: 'Forge Upload',
+      text: `${uploaded.length} arquivo(s) carregado(s) no sandbox. Clique para abrir o código.`,
+    });
+  }, [appendTerminal, upsertFile]);
+
+  const handleUploadError = useCallback((message: string) => {
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'warning',
+      source: 'Forge Upload',
+      text: `Upload: ${message}`,
+    });
+  }, [appendTerminal]);
+
+  // FORGE_UPLOAD: persist an uploaded file as a verifiable CognChain memory.
+  const handleSaveAsMemory = useCallback(async (path: string) => {
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'shell',
+      source: 'Memory Core',
+      text: `Salvando ${path} como memória verificável…`,
+    });
+    try {
+      const response = await fetch('/api/forge/memory/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ path }),
+      });
+      const data = await response.json() as { hash?: string; error?: string; truncated?: boolean };
+      if (!response.ok || !data.hash) {
+        throw new Error(typeof data.error === 'string' ? data.error : `HTTP ${response.status}`);
+      }
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'success',
+        source: 'Memory Core',
+        text: `Arquivo salvo como memória: ${data.hash}${data.truncated ? ' (conteúdo truncado)' : ''}`,
+      });
+    } catch (err) {
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'warning',
+        source: 'Memory Core',
+        text: `Falha ao salvar memória: ${err instanceof Error ? err.message : 'erro desconhecido'}.`,
+      });
+    }
+  }, [appendTerminal]);
+
   // FORGE_AGENTIC: BYOK settings (user-owned keys, localStorage only).
   const openSettings = useCallback(() => {
     setByokDraft({
@@ -746,6 +808,9 @@ function ForgeWorkspaceInner() {
               buildSteps={buildSteps}
               busy={busy}
               onSelectFile={openFile}
+              onUploaded={handleUploaded}
+              onUploadError={handleUploadError}
+              onSaveAsMemory={(path) => void handleSaveAsMemory(path)}
             />
           </ResizablePanel>
           <ResizableHandle className="bg-white/[0.06]" />
@@ -887,6 +952,9 @@ function ForgeWorkspaceInner() {
             buildSteps={buildSteps}
             busy={busy}
             onSelectFile={openFile}
+            onUploaded={handleUploaded}
+            onUploadError={handleUploadError}
+            onSaveAsMemory={(path) => void handleSaveAsMemory(path)}
           />
         </motion.div>
       </section>
