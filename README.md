@@ -620,6 +620,11 @@ Tier 3 — TEE + FHE   Long-term research · Phase 4 (2028+) · tracking Zama.ai
 
 ## 🚀 Quick Start
 
+### Local (sem Railway) + Desktop
+
+- **[Guia completo para rodar localmente](docs/rodar-local.md)** — `git clone` → `.env` → `localhost:3000`.
+- **[App desktop (Electron, estilo Cursor)](desktop/README.md)** — janela nativa com servidor local embutido; gera instalador `.exe`/`.dmg`/`.AppImage`.
+
 ### Prerequisites
 
 ```bash
