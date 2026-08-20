@@ -133,8 +133,31 @@ class DeepSeekHandler implements AIHandler {
       trackUsage('deepseek', response.usage?.prompt_tokens ?? estimateTokens(systemPrompt), response.usage?.completion_tokens ?? estimateTokens(content));
       return content;
     } catch (error) {
-      console.warn('[DeepSeek] request failed, falling back to Claude with web_search:', error);
+      console.warn('[DeepSeek] request failed, trying cheaper fallback:', error);
 
+      // Web navigation is NOT needed: fall back to the free NVIDIA/Qwen endpoint
+      // instead of paying Claude prices for plain text.
+      if (!needsWebSearch(messages)) {
+        const qwenClient = new OpenAI({
+          apiKey: process.env.NVIDIA_QWEN_KEY,
+          baseURL: 'https://integrate.api.nvidia.com/v1',
+        });
+        const qwenResponse = await qwenClient.chat.completions.create({
+          model: 'qwen/qwen3-next-80b-a3b-instruct',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+          ],
+          max_tokens: getMaxTokens('deepseek'),
+          temperature: 0.6,
+        });
+        const fallbackContent = qwenResponse.choices[0]?.message?.content || 'Fallback indisponível.';
+        trackUsage('qwen', qwenResponse.usage?.prompt_tokens ?? estimateTokens(systemPrompt), qwenResponse.usage?.completion_tokens ?? estimateTokens(fallbackContent));
+        return fallbackContent;
+      }
+
+      // Web navigation IS required and DeepSeek failed: Claude web_search is the
+      // last resort (only provider with a native web tool on this path).
       const claudeClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const claudeResponse = await claudeClient.messages.create({
         model: 'claude-opus-4-7',

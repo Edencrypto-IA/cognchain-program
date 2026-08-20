@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { listForgeFiles } from '@/lib/forge/explorer';
+import { getMythosAgentStats } from '@/lib/mythos/agentic-metrics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const files = await listForgeFiles();
-  return NextResponse.json({ files });
+  return NextResponse.json(getMythosAgentStats());
 }

@@ -101,14 +101,15 @@ function estimateTokens(text: string) {
 }
 
 function modelForIntent(intent: DeepSeekRouteIntent) {
+  // DeepSeek is the default for web-navigation heavy intents (cheap, search_enable).
   if (intent === 'analise_politica' || intent === 'risco_compliance') {
-    return { recommendedModel: 'claude', fallbackModel: 'gpt' };
+    return { recommendedModel: 'deepseek', fallbackModel: 'nvidia' };
   }
   if (intent === 'busca_financeira' || intent === 'radar_publico') {
-    return { recommendedModel: 'gpt', fallbackModel: 'claude' };
+    return { recommendedModel: 'deepseek', fallbackModel: 'nvidia' };
   }
   if (intent === 'criacao_html') {
-    return { recommendedModel: 'claude', fallbackModel: 'gpt' };
+    return { recommendedModel: 'deepseek', fallbackModel: 'nvidia' };
   }
   if (intent === 'analise_codigo' || intent === 'multi_step_agente') {
     return { recommendedModel: 'deepseek', fallbackModel: 'nvidia' };
@@ -116,7 +117,7 @@ function modelForIntent(intent: DeepSeekRouteIntent) {
   return { recommendedModel: 'deepseek', fallbackModel: 'nvidia' };
 }
 
-function inferIntent(command: string): DeepSeekRouteIntent {
+export function inferIntent(command: string): DeepSeekRouteIntent {
   if (POLITICAL_PATTERNS.test(command)) return 'analise_politica';
   if (FINANCIAL_PATTERNS.test(command)) return 'busca_financeira';
   if (PRODUCT_PATTERNS.test(command)) return 'produto_compras';
@@ -226,7 +227,7 @@ export async function routeWithDeepSeek(command: string, options: { forceRemote?
         'Voce e o roteador seguro do Mythos. Retorne apenas JSON valido.',
         'Classifique em: roteamento_simples, analise_codigo, busca_financeira, analise_politica, criacao_html, risco_compliance, multi_step_agente, produto_compras, radar_publico, solana_readonly, memecoin_safe_draft, unknown.',
         'Nunca autorize assinatura, envio de transacao, compra, venda, swap, PIX, pagamento ou movimentacao de fundos.',
-        'Para politica/compliance recomende Claude. Para dados financeiros recomende GPT/Claude com fontes. Para codigo/roteamento recomende DeepSeek.',
+        'Prefira DeepSeek (mais barato, com search_enable) para politica, financeiro, html e codigo. Claude/GPT apenas como ultimo recurso.',
       ].join(' '),
     },
     {

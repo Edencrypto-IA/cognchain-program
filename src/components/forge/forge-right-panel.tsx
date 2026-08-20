@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useMemo, useState } from 'react';
-import { CheckCircle2, Files, GitCompareArrows, MonitorPlay, PanelsTopLeft, XCircle } from 'lucide-react';
+import { CheckCircle2, Database, Files, GitCompareArrows, MonitorPlay, PanelsTopLeft, XCircle } from 'lucide-react';
 import type { ForgeDiffProposal, ForgeFile, ForgeNexusPlan, ForgePanelTab, ForgePhase, ForgeRunStatus, ForgeSandboxSession } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -30,13 +30,14 @@ function ForgeRightPanelComponent({
   onPrivatePayDemo,
   onReplayLast,
   onApplyProposal,
+  onApplyAll,
+  onApplyAllAndSave,
   canReplay,
   busy,
   latestSandboxSession,
   diffProposal,
   onDiffAccepted,
   onDiffRejected,
-  onRunSafeCommand,
   onInlineDiff,
   nexusPlan,
 }: {
@@ -52,13 +53,14 @@ function ForgeRightPanelComponent({
   onPrivatePayDemo: () => void;
   onReplayLast: () => void;
   onApplyProposal: () => void;
+  onApplyAll: () => void;
+  onApplyAllAndSave: () => void;
   canReplay: boolean;
   busy: boolean;
   latestSandboxSession?: ForgeSandboxSession;
   diffProposal?: ForgeDiffProposal | null;
   onDiffAccepted: (path: string, contents: string) => void;
   onDiffRejected: () => void;
-  onRunSafeCommand: (command: 'npm run lint' | 'npm run build') => void;
   onInlineDiff: (proposal: ForgeDiffProposal) => void;
   nexusPlan: ForgeNexusPlan | null;
 }) {
@@ -83,6 +85,12 @@ function ForgeRightPanelComponent({
     ].join('\n');
   }, [selected]);
   const canApplyProposal = files.some(file => file.status === 'created' || file.status === 'modified') && !busy;
+  // FORGE_AGENTIC: Apply All count = proposal files + pending inline diff (deduped by path).
+  const proposalCount = useMemo(() => {
+    const proposalPaths = new Set(files.filter(file => file.status === 'created' || file.status === 'modified').map(file => file.path));
+    if (diffProposal && !proposalPaths.has(diffProposal.path)) proposalPaths.add(diffProposal.path);
+    return proposalPaths.size;
+  }, [files, diffProposal]);
   const diffLines = useMemo(() => {
     const source = diffProposal?.diff || diffPreview;
     return source.split('\n').slice(0, 600).map((line, index) => {
@@ -160,22 +168,6 @@ function ForgeRightPanelComponent({
             >
               {statusLine}
             </p>
-            <div className="hidden items-center gap-1 sm:flex">
-              <button
-                type="button"
-                onClick={() => onRunSafeCommand('npm run lint')}
-                className="rounded-md border border-white/[0.06] bg-white/[0.025] px-2 py-1 text-[10px] text-white/38 hover:border-[#14F195]/25 hover:text-[#14F195]"
-              >
-                lint
-              </button>
-              <button
-                type="button"
-                onClick={() => onRunSafeCommand('npm run build')}
-                className="rounded-md border border-white/[0.06] bg-white/[0.025] px-2 py-1 text-[10px] text-white/38 hover:border-[#00D4FF]/25 hover:text-[#00D4FF]"
-              >
-                build
-              </button>
-            </div>
           </div>
 
           <TabsContent value="preview" forceMount className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
@@ -250,15 +242,37 @@ function ForgeRightPanelComponent({
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={onApplyProposal}
-                    disabled={!canApplyProposal}
-                    className="flex min-h-8 items-center gap-1.5 rounded-lg border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <CheckCircle2 className="size-3.5" />
-                    Apply Proposal
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={onApplyProposal}
+                      disabled={!canApplyProposal}
+                      className="flex min-h-8 items-center gap-1.5 rounded-lg border border-white/[0.09] bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/62 transition-colors hover:border-[#00D4FF]/30 hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                      Apply Proposal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onApplyAll}
+                      disabled={proposalCount === 0}
+                      title="Aplica todas as propostas (arquivos + diff pendente) no workspace"
+                      className="flex min-h-8 items-center gap-1.5 rounded-lg border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-1.5 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                      Apply All{proposalCount > 0 ? ` (${proposalCount})` : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onApplyAllAndSave}
+                      disabled={proposalCount === 0}
+                      title="Aplica todas as propostas e salva o resumo do build como memória CognChain"
+                      className="flex min-h-8 items-center gap-1.5 rounded-lg border border-[#00D4FF]/30 bg-[#00D4FF]/10 px-3 py-1.5 text-[11px] font-semibold text-[#5EEAD4] transition-colors hover:bg-[#00D4FF]/15 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Database className="size-3.5" />
+                      Aplicar &amp; Salvar
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

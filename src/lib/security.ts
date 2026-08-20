@@ -26,7 +26,10 @@ export interface RateLimitConfig {
 const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/chat': { windowMs: 60_000, maxRequests: 20 },
   '/api/forge/chat': { windowMs: 60_000, maxRequests: 15 },
+  '/api/forge/agent/run': { windowMs: 60_000, maxRequests: 10 },
   '/api/mythos/skill-router': { windowMs: 60_000, maxRequests: 30 },
+  '/api/mythos/agent/run': { windowMs: 60_000, maxRequests: 10 },
+  '/api/mythos/agent/approve': { windowMs: 60_000, maxRequests: 20 },
   '/api/mythos/test-chat': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/analyze-transaction': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/analyze-wallet': { windowMs: 60_000, maxRequests: 12 },
@@ -45,6 +48,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/mythos/wallet/intelligence': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/html-artifact': { windowMs: 60_000, maxRequests: 6 },
   '/api/mythos/read': { windowMs: 60_000, maxRequests: 8 },
+  '/api/mythos/research': { windowMs: 60_000, maxRequests: 8 },
   '/api/mythos/pumpfun/builder-readiness': { windowMs: 60_000, maxRequests: 20 },
   '/api/mythos/pumpfun/launch-proposal': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/pumpfun/metadata-review': { windowMs: 60_000, maxRequests: 12 },
@@ -137,9 +141,9 @@ const NVIDIA_ROUTE_MODELS = [
   'phi4-mini',
 ];
 
-const ALLOWED_MODELS = new Set(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'glm', 'minimax', 'qwen', ...NVIDIA_ROUTE_MODELS]);
+const ALLOWED_MODELS = new Set(['gpt', 'claude', 'nvidia', 'gemini', 'deepseek', 'glm', 'minimax', 'qwen', 'ollama', ...NVIDIA_ROUTE_MODELS]);
 
-export const FREE_MODELS  = new Set(['nvidia', 'glm', 'minimax', 'qwen', ...NVIDIA_ROUTE_MODELS]);
+export const FREE_MODELS  = new Set(['nvidia', 'glm', 'minimax', 'qwen', 'ollama', ...NVIDIA_ROUTE_MODELS]);
 export const PRO_MODELS   = new Set(['gpt', 'claude', 'deepseek', 'gemini']);
 export const MODEL_TIER   = (m: string): 'free' | 'pro' => PRO_MODELS.has(m) ? 'pro' : 'free';
 const HEX_REGEX = /^[a-fA-F0-9]{64}$/;

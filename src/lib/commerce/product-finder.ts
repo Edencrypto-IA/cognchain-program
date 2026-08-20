@@ -1,6 +1,7 @@
 const MERCADO_LIVRE_API = 'https://api.mercadolibre.com';
 const ANTHROPIC_MESSAGES_API = 'https://api.anthropic.com/v1/messages';
 const OPENAI_RESPONSES_API = 'https://api.openai.com/v1/responses';
+const DEEPSEEK_CHAT_API = 'https://api.deepseek.com/chat/completions';
 
 export type MythosProductMarketplace = 'mercado_livre';
 
@@ -53,7 +54,7 @@ export type MythosProductWatchPlan = {
   note: string;
 };
 
-export type MythosProductFinderSource = 'mercado_livre' | 'anthropic_web_search' | 'openai_web_search';
+export type MythosProductFinderSource = 'mercado_livre' | 'deepseek_web_search' | 'anthropic_web_search' | 'openai_web_search';
 
 export type MythosProductFinderReport = {
   ok: true;
@@ -523,6 +524,41 @@ async function anthropicWebSearch(input: ProductFinderInput) {
   return text;
 }
 
+// DeepSeek web search is the default cheap fallback: `search_enable` gives it
+// native web search at a fraction of Claude/OpenAI cost.
+async function deepseekWebSearch(input: ProductFinderInput) {
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY is not configured.');
+
+  const response = await fetch(DEEPSEEK_CHAT_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: process.env.MYTHOS_PRODUCT_FINDER_DEEPSEEK_MODEL?.trim() || process.env.DEEPSEEK_MODEL?.trim() || 'deepseek-chat',
+      max_tokens: 1000,
+      temperature: 0.2,
+      search_enable: true,
+      messages: [
+        { role: 'system', content: webSearchSystemPrompt() },
+        { role: 'user', content: buildProductSearchUserPrompt(input) },
+      ],
+    }),
+    cache: 'no-store',
+  });
+  const data = await response.json().catch(() => ({})) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+  const text = data.choices?.[0]?.message?.content?.trim() || '';
+  if (!response.ok || !text) {
+    throw new Error(data.error?.message || `DeepSeek web search failed with HTTP ${response.status}.`);
+  }
+  return text;
+}
+
 async function openAiWebSearch(input: ProductFinderInput) {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
@@ -559,7 +595,9 @@ function buildWebSearchReport(
 ): MythosProductFinderReport {
   const normalizedQuery = input.query.trim().slice(0, 120);
   const mlDetail = mlError instanceof Error ? mlError.message : 'Mercado Livre indisponivel no momento.';
-  const aiLabel = source === 'anthropic_web_search' ? 'Anthropic web_search' : 'OpenAI web search';
+  const aiLabel = source === 'deepseek_web_search'
+    ? 'DeepSeek web search'
+    : source === 'anthropic_web_search' ? 'Anthropic web_search' : 'OpenAI web search';
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -602,6 +640,15 @@ function buildWebSearchReport(
 
 async function findProductWithWebFallback(input: ProductFinderInput, mlError: unknown): Promise<MythosProductFinderReport> {
   const failures: string[] = [];
+
+  // Cheap first: DeepSeek web search is the default; Claude/OpenAI only if it fails.
+  try {
+    const text = await deepseekWebSearch(input);
+    return buildWebSearchReport(input, cleanWebSearchSummary(text), 'deepseek_web_search', mlError);
+  } catch (error) {
+    failures.push(`DeepSeek: ${error instanceof Error ? error.message : 'failed'}`);
+  }
+
   try {
     const text = await anthropicWebSearch(input);
     return buildWebSearchReport(input, cleanWebSearchSummary(text), 'anthropic_web_search', mlError);

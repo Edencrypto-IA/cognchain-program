@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bot, Box, CheckCircle2, Clipboard, Command, Copy, FilePlus2, Play, RotateCcw, Search, ShieldCheck, Sparkles, Square } from 'lucide-react';
+import { ArrowLeft, Blocks, Bot, CheckCircle2, Clipboard, Command, Database, Ellipsis, Play, RotateCcw, Settings, Sparkles, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useShallow } from 'zustand/react/shallow';
+import type { ForgeFile } from '@/lib/forge/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,15 +23,35 @@ import { ForgeRightPanel } from '@/components/forge/forge-right-panel';
 import { ForgeFileExplorer } from '@/components/forge/forge-file-explorer';
 import { NeuralOrb } from '@/components/forge/neural-orb';
 import { useForgeSimulation } from '@/hooks/forge/use-forge-simulation';
+import { useForgeAgentic } from '@/hooks/forge/use-forge-agentic';
+import { useForgeByok } from '@/hooks/forge/use-forge-byok';
 import { useForgeStore } from '@/hooks/forge/use-forge-store';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
 import { forgeId, nowLabel } from '@/lib/forge/simulation';
+import { buildForgeMemoryContent, FORGE_MEMORY_MODEL } from '@/lib/forge/memory';
 
 const busyPhases = ['thinking', 'planning', 'building', 'deploying'] as const;
 
 function ForgeWorkspaceInner() {
   const { runPrompt, stop, runPrivatePayDemo, replayLastBuild } = useForgeSimulation();
+  const { runAgentic, stopAgentic } = useForgeAgentic();
+  const { config: byokConfig, saveConfig: saveByokConfig, clearKeys: clearByokKeys } = useForgeByok();
   const [agentsOpen, setAgentsOpen] = useState(false);
+  // FORGE_AGENTIC: when enabled, the terminal composer runs the plan→propose→verify loop.
+  const [agenticMode, setAgenticMode] = useState(false);
+  // FORGE_AGENTIC: local (Ollama) mode — private, zero API cost.
+  const [localMode, setLocalMode] = useState(false);
+  // FORGE_AGENTIC: Solana-native templates picker.
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templateList, setTemplateList] = useState<Array<{ id: string; name: string; description: string; tags: string[] }>>([]);
+  const [loadingTemplate, setLoadingTemplate] = useState('');
+  // FORGE_AGENTIC: BYOK settings modal state.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [byokDraft, setByokDraft] = useState({ deepseekKey: '', ollamaBaseUrl: '', ollamaModel: '' });
+  // FORGE_AGENTIC: Apply All in-flight guard.
+  const [applyingAll, setApplyingAll] = useState(false);
+  // FORGE_AGENTIC: build memory save state (explicit user action, per safety contract).
+  const [buildMemorySaved, setBuildMemorySaved] = useState(false);
 
   const {
     phase,
@@ -42,6 +63,7 @@ function ForgeWorkspaceInner() {
     selectedFile: selectedFilePath,
     buildSteps,
     deployStatus,
+    commandRun,
     panelTab,
     promptHistory,
     sandboxSessions,
@@ -53,7 +75,10 @@ function ForgeWorkspaceInner() {
     updateFileContents,
     hydrateFileContents,
     setFiles,
+    markFilesApplied,
+    upsertFile,
     setCommandRun,
+    setDeployStatus,
     setDiffProposal,
     appendTerminal,
     applyProposal,
@@ -69,6 +94,8 @@ function ForgeWorkspaceInner() {
       selectedFile: s.selectedFile,
       buildSteps: s.buildSteps,
       deployStatus: s.deployStatus,
+      commandRun: s.commandRun,
+      setDeployStatus: s.setDeployStatus,
       panelTab: s.panelTab,
       promptHistory: s.promptHistory,
       sandboxSessions: s.sandboxSessions,
@@ -80,6 +107,8 @@ function ForgeWorkspaceInner() {
       updateFileContents: s.updateFileContents,
       hydrateFileContents: s.hydrateFileContents,
       setFiles: s.setFiles,
+      markFilesApplied: s.markFilesApplied,
+      upsertFile: s.upsertFile,
       setCommandRun: s.setCommandRun,
       setDiffProposal: s.setDiffProposal,
       appendTerminal: s.appendTerminal,
@@ -87,6 +116,11 @@ function ForgeWorkspaceInner() {
       resetSession: s.resetSession,
     })),
   );
+
+  // FORGE_AGENTIC: reset the "memory saved" flag whenever a new run starts.
+  useEffect(() => {
+    if (phase !== 'complete' || runStatus !== 'complete') setBuildMemorySaved(false);
+  }, [phase, runStatus]);
 
   const busy = busyPhases.includes(phase as (typeof busyPhases)[number]);
   const canReplay = promptHistory.length > 0 && !busy;
@@ -276,6 +310,313 @@ function ForgeWorkspaceInner() {
     });
   }, [appendTerminal, applyProposal]);
 
+  // FORGE_AGENTIC: Apply All — writes every proposal (created/modified files + pending diff)
+  // to the workspace through the existing safe endpoints, then records a sandbox session.
+  const handleApplyAll = useCallback(async (): Promise<{ applied: number; total: number } | null> => {
+    if (applyingAll || busy) return null;
+    const proposalFiles = files.filter(
+      file => (file.status === 'created' || file.status === 'modified') && file.contents.trim().length > 0,
+    );
+    const diffTarget = diffProposal && !proposalFiles.some(file => file.path === diffProposal.path) ? diffProposal : null;
+    if (!proposalFiles.length && !diffTarget) {
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'warning',
+        source: 'Forge Apply',
+        text: 'Nenhuma proposta disponível para aplicar.',
+      });
+      return null;
+    }
+
+    setApplyingAll(true);
+    const results: Array<{ path: string; ok: boolean; error?: string }> = [];
+
+    for (const file of proposalFiles) {
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'shell',
+        source: 'Forge Apply',
+        text: `Aplicando ${file.path}…`,
+      });
+      try {
+        const response = await fetch('/api/forge/file/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: file.path, content: file.contents }),
+        });
+        const data = await response.json() as { error?: unknown };
+        if (!response.ok) {
+          const message = typeof data.error === 'string' ? data.error : `HTTP ${response.status}`;
+          results.push({ path: file.path, ok: false, error: message });
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'error',
+            source: 'Forge Apply',
+            text: `✗ ${file.path}: ${message}`,
+          });
+        } else {
+          results.push({ path: file.path, ok: true });
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'success',
+            source: 'Forge Apply',
+            text: `✓ ${file.path} aplicado no workspace.`,
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Falha de rede ao aplicar.';
+        results.push({ path: file.path, ok: false, error: message });
+        appendTerminal({
+          id: forgeId('line'),
+          timestamp: nowLabel(),
+          kind: 'error',
+          source: 'Forge Apply',
+          text: `✗ ${file.path}: ${message}`,
+        });
+      }
+    }
+
+    if (diffTarget) {
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'shell',
+        source: 'Forge Apply',
+        text: `Aplicando diff ${diffTarget.path}…`,
+      });
+      try {
+        const response = await fetch('/api/forge/file/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ path: diffTarget.path, diff: diffTarget.diff }),
+        });
+        const data = await response.json() as { content?: unknown; error?: unknown };
+        if (!response.ok || typeof data.content !== 'string') {
+          const message = typeof data.error === 'string' ? data.error : `HTTP ${response.status}`;
+          results.push({ path: diffTarget.path, ok: false, error: message });
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'error',
+            source: 'Forge Apply',
+            text: `✗ diff ${diffTarget.path}: ${message}`,
+          });
+        } else {
+          results.push({ path: diffTarget.path, ok: true });
+          updateFileContents(diffTarget.path, data.content);
+          appendTerminal({
+            id: forgeId('line'),
+            timestamp: nowLabel(),
+            kind: 'success',
+            source: 'Forge Apply',
+            text: `✓ diff ${diffTarget.path} aplicado no workspace.`,
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Falha de rede ao aplicar diff.';
+        results.push({ path: diffTarget.path, ok: false, error: message });
+        appendTerminal({
+          id: forgeId('line'),
+          timestamp: nowLabel(),
+          kind: 'error',
+          source: 'Forge Apply',
+          text: `✗ diff ${diffTarget.path}: ${message}`,
+        });
+      }
+    }
+
+    const okPaths = results.filter(result => result.ok).map(result => result.path);
+    const okCount = okPaths.length;
+    if (okPaths.length) {
+      // Sandbox session first (it collects created/modified proposals), then mark applied.
+      const session = applyProposal();
+      markFilesApplied(okPaths);
+      if (diffTarget && okPaths.includes(diffTarget.path)) setDiffProposal(null);
+      setDeployStatus(`Apply All · ${okCount}/${results.length} aplicados`);
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: okCount === results.length ? 'success' : 'warning',
+        source: 'Forge Apply',
+        text: `Apply All concluído: ${okCount}/${results.length} aplicados no workspace.${session ? ` Sandbox ${session.hash}.` : ''}`,
+      });
+    } else {
+      setDeployStatus('Apply All · falhou');
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'error',
+        source: 'Forge Apply',
+        text: 'Apply All: nenhum arquivo foi aplicado. Revise os erros acima.',
+      });
+    }
+    setApplyingAll(false);
+    return { applied: okCount, total: results.length };
+  }, [applyingAll, busy, files, diffProposal, appendTerminal, applyProposal, markFilesApplied, setDeployStatus, updateFileContents, setDiffProposal]);
+
+  // FORGE_AGENTIC: build memory — save the completed build summary to the
+  // CognChain memory layer through an explicit user action (safety contract).
+  const buildMemoryReady = phase === 'complete' && runStatus === 'complete';
+
+  const saveBuildMemory = useCallback(async () => {
+    if (!buildMemoryReady || buildMemorySaved) return;
+    const memoryFiles = files.filter(
+      file => file.status === 'created' || file.status === 'modified' || file.status === 'applied',
+    );
+    const content = buildForgeMemoryContent({
+      prompt: promptHistory[0] ?? undefined,
+      deployStatus,
+      files: memoryFiles.map(file => file.path),
+      sandboxHash: latestSandboxSession?.hash,
+      verify: commandRun ? `${commandRun.command} → ${commandRun.status}` : undefined,
+      source: 'forge',
+    });
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'shell',
+      source: 'Memory Core',
+      text: 'Salvando memória do build na camada CognChain…',
+    });
+    try {
+      const response = await fetch('/api/save-memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content, model: FORGE_MEMORY_MODEL }),
+      });
+      const data = await response.json() as { hash?: string; error?: string };
+      if (!response.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : `HTTP ${response.status}`);
+      }
+      setBuildMemorySaved(true);
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'success',
+        source: 'Memory Core',
+        text: data.hash ? `Memória do build salva: ${data.hash}` : 'Memória do build salva.',
+      });
+    } catch (err) {
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'warning',
+        source: 'Memory Core',
+        text: `Não foi possível salvar a memória do build: ${err instanceof Error ? err.message : 'erro desconhecido'}.`,
+      });
+    }
+  }, [buildMemoryReady, buildMemorySaved, files, promptHistory, deployStatus, latestSandboxSession, commandRun, appendTerminal]);
+
+  // FORGE_AGENTIC: one-click flow — Apply All proposals, then save the build
+  // memory. The single click IS the explicit user action (safety contract).
+  const handleApplyAllAndSave = useCallback(async () => {
+    const result = await handleApplyAll();
+    if (result && result.applied > 0 && buildMemoryReady) {
+      await saveBuildMemory();
+    }
+  }, [handleApplyAll, buildMemoryReady, saveBuildMemory]);
+
+  // FORGE_AGENTIC: Solana-native templates (Anchor, pump.fun, SPL, dApp).
+  const openTemplates = useCallback(() => {
+    setTemplatesOpen(true);
+    if (templateList.length) return;
+    void fetch('/api/forge/templates', { credentials: 'include' })
+      .then(response => response.json() as Promise<{ templates?: Array<{ id: string; name: string; description: string; tags: string[] }> }>)
+      .then(data => {
+        if (Array.isArray(data.templates)) setTemplateList(data.templates);
+      })
+      .catch(() => {});
+  }, [templateList.length]);
+
+  const loadTemplate = useCallback(async (templateId: string) => {
+    if (loadingTemplate) return;
+    setLoadingTemplate(templateId);
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'shell',
+      source: 'Forge Templates',
+      text: `Carregando template ${templateId}…`,
+    });
+    try {
+      const response = await fetch('/api/forge/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ templateId }),
+      });
+      const data = await response.json() as {
+        files?: ForgeFile[];
+        error?: string;
+        template?: { id?: string; name?: string };
+      };
+      if (!response.ok || !Array.isArray(data.files) || !data.files.length) {
+        throw new Error(typeof data.error === 'string' ? data.error : `HTTP ${response.status}`);
+      }
+      data.files.forEach(file => upsertFile(file));
+      setPanelTab('files');
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'success',
+        source: 'Forge Templates',
+        text: `Template ${data.template?.name ?? templateId} carregado: ${data.files.length} arquivo(s). Revise e aplique explicitamente.`,
+      });
+    } catch (err) {
+      appendTerminal({
+        id: forgeId('line'),
+        timestamp: nowLabel(),
+        kind: 'warning',
+        source: 'Forge Templates',
+        text: `Falha ao carregar template: ${err instanceof Error ? err.message : 'erro desconhecido'}.`,
+      });
+    } finally {
+      setLoadingTemplate('');
+      setTemplatesOpen(false);
+    }
+  }, [appendTerminal, loadingTemplate, setPanelTab, upsertFile]);
+
+  // FORGE_AGENTIC: BYOK settings (user-owned keys, localStorage only).
+  const openSettings = useCallback(() => {
+    setByokDraft({
+      deepseekKey: byokConfig.deepseekKey,
+      ollamaBaseUrl: byokConfig.ollamaBaseUrl,
+      ollamaModel: byokConfig.ollamaModel,
+    });
+    setSettingsOpen(true);
+  }, [byokConfig]);
+
+  const handleSaveSettings = useCallback(() => {
+    saveByokConfig(byokDraft);
+    setSettingsOpen(false);
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'success',
+      source: 'Forge BYOK',
+      text: 'Configuração BYOK salva (armazenada apenas neste navegador).',
+    });
+  }, [byokDraft, saveByokConfig, appendTerminal]);
+
+  const handleClearByok = useCallback(() => {
+    clearByokKeys();
+    setByokDraft(current => ({ ...current, deepseekKey: '' }));
+    appendTerminal({
+      id: forgeId('line'),
+      timestamp: nowLabel(),
+      kind: 'warning',
+      source: 'Forge BYOK',
+      text: 'Chave DeepSeek removida deste navegador.',
+    });
+  }, [clearByokKeys, appendTerminal]);
+
   const handleCopySelectedFile = useCallback(() => {
     if (!selectedFile) return;
     navigator.clipboard?.writeText(selectedFile.contents).catch(() => {});
@@ -306,8 +647,8 @@ function ForgeWorkspaceInner() {
         <div className="absolute right-[-10rem] bottom-[-12rem] h-96 w-96 rounded-full bg-[#14F195]/5 blur-3xl" />
       </div>
 
-      <header className="relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] bg-[#111113]/95 px-2 py-1.5 sm:min-h-9 sm:flex-nowrap sm:px-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      <header className="relative z-10 flex h-9 shrink-0 items-center justify-between gap-2 border-b border-white/[0.07] bg-[#111113]/95 px-2 sm:px-3">
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             href="/"
             className="grid size-7 shrink-0 place-items-center rounded-md border border-white/[0.07] bg-white/[0.03] text-white/45 transition-colors hover:text-white/85"
@@ -315,151 +656,94 @@ function ForgeWorkspaceInner() {
           >
             <ArrowLeft className="size-3.5" />
           </Link>
-          <Box className="size-4 shrink-0 text-white/45" />
-          <div className="hidden items-center gap-0.5 sm:flex">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="rounded px-2 py-1 text-xs text-white/42 outline-none transition-colors hover:bg-white/[0.06] hover:text-white/82 data-[state=open]:bg-white/[0.08] data-[state=open]:text-white/82">
-                File
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 border-white/[0.08] bg-[#0b0b0d] text-white/76">
-                <DropdownMenuLabel className="text-xs text-white/38">Forge Workspace</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={handleReset} className="text-xs">
-                  <FilePlus2 className="size-3.5" />
-                  New Forge Session
-                  <DropdownMenuShortcut>Reset</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={handleApplyProposal} disabled={busy} className="text-xs">
-                  <CheckCircle2 className="size-3.5" />
-                  Apply Proposal
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={handleCopySandboxSummary} className="text-xs">
-                  <Clipboard className="size-3.5" />
-                  Copy Sandbox Summary
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/[0.08]" />
-                <DropdownMenuItem disabled className="text-xs">
-                  Export Files
-                  <DropdownMenuShortcut>Soon</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled className="text-xs">
-                  Save to Project
-                  <DropdownMenuShortcut>Future</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger className="rounded px-2 py-1 text-xs text-white/42 outline-none transition-colors hover:bg-white/[0.06] hover:text-white/82 data-[state=open]:bg-white/[0.08] data-[state=open]:text-white/82">
-                Edit
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 border-white/[0.08] bg-[#0b0b0d] text-white/76">
-                <DropdownMenuLabel className="text-xs text-white/38">Proposal Tools</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={handleCopySelectedFile} disabled={!selectedFile} className="text-xs">
-                  <Copy className="size-3.5" />
-                  Copy Selected File
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={handleCopySandboxSummary} className="text-xs">
-                  <Clipboard className="size-3.5" />
-                  Copy Judge Summary
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/[0.08]" />
-                <DropdownMenuItem disabled className="text-xs">
-                  Format Proposal
-                  <DropdownMenuShortcut>Soon</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled className="text-xs">
-                  Clear Terminal
-                  <DropdownMenuShortcut>Future</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger className="rounded px-2 py-1 text-xs text-white/42 outline-none transition-colors hover:bg-white/[0.06] hover:text-white/82 data-[state=open]:bg-white/[0.08] data-[state=open]:text-white/82">
-                Run
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 border-white/[0.08] bg-[#0b0b0d] text-white/76">
-                <DropdownMenuLabel className="text-xs text-white/38">Execution</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={() => void runPrivatePayDemo()} disabled={busy} className="text-xs">
-                  <Play className="size-3.5" />
-                  Run PrivatePay Demo
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void replayLastBuild()} disabled={!canReplay} className="text-xs">
-                  <Sparkles className="size-3.5" />
-                  Replay Last Build
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={stop} disabled={!busy} className="text-xs">
-                  <Square className="size-3.5" />
-                  Stop Stream
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/[0.08]" />
-                <DropdownMenuItem onSelect={handleApplyProposal} disabled={busy} className="text-xs">
-                  <ShieldCheck className="size-3.5" />
-                  Verify Sandbox
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="order-last flex w-full basis-full items-center justify-center gap-1.5 sm:order-none sm:w-auto sm:basis-auto sm:justify-end">
-          <button
-            type="button"
-            onClick={() => void runPrivatePayDemo()}
-            disabled={busy}
-            className="flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-[#14F195]/20 bg-[#14F195]/10 px-2 py-1.5 text-[10px] font-medium text-[#14F195] transition-colors hover:bg-[#14F195]/15 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-initial sm:px-2.5 sm:text-[11px]"
-          >
-            <Play className="size-3 shrink-0" />
-            <span className="truncate">PrivatePay demo</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => void replayLastBuild()}
-            disabled={!canReplay}
-            className="flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-[#9945FF]/25 bg-[#9945FF]/10 px-2 py-1.5 text-[10px] font-medium text-[#C084FC] transition-colors hover:bg-[#9945FF]/15 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-initial sm:px-2.5 sm:text-[11px]"
-          >
-            <Sparkles className="size-3 shrink-0" />
-            <span className="truncate">Replay build</span>
-          </button>
-        </div>
-
-        <div className="hidden h-6 max-w-[28vw] items-center gap-2 rounded-md border border-white/[0.09] bg-black/25 px-2 text-[10px] text-white/38 md:flex lg:max-w-[34rem]">
-          <Search className="size-3 shrink-0" />
-          <span className="truncate">CONGCHAIN-project / Forge workspace - {RUN_STATUS_LABELS[runStatus]}</span>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <button
-            type="button"
-            onClick={() => setAgentsOpen(true)}
-            className="flex min-h-8 items-center gap-1.5 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-[10px] text-white/48 transition-colors hover:border-[#9945FF]/30 hover:text-white/82 sm:text-[11px]"
-          >
-            <Bot className="size-3.5 shrink-0" />
-            <span className="hidden sm:inline">Agents</span>
-          </button>
-          <div className="hidden items-center gap-1.5 text-[10px] text-white/32 sm:flex sm:text-[11px]">
+          <span className="text-xs font-semibold tracking-tight text-white/72">Forge</span>
+          <div className="hidden items-center gap-1.5 text-[10px] text-white/32 sm:flex">
             <NeuralOrb active={phase !== 'idle'} className="scale-75" />
-            <span className="max-w-[8rem] truncate lg:max-w-none">{RUN_STATUS_LABELS[runStatus]}</span>
+            <span className="max-w-[7rem] truncate">{RUN_STATUS_LABELS[runStatus]}</span>
           </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="grid size-7 place-items-center rounded-md border border-white/[0.07] bg-white/[0.03] text-white/45 transition-colors hover:text-white/85 data-[state=open]:bg-white/[0.08]"
+              aria-label="Mais opções"
+            >
+              <Ellipsis className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60 border-white/[0.08] bg-[#0b0b0d] text-white/76">
+              <DropdownMenuLabel className="text-xs text-white/38">Forge</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={handleReset} className="text-xs">
+                <RotateCcw className="size-3.5" />
+                Nova sessão
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void runPrivatePayDemo()} disabled={busy} className="text-xs">
+                <Play className="size-3.5" />
+                Demo PrivatePay
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void replayLastBuild()} disabled={!canReplay} className="text-xs">
+                <Sparkles className="size-3.5" />
+                Repetir último build
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-white/[0.08]" />
+              <DropdownMenuItem onSelect={handleApplyProposal} disabled={busy} className="text-xs">
+                <CheckCircle2 className="size-3.5" />
+                Aplicar proposta
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void handleApplyAll()} disabled={busy || applyingAll} className="text-xs">
+                <Zap className="size-3.5" />
+                Aplicar tudo
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void handleApplyAllAndSave()} disabled={busy || applyingAll || !buildMemoryReady} className="text-xs">
+                <Database className="size-3.5" />
+                Aplicar e salvar memória
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void saveBuildMemory()} disabled={!buildMemoryReady || buildMemorySaved} className="text-xs">
+                <Database className="size-3.5" />
+                Salvar memória do build
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleCopySandboxSummary} className="text-xs">
+                <Clipboard className="size-3.5" />
+                Copiar resumo do sandbox
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-white/[0.08]" />
+              <DropdownMenuItem onSelect={openTemplates} className="text-xs">
+                <Blocks className="size-3.5" />
+                Templates Solana
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={openSettings} className="text-xs">
+                <Settings className="size-3.5" />
+                Config (BYOK)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setAgentsOpen(true)} className="text-xs">
+                <Bot className="size-3.5" />
+                Agentes
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-white/[0.08]" />
+              <DropdownMenuItem onSelect={() => { window.location.href = '/pricing'; }} className="text-xs">
+                <Database className="size-3.5" />
+                Preços (BRL)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             type="button"
             onClick={handleReset}
-            className="flex min-h-8 items-center gap-1.5 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1 text-[10px] text-white/42 transition-colors hover:border-[#9945FF]/30 hover:text-white/80 sm:text-[11px]"
+            className="grid size-7 place-items-center rounded-md border border-white/[0.07] bg-white/[0.03] text-white/45 transition-colors hover:text-white/85"
+            aria-label="Nova sessão"
           >
-            <RotateCcw className="size-3.5 shrink-0" />
-            <span className="hidden sm:inline">Reset</span>
+            <RotateCcw className="size-3.5" />
           </button>
         </div>
       </header>
 
+
       <section className="relative z-10 hidden min-h-0 flex-1 overflow-hidden lg:block">
         <ResizablePanelGroup direction="horizontal" className="h-full min-h-0 overflow-hidden">
-          <ResizablePanel defaultSize={21} minSize={16} maxSize={30}>
+          <ResizablePanel defaultSize={16} minSize={12} maxSize={28}>
             <ForgeFileExplorer
               files={files}
               selectedFile={selectedFilePath}
               buildSteps={buildSteps}
-              sandboxSessions={sandboxSessions}
               busy={busy}
               onSelectFile={openFile}
             />
@@ -482,6 +766,8 @@ function ForgeWorkspaceInner() {
                   onPrivatePayDemo={runPrivatePayDemo}
                   onReplayLast={replayLastBuild}
                   onApplyProposal={handleApplyProposal}
+                  onApplyAll={() => void handleApplyAll()}
+                  onApplyAllAndSave={() => void handleApplyAllAndSave()}
                   canReplay={canReplay}
                   busy={busy}
                   latestSandboxSession={latestSandboxSession}
@@ -489,7 +775,6 @@ function ForgeWorkspaceInner() {
                   // FORGE_UPGRADE: Diff proposals can be accepted only from the explicit review button.
                   onDiffAccepted={updateFileContents}
                   onDiffRejected={() => setDiffProposal(null)}
-                  onRunSafeCommand={runSafeCommand}
                   onInlineDiff={setDiffProposal}
                   nexusPlan={nexusPlan}
                 />
@@ -504,7 +789,21 @@ function ForgeWorkspaceInner() {
                   // FORGE_UPGRADE: Terminal composer can attach @file context from the explorer graph.
                   files={files}
                   onRunPrompt={runPrompt}
-                  onStop={stop}
+                  // FORGE_AGENTIC: plan→propose→verify loop from the same composer.
+                  onRunAgentic={(prompt, opts) => runAgentic(prompt, {
+                    ...opts,
+                    localMode,
+                    providerKeys: {
+                      deepseek: byokConfig.deepseekKey || undefined,
+                      ollamaBaseUrl: byokConfig.ollamaBaseUrl || undefined,
+                      ollamaModel: byokConfig.ollamaModel || undefined,
+                    },
+                  })}
+                  agenticMode={agenticMode}
+                  onAgenticModeChange={setAgenticMode}
+                  localMode={localMode}
+                  onLocalModeChange={setLocalMode}
+                  onStop={agenticMode ? stopAgentic : stop}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -532,6 +831,8 @@ function ForgeWorkspaceInner() {
             onPrivatePayDemo={runPrivatePayDemo}
             onReplayLast={replayLastBuild}
             onApplyProposal={handleApplyProposal}
+            onApplyAll={() => void handleApplyAll()}
+            onApplyAllAndSave={() => void handleApplyAllAndSave()}
             canReplay={canReplay}
             busy={busy}
             latestSandboxSession={latestSandboxSession}
@@ -539,7 +840,6 @@ function ForgeWorkspaceInner() {
             // FORGE_UPGRADE: Diff proposals can be accepted only from the explicit review button.
             onDiffAccepted={updateFileContents}
             onDiffRejected={() => setDiffProposal(null)}
-            onRunSafeCommand={runSafeCommand}
             onInlineDiff={setDiffProposal}
             nexusPlan={nexusPlan}
           />
@@ -558,7 +858,21 @@ function ForgeWorkspaceInner() {
             // FORGE_UPGRADE: Terminal composer can attach @file context from the explorer graph.
             files={files}
             onRunPrompt={runPrompt}
-            onStop={stop}
+            // FORGE_AGENTIC: plan→propose→verify loop from the same composer.
+            onRunAgentic={(prompt, opts) => runAgentic(prompt, {
+              ...opts,
+              localMode,
+              providerKeys: {
+                deepseek: byokConfig.deepseekKey || undefined,
+                ollamaBaseUrl: byokConfig.ollamaBaseUrl || undefined,
+                ollamaModel: byokConfig.ollamaModel || undefined,
+              },
+            })}
+            agenticMode={agenticMode}
+            onAgenticModeChange={setAgenticMode}
+            localMode={localMode}
+            onLocalModeChange={setLocalMode}
+            onStop={agenticMode ? stopAgentic : stop}
           />
         </motion.div>
         <motion.div
@@ -571,7 +885,6 @@ function ForgeWorkspaceInner() {
             files={files}
             selectedFile={selectedFilePath}
             buildSteps={buildSteps}
-            sandboxSessions={sandboxSessions}
             busy={busy}
             onSelectFile={openFile}
           />
@@ -690,6 +1003,122 @@ function ForgeWorkspaceInner() {
                 );
               })}
               {pickerResults.length === 0 ? <p className="px-4 py-6 text-center text-xs text-white/28">Nenhum arquivo encontrado.</p> : null}
+            </div>
+          </div>
+        </div>
+      )}
+      {settingsOpen && (
+        <div
+          className="absolute inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[14vh]"
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/[0.09] bg-[#08080a] p-4 shadow-2xl shadow-black"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center gap-2 border-b border-white/[0.07] pb-2">
+              <Settings className="size-4 text-[#C084FC]" />
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">BYOK — traga sua própria chave</span>
+            </div>
+            <p className="mb-3 text-[11px] leading-5 text-white/38">
+              Chaves ficam <span className="text-white/60">apenas neste navegador</span> (localStorage) e são enviadas
+              por requisição para a sua sessão — nunca são salvas no servidor. DeepSeek é o modelo barato para refactors
+              simples; Ollama roda 100% local.
+            </p>
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">Chave DeepSeek (opcional)</label>
+            <input
+              type="password"
+              value={byokDraft.deepseekKey}
+              onChange={event => setByokDraft(current => ({ ...current, deepseekKey: event.target.value }))}
+              placeholder="sk-..."
+              className="mb-3 w-full rounded-lg border border-white/[0.08] bg-black/25 px-3 py-2 font-mono text-[12px] text-white/75 outline-none placeholder:text-white/20 focus:border-[#C084FC]/40"
+            />
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">Ollama base URL</label>
+            <input
+              type="text"
+              value={byokDraft.ollamaBaseUrl}
+              onChange={event => setByokDraft(current => ({ ...current, ollamaBaseUrl: event.target.value }))}
+              placeholder="http://127.0.0.1:11434"
+              className="mb-3 w-full rounded-lg border border-white/[0.08] bg-black/25 px-3 py-2 font-mono text-[12px] text-white/75 outline-none placeholder:text-white/20 focus:border-[#00D4FF]/40"
+            />
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">Ollama model</label>
+            <input
+              type="text"
+              value={byokDraft.ollamaModel}
+              onChange={event => setByokDraft(current => ({ ...current, ollamaModel: event.target.value }))}
+              placeholder="qwen2.5-coder:7b"
+              className="mb-4 w-full rounded-lg border border-white/[0.08] bg-black/25 px-3 py-2 font-mono text-[12px] text-white/75 outline-none placeholder:text-white/20 focus:border-[#00D4FF]/40"
+            />
+            <div className="flex items-center justify-end gap-2">
+              {byokConfig.deepseekKey ? (
+                <button
+                  type="button"
+                  onClick={handleClearByok}
+                  className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/15"
+                >
+                  Remover chave
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[11px] font-semibold text-white/55 transition-colors hover:text-white/80"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveSettings}
+                className="rounded-lg border border-[#14F195]/25 bg-[#14F195]/10 px-3 py-2 text-[11px] font-semibold text-[#14F195] transition-colors hover:bg-[#14F195]/15"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {templatesOpen && (
+        <div
+          className="absolute inset-0 z-40 flex items-start justify-center bg-black/50 px-4 pt-[14vh]"
+          onClick={() => setTemplatesOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-white/[0.09] bg-[#08080a] p-3 shadow-2xl shadow-black"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center gap-2 border-b border-white/[0.07] px-1 pb-2">
+              <Blocks className="size-4 text-[#00D4FF]" />
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Templates Solana-native</span>
+              <span className="ml-auto text-[10px] text-white/25">propostas — aplique explicitamente</span>
+            </div>
+            <div className="max-h-[46vh] space-y-2 overflow-y-auto">
+              {templateList.map(template => (
+                <button
+                  key={template.id}
+                  type="button"
+                  disabled={loadingTemplate === template.id}
+                  onClick={() => void loadTemplate(template.id)}
+                  className="flex w-full items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-3 text-left transition-colors hover:border-[#14F195]/30 hover:bg-[#14F195]/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-[#14F195]/20 bg-[#14F195]/10 text-[#14F195]">
+                    <Blocks className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-white/82">{template.name}</span>
+                    <span className="mt-0.5 block text-[11px] leading-5 text-white/40">{template.description}</span>
+                    <span className="mt-1.5 flex flex-wrap gap-1">
+                      {template.tags.map(tag => (
+                        <span key={tag} className="rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[9px] uppercase tracking-wide text-[#00D4FF]/80">
+                          {tag}
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                </button>
+              ))}
+              {!templateList.length ? (
+                <p className="px-2 py-6 text-center text-xs text-white/30">Carregando templates…</p>
+              ) : null}
             </div>
           </div>
         </div>

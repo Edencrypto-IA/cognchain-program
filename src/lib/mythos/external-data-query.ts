@@ -28,6 +28,7 @@ type JsonRecord = Record<string, unknown>;
 
 const DATA_TIMEOUT_MS = 12_000;
 const ANTHROPIC_MESSAGES_API = 'https://api.anthropic.com/v1/messages';
+const DEEPSEEK_CHAT_API = 'https://api.deepseek.com/chat/completions';
 
 function asRecord(value: unknown): JsonRecord {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
@@ -477,9 +478,35 @@ function politicalRadarMode(query: string) {
   return 'radar_publico';
 }
 
+// Shared safety prompt for the political radar (used by DeepSeek and the
+// Anthropic fallback so the behavioural contract stays identical).
+function politicalRadarSystemPrompt(query: string): string {
+  return [
+    'Voce e o Radar Politico BR dentro do Mythos.',
+    'Use web search puro para analisar apenas informacoes publicas e verificaveis.',
+    'Responda em portugues brasileiro, com tom claro e util.',
+    'Nao acuse crime, corrupcao ou irregularidade sem fonte oficial e linguagem cautelosa.',
+    'Quando falar de risco, use termos como "ponto de atencao", "precisa verificar" e "sinal publico", nunca condenacao.',
+    'Dados de web search podem ter defasagem de horas ou dias. Avise isso no limite.',
+    'Matriz obrigatoria de fontes a tentar, conforme aplicavel:',
+    ...politicalRadarSourceMatrix(politicalRadarMode(query)),
+    'Formato obrigatorio sem markdown pesado, sem tabela e sem emoji:',
+    'Resumo: uma leitura curta.',
+    'Identidade publica: cargo, partido, localidade, periodo ou entidade analisada quando encontrado.',
+    'Historico eleitoral: candidatura, resultado, bens declarados, contas ou fonte TSE/TRE quando aplicavel.',
+    'Patrimonio e declaracoes: bens declarados, evolucao aparente ou "nao encontrado nesta busca".',
+    'Contratos e licitacoes: CEIS/CNEP/Portal da Transparencia/portal local; diga se nao encontrou ligacao direta.',
+    'Contas publicas e obras: TCE/TCU/SICONFI/Tesouro/IBGE; destaque apenas sinais publicos.',
+    'Noticias recentes: fatos recentes, investigacoes ou controversias com linguagem cautelosa.',
+    'Riscos e limites: o que ainda precisa checar e onde pode haver defasagem.',
+    'Fontes a verificar: liste 5 a 8 fontes especificas ou tipos de fonte.',
+    'Proximo passo: uma acao segura de pesquisa.',
+  ].join('\n');
+}
+
 async function anthropicPoliticalRadar(query: string) {
   const apiKey = getEnv(['ANTHROPIC_API_KEY']);
-  if (!apiKey) throw new Error('Configure ANTHROPIC_API_KEY no Railway para usar o Radar Politico com busca web.');
+  if (!apiKey) throw new Error('Configure ANTHROPIC_API_KEY no Railway para usar o fallback do Radar Politico com busca web.');
 
   const response = await fetch(ANTHROPIC_MESSAGES_API, {
     method: 'POST',
@@ -497,27 +524,7 @@ async function anthropicPoliticalRadar(query: string) {
           name: 'web_search',
         },
       ],
-      system: [
-        'Voce e o Radar Politico BR dentro do Mythos.',
-        'Use web search puro para analisar apenas informacoes publicas e verificaveis.',
-        'Responda em portugues brasileiro, com tom claro e util.',
-        'Nao acuse crime, corrupcao ou irregularidade sem fonte oficial e linguagem cautelosa.',
-        'Quando falar de risco, use termos como "ponto de atencao", "precisa verificar" e "sinal publico", nunca condenacao.',
-        'Dados de web search podem ter defasagem de horas ou dias. Avise isso no limite.',
-        'Matriz obrigatoria de fontes a tentar, conforme aplicavel:',
-        ...politicalRadarSourceMatrix(politicalRadarMode(query)),
-        'Formato obrigatorio sem markdown pesado, sem tabela e sem emoji:',
-        'Resumo: uma leitura curta.',
-        'Identidade publica: cargo, partido, localidade, periodo ou entidade analisada quando encontrado.',
-        'Historico eleitoral: candidatura, resultado, bens declarados, contas ou fonte TSE/TRE quando aplicavel.',
-        'Patrimonio e declaracoes: bens declarados, evolucao aparente ou "nao encontrado nesta busca".',
-        'Contratos e licitacoes: CEIS/CNEP/Portal da Transparencia/portal local; diga se nao encontrou ligacao direta.',
-        'Contas publicas e obras: TCE/TCU/SICONFI/Tesouro/IBGE; destaque apenas sinais publicos.',
-        'Noticias recentes: fatos recentes, investigacoes ou controversias com linguagem cautelosa.',
-        'Riscos e limites: o que ainda precisa checar e onde pode haver defasagem.',
-        'Fontes a verificar: liste 5 a 8 fontes especificas ou tipos de fonte.',
-        'Proximo passo: uma acao segura de pesquisa.',
-      ].join('\n'),
+      system: politicalRadarSystemPrompt(query),
       messages: [
         {
           role: 'user',
@@ -541,6 +548,48 @@ async function anthropicPoliticalRadar(query: string) {
   return cleanPoliticalRadarText(text);
 }
 
+// DeepSeek is the default web-navigation model for the political radar: the
+// `search_enable` flag gives it native web search at a fraction of Claude's cost.
+async function deepseekPoliticalRadar(query: string) {
+  const apiKey = getEnv(['DEEPSEEK_API_KEY']);
+  if (!apiKey) throw new Error('Configure DEEPSEEK_API_KEY no Railway para usar o Radar Politico com busca web DeepSeek.');
+
+  const response = await fetch(DEEPSEEK_CHAT_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: process.env.MYTHOS_RADAR_POLITICO_DEEPSEEK_MODEL?.trim() || process.env.DEEPSEEK_MODEL?.trim() || 'deepseek-chat',
+      max_tokens: 1200,
+      temperature: 0.2,
+      search_enable: true,
+      messages: [
+        {
+          role: 'system',
+          content: politicalRadarSystemPrompt(query),
+        },
+        {
+          role: 'user',
+          content: `Analise este tema politico brasileiro com fontes publicas: ${query}`,
+        },
+      ],
+    }),
+    cache: 'no-store',
+  });
+
+  const data = await response.json().catch(() => ({})) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+  const text = data.choices?.[0]?.message?.content?.trim() || '';
+  if (!response.ok || !text) {
+    throw new Error(data.error?.message || `Radar Politico DeepSeek web search failed with HTTP ${response.status}.`);
+  }
+  return cleanPoliticalRadarText(text);
+}
+
 async function radarPoliticoReport(query: string): Promise<MythosExternalDataReport> {
   const target = query.trim().replace(/^politico\s+/i, '').replace(/^pol[ií]tico\s+/i, '').trim();
   if (!target) {
@@ -548,7 +597,25 @@ async function radarPoliticoReport(query: string): Promise<MythosExternalDataRep
   }
 
   const mode = politicalRadarMode(target);
-  const analysis = await anthropicPoliticalRadar(target);
+
+  // Default: DeepSeek web search (cheap). Fallback: Anthropic web_search.
+  let analysis: string;
+  let sourceLabel = 'DeepSeek web search com fontes publicas';
+  let sourceString = 'Radar Politico BR model + DeepSeek web search + fontes publicas brasileiras';
+  try {
+    analysis = await deepseekPoliticalRadar(target);
+  } catch (deepseekError) {
+    try {
+      analysis = await anthropicPoliticalRadar(target);
+      sourceLabel = 'Anthropic web_search (fallback: DeepSeek indisponivel)';
+      sourceString = 'Radar Politico BR model + Anthropic web_search (fallback) + fontes publicas brasileiras';
+    } catch (anthropicError) {
+      const ds = deepseekError instanceof Error ? deepseekError.message : 'falhou';
+      const an = anthropicError instanceof Error ? anthropicError.message : 'falhou';
+      throw new Error(`Radar Politico indisponivel. DeepSeek: ${ds}. Anthropic fallback: ${an}`);
+    }
+  }
+
   const firstLine = analysis.split('\n').map(line => line.trim()).find(Boolean) || `Radar publico para ${target}.`;
 
   return {
@@ -559,11 +626,11 @@ async function radarPoliticoReport(query: string): Promise<MythosExternalDataRep
     facts: [
       { label: 'Consulta', value: target },
       { label: 'Modo', value: mode },
-      { label: 'Fonte principal', value: 'Anthropic web_search com fontes publicas' },
+      { label: 'Fonte principal', value: sourceLabel },
       { label: 'Resumo curto', value: firstLine.replace(/^Resumo:\s*/i, '') },
       { label: 'Padrao de seguranca', value: 'Nao acusa irregularidade sem fonte oficial, documento e contexto.' },
     ],
-    source: 'Radar Politico BR model + Anthropic web_search + fontes publicas brasileiras',
+    source: sourceString,
     generatedAt: new Date().toISOString(),
     safety: 'Analise politica somente leitura. Pode conter informacoes publicas recentes, mas exige verificacao em fonte oficial antes de conclusao, publicacao ou decisao.',
     nextStep: 'Aprofunde com TSE, Portal da Transparencia, TCU/CGU, camara/senado, prefeitura/governo estadual ou imprensa reconhecida.',

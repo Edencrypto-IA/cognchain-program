@@ -58,6 +58,7 @@ interface ForgeState {
   hydrateFileContents: (path: string, contents: string) => void;
   setDiffProposal: (proposal: ForgeDiffProposal | null) => void;
   setFiles: (files: ForgeFile[]) => void;
+  markFilesApplied: (paths: string[]) => void;
   setCommandRun: (run: ForgeCommandRun | null) => void;
   setNexusPlan: (plan: ForgeNexusPlan | null) => void;
   upsertMemory: (node: ForgeMemoryNode) => void;
@@ -151,6 +152,10 @@ export const useForgeStore = create<ForgeState>()(
       // FORGE_UPGRADE: keep CodeMirror saves reflected in the local Forge file graph.
       updateFileContents: (path, contents) => set(state => ({
         files: state.files.map(file => file.path === path ? { ...file, contents, status: 'modified' } : file),
+      })),
+      // FORGE_AGENTIC: mark proposal files as applied on disk (Apply All).
+      markFilesApplied: paths => set(state => ({
+        files: state.files.map(file => paths.includes(file.path) ? { ...file, status: 'applied' } : file),
       })),
       // FORGE_UPGRADE: opening real repository files should not mark them modified.
       hydrateFileContents: (path, contents) => set(state => ({

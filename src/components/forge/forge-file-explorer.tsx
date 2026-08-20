@@ -1,8 +1,8 @@
 'use client';
 
 import { memo, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, FileCode2, Folder, Loader2, ShieldCheck } from 'lucide-react';
-import type { ForgeBuildStep, ForgeFile, ForgeSandboxSession } from '@/lib/forge/types';
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, FileCode2, Folder, Loader2 } from 'lucide-react';
+import type { ForgeBuildStep, ForgeFile } from '@/lib/forge/types';
 import { cn } from '@/lib/utils';
 
 const EXPLORER_COLLAPSE_KEY = 'forge:explorer:collapsed:v1';
@@ -30,14 +30,12 @@ function ForgeFileExplorerComponent({
   files,
   selectedFile,
   buildSteps,
-  sandboxSessions,
   busy,
   onSelectFile,
 }: {
   files: ForgeFile[];
   selectedFile: string;
   buildSteps: ForgeBuildStep[];
-  sandboxSessions: ForgeSandboxSession[];
   busy: boolean;
   onSelectFile: (path: string) => void;
 }) {
@@ -81,6 +79,9 @@ function ForgeFileExplorerComponent({
     });
   };
 
+  // Show progress only while a run actually has something to show.
+  const hasActiveTasks = buildSteps.some(step => step.status !== 'pending');
+
   return (
     <aside className="flex h-full min-h-0 flex-col border-r border-white/[0.07] bg-[#0a0a0c]/82">
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/[0.07] px-3">
@@ -89,7 +90,6 @@ function ForgeFileExplorerComponent({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-        <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">CONGCHAIN-FORGE</p>
         <div className="space-y-1">
           {sections.map(section => {
             const isCollapsed = collapsed[section.id] ?? false;
@@ -132,38 +132,25 @@ function ForgeFileExplorerComponent({
           })}
         </div>
 
-        {sandboxSessions.length > 0 && (
+        {hasActiveTasks && (
           <>
-            <p className="mt-5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">Sandbox Sessions</p>
-            <div className="space-y-1">
-              {sandboxSessions.slice(0, 4).map(session => (
-                <div key={session.id} className="rounded-lg border border-white/[0.06] bg-white/[0.025] px-2 py-2">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="size-3.5 shrink-0 text-[#C084FC]/75" />
-                    <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-white/55">{session.title}</p>
+            <p className="mt-4 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">Progresso</p>
+            <div className="space-y-0.5">
+              {buildSteps.map(step => {
+                const Icon = step.status === 'complete' ? CheckCircle2 : step.status === 'running' ? Loader2 : Circle;
+                return (
+                  <div key={step.id} className="rounded-lg px-2 py-1.5 text-[11px] text-white/42">
+                    <div className="flex items-center gap-2">
+                      <Icon className={cn('size-3.5 shrink-0', step.status === 'complete' && 'text-[#14F195]', step.status === 'running' && 'animate-spin text-[#38BDF8]', step.status === 'pending' && 'text-white/18')} />
+                      <span className="min-w-0 flex-1 truncate">{step.label}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 pl-5 text-[10px] leading-4 text-white/26">{step.result || step.detail}</p>
                   </div>
-                  <p className="mt-1 truncate pl-5 font-mono text-[10px] text-[#14F195]/60">{session.hash}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
-
-        <p className="mt-5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/24">Tasks</p>
-        <div className="space-y-0.5">
-          {buildSteps.map(step => {
-            const Icon = step.status === 'complete' ? CheckCircle2 : step.status === 'running' ? Loader2 : Circle;
-            return (
-              <div key={step.id} className="rounded-lg px-2 py-1.5 text-[11px] text-white/42">
-                <div className="flex items-center gap-2">
-                  <Icon className={cn('size-3.5 shrink-0', step.status === 'complete' && 'text-[#14F195]', step.status === 'running' && 'animate-spin text-[#38BDF8]', step.status === 'pending' && 'text-white/18')} />
-                  <span className="min-w-0 flex-1 truncate">{step.label}</span>
-                </div>
-                <p className="mt-1 line-clamp-2 pl-5 text-[10px] leading-4 text-white/26">{step.result || step.detail}</p>
-              </div>
-            );
-          })}
-        </div>
       </div>
     </aside>
   );

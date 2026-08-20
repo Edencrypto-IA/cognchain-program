@@ -81,7 +81,7 @@ export interface ForgeTerminalLine {
 export interface ForgeFile {
   path: string;
   language: string;
-  status: 'created' | 'modified' | 'queued';
+  status: 'created' | 'modified' | 'queued' | 'applied';
   contents: string;
   real?: boolean;
   size?: number;

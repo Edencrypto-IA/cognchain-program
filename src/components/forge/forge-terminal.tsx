@@ -2,10 +2,10 @@
 
 import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUp, Bot, Boxes, Braces, FileCode2, Layers3, Loader2, Square, Terminal, X } from 'lucide-react';
+import { ArrowUp, Cpu, FileCode2, Loader2, Square, Terminal, X, Zap } from 'lucide-react';
 import type { ForgeFile, ForgePhase, ForgeRunStatus, ForgeTerminalLine } from '@/lib/forge/types';
 import { RUN_STATUS_LABELS } from '@/lib/forge/forge-ui';
-import { suggestedPrompts } from '@/lib/forge/demo-data';
+import { extractFileMentions } from '@/lib/forge/context';
 
 const lineColors = {
   system: 'text-[#C084FC]',
@@ -16,16 +16,7 @@ const lineColors = {
   error: 'text-red-300',
 };
 
-type ForgeComposerMode = 'App' | 'Component' | 'API' | 'Agent';
-
-const COMPOSER_MODES: Array<{ mode: ForgeComposerMode; icon: typeof Layers3; placeholder: string }> = [
-  { mode: 'App', icon: Layers3, placeholder: 'Describe the full app you want Forge to build...' },
-  { mode: 'Component', icon: Boxes, placeholder: 'Describe the component, state, props, and behavior...' },
-  { mode: 'API', icon: Braces, placeholder: 'Describe the endpoint, data contract, and validation...' },
-  { mode: 'Agent', icon: Bot, placeholder: 'Describe the agent workflow, tools, and success criteria...' },
-];
-
-const SUGGESTED_PREVIEW = suggestedPrompts.slice(0, 2);
+const COMPOSER_PLACEHOLDER = 'Descreva o que você quer construir… (use @ para anexar arquivos)';
 
 const TerminalLineList = memo(function TerminalLineList({ lines }: { lines: ForgeTerminalLine[] }) {
   return (
@@ -84,7 +75,7 @@ const StreamPanel = memo(function StreamPanel({ text, pulsing }: { text: string;
     >
       <div className="mb-2 flex items-center gap-2 sm:mb-3">
         <Terminal className="size-4 shrink-0 text-[#C084FC]" />
-        <p className="text-sm font-semibold text-white/80">Forge response stream</p>
+        <p className="text-sm font-semibold text-white/80">Resposta</p>
         {pulsing && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#14F195]" />}
       </div>
       <p className="max-h-[min(40vh,22rem)] overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-white/65">
@@ -102,6 +93,11 @@ function ForgeTerminalComponent({
   streamedResponse,
   files,
   onRunPrompt,
+  onRunAgentic,
+  agenticMode = false,
+  onAgenticModeChange,
+  localMode = false,
+  onLocalModeChange,
   onStop,
 }: {
   phase: ForgePhase;
@@ -110,10 +106,14 @@ function ForgeTerminalComponent({
   streamedResponse: string;
   files: ForgeFile[];
   onRunPrompt: (prompt: string) => void;
+  onRunAgentic?: (prompt: string, opts?: { contextFiles?: string[]; localMode?: boolean }) => void;
+  agenticMode?: boolean;
+  onAgenticModeChange?: (mode: boolean) => void;
+  localMode?: boolean;
+  onLocalModeChange?: (mode: boolean) => void;
   onStop: () => void;
 }) {
   const [prompt, setPrompt] = useState('');
-  const [mode, setMode] = useState<ForgeComposerMode>('App');
   const [fileOptions, setFileOptions] = useState<Array<{ path: string; name: string }>>([]);
   const [fileDropdownOpen, setFileDropdownOpen] = useState(false);
   const [selectedContextFiles, setSelectedContextFiles] = useState<string[]>([]);
@@ -126,8 +126,6 @@ function ForgeTerminalComponent({
   const running = ['thinking', 'planning', 'building', 'deploying'].includes(phase);
   const connecting = runStatus === 'connecting';
   const streaming = runStatus === 'streaming';
-  const activeMode = COMPOSER_MODES.find(item => item.mode === mode) ?? COMPOSER_MODES[0];
-  const ActiveModeIcon = activeMode.icon;
 
   const scheduleScroll = useCallback(() => {
     if (scrollRafRef.current != null) cancelAnimationFrame(scrollRafRef.current);
@@ -240,15 +238,20 @@ function ForgeTerminalComponent({
     }
 
     if (!blocks.length) return basePrompt;
-    // FORGE_UPGRADE: file context is prepended client-side without changing the main chat endpoint.
     return `Contexto de arquivos selecionados:\n${blocks.join('\n\n')}\n\nPedido do usuario:\n${basePrompt}`;
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!prompt.trim() || running || connecting) return;
-    const enrichedPrompt = await buildPromptWithFileContext(prompt);
-    onRunPrompt(`[${mode}] ${enrichedPrompt}`);
+    if (agenticMode && onRunAgentic) {
+      // FORGE_AGENTIC: pass @file paths; the server reads them and injects the
+      // context block (retry passes keep it). No client-side content inlining.
+      onRunAgentic(prompt, { contextFiles: extractFileMentions(prompt) });
+    } else {
+      const enrichedPrompt = await buildPromptWithFileContext(prompt);
+      onRunPrompt(enrichedPrompt);
+    }
     setPrompt('');
     setSelectedContextFiles([]);
     setFileDropdownOpen(false);
@@ -262,12 +265,7 @@ function ForgeTerminalComponent({
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col border-t border-white/[0.07] bg-[#0b0b0d]/95">
       <header className="flex h-9 shrink-0 items-center justify-between border-b border-white/[0.07] px-2 sm:px-3">
-        <div className="flex min-w-0 items-center gap-3 text-[12px] font-medium">
-          {['Problems', 'Output', 'Debug'].map(item => (
-            <span key={item} className="hidden text-white/32 sm:inline">
-              {item}
-            </span>
-          ))}
+        <div className="flex min-w-0 items-center gap-2 text-[12px] font-medium">
           <span className="rounded-md bg-white/[0.07] px-2 py-1 text-white/80">Terminal</span>
         </div>
         <div className="flex min-w-0 items-center gap-2 text-[11px] text-white/35">
@@ -288,41 +286,47 @@ function ForgeTerminalComponent({
 
       <div className="shrink-0 border-t border-white/[0.07] p-2 sm:p-3">
         <form ref={formRef} onSubmit={event => { void submit(event); }} className="relative rounded-2xl border border-white/[0.09] bg-[#101013]/95 p-2 shadow-2xl shadow-black/25">
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex w-full rounded-xl border border-white/[0.07] bg-black/25 p-1 sm:w-auto">
-              {COMPOSER_MODES.map(({ mode: itemMode, icon: Icon }) => (
+          {(onRunAgentic || onLocalModeChange) && (
+            <div className="mb-2 flex items-center gap-1.5">
+              {onRunAgentic ? (
                 <button
-                  key={itemMode}
                   type="button"
-                  onClick={() => setMode(itemMode)}
+                  onClick={() => onAgenticModeChange?.(!agenticMode)}
                   disabled={running || connecting}
-                  className={`flex min-h-8 flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors sm:gap-1.5 sm:px-2.5 sm:text-[11px] ${
-                    mode === itemMode
-                      ? 'bg-white/[0.08] text-white/85'
-                      : 'text-white/34 hover:bg-white/[0.045] hover:text-white/65'
+                  title={agenticMode
+                    ? 'Modo agêntico ativo: a IA planeja, propõe arquivos e verifica com lint/build'
+                    : 'Ativar modo agêntico: a IA planeja, propõe arquivos e verifica com lint/build'}
+                  className={`flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-medium transition-colors ${
+                    agenticMode
+                      ? 'bg-[#14F195]/15 text-[#14F195]'
+                      : 'text-white/38 hover:bg-white/[0.05] hover:text-white/68'
                   } disabled:cursor-not-allowed disabled:opacity-40`}
                 >
-                  <Icon className="size-3.5 shrink-0" />
-                  {itemMode}
+                  <Zap className="size-3.5 shrink-0" />
+                  Agentic
                 </button>
-              ))}
+              ) : null}
+              {onLocalModeChange ? (
+                <button
+                  type="button"
+                  onClick={() => onLocalModeChange(!localMode)}
+                  disabled={running || connecting}
+                  title={localMode
+                    ? 'Modo local ativo: Ollama na sua máquina — zero custo de API, dados não saem do computador'
+                    : 'Ativar modo local: usar Ollama na sua máquina (privado, sem custo de API)'}
+                  className={`flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-medium transition-colors ${
+                    localMode
+                      ? 'bg-[#00D4FF]/15 text-[#5EEAD4]'
+                      : 'text-white/38 hover:bg-white/[0.05] hover:text-white/68'
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  <Cpu className="size-3.5 shrink-0" />
+                  Local
+                </button>
+              ) : null}
+              <span className="ml-auto hidden text-[10px] text-white/22 sm:inline">@ para anexar arquivos · Ctrl K para comandos</span>
             </div>
-
-            {!running && !connecting && (
-              <div className="hidden min-w-0 flex-1 justify-end gap-1.5 overflow-hidden md:flex">
-                {SUGGESTED_PREVIEW.map(item => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setPrompt(item)}
-                    className="truncate rounded-lg border border-white/[0.06] bg-white/[0.025] px-2.5 py-1.5 text-[11px] text-white/32 transition-colors hover:border-[#9945FF]/30 hover:text-white/68"
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           {selectedContextFiles.length || contextWarning ? (
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -343,9 +347,6 @@ function ForgeTerminalComponent({
           ) : null}
 
           <div className="flex items-end gap-2">
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-white/[0.035] text-white/42">
-              <ActiveModeIcon className="size-4" />
-            </div>
             <textarea
               ref={textareaRef}
               value={prompt}
@@ -354,7 +355,7 @@ function ForgeTerminalComponent({
                 if (event.key === 'Escape') setFileDropdownOpen(false);
               }}
               rows={1}
-              placeholder={activeMode.placeholder}
+              placeholder={COMPOSER_PLACEHOLDER}
               className="min-h-[2.75rem] flex-1 resize-y bg-transparent px-1 py-2 text-sm leading-5 text-white/82 outline-none placeholder:text-white/24 sm:min-h-9"
               disabled={running || connecting}
             />

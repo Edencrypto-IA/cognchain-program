@@ -34,6 +34,8 @@ import type { MythosSolanaEcosystemReport, MythosSolanaReportMode } from '@/lib/
 import type { MythosExternalConnectorReadiness } from '@/lib/mythos/external-data-connectors';
 import type { MythosExternalDataReport } from '@/lib/mythos/external-data-query';
 import { parseMythosExternalDataCommand } from '@/lib/mythos/external-data-query';
+import type { MythosResearchReport } from '@/lib/mythos/research-adapter';
+import { parseMythosResearchCommand } from '@/lib/mythos/research-adapter';
 import { routeMythosTrigger } from '@/lib/mythos/trigger-engine';
 import {
   MYTHOS_AGENT_PROFILE,
@@ -675,6 +677,10 @@ const TERMINAL_COMMANDS = [
   {
     command: '/procurar ou /monitorar <produto> ate <valor>',
     detail: 'Find product opportunities, compare price intelligence, rank seller/shipping risk, and prepare a safe future price alert plan.',
+  },
+  {
+    command: '/research, /github, /youtube, /reddit ou /twitter <tema ou URL>',
+    detail: 'Run read-only public research across web, GitHub, YouTube, Reddit, and guarded Twitter/X mode. No login, cookies, posting, or shell scraping.',
   },
   {
     command: '/apis ou /fontes',
@@ -2074,6 +2080,37 @@ function formatProductFinderText(report: MythosProductFinderReport) {
   ].join('\n'));
 }
 
+function formatMythosResearchText(report: MythosResearchReport) {
+  const statusLabel = report.status === 'ok'
+    ? 'fontes publicas lidas com sucesso'
+    : report.status === 'blocked'
+      ? 'bloqueado pelo modo seguro'
+      : 'resultado parcial';
+  const items = report.items.slice(0, 4);
+
+  return cleanTerminalText([
+    terminalSection('Pesquisa Mythos', [
+      `Tema: ${report.query || 'consulta publica'}`,
+      `Plataforma: ${report.platform}`,
+      `Status: ${statusLabel}`,
+      `Gerado em: ${new Date(report.generatedAt).toLocaleString('pt-BR')}`,
+    ]),
+    terminalSection('Resumo', report.summary),
+    terminalSection('Fontes lidas', items.length
+      ? items.map((item, index) => `${index + 1}. ${item.title}\n${item.url}\nStatus: ${item.status}. Hash: ${shortHash(item.contentHash, 16)}\n${item.excerpt ? item.excerpt.slice(0, 520) : item.error || 'Sem trecho disponivel.'}`)
+      : ['Nenhuma fonte publica estavel foi lida.']
+    ),
+    terminalSection('Auditoria', [
+      `Adapter: ${report.audit.adapter}`,
+      `Agent-Reach instalado no servidor: ${report.audit.usedAgentReachPackage ? 'sim' : 'nao'}`,
+      report.audit.reason,
+    ]),
+    terminalSection('Limite seguro', [
+      report.safety.note,
+      'Nenhum login, cookie, postagem, comentario, follow, like, shell scraper, compra, assinatura ou movimentacao de fundos foi executado.',
+    ]),
+  ].join('\n\n'));
+}
 function findLatestProductFinder(messages: MythosLabMessage[]) {
   return [...messages].reverse().find(message => message.productFinder)?.productFinder || null;
 }
@@ -5500,6 +5537,50 @@ export default function MythosLabConsole() {
       return;
     }
 
+    const researchRequest = parseMythosResearchCommand(command);
+    if (researchRequest) {
+      const response = await fetch('/api/mythos/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ query: researchRequest.query, platform: researchRequest.platform }),
+      });
+      const data = await response.json();
+      if (!response.ok || !isRecord(data) || data.ok !== true || !isRecord(data.report)) {
+        const error = isRecord(data) ? asString(data.error, 'Nao consegui executar essa pesquisa agora.') : 'Nao consegui executar essa pesquisa agora.';
+        appendTerminalResponse([
+          'Nao consegui concluir a pesquisa publica agora.',
+          '',
+          `Motivo: ${error}`,
+          '',
+          'Nenhum login, cookie, postagem, shell scraper ou acao financeira foi executado.',
+        ].join('\n'));
+        return;
+      }
+
+      const report = data.report as unknown as MythosResearchReport;
+      appendTerminalResponse(formatMythosResearchText(report), {
+        trace: {
+          perception: `User requested public research on ${report.platform}: ${report.query}.`,
+          memoryContext: 'Only public read-only pages were requested server-side. No login, cookie, browser session, or private account was used.',
+          selectedSkill: 'Mythos Research Adapter',
+          reasoningPath: 'Mythos routed the request through the native TypeScript research adapter, reused safe URL reading where possible, and returned source hashes plus platform limits.',
+          prediction: 'User can inspect the source links, ask for a deeper synthesis, or save the answer as CongChain memory.',
+          decision: 'Return a source-backed research readout with explicit safety boundaries.',
+          confidence: report.status === 'ok' ? 82 : report.status === 'partial' ? 58 : 44,
+          safetyBoundary: 'Read-only public research. No login, cookies, posting, comments, shell scraping, wallet signature, transaction, purchase, or fund movement.',
+          nextHumanStep: 'Open the sources manually or ask Mythos for a focused summary with the visible evidence.',
+        },
+        observability: {
+          model: activeSession.model,
+          modelLabel: `Mythos Research Adapter - ${report.platform}`,
+          latencyMs: Date.now() - started,
+          mode: activeSession.mode,
+          traceSchema: 'mythos-research-adapter/v1',
+        },
+      });
+      return;
+    }
     const externalDataRequest = parseMythosExternalDataCommand(command);
     if (externalDataRequest) {
       const response = await fetch(`/api/mythos/data/query?command=${encodeURIComponent(command)}`, {

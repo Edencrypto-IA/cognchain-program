@@ -306,6 +306,26 @@ Forge is designed to become the place where users ask AI agents to build apps, A
 
 ---
 
+## Forge status — Agentic Loop + Community
+
+The Forge agentic loop is live: **plan → propose → verify → fix → done**, with:
+
+| Capability | What it means |
+|---|---|
+| Agentic Run | `POST /api/forge/agent/run` — Nexus plan, model proposals (files + diffs), `npm run lint` verification, auto-fix iterations |
+| Apply All | One click applies every proposal through the safe `/file/save` + `/file/apply` endpoints |
+| Repo context | Auto-indexed repository (193+ files) — the loop injects the most relevant files for your prompt (PT/EN synonyms supported) |
+| Cost router | Simple tasks → Qwen (free) / DeepSeek (pro); complex tasks → NVIDIA / Claude |
+| Local mode | Ollama support (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`) — private, zero API cost, data stays on the machine |
+| BYOK | Bring your own DeepSeek key / Ollama server — stored only in the browser, never on the server |
+| Templates | Solana-native scaffolds: Anchor counter, pump.fun launch config, SPL token mint, dApp shell |
+| Build memory | One click saves the build summary as a verifiable CognChain memory (hash-addressable) |
+| Pricing | [`/pricing`](https://cognchain-program-production.up.railway.app/pricing) — Free R$0 / Pro R$29/mês / Enterprise sob consulta, em reais (BRL) |
+
+Community focus: hackathons Solana, builders BR/LatAm, and a public roadmap. Follow [@PenguPudgyPump](https://x.com/PenguPudgyPump) for weekly builds in public.
+
+---
+
 <div align="center">
 
 **Language / Idioma / 语言**
