@@ -140,6 +140,64 @@ function callDeepSeek(messages: DeepSeekMessage[], tools: boolean): Promise<{ me
 }
 
 /**
+ * Ollama local backend — function calling via /api/chat (stream: false).
+ * Zero cost, 100% offline; used when MYTHOS_AGENT_MODEL=ollama (or
+ * OLLAMA_AGENT_ENABLED=true / options.model === 'ollama').
+ */
+async function callOllama(messages: DeepSeekMessage[], withTools: boolean): Promise<{ message: DeepSeekMessage; finish: string | null } | null> {
+  const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
+  const model = process.env.OLLAMA_AGENT_MODEL || process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+
+  try {
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        ...(withTools ? { tools: buildMythosToolSchemas() } : {}),
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!response.ok) {
+      console.warn('[MythosAgent] Ollama HTTP', response.status);
+      return null;
+    }
+    const data = await response.json() as { message?: DeepSeekMessage; done?: boolean; error?: string };
+    if (data.error) {
+      console.warn('[MythosAgent] Ollama error', data.error);
+      return null;
+    }
+    if (!data.message) return null;
+    return { message: data.message, finish: null };
+  } catch (error) {
+    console.warn('[MythosAgent] Ollama call failed', error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+function wantsLocalAgent(options: MythosAgenticOptions): boolean {
+  return options.model === 'ollama' ||
+    process.env.MYTHOS_AGENT_MODEL === 'ollama' ||
+    process.env.OLLAMA_AGENT_ENABLED === 'true';
+}
+
+/** Pick the agent backend: Ollama local when requested, DeepSeek otherwise (with graceful fallback). */
+async function callAgentModel(
+  messages: DeepSeekMessage[],
+  withTools: boolean,
+  options: MythosAgenticOptions,
+): Promise<{ message: DeepSeekMessage; finish: string | null } | null> {
+  if (wantsLocalAgent(options)) {
+    const local = await callOllama(messages, withTools);
+    if (local) return local;
+    console.warn('[MythosAgent] Ollama indisponível — tentando DeepSeek como fallback.');
+  }
+  return callDeepSeek(messages, withTools);
+}
+
+/**
  * Run the Mythos agentic loop. Prefers DeepSeek function calling; falls back
  * to the deterministic plan when the remote call is unavailable.
  */
@@ -213,9 +271,13 @@ export async function runMythosAgenticLoop(
   };
 
   emit({ type: 'plan', plan });
-  emit({ type: 'status', text: `Plano: intenção ${plan.intent} — ${plan.steps.length} passo(s).` });
+  const agentBackend = wantsLocalAgent(options) ? 'ollama' : 'deepseek';
+  emit({
+    type: 'status',
+    text: `Plano: intenção ${plan.intent} — ${plan.steps.length} passo(s). Backend: ${agentBackend}${agentBackend === 'ollama' ? ' (local, 100% offline)' : ''}.`,
+  });
 
-  // ---- Mode 1: DeepSeek function calling ----
+  // ---- Mode 1: function calling (DeepSeek ou Ollama local) ----
   const memoryBlock = buildMemoryContextBlock(retrieved);
   const systemPrompt = [
     'Voce e o Mythos, agente de IA do CongChain, executando uma tarefa com ferramentas seguras.',
@@ -232,7 +294,7 @@ export async function runMythosAgenticLoop(
   let usedFunctionCalling = false;
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     budget.inputChars += JSON.stringify(history).length;
-    const remote = await callDeepSeek(history, true);
+    const remote = await callAgentModel(history, true, options);
     if (!remote) break; // fall back to deterministic below
 
     usedFunctionCalling = true;
