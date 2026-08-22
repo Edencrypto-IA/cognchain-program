@@ -37,6 +37,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
+  // PERF: tree-shake heavy icon/animation packages and split them per-import.
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'framer-motion'],
+  },
   // NOTE: cabeçalhos CORS foram REMOVIDOS daqui. O CORS de /api/* é
   // controlado exclusivamente por src/middleware.ts (lógica
   // ALLOWED_ORIGINS). Duplicar Access-Control-Allow-Origin: * aqui

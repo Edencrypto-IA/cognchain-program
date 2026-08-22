@@ -15,8 +15,6 @@ import Orb, { type OrbMode } from './orb';
 import { MODEL_LABELS, type AIModel } from '@/services/memory/memory.model';
 import type { StructuredResponse } from '@/lib/grounding/types';
 import {
-  WalletAgentPreviewCard,
-  WalletAgentReviewPanel,
   confirmWalletAgentIntent,
   confirmWalletAgentDevnetTransaction,
   createWalletAgentHistoryEntry,
@@ -41,6 +39,9 @@ import dynamic from 'next/dynamic';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 const ResponseRouter = dynamic(() => import('@/components/responses/ResponseRouter'), { ssr: false });
 const ReactMarkdown = dynamic(() => import('react-markdown'), { ssr: false });
+// PERF: heavy wallet-agent UI renders only when a wallet intent is active.
+const WalletAgentPreviewCard = dynamic(() => import('@/features/wallet-agent/components/wallet-agent-preview-card').then(module => module.WalletAgentPreviewCard), { ssr: false });
+const WalletAgentReviewPanel = dynamic(() => import('@/features/wallet-agent/components/wallet-agent-review-panel').then(module => module.WalletAgentReviewPanel), { ssr: false });
 const WalletAdapterButton = dynamic(() => import('./wallet-button'), { ssr: false });
 const SocialIdentityChip = dynamic(() => import('./social-identity-chip'), { ssr: false });
 type ChatPhase = 'idle' | 'connecting' | 'thinking' | 'streaming' | 'completed' | 'error';
