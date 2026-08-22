@@ -29,7 +29,7 @@ export async function retrieveMythosMemories(query: string, limit = MYTHOS_MEMOR
     const memories = await listMemories(MYTHOS_MEMORY_POOL, 0);
     const refs = memories
       .filter(memory => typeof memory.content === 'string' && memory.content.trim().length > 0)
-      .map(memory => ({ hash: memory.hash, content: memory.content }));
+      .map(memory => ({ hash: memory.hash, content: memory.content, createdAt: memory.timestamp }));
     return scoreMemoriesForQuery(query, refs).slice(0, limit);
   } catch {
     // DB unavailable (e.g. local dev without Postgres) — the loop must not break.

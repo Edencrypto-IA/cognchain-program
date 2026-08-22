@@ -284,7 +284,9 @@ export async function runMythosAgenticLoop(
     'Use as ferramentas para coletar informacoes reais antes de responder.',
     'web_search, web_read, data_query e solana_wallet sao somente leitura e executam automaticamente.',
     'memory_save e html_draft tem efeito: chamam, mas a acao so acontece apos aprovacao humana (proposta).',
-    'Ao terminar, responda em portugues brasileiro com um resumo claro e cite o que usou.',
+    'ATUALIDADE: para precos, cotacoes, noticias, clima, eventos, dados de mercado, blockchain ou qualquer pergunta sobre "hoje/agora/atual/ultimo", chame web_search ANTES de responder. Nunca responda dados mutaveis sem buscar.',
+    'Memorias de tarefas anteriores sao contexto HISTORICO e podem estar desatualizadas: use-as para aprender o estilo e evitar repeticoes, mas revalide fatos mutaveis com web_search.',
+    'Ao terminar, responda em portugues brasileiro com um resumo claro, cite o que usou e, se nao conseguiu buscar dados atuais, avise explicitamente.',
     'Seguranca: nunca assine, envie, compre, venda ou mova fundos. Nao invente fontes nem dados.',
     memoryBlock ? memoryBlock : '',
   ].filter(Boolean).join(' ');

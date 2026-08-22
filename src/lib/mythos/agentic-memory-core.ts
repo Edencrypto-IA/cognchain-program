@@ -9,6 +9,8 @@ import { tokenize } from '../forge/repomap';
 export interface MythosMemoryRef {
   hash: string;
   content: string;
+  /** Unix timestamp (seconds) da memória — para sinalizar frescor. */
+  createdAt?: number;
 }
 
 export interface ScoredMemory extends MythosMemoryRef {
@@ -18,6 +20,22 @@ export interface ScoredMemory extends MythosMemoryRef {
 export const MYTHOS_MEMORY_RETRIEVAL_LIMIT = 4;
 export const MYTHOS_MEMORY_POOL = 100;
 export const MYTHOS_MEMORY_CONTENT_MAX = 600;
+/** Memórias mais velhas que isto são tratadas como histórico (revalidar com web_search). */
+export const MYTHOS_MEMORY_STALE_SECONDS = 7 * 24 * 60 * 60;
+
+/** Formata a data da memória: "2026-08-20" ou "há 2d" / "ontem". */
+export function formatMemoryDate(createdAt: number | undefined, now = Date.now()): string {
+  if (!createdAt || createdAt <= 0) return 'data desconhecida';
+  const diffMs = now - createdAt * 1000;
+  if (diffMs < 60 * 60 * 1000) return 'há <1h';
+  const hours = Math.floor(diffMs / (60 * 60 * 1000));
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (days === 1) return 'ontem';
+  if (days < 30) return `há ${days}d`;
+  const date = new Date(createdAt * 1000);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
 
 /** Pure scoring: how relevant is each memory to the query? */
 export function scoreMemoriesForQuery(query: string, memories: MythosMemoryRef[]): ScoredMemory[] {
@@ -40,14 +58,19 @@ export function scoreMemoriesForQuery(query: string, memories: MythosMemoryRef[]
     .slice(0, MYTHOS_MEMORY_RETRIEVAL_LIMIT);
 }
 
-/** Format retrieved memories for injection into the agent system prompt. */
-export function buildMemoryContextBlock(memories: ScoredMemory[]): string {
+/**
+ * Format retrieved memories for injection into the agent system prompt.
+ * Includes age + a freshness warning so the model revalidates mutable facts.
+ */
+export function buildMemoryContextBlock(memories: MythosMemoryRef[]): string {
   if (!memories.length) return '';
   const lines = memories.map(memory => {
     const content = memory.content.slice(0, MYTHOS_MEMORY_CONTENT_MAX).replace(/\s+/g, ' ').trim();
-    return `- [${memory.hash.slice(0, 12)}] ${content}`;
+    const date = formatMemoryDate(memory.createdAt);
+    const stale = memory.createdAt && Date.now() - memory.createdAt * 1000 > MYTHOS_MEMORY_STALE_SECONDS ? ' (ANTIGA)' : '';
+    return `- [${memory.hash.slice(0, 12)} · ${date}${stale}] ${content}`;
   });
-  return `Memorias verificadas de tarefas anteriores relevantes:\n${lines.join('\n')}`;
+  return `Memorias verificadas de tarefas anteriores (contexto HISTORICO — podem estar desatualizadas; revalide fatos mutaveis com web_search):\n${lines.join('\n')}`;
 }
 
 export interface TaskMemoryInput {
