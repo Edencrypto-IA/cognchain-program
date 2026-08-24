@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { callModel } from '@/services/ai/ai.router';
 import { saveMemory } from '@/services/memory/memory.service';
 import { incrementInteraction } from '@/services/agents/agent.service';
+import { runMythosForChannel } from '@/lib/mythos/agent-channel';
+import { sendTelegramMessage } from '@/lib/mythos/notify';
 
 /**
  * Telegram Webhook Handler
  * Receives messages from Telegram bot API and routes to CONGCHAIN agent.
  * 
  * Setup: POST https://api.telegram.org/bot<TOKEN>/setWebhook?url=<YOUR_URL>/api/webhook/telegram?agentId=<AGENT_ID>
+ * 
+ * Mythos mode: use ?mode=mythos — runs the autonomous Mythos agent (agentic
+ * loop with tools) and replies with the summary. Chat authorization via
+ * TELEGRAM_ALLOWED_CHAT_IDS (comma-separated); empty = allow all.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +32,19 @@ export async function POST(request: NextRequest) {
     // Get agentId from query param
     const { searchParams } = new URL(request.url);
     const agentId = searchParams.get('agentId');
+
+    // ── MYTHOS AUTONOMOUS MODE ──────────────────────────────────────────
+    if (searchParams.get('mode') === 'mythos' || (!agentId && process.env.TELEGRAM_BOT_TOKEN)) {
+      const allowed = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || '')
+        .split(',').map(value => value.trim()).filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes(String(chatId))) {
+        return NextResponse.json({ ok: true }); // Chat não autorizado — ignora
+      }
+
+      const result = await runMythosForChannel(text);
+      await sendTelegramMessage(chatId, result.text);
+      return NextResponse.json({ ok: true, mode: 'mythos', response: result.text.slice(0, 200) });
+    }
 
     if (!agentId) {
       return NextResponse.json({ error: 'agentId is required' }, { status: 400 });

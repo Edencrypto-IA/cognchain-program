@@ -31,6 +31,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   '/api/mythos/skill-router': { windowMs: 60_000, maxRequests: 30 },
   '/api/mythos/agent/run': { windowMs: 60_000, maxRequests: 10 },
   '/api/mythos/agent/approve': { windowMs: 60_000, maxRequests: 20 },
+  '/api/mythos/tasks': { windowMs: 60_000, maxRequests: 30 },
   '/api/mythos/test-chat': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/analyze-transaction': { windowMs: 60_000, maxRequests: 12 },
   '/api/mythos/solana/analyze-wallet': { windowMs: 60_000, maxRequests: 12 },
